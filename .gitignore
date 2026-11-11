@@ -1,7 +1,44 @@
+# Entornos y secretos
+.env
+.env.*
+!.env.example
+
+# Datos de la clínica: nunca se versionan
+datos/
+*.xlsx
+*.xls
+*.xlsm
+!backend/tests/fixtures/*.xlsx
+
+# Python (backend)
 __pycache__/
 *.pyc
 .venv/
-.env
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node / web
 node_modules/
-.expo/
-*.sqlite
+dist/
+build/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# Editores / SO
+.DS_Store
+.vscode/
+.idea/
+
+# Utilidades locales
+*.bundle
+
+# Arneses y configuración local de asistentes (NO se publican, ADR-004)
+.claude/
+.cursor/
+AGENTS.md
+CLAUDE.md
+MEMORY.md

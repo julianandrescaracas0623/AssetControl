@@ -1,0 +1,17 @@
+#!/bin/sh
+# Elimina cualquier atribución de un asistente (Claude, Cursor, OpenCode, Copilot)
+# del mensaje de commit. El autor es el humano.
+msg="$1"
+tmp="$msg.tmp"
+pattern='co-authored-by:.*(claude|cursor|opencode|copilot|codex|anthropic|openai|noreply@anthropic\.com|cursoragent@cursor\.com|noreply@opencode\.ai)|generated with .*(claude|cursor|opencode|copilot)|made-with:.*(cursor|claude|opencode)|harness:.*(opencode|cursor|claude)|(claude|cursor|opencode)-session:'
+
+grep -viE "$pattern" "$msg" > "$tmp" || true
+
+if cmp -s "$msg" "$tmp"; then
+  rm -f "$tmp"
+else
+  mv "$tmp" "$msg"
+  echo "commit-msg: se eliminó la atribución de un asistente. El autor es el humano." >&2
+fi
+
+exit 0
