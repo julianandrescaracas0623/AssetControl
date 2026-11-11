@@ -1,0 +1,3 @@
+# Los hooks se ejecutan con sh: deben llegar con LF, también en Windows.
+scripts/*.sh text eol=lf
+scripts/hooks/* text eol=lf

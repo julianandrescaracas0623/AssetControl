@@ -1,0 +1,10 @@
+#!/bin/sh
+# Bloquea los archivos locales del arnés: no se publican en GitHub.
+blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^(\.claude/|\.cursor/|\.opencode/|AGENTS\.md$|CLAUDE\.md$|MEMORY\.md$|opencode\.jsonc$)')
+if [ -n "$blocked" ]; then
+  echo "pre-commit: estos archivos son locales y no deben publicarse:" >&2
+  echo "$blocked" | sed 's/^/  - /' >&2
+  echo "Quítalos del staging con: git restore --staged <archivo>" >&2
+  exit 1
+fi
+exit 0
