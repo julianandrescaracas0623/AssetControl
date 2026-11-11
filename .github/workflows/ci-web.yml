@@ -1,0 +1,61 @@
+name: CI web
+
+on:
+  pull_request:
+    paths:
+      - "web/**"
+      - ".github/workflows/ci-web.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+
+concurrency:
+  group: ci-web-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      # Mientras no exista el proyecto web, el job termina en verde sin hacer nada.
+      - name: Detectar proyecto web
+        id: detect
+        run: |
+          if [ -f package.json ]; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; echo "Aún no hay web/package.json; se omite."; fi
+
+      - uses: actions/setup-node@v4
+        if: steps.detect.outputs.exists == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instalar dependencias
+        if: steps.detect.outputs.exists == 'true'
+        run: npm ci
+
+      - name: Lint
+        if: steps.detect.outputs.exists == 'true'
+        run: npm run lint
+
+      - name: Tipos
+        if: steps.detect.outputs.exists == 'true'
+        run: npm run typecheck
+
+      - name: Pruebas
+        if: steps.detect.outputs.exists == 'true'
+        run: npm test -- --run
+
+      - name: Build
+        if: steps.detect.outputs.exists == 'true'
+        run: npm run build
