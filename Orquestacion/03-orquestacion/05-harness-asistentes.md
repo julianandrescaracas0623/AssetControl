@@ -119,7 +119,7 @@ Con el reviewer, el domain-guardian y el security-reviewer pasa algo parecido, p
 | `asset-domain` | Se toca conteo, precios, ubicaciones o totales | `backend/**/*.py`, `web/src/**`, `backend/migrations/**` |
 | `tenant-security` | Se toca SQL, auth, roles, subidas, exportación o logs | `backend/**/*.py`, `backend/migrations/**` |
 | `web-ui` | Se crean o modifican pantallas (Tailwind, shadcn/ui) | `web/**` |
-| `browser-qa` | Se verifica UI en navegador a 375 px | `web/**` |
+| `browser-qa` | Se verifica UI en navegador a 375 px y 1440 px | `web/**` |
 
 Las skills no se cargan todas: se cargan cuando hacen falta. Eso mantiene el contexto pequeño.
 
@@ -178,7 +178,7 @@ Servidores previstos, todos opcionales:
 
 | MCP | Para qué | Cuándo activarlo |
 |---|---|---|
-| Chrome DevTools | Verificar UI real, consola, red, móvil 375 px y cámara | Desde la fase 2 |
+| Chrome DevTools | Verificar UI real, consola, red, 375 px y 1440 px, y cámara | Desde la fase 2 |
 | Context7 | Documentación actualizada de Flask, React, Tailwind y shadcn/ui | Cuando haya dudas de API |
 
 **Regla:** ningún MCP se agrega "porque suena bien". Se agrega cuando una tarea concreta lo necesita. Los secretos van en variables de entorno, nunca en el repo.

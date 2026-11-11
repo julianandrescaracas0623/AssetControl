@@ -97,7 +97,7 @@ Para cambios que no cambian una decisión ni el esquema:
 - [ ] Reviewer aprueba.
 - [ ] Domain guardian sin violaciones (si aplica).
 - [ ] Security reviewer sin hallazgos bloqueantes (si aplica).
-- [ ] Evidencia de prueba (comando + salida o captura a 375 px).
+- [ ] Evidencia de prueba (comando + salida o capturas a 375 px y 1440 px).
 - [ ] Documentación y `MEMORY.md` actualizados.
 
 Merge solo con G5 completa y aprobación humana.
@@ -188,7 +188,7 @@ Una tarea se cierra solo si:
 |---|---|
 | Backend | `uv run pytest` con salida y cobertura del caso |
 | Aislamiento | Prueba que usa dos tenants y demuestra que el segundo no ve nada del primero |
-| Web | `npm test` + captura a 375 px |
+| Web | `npm test` + capturas a 375 px y 1440 px |
 | Migración | Alembic `upgrade` y `downgrade` aplicados |
 | Informe | Prueba que compara el total con la suma de las partes |
 | Documentación | Diff revisado y enlaces válidos |

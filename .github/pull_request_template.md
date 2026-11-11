@@ -8,7 +8,7 @@
 
 ## Cómo se verificó
 
-<!-- Comando + resultado, y captura a 375 px si toca la web -->
+<!-- Comando + resultado, y capturas a 375 px y 1440 px si toca la web -->
 
 ## Definición de terminado
 

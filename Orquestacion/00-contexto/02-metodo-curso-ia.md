@@ -40,7 +40,7 @@ scripts/hooks, scripts/*.sh   hooks de Git y chequeo de autoría (versionados)
 | Pruebas automáticas | `uv run pytest` (backend) y `vitest` / Playwright (web) |
 | Specs por slice vertical | Fundación, catálogo y alta, conteo, informe, piloto, importación opcional |
 | Revisión de código | Revisión general + dominio (informes y verificaciones) + seguridad (tenant y roles), separadas |
-| Demo visual | Verificación en navegador real a 375 px (skill `browser-qa`) |
+| Demo visual | Verificación en navegador real a 375 px y 1440 px (skill `browser-qa`) |
 | Agentes genéricos | Agentes con conocimiento del dominio de activos y conteos |
 
 ---

@@ -24,10 +24,10 @@ No se paraleliza lo que depende de lo anterior. La importación del Excel solo s
 | 0. Definición | — | Docs 01–06, ADR, constitución, orquestación | Enlaces válidos, ADR indexados |
 | 1. Fundación | `001-fundacion-tecnica` | Repo reproducible, API con `/health`, web base con Tailwind y shadcn/ui, CI y hooks | `uv run pytest`, `npm test`, CI verde |
 | 1. Acceso | `002` Acceso y usuarios | Login, invitación, roles `admin`/`contador`, aislamiento por tenant | Un contador recibe 403 en ruta de admin; prueba de aislamiento entre dos tenants |
-| 2. Catálogo y alta | `003` Ubicaciones y categorías | Sede > sala > box; lista cerrada de categorías | El contador ve el selector a 375 px |
+| 2. Catálogo y alta | `003` Ubicaciones y categorías | Sede > sala > box; lista cerrada de categorías | El contador ve el selector a 375 px y 1440 px |
 | 2. Catálogo y alta | `004` Activos: alta por escaneo | Escáner, alta con autocompletar y duplicar, entrada manual | Alta por escaneo < 30 s; `codigo` duplicado rechazado; reintento sin duplicar |
 | 2. Catálogo y alta | `005` Ciclo de vida e historial | Editar (`412`), mover, estado, baja lógica, línea de tiempo | Cada cambio deja evento |
-| 3. Conteo | `006` Sesiones y verificación | Abrir sesión, verificar idempotente, `409 sesion_cerrada` | Flujo de conteo a 375 px; reintento sin duplicar |
+| 3. Conteo | `006` Sesiones y verificación | Abrir sesión, verificar idempotente, `409 sesion_cerrada` | Flujo de conteo (móvil primero) a 375 px y 1440 px; reintento sin duplicar |
 | 3. Conteo | `007` Discrepancias | Lista de discrepancias y pendientes; aplicar | Aplicar deja `ubicacion_cambiada` |
 | 4. Informe | `008` Cierre e informe de sesión | Cierre con totales y desglose por categoría y ubicación congelados (R4, R9), valor en tiempo real separado | Total = suma de las partes y suma de filas por dimensión = tres cifras, cero diferencias |
 | 4. Informe | `009` Exportación PDF y Excel | Archivos con las cifras del informe | Igualdad con la pantalla |
