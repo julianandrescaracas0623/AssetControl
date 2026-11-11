@@ -1,0 +1,53 @@
+name: CI repositorio
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-repo-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  docs-y-datos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enlaces de la documentación
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --offline --no-progress --include-fragments "README.md" "docs/**/*.md" "Orquestacion/**/*.md" "specs/**/*.md"
+          fail: true
+
+      - name: Todos los ADR están en el índice
+        run: |
+          status=0
+          for f in docs/adr/ADR-*.md; do
+            name=$(basename "$f")
+            if ! grep -q "($name)" docs/adr/README.md; then
+              echo "::error file=docs/adr/README.md::Falta $name en el índice de ADR"
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: Sin datos de la clínica, secretos ni arnés local versionados
+        run: |
+          bad=$(git ls-files | grep -Ei '(^|/)(\.env(\..*)?|datos/.*)$|\.(xlsx|xls|xlsm)$|^(\.claude/|\.cursor/|AGENTS\.md$|CLAUDE\.md$|MEMORY\.md$)' | grep -v '^backend/tests/fixtures/' | grep -v '\.env\.example$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Archivos que no deben versionarse:"
+            echo "$bad"
+            exit 1
+          fi
+
+      - name: Sin atribución de asistentes en los commits del PR
+        if: github.event_name == 'pull_request'
+        run: sh scripts/check-attribution.sh "origin/${{ github.base_ref }}..HEAD"
