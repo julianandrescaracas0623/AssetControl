@@ -2,3 +2,5 @@
 *.sh text eol=lf
 scripts/*.sh text eol=lf
 scripts/hooks/* text eol=lf
+# Scripts de init de PostgreSQL: con CRLF el contenedor no arranca.
+docker/**/*.sh text eol=lf
