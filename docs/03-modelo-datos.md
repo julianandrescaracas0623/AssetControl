@@ -44,7 +44,14 @@ erDiagram
 | `tenant` | `id`, `nombre`, `creado_en` | Se crea por script/CLI, sin pantalla de alta. |
 | `usuario` | `id`, `email` (único), `nombre`, `password_hash`, `activo` | Global, no pertenece a un tenant. |
 | `membresia` | `id`, `tenant_id`, `usuario_id`, `rol` (`admin`\|`contador`), `activa` | Único `(tenant_id, usuario_id)`. El token de acceso lleva un solo tenant. |
-| `invitacion` | `id`, `tenant_id`, `rol`, `token_hash`, `expira_en`, `usada_en`, `creada_por` | Enlace de un solo uso. Se guarda el hash, nunca el token. |
+| `invitacion` | `id`, `tenant_id`, `email`, `rol`, `token_hash`, `expira_en`, `usada_en`, `creada_por` | Enlace de un solo uso. Se guarda `sha256(clave)` con `clave = sha256(token)`, nunca el token. El `email` lo fija quien invita; la aceptación lo toma de la invitación y el invitado no lo escribe. |
+| `refresh_token` | `id`, `tenant_id`, `membresia_id`, `familia_id`, `token_hash`, `expira_en`, `usado_en`, `revocado_en`, `creado_en` | Refresh con rotación. Se guarda solo `sha256(clave)` (ver formato abajo). `familia_id` agrupa la cadena de rotación. Único `token_hash`. FK compuesta `(tenant_id, membresia_id)` → `membresia`. El reuso fuera de la ventana de gracia (~10 s) revoca la familia. |
+
+- **`invitacion.email`.** Obligatorio y normalizado: `lower(btrim(email))`.
+- **Formato del hash.** `token_hash` es `bytea` de 32 bytes (`CHECK (octet_length(token_hash) = 32)`) en `invitacion` y `refresh_token`. La aplicación calcula `clave = sha256(token)` y la envía a la base en **hex minúsculo de 64 caracteres**; la función hace `sha256(decode(p_clave, 'hex'))` y compara con `token_hash`. Lo que se almacena es, por tanto, `sha256(clave)`, que no sirve como credencial.
+- **`invitacion.creada_por`.** `NULL` permitido; `NULL` significa "creada por el operador (script)". La FK `(tenant_id, creada_por)` → `membresia (tenant_id, usuario_id)` usa `MATCH SIMPLE`. Los endpoints de la aplicación solo insertan con `creada_por` no nulo.
+- **CHECKs y normalización.** `usuario.email` e `invitacion.email` con `CHECK (email = lower(btrim(email)))` e índice único sobre `usuario.email`; `membresia.rol` e `invitacion.rol` con `CHECK (rol IN ('admin','contador'))`.
+- **`usuario` y `tenant`.** No son legibles por el rol de aplicación fuera de la membresía del tenant fijado y no reciben `INSERT`/`UPDATE` de la aplicación; las altas se hacen por funciones del esquema `acceso` y por el script del operador.
 
 ### Catálogo
 
