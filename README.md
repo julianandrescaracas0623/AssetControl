@@ -105,6 +105,16 @@ docker compose exec db bash /docker-entrypoint-initdb.d/01-app-role.sh      # o:
 
 El script usa bashismos: ejecútalo siempre con `bash`, nunca con `sh`. Es idempotente.
 
+### Reparar un volumen existente (rol `auth_owner`, spec 002)
+
+Un volumen `pgdata` creado antes de la spec 002 no tiene el rol `auth_owner`, y uno manipulado puede tenerlo con `LOGIN`, contraseña, membresías o `CREATE`. No hace falta `down -v` (que borra los datos locales): con `db` en marcha, vuelve a ejecutar el script de init, que crea o reafirma `auth_owner`, revoca todas sus membresías y su `CREATE` en `public` y en las bases, y falla si queda alguna membresía:
+
+```sh
+docker compose exec db bash /docker-entrypoint-initdb.d/01-app-role.sh
+```
+
+Debe terminar con `01-app-role.sh: roles de la aplicación y auth_owner, y base assetcontrol_test listos.` y código de salida 0; los datos existentes se conservan. En Git Bash (Windows) antepón `MSYS_NO_PATHCONV=1`: sin eso, Git Bash convierte la ruta del contenedor en `C:/Program Files/Git/docker-entrypoint-initdb.d/...` y falla con `No such file or directory`. En PowerShell el comando funciona tal cual.
+
 ## CI (GitHub Actions)
 
 Los workflows de `.github/workflows/` corren en cada PR hacia `main`, `develop` y las ramas encadenadas `feat/**` y `docs/**`, y en cada push a `main` y `develop`:
