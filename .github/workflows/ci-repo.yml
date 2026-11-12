@@ -1,13 +1,15 @@
 name: CI repositorio
 
+# Corre en todo PR hacia develop, main y las ramas encadenadas (feat/**, docs/**).
 on:
   pull_request:
+    branches: [main, develop, "feat/**", "docs/**"]
   push:
-    branches: [main]
+    branches: [main, develop]
 
 concurrency:
   group: ci-repo-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -17,9 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Enlaces de la documentación
         uses: lycheeverse/lychee-action@v2
@@ -41,13 +44,36 @@ jobs:
 
       - name: Sin datos de la clínica, secretos ni arnés local versionados
         run: |
-          bad=$(git ls-files | grep -Ei '(^|/)(\.env(\..*)?|datos/.*)$|\.(xlsx|xls|xlsm)$|^(\.claude/|\.cursor/|AGENTS\.md$|CLAUDE\.md$|MEMORY\.md$)' | grep -v '^backend/tests/fixtures/' | grep -v '\.env\.example$' || true)
+          bad=$(git ls-files | grep -Ei '(^|/)(\.env(\..*)?|datos/.*)$|\.(xlsx|xls|xlsm|xlsb|ods|csv|sql)$|^(\.claude/|\.cursor/|AGENTS\.md$|CLAUDE\.md$|MEMORY\.md$)' | grep -v '\.env\.example$' || true)
           if [ -n "$bad" ]; then
             echo "::error::Archivos que no deben versionarse:"
             echo "$bad"
             exit 1
           fi
 
+      # Rango exacto del PR: commits de la rama que no están en la base (sin el merge sintético).
       - name: Sin atribución de asistentes en los commits del PR
         if: github.event_name == 'pull_request'
-        run: sh scripts/check-attribution.sh "origin/${{ github.base_ref }}..HEAD"
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: sh scripts/check-attribution.sh "${BASE_SHA}..${HEAD_SHA}"
+
+      # Deuda de T7: el contenedor api nunca recibe la URL del rol migrador.
+      # Valores efímeros solo para que "docker compose config" resuelva las variables obligatorias.
+      - name: El servicio api no recibe MIGRATION_DATABASE_URL
+        env:
+          POSTGRES_USER: ci-migrador
+          POSTGRES_PASSWORD: ci-migrador-clave
+          POSTGRES_DB: ci-base
+          APP_DB_USER: ci-app
+          APP_DB_PASSWORD: ci-app-clave
+          SECRET_KEY: ci-efimera
+          MIGRATION_DATABASE_URL: postgresql+psycopg://ci-migrador:ci-migrador-clave@db:5432/ci-base
+        run: |
+          docker compose config --format json api > compose-api.json
+          if jq -e '.services.api | tostring | contains("MIGRATION_DATABASE_URL") or contains("ci-migrador") or contains("ci-migrador-clave")' compose-api.json > /dev/null; then
+            echo "::error file=docker-compose.yml::El servicio api recibe la URL o el rol del migrador."
+            exit 1
+          fi
+          echo "El servicio api no recibe la URL ni el rol del migrador."
