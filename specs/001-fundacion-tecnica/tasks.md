@@ -134,7 +134,7 @@
 - **Implementada (2026-11-12), aprobada por reviewer:** `npm ci`, `npm run build` y `npm run typecheck` en verde; capturas a 375 y 1440 px de cargando, error (API caída), base caída (503) y éxito. CLI fijada en `shadcn@4.23.0` (preset `nova`, base `radix`).
   - Dependencias aprobadas por el humano con **versiones fijadas** (exactas, sin `^` ni `~`, iguales a `package-lock.json`):
     - `dependencies`: `react` 19.3.1, `react-dom` 19.3.1, `tailwindcss` 4.3.5, `@tailwindcss/vite` 4.3.5, `radix-ui` 1.8.1, `class-variance-authority` 0.7.1, `cn` 0.5.2, `tw-animate-css` 1.4.0, `lucide-react` 1.72.0 (añadido por la CLI, sin uso aún).
-    - `devDependencies`: `typescript` 7.0.2, `vite` 8.3.8, `@vitejs/plugin-react` 6.3.0, `@types/node` 24.19.2, `@types/react` 19.3.0, `@types/react-dom` 19.3.0, `shadcn` 4.23.0 (movido a dev: solo aporta `shadcn/tailwind.css` en build y la CLI; build y typecheck siguen en verde).
+    - `devDependencies`: `typescript` 7.0.2 (en T9 quedó en **6.0.3** por la decisión D; ver T9), `vite` 8.3.8, `@vitejs/plugin-react` 6.3.0, `@types/node` 24.19.2, `@types/react` 19.3.0, `@types/react-dom` 19.3.0, `shadcn` 4.23.0 (movido a dev: solo aporta `shadcn/tailwind.css` en build y la CLI; build y typecheck siguen en verde).
   - `cn` (usado en `src/lib/utils.ts`) procede del paquete que instala la CLI (repositorio shadcn-ui/cn); **humano a confirmar** el editor del paquete en npm.
   - TanStack Query se difiere a la primera pantalla con datos (decisión humana); `/health` usa `fetch` + `useEffect` en `src/lib/health.ts`.
   - La CLI añade la fuente Geist; se quitó hasta aprobar la fuente de la marca.
@@ -149,7 +149,20 @@
 - **Criterio:** `npm run lint`, `npm run typecheck` y `npm test` pasan; la prueba cubre los tres estados de la pantalla de salud.
 - **Verificación:** `cd web && npm run lint && npm run typecheck && npm test`
 - **Riesgo:** pruebas que dependen de la red real.
-- **Riesgo:** compatibilidad de ESLint (`typescript-eslint`) y Vitest con TypeScript 7.0.2 (fijado en T8); verificar los rangos de `peerDependencies` antes de instalar y, si no hay soporte, decidir con el humano en lugar de bajar TS por cuenta propia.
+- **Riesgo:** compatibilidad de ESLint (`typescript-eslint`) y Vitest con TypeScript 7.0.2 (fijado en T8; quedó en 6.0.3 por la decisión D); verificar los rangos de `peerDependencies` antes de instalar y, si no hay soporte, decidir con el humano en lugar de bajar TS por cuenta propia.
+- **Bloqueada (2026-11-12), pendiente de decisión humana:** `typescript-eslint` (8.72.2 `latest` y 8.72.3-alpha.8 `canary`) exige `typescript >=4.8.4 <6.1.0`. Además, el paquete `typescript` 7.0.2 (compilador nativo) solo exporta `version` y `versionMajorMinor`, sin la API de compilador (`createSourceFile`, `createProgram`) que usa el parser. No es solo el rango: no funciona. Vitest 5.1.0, jsdom, Testing Library y los plugins de React no dependen de TypeScript y son compatibles. No se instaló nada ni se bajó TS. Opciones:
+  - A: añadir `@typescript/typescript6` 6.0.2 (Microsoft, binario `tsc6`) para las herramientas, junto a TS 7 para `typecheck`/`build`, y resolver `typescript` hacia él solo para `typescript-eslint` (alias u `overrides` de npm; verificar que funcione).
+  - B: cambiar ESLint por un linter que no dependa de TS (`oxlint` 1.93.0, con reglas de react-hooks, o `@biomejs/biome` 2.6.7), con `eslint.config.js` sustituido por su configuración.
+  - C: ESLint sin TypeScript (solo `.js`) más el typecheck de TS 7 para `.ts`/`.tsx`. Cubre poco: descartable.
+  - D: bajar el proyecto a TS 6.0.3 (lo prohíbe la instrucción actual; requiere decisión humana).
+- **Decisión humana (2026-11-12): opción D.** `typescript` fijado en **6.0.3 exacto** para usar `typescript-eslint` estándar. No hizo falta cambiar `tsconfig` por TS 6; solo se añadió `vitest.config.ts` al `include` de `tsconfig.node.json`. Build y typecheck de T8 siguen en verde con TS 6.0.3.
+  - **Recordatorio:** volver a TypeScript 7 cuando `typescript-eslint` lo soporte (rango `peerDependencies` que incluya 7 y API de compilador disponible); revisar en cada actualización de `typescript-eslint`.
+  - `devDependencies` añadidas, versiones exactas: `eslint` 10.14.0, `@eslint/js` 10.0.1, `typescript-eslint` 8.72.2, `eslint-plugin-react-hooks` 7.1.1, `eslint-plugin-react-refresh` 0.5.7, `globals` 17.14.0, `vitest` 5.1.0, `jsdom` 31.0.0, `@testing-library/react` 16.3.3, `@testing-library/dom` 10.4.2.
+  - Scripts: `lint` (`eslint . --max-warnings 0`), `test` (`vitest run`); `typecheck` ya existía. `src/App.test.tsx` cubre cargando, éxito (200), base caída (503) y error de red con `fetch` simulado (sin red real).
+  - `npm audit`: 0 en producción; 15 (2 bajas, 13 moderadas) solo en dev, por `minimatch`/`deepmerge` transitivas de ESLint, `typescript-eslint` y `shadcn`. Revisar antes del piloto junto con la deuda de T8.
+- **Implementada (2026-11-12), aprobada por reviewer.** `npm ci`, `lint`, `typecheck`, `test` y `build` en verde.
+  - Ratificadas por el humano (2026-11-12): `eslint` 10.14.0, `@eslint/js` 10.0.1 y `globals` 17.14.0.
+  - Deuda aceptada por el humano: los 15 avisos de `npm audit` en `devDependencies` se revisan antes del piloto (pasa a T10).
 
 ---
 
@@ -162,6 +175,7 @@
 - **Riesgo:** CI que no corre por la configuración de ramas.
 - **Deuda heredada de T3 (2026-11-11):** el script de init usa bashismos: se ejecuta con `bash`, no con `sh`. En CI se crea el rol de la aplicación con ese mismo script antes de `pytest`, y `TEST_DATABASE_URL` nunca puede ser el superusuario del servicio de PostgreSQL.
 - **Deuda heredada de T4 (2026-11-11):** el comando de producción es `gunicorn` (workers `gthread` o suficientes), nunca `flask run`; el README documenta rate limit de `/health` en el proxy y acceso/retención acotados de logs. Detalle en `plan.md` §4 "Deuda de operación (heredada de T4)".
+- **Deuda heredada de T9 (2026-11-12):** fijar la versión de Node: CI con `actions/setup-node` en 24.x y `engines` en `web/package.json` o `.nvmrc` (jsdom 31 exige `^22.22.2 || ^24.15.0 || >=26`). Revisar `npm audit` (15 avisos solo en dev) antes del piloto.
 
 ---
 
