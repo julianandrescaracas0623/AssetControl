@@ -49,6 +49,18 @@ Dentro de los contenedores la API se conecta a la base por el host `db`, no `loc
 - **`APP_DB_USER` debe ser distinto de `POSTGRES_USER`.** `POSTGRES_USER` es el rol migrador (dueño del esquema, ejecuta Alembic); `APP_DB_USER` es el rol de la aplicación, sin `SUPERUSER` ni `BYPASSRLS`, y el script de init falla si son el mismo.
 - **El rol de la aplicación solo se crea con el volumen vacío.** El script `docker/postgres/init/01-app-role.sh` corre únicamente la primera vez que se inicializa el volumen `pgdata`. Si el volumen ya existía sin ese rol (o cambiaste `APP_DB_USER`), el servicio `db` no queda sano y la API no arranca. Recrea el volumen con `docker compose down -v` (borra los datos locales de la base) y vuelve a levantar; o ejecuta el mismo script a mano dentro del contenedor `db`.
 - Si una contraseña lleva caracteres especiales (`@ : / ? # %`), codifícala en las URL de `.env`.
+- **Usa contraseñas alfanuméricas en `.env` (solo desarrollo local).** Los comandos de migración y de pruebas cargan `.env` en el shell con `. ./.env`: caracteres como `& ; $ ( ) # \` o espacios lo rompen o se interpretan. Además, los valores quedan en los argumentos del proceso `docker compose` del host, visibles para otros usuarios de la máquina mientras corre.
+
+### Migraciones dentro de Docker
+
+El contenedor `api` solo recibe la URL del rol de la aplicación; la del rol migrador (`MIGRATION_DATABASE_URL`) no queda en su entorno. Para aplicar las migraciones, pásala solo a un contenedor efímero, desde la raíz del repositorio (bash/Git Bash) y sin escribir ni imprimir los valores:
+
+```sh
+set -a; . ./.env; set +a
+docker compose run --rm \
+  -e MIGRATION_DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}" \
+  api uv run alembic upgrade head
+```
 
 ### Pruebas dentro del contenedor `api`
 

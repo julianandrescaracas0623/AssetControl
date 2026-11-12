@@ -110,7 +110,17 @@
   - `.env.example` con `APP_DB_USER` (valor sugerido `assetcontrol_app` solo como comentario), `APP_DB_PASSWORD`, `MIGRATION_DATABASE_URL`, `TEST_DATABASE_URL` y `TEST_MIGRATION_DATABASE_URL`, sin valores.
   - README: `docker compose down -v` si el volumen no tiene el rol, y `APP_DB_USER` debe ser distinto de `POSTGRES_USER`.
 - **Implementada (2026-11-12), pendiente de revisión:** `docker compose up --build` deja `db` sano (healthcheck con `pg_isready` y rol de la aplicación sin `rolsuper` ni `rolbypassrls`) y `GET /health` responde `200` con `db: ok`; la API usa el host `db` y el rol de la aplicación; recarga verificada; 131 pruebas pasan dentro del contenedor `api`.
-  - Cambios del reviewer (2026-11-12): `.env.example` añadido; README con el comando de pruebas dentro del contenedor `api` (`TEST_DATABASE_URL` y `TEST_MIGRATION_DATABASE_URL` sobre `assetcontrol_test`). Pendiente de security-reviewer.
+  - Cambios del reviewer (2026-11-12): `.env.example` añadido; README con el comando de pruebas dentro del contenedor `api` (`TEST_DATABASE_URL` y `TEST_MIGRATION_DATABASE_URL` sobre `assetcontrol_test`).
+  - Security-reviewer (2026-11-12): aprobada con M1 y B1, corregidos con autorización humana.
+    - M1 resuelto: `MIGRATION_DATABASE_URL` sale del servicio `api`; el README documenta migrar con `docker compose run --rm -e MIGRATION_DATABASE_URL=... api uv run alembic upgrade head` (contenedor efímero).
+    - B1 resuelto: el README avisa que las contraseñas de `.env` deben ser alfanuméricas (el comando carga `.env` en el shell y los valores quedan en los argumentos del proceso del host; solo desarrollo local).
+- **Deuda de T7 (security-reviewer):**
+  - B2: el montaje `./backend:/app` es de lectura/escritura; valorar `:ro` (cuidar la caché de pytest/ruff).
+  - B3: validar longitud y debilidad de `SECRET_KEY` en la spec de auth.
+  - B4: `ENVIRONMENT` cae en `development` por defecto; el compose es solo para desarrollo, nunca para producción.
+  - B5: fijar las imágenes (`postgres:17`, base de Python) por digest.
+  - M2 de T6: antes del piloto, verificación al arrancar de `rolsuper`/`rolbypassrls` del `current_user` de `DATABASE_URL`; el *healthcheck* solo cubre `APP_DB_USER`.
+  - Prueba (CI/T10) que verifique que `docker compose config` del servicio `api` no contiene `MIGRATION_DATABASE_URL`.
 
 ---
 
