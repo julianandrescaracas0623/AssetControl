@@ -167,3 +167,5 @@ El método está en [Orquestacion/](Orquestacion/README.md). La configuración d
 ```sh
 sh scripts/setup-hooks.sh
 ```
+
+<!-- Prueba de CI de T10: línea temporal, no mergear. -->
