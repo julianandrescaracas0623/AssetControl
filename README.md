@@ -38,6 +38,18 @@ Fase: definición de arquitectura y alcance del MVP. Fundación técnica en curs
 
 La justificación está en [ADR-001](docs/adr/ADR-001-stack.md) y [ADR-002](docs/adr/ADR-002-solo-online-cliente-web.md).
 
+## Entorno local con Docker
+
+1. Copia `.env.example` a `.env` y completa los valores (`.env` está ignorado por git).
+2. `docker compose up --build` levanta PostgreSQL 17 (`db`, solo en `127.0.0.1:5432`) y la API con recarga (`api`, en `http://localhost:5000`).
+3. Comprueba la API con `curl http://localhost:5000/health` (`200`, `"db": "ok"`).
+
+Dentro de los contenedores la API se conecta a la base por el host `db`, no `localhost`, y con el rol de la aplicación (`APP_DB_USER`), nunca con el superusuario.
+
+- **`APP_DB_USER` debe ser distinto de `POSTGRES_USER`.** `POSTGRES_USER` es el rol migrador (dueño del esquema, ejecuta Alembic); `APP_DB_USER` es el rol de la aplicación, sin `SUPERUSER` ni `BYPASSRLS`, y el script de init falla si son el mismo.
+- **El rol de la aplicación solo se crea con el volumen vacío.** El script `docker/postgres/init/01-app-role.sh` corre únicamente la primera vez que se inicializa el volumen `pgdata`. Si el volumen ya existía sin ese rol (o cambiaste `APP_DB_USER`), el servicio `db` no queda sano y la API no arranca. Recrea el volumen con `docker compose down -v` (borra los datos locales de la base) y vuelve a levantar; o ejecuta el mismo script a mano dentro del contenedor `db`.
+- Si una contraseña lleva caracteres especiales (`@ : / ? # %`), codifícala en las URL de `.env`.
+
 ## Trabajo con asistentes de IA
 
 El método está en [Orquestacion/](Orquestacion/README.md). La configuración de Claude Code y Cursor (`.claude/`, `.cursor/`, `AGENTS.md`, `CLAUDE.md`, `MEMORY.md`) es **local** y no se publica ([ADR-004](docs/adr/ADR-004-arnes-local-y-autoria-humana.md)). Tras clonar, instala los hooks de Git:
