@@ -63,11 +63,17 @@
 ### T5 — Arnés de pruebas
 
 - **Depende de:** T2, T3, T4
-- **Archivos:** `backend/tests/conftest.py`, `backend/pyproject.toml`
+- **Archivos:** `backend/tests/conftest.py`, `backend/tests/test_harness.py`, `backend/pyproject.toml`
 - **Criterio:** cada prueba corre en una transacción con rollback sobre PostgreSQL; `pytest` se puede correr dos veces seguidas sin residuos; hay fixtures de app y de cliente HTTP.
-- **Verificación:** `cd backend && uv run pytest && uv run pytest`
+- **Verificación:** `cd backend && uv run pytest && uv run pytest` (en local: `uv run --env-file ../.env pytest`).
 - **Riesgo:** dejar datos de prueba entre corridas.
 - **Deuda heredada de T3 (2026-11-11):** decidir y anotar en `conftest.py` si se mantiene "crear/borrar tablas por prueba" (como hace hoy T3) en lugar de "transacción con rollback por prueba" (`plan.md` §2), y el riesgo de `SET LOCAL` con *savepoints* (`plan.md` §4).
+- **Decisión (2026-11-11, documentada en `conftest.py`):**
+  - Por defecto, transacción con rollback por prueba: fixtures `db_connection`, `app` y `client`; la fábrica de sesiones se ata a una transacción externa con `join_transaction_mode="create_savepoint"` y al final se revierte.
+  - Se mantiene crear/borrar tablas con `commit` real en `pg_app` de T3: esas pruebas verifican límites reales de transacción y del pool que una transacción externa ocultaría.
+  - Mitigación de `SET LOCAL` con *savepoints*: al terminar cada transacción raíz de la sesión se vacía `app.tenant_id` en la conexión de la prueba; lo cubren `test_tenant_does_not_survive_*` en `test_harness.py` (fallan sin la mitigación).
+  - Guardián de residuos de sesión (`database_residue_guard`): falla si quedan tablas `prueba_*` o cambian tablas, políticas o conteos fuera de ellas.
+- **Deuda de T5 (resolver antes de la spec 002):** bajo `FORCE ROW LEVEL SECURITY` el conteo de filas del guardián, sin `app.tenant_id`, da 0 en las tablas de negocio, así que no detecta filas residuales en ellas. Decidir cómo contarlas (por tenant, rol de pruebas con `BYPASSRLS` o `pg_stat_user_tables`).
 
 ---
 
