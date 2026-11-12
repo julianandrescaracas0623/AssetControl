@@ -7,6 +7,9 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
+
 REQUIRED_VARS: tuple[str, ...] = ("DATABASE_URL", "SECRET_KEY", "ENVIRONMENT")
 
 
@@ -32,6 +35,57 @@ class Config:
             "ENVIRONMENT": self.environment,
             "TESTING": self.environment == "test",
         }
+
+
+MIGRATION_URL_VAR = "MIGRATION_DATABASE_URL"
+
+
+class SameDatabaseRoleError(RuntimeError):
+    """La URL del migrador usa el mismo rol que la de la aplicación (R4c)."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            f"{MIGRATION_URL_VAR} usa el mismo rol que DATABASE_URL; "
+            "las migraciones deben correr con el rol migrador, no con el de la aplicación"
+        )
+
+
+class InvalidDatabaseUrlError(RuntimeError):
+    """No se pudo leer el rol de una URL de base de datos; nunca muestra la URL."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            f"No se pudo interpretar {MIGRATION_URL_VAR} o DATABASE_URL para comparar sus roles"
+        )
+
+
+def _url_username(raw: str) -> str | None:
+    """Usuario decodificado con el mismo parser que el engine (``make_url``)."""
+    try:
+        return make_url(raw).username
+    except (ArgumentError, ValueError, TypeError):
+        # ``from None``: la excepción original puede traer fragmentos de la URL.
+        raise InvalidDatabaseUrlError() from None
+
+
+def load_migration_url(environ: Mapping[str, str] | None = None) -> str:
+    """URL del rol migrador; la usa solo Alembic (``migrations/env.py``).
+
+    No es obligatoria para arrancar la API. Nunca se usa ``DATABASE_URL`` en su
+    lugar: si falta, falla con el nombre de la variable y sin su valor.
+
+    Si ``DATABASE_URL`` está definida, el rol del migrador debe ser distinto; si
+    alguna de las dos no se puede interpretar, falla (no se omite en silencio).
+    Sin ``DATABASE_URL`` (job de migración dedicado) el chequeo no aplica.
+    """
+    source = os.environ if environ is None else environ
+    url = (source.get(MIGRATION_URL_VAR) or "").strip()
+    if not url:
+        raise MissingConfigError([MIGRATION_URL_VAR])
+    app_url = (source.get("DATABASE_URL") or "").strip()
+    if app_url and _url_username(app_url) == _url_username(url):
+        raise SameDatabaseRoleError()
+    return url
 
 
 def load_config(environ: Mapping[str, str] | None = None) -> Config:
