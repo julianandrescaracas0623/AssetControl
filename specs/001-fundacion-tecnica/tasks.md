@@ -131,6 +131,14 @@
 - **Criterio:** compila en TypeScript estricto; Tailwind activo; shadcn/ui inicializado con al menos un componente añadido por la CLI; la pantalla muestra el estado de `/health` (cargando, error, éxito) y se ve bien a 375 px y a 1440 px.
 - **Verificación:** `cd web && npm run build` + capturas a 375 px y 1440 px
 - **Riesgo:** acoplar la pantalla base a un diseño que aún no existe.
+- **Implementada (2026-11-12), aprobada por reviewer:** `npm ci`, `npm run build` y `npm run typecheck` en verde; capturas a 375 y 1440 px de cargando, error (API caída), base caída (503) y éxito. CLI fijada en `shadcn@4.23.0` (preset `nova`, base `radix`).
+  - Dependencias aprobadas por el humano con **versiones fijadas** (exactas, sin `^` ni `~`, iguales a `package-lock.json`):
+    - `dependencies`: `react` 19.3.1, `react-dom` 19.3.1, `tailwindcss` 4.3.5, `@tailwindcss/vite` 4.3.5, `radix-ui` 1.8.1, `class-variance-authority` 0.7.1, `cn` 0.5.2, `tw-animate-css` 1.4.0, `lucide-react` 1.72.0 (añadido por la CLI, sin uso aún).
+    - `devDependencies`: `typescript` 7.0.2, `vite` 8.3.8, `@vitejs/plugin-react` 6.3.0, `@types/node` 24.19.2, `@types/react` 19.3.0, `@types/react-dom` 19.3.0, `shadcn` 4.23.0 (movido a dev: solo aporta `shadcn/tailwind.css` en build y la CLI; build y typecheck siguen en verde).
+  - `cn` (usado en `src/lib/utils.ts`) procede del paquete que instala la CLI (repositorio shadcn-ui/cn); **humano a confirmar** el editor del paquete en npm.
+  - TanStack Query se difiere a la primera pantalla con datos (decisión humana); `/health` usa `fetch` + `useEffect` en `src/lib/health.ts`.
+  - La CLI añade la fuente Geist; se quitó hasta aprobar la fuente de la marca.
+  - `npm ci` reporta 6 vulnerabilidades (2 bajas, 4 moderadas) en dependencias transitivas; revisar con `npm audit` antes del piloto.
 
 ---
 
@@ -141,6 +149,7 @@
 - **Criterio:** `npm run lint`, `npm run typecheck` y `npm test` pasan; la prueba cubre los tres estados de la pantalla de salud.
 - **Verificación:** `cd web && npm run lint && npm run typecheck && npm test`
 - **Riesgo:** pruebas que dependen de la red real.
+- **Riesgo:** compatibilidad de ESLint (`typescript-eslint`) y Vitest con TypeScript 7.0.2 (fijado en T8); verificar los rangos de `peerDependencies` antes de instalar y, si no hay soporte, decidir con el humano en lugar de bajar TS por cuenta propia.
 
 ---
 
