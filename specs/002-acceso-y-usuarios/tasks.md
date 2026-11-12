@@ -1,10 +1,10 @@
 # Tasks 002 — Acceso y usuarios
 
 > **Estado:** Propuesta, pendiente de aprobación humana (G1–G3). Máximo 10 tareas, cada una ≤ 1 día, una a la vez, **tests primero en cada tarea** (se escriben y se ven fallar antes del código). Backend únicamente; OpenAPI/tipos y web están en `specs/002b-acceso-web/`.
-> Las tareas asumen las decisiones (Q1, Q2, Q4, Q18) y las recomendaciones de `spec.md`; si el humano decide otra cosa, se ajusta con `/sdd-change` antes de implementar. Ninguna dependencia se instala sin la aprobación de `plan.md` §6.
-> "Depende de" lista tareas y preguntas que deben estar respondidas antes de empezar (coincide con `plan.md` §8 y `spec.md`).
+> Las tareas asumen las decisiones humanas de la ronda G1 (Q1–Q8, Q10, Q12–Q18) y las recomendaciones aún sin confirmar (Q9, Q11) de `spec.md`; si el humano decide otra cosa, se ajusta con `/sdd-change` antes de implementar. Solo `argon2-cffi` y `PyJWT` (Q8) pueden instalarse, con versiones exactas (`plan.md` §6).
+> "Depende de" lista tareas y preguntas que deben seguir respondiéndose antes de empezar (coincide con `plan.md` §8 y `spec.md`); las decididas no se repiten.
 > **Prerrequisitos globales (los aplica el humano, antes de T1):**
-> 1. Cambios a `docs/03` de `spec.md` (incluido el formato `bytea` del hash).
+> 1. Cambios 1–5 a `docs/03` de `spec.md` (incluido el formato `bytea` del hash). El cambio 6 (`limite_tasa`) se aplica antes de T10.
 > 2. **P0:** ampliar `docker/postgres/init/01-app-role.sh` con el rol `auth_owner` (`NOLOGIN`, sin `rolsuper` ni `rolbypassrls`, `CREATE ROLE` condicional). El script solo corre con el volumen vacío (`docker compose down -v`) y la CI ya lo ejecuta. Criterio A0: `docker compose down -v && docker compose up -d db`, luego `psql -c "select rolname, rolcanlogin, rolsuper, rolbypassrls from pg_roles where rolname='auth_owner'"` devuelve una fila (`f`,`f`,`f`); ejecutar el script dos veces no falla; el job de la CI sigue verde.
 > Comandos con `uv run`.
 
@@ -13,10 +13,10 @@
 ### T1 — Esquema base, RLS y prueba de catálogo
 
 - **Resultado:** `alembic upgrade head` crea el esquema `acceso` y las tablas `tenant`, `usuario`, `membresia`, `invitacion` (con `email`, `token_hash` `bytea(32)`) y `refresh_token` con RLS forzada, `tenant_isolation` `TO` rol de aplicación, política `RESTRICTIVE` `FOR INSERT` de `creada_por IS NOT NULL` en `invitacion`, claves compuestas, CHECKs (`rol`, email normalizado), `GRANT` por columna (sin `password_hash` ni `token_hash` para la aplicación) y `REVOKE` a `anon`/`authenticated`/`service_role`; la prueba de catálogo (A2, parte de tablas) pasa. **Primer resultado ejecutable:** migración que sube, baja y sube.
-- **Tests primero:** `test_catalog_rls.py` (tablas) y `test_migrations.py` fallan antes de la migración.
+- **Tests primero:** `test_catalog_rls.py` (tablas) y `test_migrations.py` fallan antes de la migración. La lista cerrada de excepciones de `test_catalog_rls.py` es `alembic_version`, `tenant`, `usuario` y `limite_tasa` (esta última se crea en T10; la excepción es por nombre y no exige que exista aún), cada una con su prueba propia.
 - **Archivos probables:** `backend/migrations/versions/0002_acceso_y_usuarios.py`, `backend/app/auth/models.py`, `backend/tests/test_catalog_rls.py`, `backend/tests/test_migrations.py`.
 - **Verificación:** `cd backend && uv run alembic upgrade head && uv run alembic downgrade base && uv run alembic upgrade head && uv run pytest tests/test_catalog_rls.py tests/test_migrations.py && uv run ruff check .`
-- **Depende de:** spec aprobada; `docs/03` actualizado; P0 (A0); Q17.
+- **Depende de:** spec aprobada; `docs/03` actualizado (cambios 1–5); P0 (A0).
 - **Riesgo:** `GRANT` de columnas de más; política de lectura de `usuario` mal acotada; política permisiva que anule la `RESTRICTIVE`.
 
 ### T2 — Políticas del dueño y pruebas de aislamiento
@@ -25,7 +25,7 @@
 - **Tests primero:** `test_auth_tables_isolation.py` falla antes de la migración.
 - **Archivos probables:** `backend/migrations/versions/0003_politicas_del_dueno.py`, `backend/tests/test_auth_tables_isolation.py`, `backend/tests/test_roles_attributes.py`, `backend/tests/conftest.py`, `backend/tests/test_harness.py`.
 - **Verificación:** `cd backend && uv run pytest tests/test_auth_tables_isolation.py tests/test_roles_attributes.py tests/test_harness.py && uv run pytest` (dos veces, sin residuos) `&& uv run ruff check .`
-- **Depende de:** T1; Q17; revisión del `security-reviewer`.
+- **Depende de:** T1; revisión del `security-reviewer`.
 - **Riesgo:** cero filas por FORCE RLS; permisivas que se combinan por OR; `membresia` aceptando una invitación de otra transacción.
 
 ### T3 — Funciones `acceso.*`, `crear_tenant` y catálogo cerrado
@@ -34,16 +34,16 @@
 - **Tests primero:** `test_auth_functions.py` y la parte de funciones/políticas de `test_catalog_rls.py` fallan antes de la migración.
 - **Archivos probables:** `backend/migrations/versions/0004_funciones_de_acceso.py`, `backend/tests/test_auth_functions.py`, `backend/tests/test_catalog_rls.py`.
 - **Verificación:** `cd backend && uv run pytest tests/test_auth_functions.py tests/test_catalog_rls.py && uv run pytest && uv run ruff check .`
-- **Depende de:** T2; Q3 (24 h); Q16.
+- **Depende de:** T2 (Q3, 24 h, y Q16 ya decididos).
 - **Riesgo:** función expuesta a `anon`; contexto que sobrevive a un savepoint; si no cabe en un día, se divide con `/sdd-change` (catálogo C6 como tarea propia y se mueven límites/`/ready` a 002b), no se recorta cobertura.
 
 ### T4 — Credenciales, tokens, configuración segura y logs
 
-- **Resultado:** (a) hash y verificación de contraseña con hash simulado del mismo costo, longitud máxima y política (Q9); generación y doble hash (`sha256` → `sha256`, `bytea`) de tokens de invitación y refresh; JWT `HS256` fijo con `exp` e `iss` obligatorios, clave derivada de `SECRET_KEY`, rechazo de `alg` distinto y de `none`. (b) `SECRET_KEY` validada (B3 de T7); verificación del rol de aplicación al arrancar (M2); `ENVIRONMENT` por defecto producción, cookie `__Secure-`/`Secure` salvo `development` explícito (B4 de T7) con `docker-compose.yml` y `.env.example` fijándolo; `Cache-Control: no-store` y `Referrer-Policy: no-referrer` en `/auth` e `/invitaciones`; límite de tamaño de cuerpo (`413`); redacción de `DBAPIError` (tipo y `sqlstate`); `caplog` sin secretos.
+- **Resultado:** (a) hash **Argon2id** con `argon2-cffi` (Q8; versiones exactas de `argon2-cffi` y `PyJWT` fijadas con `==` en `pyproject.toml` y `uv.lock`; parámetros de Argon2id medidos y revisados por el `security-reviewer`, `plan.md` §6) y verificación de contraseña con **hash simulado de los mismos parámetros** calculado al arrancar, longitud máxima y política (Q9: 10–128 `[RECOMENDACIÓN, pendiente de confirmación humana]`); comprobación de que la imagen del `api` instala la rueda binaria sin compilar; generación y doble hash (`sha256` → `sha256`, `bytea`) de tokens de invitación y refresh; JWT `HS256` fijo con `exp` e `iss` obligatorios, clave derivada de `SECRET_KEY`, rechazo de `alg` distinto y de `none`. (b) `SECRET_KEY` validada (B3 de T7; ≥ 32 bytes `[RECOMENDACIÓN, pendiente de confirmación humana, Q11]`); verificación del rol de aplicación al arrancar (M2); `ENVIRONMENT` por defecto producción, cookie `__Secure-`/`Secure` salvo `development` explícito (B4 de T7) con `docker-compose.yml` y `.env.example` fijándolo; `Cache-Control: no-store` y `Referrer-Policy: no-referrer` en `/auth` e `/invitaciones`; límite de tamaño de cuerpo (`413`); redacción de `DBAPIError` (tipo y `sqlstate`); `caplog` sin secretos.
 - **Tests primero:** `test_credentials.py`, `test_config.py`, `test_log_redaction.py`.
 - **Archivos probables:** `backend/app/auth/credentials.py`, `backend/app/config.py`, `backend/app/db.py`, `backend/app/errors.py`, `backend/pyproject.toml` y lock (solo dependencias aprobadas), `docker-compose.yml`, `.env.example`, `backend/tests/test_credentials.py`, `backend/tests/test_config.py`, `backend/tests/test_log_redaction.py`.
 - **Verificación:** `cd backend && uv run pytest tests/test_credentials.py tests/test_config.py tests/test_log_redaction.py && uv run ruff check .`
-- **Depende de:** T1; Q7, Q8, Q9, Q11 y aprobación de dependencias.
+- **Depende de:** T1; valores de Q9 y Q11 (confirmación humana pendiente); Q7 y Q8 decididos.
 - **Nota:** de T4 solo se prueba el mecanismo de las cabeceras (`no-store`, `no-referrer`); las pruebas por ruta de `/auth` e `/invitaciones` se escriben en T6/T8/T9, cuando existan las rutas. Si T4 pasa de un día, se parte con `/sdd-change` (p. ej. configuración y logs aparte de credenciales).
 - **Riesgo:** costo de hash lento en pruebas (costo bajo solo en tests); imprimir `SECRET_KEY`; romper el arranque local.
 
@@ -53,7 +53,7 @@
 - **Tests primero:** `test_cli_tenant.py` falla antes del comando.
 - **Archivos probables:** `backend/app/cli.py`, `backend/tests/test_cli_tenant.py`, `backend/tests/conftest.py`, `README.md`, `.env.example`.
 - **Verificación:** `cd backend && uv run pytest tests/test_cli_tenant.py` y ejecución manual, comprobando que `invitacion` solo tiene `sha256(clave)`.
-- **Depende de:** T3, T4; Q3, Q5, Q17.
+- **Depende de:** T3, T4 (Q3, Q5, Q17 decididos).
 - **Riesgo:** enlace en logs o historial; credenciales en argv; prueba que pase solo por ser superusuario.
 
 ### T6 — Login y usuario actual
@@ -62,16 +62,16 @@
 - **Tests primero:** `test_auth_login.py` (A10, A21).
 - **Archivos probables:** `backend/app/auth/routes.py`, `backend/app/auth/service.py`, `backend/app/__init__.py`, `backend/tests/test_auth_login.py`.
 - **Verificación:** `cd backend && uv run pytest tests/test_auth_login.py`
-- **Depende de:** T3, T4; Q6, Q7.
+- **Depende de:** T3, T4 (Q6, Q7 decididos: acceso 15 min, refresh 7 días).
 - **Riesgo:** enumeración por mensaje o tiempo; `buscar_login` dentro de `tenant_session`.
 
 ### T7 — Refresh y logout
 
-- **Resultado:** `POST /auth/refresh` con rotación en un `UPDATE` atómico, cabecera personalizada y comprobación `Origin`/`Sec-Fetch-Site` (Q14); `[RECOMENDACIÓN Q15, pendiente de confirmación humana]` ventana de gracia ~10 s y revocación de familia ante reuso (A23); sin confirmación, solo rotación y `401` al reuso; `POST /auth/logout` por cookie de refresh que revoca la familia y limpia la cookie (A11).
+- **Resultado:** `POST /auth/refresh` con rotación en un `UPDATE` atómico, cabecera personalizada y comprobación `Origin`/`Sec-Fetch-Site` (Q14, decidido); ventana de gracia ~10 s y revocación de familia ante reuso (Q15, decidido; A23); `POST /auth/logout` por cookie de refresh que revoca la familia y limpia la cookie (A11).
 - **Tests primero:** `test_auth_refresh_logout.py`.
 - **Archivos probables:** `backend/app/auth/routes.py`, `backend/app/auth/service.py`, `backend/tests/test_auth_refresh_logout.py`.
 - **Verificación:** `cd backend && uv run pytest tests/test_auth_refresh_logout.py`
-- **Depende de:** T6; Q7, Q14, Q15.
+- **Depende de:** T6 (Q7, Q14, Q15 decididos).
 - **Riesgo:** refresh que sobrevive al logout; condiciones de carrera en la rotación.
 
 ### T8 — Autorización por rol e invitar
@@ -80,26 +80,26 @@
 - **Tests primero:** `test_roles.py`, `test_invitaciones_crear.py`.
 - **Archivos probables:** `backend/app/auth/decorators.py`, `backend/app/invitaciones/routes.py`, `backend/app/invitaciones/service.py`, `backend/tests/test_roles.py`, `backend/tests/test_invitaciones_crear.py`.
 - **Verificación:** `cd backend && uv run pytest tests/test_roles.py tests/test_invitaciones_crear.py`
-- **Depende de:** T6; Q7, Q13.
+- **Depende de:** T6 (Q7 y Q13 decididos: enlace `/invitacion#<token>`, invitación 72 h).
 - **Riesgo:** rol tomado del token o de la petición; token en logs.
 
 ### T9 — Validar y aceptar invitación
 
-- **Resultado:** `POST /invitaciones/validar` (`{token}`, solo vigente o no) y `POST /invitaciones/aceptar` (`{token, nombre, password}`, **sin email**; token en cuerpo); `aceptar_invitacion` atómica con el email de la invitación, `ON CONFLICT DO NOTHING` y excepción estática (Q16-A, A20); sesión tras el commit (A22); mismo error para vencido, usado, inexistente o email ya existente; concurrencia (A9).
+- **Resultado:** `POST /invitaciones/validar` (`{token}`, solo vigente o no) y `POST /invitaciones/aceptar` (`{token, nombre, password}`, **sin email**; token en cuerpo); `aceptar_invitacion` atómica con el email de la invitación, `ON CONFLICT DO NOTHING` y excepción estática (Q16, decidido; A20); sesión tras el commit (A22); mismo error para vencido, usado, inexistente o email ya existente; concurrencia (A9).
 - **Tests primero:** `test_invitaciones_aceptar.py`, `test_invitaciones_concurrencia.py`.
 - **Archivos probables:** `backend/app/invitaciones/routes.py`, `backend/app/invitaciones/service.py`, `backend/tests/test_invitaciones_aceptar.py`, `backend/tests/test_invitaciones_concurrencia.py`.
 - **Verificación:** `cd backend && uv run pytest tests/test_invitaciones_aceptar.py tests/test_invitaciones_concurrencia.py`
-- **Depende de:** T3, T6, T8; Q9, Q16.
+- **Depende de:** T3, T6, T8; Q9 (lista de contraseñas comunes; Q16 decidido).
 - **Riesgo:** carrera en el uso único; revelar email existente por mensaje o tiempo.
 
 ### T10 — Límites de tasa, `/ready` y secretos en logs
 
-- **Resultado:** `429` por IP y cuenta en login, refresh, validar y aceptar (Q10); `GET /ready` cacheado; prueba `caplog` de que ningún log contiene tokens, hashes ni contraseñas, incluidos `validar` y `aceptar`; cierre de A18: `git grep` de secretos y revisión de que `.env.example` lista las variables nuevas sin valores.
+- **Resultado:** migración `0005_limite_tasa` (tabla de infraestructura sin `tenant_id`, `plan.md` §3.1, con RLS forzada, política y `GRANT` mínimos, sin `DELETE`) y prueba propia en el catálogo (la excepción ya figura desde T1); `429` por IP y cuenta en login, refresh, validar y aceptar con contador en esa tabla, en transacción propia, sin Flask-Limiter ni Redis (Q10; umbrales y ventanas a confirmar con el humano); `GET /ready` cacheado (Q12); sin dependencias nuevas; prueba `caplog` de que ningún log contiene tokens, hashes ni contraseñas, incluidos `validar` y `aceptar`; cierre de A18: `git grep` de secretos y revisión de que `.env.example` lista las variables nuevas sin valores.
 - **Tests primero:** `test_rate_limits.py`, `test_ready.py`, `test_no_secrets_in_logs.py`.
-- **Archivos probables:** `backend/app/auth/limits.py`, `backend/app/meta/routes.py`, `backend/tests/test_rate_limits.py`, `backend/tests/test_ready.py`, `backend/tests/test_no_secrets_in_logs.py`, `README.md`.
-- **Verificación:** `cd backend && uv run pytest tests/test_rate_limits.py tests/test_ready.py tests/test_no_secrets_in_logs.py && uv run pytest && uv run ruff check . && git grep -nEi "(secret|password|token)[a-z_]*\s*=\s*['\"][^'\"]+['\"]" -- . ':!*/tests/*'` (sin coincidencias reales; criterio A18)
-- **Depende de:** T6–T9; Q8 (si `Flask-Limiter`), Q10, Q12.
-- **Riesgo:** contador no compartido; `X-Forwarded-For` falsificable.
+- **Archivos probables:** `backend/migrations/versions/0005_limite_tasa.py`, `backend/tests/test_catalog_rls.py`, `backend/app/auth/limits.py`, `backend/app/meta/routes.py`, `backend/tests/test_rate_limits.py`, `backend/tests/test_ready.py`, `backend/tests/test_no_secrets_in_logs.py`, `README.md`.
+- **Verificación:** `cd backend && uv run alembic upgrade head && uv run alembic downgrade base && uv run alembic upgrade head && uv run pytest tests/test_rate_limits.py tests/test_ready.py tests/test_no_secrets_in_logs.py tests/test_catalog_rls.py && uv run pytest && uv run ruff check . && git grep -nEi "(secret|password|token)[a-z_]*\s*=\s*['\"][^'\"]+['\"]" -- . ':!*/tests/*'` (sin coincidencias reales; criterio A18)
+- **Depende de:** T6–T9; cambio 6 a `docs/03` (`limite_tasa`) aplicado por el humano; umbrales de Q10 (Q12 decidido).
+- **Riesgo:** `X-Forwarded-For` falsificable; el contador revertido por el fallo de la petición; tabla sin `tenant_id` mal acotada (privilegio mínimo y prueba propia).
 
 ---
 
@@ -111,16 +111,16 @@ Spec `002b-acceso-web` (Propuesta): OpenAPI + tipos TS y web mínima; depende de
 
 | Tarea | Depende de | Verificación |
 |---|---|---|
-| T1 | `docs/03` actualizado; P0 (A0); Q17 | `alembic up/down/up` + catálogo de tablas |
-| T2 | T1; Q17; `security-reviewer` | `pytest` aislamiento y atributos, dos veces |
-| T3 | T2; Q3, Q16 | `pytest` funciones + catálogo cerrado |
-| T4 | T1; Q7, Q8, Q9, Q11 | `pytest test_credentials test_config test_log_redaction` |
-| T5 | T3, T4; Q3, Q5, Q17 | `pytest test_cli_tenant` + manual |
-| T6 | T3, T4; Q6, Q7 | `pytest test_auth_login` |
-| T7 | T6; Q7, Q14, Q15 | `pytest test_auth_refresh_logout` |
-| T8 | T6; Q7, Q13 | `pytest test_roles test_invitaciones_crear` |
-| T9 | T3, T6, T8; Q9, Q16 | `pytest test_invitaciones_*` |
-| T10 | T6–T9; Q8, Q10, Q12 | `pytest test_rate_limits test_ready test_no_secrets_in_logs` |
+| T1 | `docs/03` (1–5) actualizado; P0 (A0) | `alembic up/down/up` + catálogo de tablas |
+| T2 | T1; `security-reviewer` | `pytest` aislamiento y atributos, dos veces |
+| T3 | T2 | `pytest` funciones + catálogo cerrado |
+| T4 | T1; valores Q9 y Q11 | `pytest test_credentials test_config test_log_redaction` |
+| T5 | T3, T4 | `pytest test_cli_tenant` + manual |
+| T6 | T3, T4 | `pytest test_auth_login` |
+| T7 | T6 | `pytest test_auth_refresh_logout` |
+| T8 | T6 | `pytest test_roles test_invitaciones_crear` |
+| T9 | T3, T6, T8; Q9 (comunes) | `pytest test_invitaciones_*` |
+| T10 | T6–T9; `docs/03` cambio 6; umbrales Q10 | `alembic up/down/up` + `pytest test_rate_limits test_ready test_no_secrets_in_logs test_catalog_rls` |
 
 ## Reglas de ejecución
 
@@ -128,4 +128,4 @@ Spec `002b-acceso-web` (Propuesta): OpenAPI + tipos TS y web mínima; depende de
 - Nada de las preguntas abiertas se decide dentro de una tarea: se detiene y se pregunta.
 - No se cambia `docs/03` ni `docs/adr/` desde esta spec; lo aplica el humano.
 - Toda tabla nueva nace con RLS forzada, política y `GRANT` mínimos en su misma migración.
-- No se instala dependencia fuera de la lista aprobada de `plan.md` §6.
+- No se instala dependencia fuera de la lista aprobada de `plan.md` §6 (`argon2-cffi`, `PyJWT`).

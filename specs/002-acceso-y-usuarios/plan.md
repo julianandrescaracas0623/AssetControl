@@ -1,6 +1,6 @@
 # Plan 002 — Acceso y usuarios
 
-> **Estado:** Propuesta, pendiente de aprobación humana (G1–G3). Incorpora Q1 (A1, C1–C10), Q2, Q4 y Q18 (decididos) y los dos veredictos del `security-reviewer`. Backend en 10 tareas (T1–T10). Lo marcado `[RECOMENDACIÓN]` o `[PENDIENTE Qn]` depende de `spec.md` §Preguntas abiertas. Cubre el backend (T1–T10); OpenAPI y web están en `specs/002b-acceso-web/`.
+> **Estado:** Propuesta, pendiente de aprobación humana (G1–G3). Incorpora las decisiones humanas de la ronda G1 (Q1–Q8, Q10, Q12–Q18) y los dos veredictos del `security-reviewer`. Backend en 10 tareas (T1–T10). Siguen abiertas Q9 y Q11 (`[RECOMENDACIÓN, pendiente de confirmación humana]`), los umbrales de Q10 y Q19 (solo 002b); ver `spec.md` §Preguntas abiertas. Cubre el backend (T1–T10); OpenAPI y web están en `specs/002b-acceso-web/`.
 
 ## 1. Enfoque
 
@@ -26,7 +26,7 @@ Primero el esquema con RLS (la base manda), luego el esquema `acceso` con el rol
 | `acceso.buscar_login(p_email)` | email normalizado | solo lectura: `usuario_id`, `password_hash`, `activo` y la membresía activa (`tenant_id`, `rol`) | `app.auth_email`, luego `app.auth_usuario` para leer `membresia` |
 | `acceso.validar_invitacion(p_clave)` | `sha256(token)` hex | solo lectura: indica si es vigente y no usada; sin tenant, rol ni creador | `app.auth_inv_validar` |
 | `acceso.aceptar_invitacion(p_clave, p_nombre, p_password_hash)` | clave (hex), nombre, hash de contraseña; **sin email** (Q4=B) | atómica: `UPDATE invitacion` condicional (`RETURNING email, tenant_id, rol`), `INSERT usuario` con el email de la invitación `... ON CONFLICT DO NOTHING` (sin fila → excepción estática), fija `app.auth_usuario_nuevo`, `INSERT membresia`; devuelve `usuario_id`, `tenant_id`, `rol`. El `id` del usuario se genera dentro de la función (sin `INSERT ... RETURNING`, que exigiría una política `SELECT`) | `app.auth_inv_aceptar`, `app.auth_usuario_nuevo` (no existe `app.auth_email_nuevo`) |
-| `acceso.crear_tenant(p_nombre, p_email, p_clave)` | nombre, email del primer admin (normalizado), clave (hex) | atómica: `INSERT tenant` e `INSERT invitacion` (`rol` `admin`, `creada_por` NULL, `expira_en = now() + interval '24 hours'` `[Q3]`); devuelve `tenant_id`. **`EXECUTE` solo para el rol migrador**, no para la aplicación | `app.auth_tenant_nuevo` |
+| `acceso.crear_tenant(p_nombre, p_email, p_clave)` | nombre, email del primer admin (normalizado), clave (hex) | atómica: `INSERT tenant` e `INSERT invitacion` (`rol` `admin`, `creada_por` NULL, `expira_en = now() + interval '24 hours'`, Q3 DECIDIDO); devuelve `tenant_id`. **`EXECUTE` solo para el rol migrador**, no para la aplicación | `app.auth_tenant_nuevo` |
 
 La función calcula `token_hash = sha256(decode(p_clave, 'hex'))` con la función de `pg_catalog` (sin extensión) y compara con la columna `bytea` (I1). Formato: `token_hash` `bytea(32)`; la clave viaja en hex minúsculo de 64 caracteres (validado por la función; otro formato → cero filas).
 
@@ -60,21 +60,21 @@ Las `tenant_isolation` de la aplicación son `TO <rol de aplicación>` explícit
 ### 2.2 Flujos
 
 - **Petición protegida:** validar JWT (HS256 fijo, `exp`, `iss`) → `tenant_session(tenant_id del claim)` → leer de `membresia` `rol` y `activa` del usuario **en cada petición** (no del claim) → comprobar rol del endpoint (I9).
-- **Login:** `buscar_login(email)`; hash verificado en Python, con hash simulado del mismo costo si el email no existe; longitud máxima de contraseña antes de hashear. Una sola membresía activa; si hay más, falla cerrado (Q6). Luego `tenant_session` y se guarda el refresh.
-- **Refresh (Q2, L1):** cookie `__Secure-refresh=<tenant_id>.<secreto>`. El servidor fija el tenant de la cookie y calcula `sha256(sha256(secreto))`. Rotación: **un `UPDATE refresh_token SET usado_en = now() WHERE token_hash = :h AND usado_en IS NULL AND revocado_en IS NULL AND expira_en > now() RETURNING ...`**; si devuelve fila, inserta el siguiente de la misma `familia_id`. Si no devuelve fila, **`[RECOMENDACIÓN, pendiente de confirmación humana, Q15]`**: si el refresh se usó hace menos de la ventana de gracia (~10 s) se responde `401` sin revocar; si es reuso fuera de ventana se hace `UPDATE ... SET revocado_en = now()` sobre toda la `familia_id`. (Decidido por el humano: solo la tabla `refresh_token`, la cookie L1 y la rotación; sin confirmación, T7 implementa la rotación y `401` sin revocar por reuso.) Cabecera personalizada obligatoria y comprobación de `Origin`/`Sec-Fetch-Site` (Q14).
+- **Login:** `buscar_login(email)`; hash verificado en Python, con hash simulado del mismo costo si el email no existe; longitud máxima de contraseña antes de hashear. Una sola membresía activa; si hay más, falla cerrado (Q6, DECIDIDO). Luego `tenant_session` y se guarda el refresh.
+- **Refresh (Q2, L1):** cookie `__Secure-refresh=<tenant_id>.<secreto>`. El servidor fija el tenant de la cookie y calcula `sha256(sha256(secreto))`. Rotación: **un `UPDATE refresh_token SET usado_en = now() WHERE token_hash = :h AND usado_en IS NULL AND revocado_en IS NULL AND expira_en > now() RETURNING ...`**; si devuelve fila, inserta el siguiente de la misma `familia_id`. Si no devuelve fila (Q15, DECIDIDO): si el refresh se usó hace menos de la ventana de gracia (~10 s) se responde `401` sin revocar; si es reuso fuera de ventana se hace `UPDATE ... SET revocado_en = now()` sobre toda la `familia_id`. Cabecera personalizada obligatoria y comprobación de `Origin`/`Sec-Fetch-Site` (Q14, DECIDIDO).
 - **Logout (I8):** usa la cookie de refresh (no depende de un acceso vigente); revoca la familia y limpia la cookie.
 - **Validar invitación:** token en cuerpo → `clave = sha256(token)` → `validar_invitacion(clave)`.
-- **Aceptar:** cuerpo `{token, nombre, password}` (sin email); hash de contraseña antes de la función; `aceptar_invitacion` atómica, con el email tomado de la invitación; email ya existente, vencido, usado o inexistente → `invitacion_invalida`. Sesión después del `COMMIT` (A22).
-- **Tokens:** acceso JWT `HS256`, claims `sub`, `tenant`, `exp`, `iss` (el `rol` del claim es informativo para la web, no se usa para autorizar); clave derivada de `SECRET_KEY` con contexto propio; TTL `[PENDIENTE Q7]`. Refresh e invitación opacos, `secrets.token_urlsafe`.
+- **Aceptar:** cuerpo `{token, nombre, password}` (sin email); hash de contraseña antes de la función; `aceptar_invitacion` atómica, con el email tomado de la invitación; email ya existente, vencido, usado o inexistente → `invitacion_invalida` (Q16, DECIDIDO). Sesión después del `COMMIT` (A22).
+- **Tokens:** acceso JWT `HS256`, claims `sub`, `tenant`, `exp`, `iss` (el `rol` del claim es informativo para la web, no se usa para autorizar); clave derivada de `SECRET_KEY` con contexto propio; TTL acceso 15 min y refresh 7 días; invitación 72 h (bootstrap 24 h) (Q7, DECIDIDO). Refresh e invitación opacos, `secrets.token_urlsafe`.
 - **Cookie:** `__Secure-` (implica `Secure`), `HttpOnly`, `SameSite=Lax`, `Path=/auth`. Solo con `ENVIRONMENT=development` explícito se omite `Secure` (y entonces el prefijo `__Secure-` no se usa en desarrollo; el nombre lo decide T4/T6).
 - **Errores:** JSON uniforme de la spec 001; códigos `credenciales_invalidas`, `no_autenticado` (401), `prohibido` (403), `invitacion_invalida`, `demasiadas_solicitudes` (429), `cuerpo_demasiado_grande` (413).
-- **Cabeceras y límites (T4):** `Cache-Control: no-store` y `Referrer-Policy: no-referrer` en `/auth/*` e `/invitaciones/*` (T4 implementa y prueba el mecanismo; la prueba por ruta de cada endpoint va en T6/T8/T9 cuando existan); límite de tamaño de cuerpo (`MAX_CONTENT_LENGTH`) y de longitud de contraseña; valores `[PENDIENTE Q9/T4]` (referencia no vinculante: cuerpo ≤ 4 KB, contraseña ≤ 128 caracteres).
+- **Cabeceras y límites (T4):** `Cache-Control: no-store` y `Referrer-Policy: no-referrer` en `/auth/*` e `/invitaciones/*` (T4 implementa y prueba el mecanismo; la prueba por ruta de cada endpoint va en T6/T8/T9 cuando existan); límite de tamaño de cuerpo (`MAX_CONTENT_LENGTH`) y de longitud de contraseña; contraseña de 10 a 128 caracteres `[RECOMENDACIÓN, pendiente de confirmación humana, Q9]`; cuerpo máximo `[PENDIENTE]` en T4 (referencia no vinculante: ≤ 4 KB).
 - **Logs:** `DBAPIError` con tipo y `sqlstate`; sin tokens, hashes ni contraseñas; el enlace del script solo va a stdout.
-- **Arranque:** valida `SECRET_KEY` (Q11) y `rolsuper`/`rolbypassrls` del `current_user`.
+- **Arranque:** valida `SECRET_KEY` (≥ 32 bytes, `[RECOMENDACIÓN, pendiente de confirmación humana, Q11]`) y `rolsuper`/`rolbypassrls` del `current_user`.
 
 ### 2.3 Script del operador
 
-`flask create-tenant <nombre> <email>`: genera el token, calcula `clave = sha256(token)` y llama a **`acceso.crear_tenant(nombre, email, clave)`** (§2.1), que en **una transacción** crea `tenant` e `invitacion` (rol `admin`, `creada_por` NULL, expira 24 h `[RECOMENDACIÓN Q3]`). El script no hace INSERT directo ni fija `app.tenant_id`: el migrador no tiene política bajo `FORCE RLS`. Solo rol admin; las credenciales del migrador solo vienen de variable de entorno (nunca de argv ni archivo versionado); el enlace solo a stdout; no corre en el contenedor `api`. **Prueba (T5):** crea un rol migrador de prueba sin superusuario ni `BYPASSRLS` (con `USAGE` en `acceso` y `EXECUTE` en `crear_tenant`), lo usa para ejecutar el script y verifica que (a) funciona, (b) ese rol no puede INSERT directo en `tenant`/`invitacion`, (c) el rol de aplicación no puede ejecutar `crear_tenant`. No usa `POSTGRES_USER`.
+`flask create-tenant <nombre> <email>`: genera el token, calcula `clave = sha256(token)` y llama a **`acceso.crear_tenant(nombre, email, clave)`** (§2.1), que en **una transacción** crea `tenant` e `invitacion` (rol `admin`, `creada_por` NULL, expira 24 h, Q3 DECIDIDO). El script no hace INSERT directo ni fija `app.tenant_id`: el migrador no tiene política bajo `FORCE RLS`. Solo rol admin; las credenciales del migrador solo vienen de variable de entorno (nunca de argv ni archivo versionado); el enlace solo a stdout; no corre en el contenedor `api`. **Prueba (T5):** crea un rol migrador de prueba sin superusuario ni `BYPASSRLS` (con `USAGE` en `acceso` y `EXECUTE` en `crear_tenant`), lo usa para ejecutar el script y verifica que (a) funciona, (b) ese rol no puede INSERT directo en `tenant`/`invitacion`, (c) el rol de aplicación no puede ejecutar `crear_tenant`. No usa `POSTGRES_USER`.
 
 ## 3. Tablas afectadas, RLS y GRANT
 
@@ -87,7 +87,24 @@ Las `tenant_isolation` de la aplicación son `TO <rol de aplicación>` explícit
 | `refresh_token` | sí | `tenant_isolation` `TO` aplicación | `SELECT`, `INSERT`, `UPDATE (usado_en, revocado_en)` | FK compuesta `(tenant_id, membresia_id)`; `token_hash` `bytea(32)` con índice único; índice `familia_id` |
 
 - Ninguna tabla con `DELETE`. `REVOKE` a `anon`/`authenticated`/`service_role` en cada tabla (deuda T6).
-- Lista de excepciones de la prueba de catálogo: `alembic_version`, `tenant`, `usuario` (cada una con prueba propia).
+- Lista de excepciones de la prueba de catálogo: `alembic_version`, `tenant`, `usuario`, `limite_tasa` (cada una con prueba propia). La prueba de T1 ya incluye `limite_tasa` en la lista aunque la tabla aún no exista (se crea en T10): la excepción es por nombre, no exige que esté presente, y T10 añade su prueba propia.
+
+### 3.1 `limite_tasa` (Q10 DECIDIDO) — esquema propuesto para `docs/03` (cambio 6, lo aplica el humano antes de T10)
+
+Tabla de **infraestructura**, no de negocio: sin `tenant_id` porque el login, la validación y la aceptación se limitan antes de conocer el tenant. Guarda solo contadores; no contiene datos de la clínica.
+
+| Columna | Tipo | Nota |
+|---|---|---|
+| `ambito` | `text` NOT NULL, `CHECK (ambito IN ('login_ip','login_cuenta','refresh_ip','validar_ip','aceptar_ip'))` | qué se limita (lista cerrada; ajustable en T10) |
+| `clave_hash` | `bytea` NOT NULL, `CHECK (octet_length(clave_hash) = 32)` | `sha256` de la IP o del email normalizado, con la clave derivada de `SECRET_KEY`; nunca IP ni email en claro |
+| `ventana_inicio` | `timestamptz` NOT NULL | inicio de la ventana fija |
+| `intentos` | `integer` NOT NULL DEFAULT 0, `CHECK (intentos >= 0)` | contador |
+
+PK `(ambito, clave_hash, ventana_inicio)`. Incremento atómico con `INSERT ... ON CONFLICT (...) DO UPDATE SET intentos = limite_tasa.intentos + 1 RETURNING intentos`, en una **transacción propia** (autocommit) para que el fallo de la petición no revierta el contador. Umbrales y duración de ventana: `[PENDIENTE]`, se fijan en T10 con el humano.
+
+- **RLS y `GRANT` mínimos:** `ENABLE` + `FORCE ROW LEVEL SECURITY`; una política por comando `TO <rol de aplicación>` (`SELECT`, `INSERT`, `UPDATE`), sin `PUBLIC` ni `FOR ALL`; `GRANT SELECT, INSERT, UPDATE (intentos)` al rol de aplicación (el `SELECT` de tabla completa es necesario para el `RETURNING`; la tabla solo guarda hashes y contadores); **sin `DELETE`** (constitución §6) y `REVOKE` a `anon`/`authenticated`/`service_role`. Como la tabla no tiene datos de negocio ni de tenant, la política no filtra por tenant: su defensa es el privilegio mínimo y el hash de la clave. Las ventanas vencidas se ignoran; la purga (único `DELETE`, con `GRANT DELETE` solo al migrador) es una tarea operativa fuera de esta spec `[PENDIENTE]`.
+- **Excepción a la constitución §4** (toda tabla de negocio lleva `tenant_id`): se justifica porque no es una tabla de negocio. Queda en la lista cerrada de A2 con prueba propia (sin `DELETE`, solo `intentos` actualizable, sin columnas en claro).
+- Migración `0005_limite_tasa` (T10).
 
 ## 4. Endpoints y permisos
 
@@ -110,19 +127,27 @@ El token nunca va en ruta ni query. Cada endpoint declara su rol y trae pruebas 
 - `0002_acceso_y_usuarios` (T1): esquema `acceso` (vacío), las cinco tablas, CHECKs, índices, claves, RLS + FORCE, `tenant_isolation`, política `RESTRICTIVE` de `creada_por`, lectura por membresía, `GRANT` por columna y `REVOKE` a roles de Supabase.
 - `0003_politicas_del_dueno` (T2): políticas por comando `TO auth_owner` y `GRANT` por columna del dueño (incluidas las de `crear_tenant`).
 - `0004_funciones_de_acceso` (T3): las cuatro funciones de §2.1 en el orden de C3.
+- `0005_limite_tasa` (T10): tabla `limite_tasa` de §3.1 con RLS forzada, política y `GRANT` mínimos; `downgrade` la elimina.
 - Ninguna migración crea roles (`auth_owner` lo crea el script de init, P0).
-- **Prerrequisitos (humano, antes de T1):** cambios a `docs/03` de `spec.md` y P0 (script de init con `auth_owner`; A0).
+- **Prerrequisitos (humano, antes de T1):** cambios 1–5 a `docs/03` de `spec.md` y P0 (script de init con `auth_owner`; A0). **Antes de T10:** cambio 6 (`limite_tasa`).
 - CI y Docker local con PostgreSQL 17; paridad con Supabase antes del piloto (C8).
 
-## 6. Dependencias nuevas a aprobar (ninguna se instala sin aprobación)
+## 6. Dependencias nuevas de backend (Q8 DECIDIDO: aprobadas)
 
-| Dependencia | Uso | Justificación | Alternativa |
+| Dependencia | Uso | Justificación | Alternativa descartada |
 |---|---|---|---|
+| `argon2-cffi` | hash Argon2id de contraseñas | algoritmo adaptativo y resistente a GPU; decisión humana | `werkzeug.security` (reemplazada) |
 | `PyJWT` | firmar/verificar acceso (HS256 fijo) | estándar, pequeña | `itsdangerous` |
-| `werkzeug.security` (ya con Flask) **o** `argon2-cffi` | hash de contraseñas | Werkzeug sin dependencia nueva | — |
-| `Flask-Limiter` | R13 solo si Q10 no se resuelve en proxy/base | límites por IP y cuenta | contador en tabla (requiere `docs/03`) o proxy |
 
-Versiones exactas. Las dependencias de 002b están en su propia spec.
+Sin `Flask-Limiter` ni Redis: los límites usan la tabla `limite_tasa` (§3.1, Q10).
+
+**Versiones exactas:** se fijan con `==` en `pyproject.toml` y en `uv.lock` en T4 (no se inventan aquí); no se instalan otras.
+
+**Argon2id (T4):** los parámetros (`time_cost`, `memory_cost`, `parallelism`, longitud de hash y sal) se fijan en T4 midiendo en el hardware objetivo, partiendo de un perfil publicado (RFC 9106 / OWASP) y con revisión del `security-reviewer`; `[PENDIENTE]` hasta T4. En pruebas se usa un costo bajo solo vía configuración de test. **Hash simulado:** se calcula una vez al arrancar con **los mismos parámetros** y se verifica cuando el email no existe, para que el tiempo de login no distinga cuentas (A10).
+
+**Despliegue:** `argon2-cffi` depende de `argon2-cffi-bindings` (extensión en C); el despliegue necesita la **rueda binaria** (imagen del `api` sin compilador), con `uv.lock` fijado. T4 comprueba que la imagen instala sin compilar.
+
+Las dependencias de 002b están en su propia spec.
 
 ## 7. Estrategia de pruebas
 
@@ -152,7 +177,7 @@ Falla si: una tabla de `public` fuera de la lista de excepciones carece de `tena
 `pg_roles` sin `rolsuper` ni `rolbypassrls` (aplicación y `auth_owner`); arranque falla con rol inseguro.
 
 ### 7.5 Refresh y sesión (A11, A23, A24)
-Rotación atómica concurrente; `[RECOMENDACIÓN Q15]` ventana de gracia y reuso fuera de ella revoca la familia; `UPDATE` de otras columnas denegado; logout por cookie; rol y `activa` leídos de `membresia` en cada petición.
+Rotación atómica concurrente; (Q15) ventana de gracia y reuso fuera de ella revoca la familia; `UPDATE` de otras columnas denegado; logout por cookie; rol y `activa` leídos de `membresia` en cada petición.
 
 ### 7.6 Otras
 Concurrencia (A9), atomicidad (A20, A22), auth (A10, A13, A14, A21), JWT/cabeceras/tamaños (A25), roles (A8, A12), script del operador con migrador real (A7). Secretos en el repo (A18): `git grep` de patrones de secretos y revisión de `.env.example` en T10. Guardián de residuos bajo FORCE RLS (deuda de T5): `pg_stat_user_tables` o rol de solo lectura de pruebas `[decisión del implementer, documentada en conftest.py; si requiere rol nuevo, se aprueba]`. Datos sintéticos; nunca datos de la clínica.
@@ -168,22 +193,24 @@ Concurrencia (A9), atomicidad (A20, A22), auth (A10, A13, A14, A21), JWT/cabecer
 | Rol obsoleto en el token | Rol desde `membresia` en cada petición |
 | Script con `BYPASSRLS` implícito | Prueba con migrador real, entorno, stdout |
 | Cookie `Secure` rompe el desarrollo local | `development` explícito en compose y `.env.example` |
-| Contador en memoria con varios workers | Q10 |
+| Contador en memoria con varios workers | Tabla `limite_tasa` (Q10) |
 
-| Tarea | Debe estar respondido antes |
+"Debe estar respondido antes" (solo lo que sigue abierto; el resto está decidido):
+
+| Tarea | Pendiente antes de empezar |
 |---|---|
-| T1 | `docs/03` actualizado por el humano (cinco cambios), P0 (init con `auth_owner`), Q17 |
-| T2 | T1, Q17; revisión del SQL de políticas por el `security-reviewer` |
-| T3 | T2, Q3, Q16 (según el comportamiento de `aceptar_invitacion`) |
-| T4 | Q7, Q8, Q9 (política y tamaños), Q11 |
-| T5 | T3, T4, Q3, Q5, Q17 |
-| T6 | Q6, Q7 |
-| T7 | Q7, Q14, Q15 |
-| T8 | Q7, Q13 |
-| T9 | Q9, Q16 |
-| T10 | Q8, Q10, Q12 |
+| T1 | `docs/03` actualizado por el humano (cambios 1–5), P0 (init con `auth_owner`) |
+| T2 | T1; revisión del SQL de políticas por el `security-reviewer` |
+| T3 | T2 |
+| T4 | Q9 (valores) y Q11 (valor); versiones exactas y parámetros de Argon2id (se fijan en la tarea) |
+| T5 | T3, T4 |
+| T6 | T3, T4 |
+| T7 | T6 |
+| T8 | T6 |
+| T9 | Q9 (lista de comunes), T3, T6, T8 |
+| T10 | Cambio 6 a `docs/03` (`limite_tasa`) por el humano; umbrales de Q10 |
 
-Q1, Q2, Q4 y Q18 están decididas; Q19 solo afecta a 002b.
+Decididas: Q1–Q8, Q10 (almacenamiento), Q12–Q18. Q19 solo afecta a 002b.
 
 ## 9. Alternativa descartada
 
@@ -200,3 +227,5 @@ Q1, Q2, Q4 y Q18 están decididas; Q19 solo afecta a 002b.
 - **Política permisiva adicional para `creada_por IS NOT NULL`**: se combina con OR y no restringe; se usa `RESTRICTIVE`.
 - **Refresh sin estado** (Q2-C) y **`token_version`** (Q2-B): no permiten detección de reuso por familia.
 - **Contador de intentos solo en memoria con varios workers**: no se comparte.
+- **`Flask-Limiter`, Redis o proxy** (Q10): descartados por decisión humana; se usa la tabla `limite_tasa`.
+- **`werkzeug.security` para el hash** (Q8): reemplazado por `argon2-cffi`.

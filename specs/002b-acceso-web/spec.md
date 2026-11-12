@@ -31,5 +31,5 @@ Las de la spec 002. Riesgo: token en historial o logs del navegador; mitigación
 
 - **Q8 (web):** generador OpenAPI (`flask-smorest` o `apispec`), `openapi-typescript`, `react-router-dom`, `@tanstack/react-query`; ninguna se instala sin aprobación.
 - **Q19:** origen en desarrollo; recomendado *proxy* de Vite.
-- Q13 (forma del enlace) se decide en la spec 002.
+- Q13 (forma del enlace) **[DECIDIDO]** en la spec 002: fragmento `/invitacion#<token>`. Q8 de la spec 002 (`argon2-cffi`, `PyJWT`) es solo de backend y no cubre estas dependencias web.
 - Número y nombre definitivos de la spec, y tareas definitivas, tras aceptar la partición.
