@@ -42,8 +42,8 @@ La profundidad objetivo es 1: el coordinator delega y los especialistas no vuelv
 
 ### `implementer`
 
-- **Puede:** editar código y tests, correr pruebas.
-- **No puede:** cambiar la spec, mergear, tocar migraciones, auth o precios sin aprobación, empujar a remoto.
+- **Puede:** editar código y tests, correr pruebas. Tras la aprobación del reviewer (y de security-reviewer/domain-guardian cuando aplique): crear la rama, hacer commit, hacer push de ramas `feat/*` y `docs/*` y abrir el PR con `gh pr create --base <base>`.
+- **No puede:** cambiar la spec, mergear (`git merge`, `gh pr merge`), tocar migraciones, auth o precios sin aprobación, hacer push a `main` o `develop`, hacer push forzado (`--force`, `-f`, `--force-with-lease`), reescribir historial (`rebase`, `reset --hard`, `commit --amend`, `filter-branch`) ni borrar ramas remotas.
 - **Salida:** tarea, estado, archivos, pruebas con resultado real, pendiente y riesgo.
 
 ### `reviewer`
