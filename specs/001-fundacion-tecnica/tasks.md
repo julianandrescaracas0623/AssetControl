@@ -84,6 +84,15 @@
 - **Criterio:** `upgrade head` y `downgrade base` funcionan sobre una base vacía; no crea tablas de negocio. `env.py` se conecta con `MIGRATION_DATABASE_URL` (rol migrador, nombre `[PROPUESTA]`), nunca con el rol de la aplicación. Queda documentado en `migrations/` (comentario o README corto) el **patrón obligatorio de toda tabla de negocio** para la spec 002: en el mismo `upgrade`, `ENABLE` + `FORCE ROW LEVEL SECURITY`, política `tenant_isolation` con `USING`/`WITH CHECK` sobre `NULLIF(current_setting('app.tenant_id', true), '')::uuid` y `GRANT` mínimos al rol de la aplicación; el `downgrade` los revierte (`plan.md` §2 y §6).
 - **Verificación:** `cd backend && uv run alembic upgrade head && uv run alembic downgrade base && uv run alembic upgrade head`
 - **Riesgo:** `env.py` usando por error la URL del rol de la aplicación (sin permisos de DDL) o la aplicación usando la del migrador (dueño: RLS no se le aplicaría sin `FORCE`).
+- **Implementada y aprobada (2026-11-12):** 131 pruebas pasan con base real; aprobada por reviewer y security-reviewer (incluida la corrección M1).
+  - La prueba de `upgrade`/`downgrade`/`upgrade` corre sobre una base temporal vacía creada y borrada por la propia prueba (requiere `CREATEDB` en el rol de `TEST_MIGRATION_DATABASE_URL`).
+  - Guard de mismo rol: `load_migration_url` compara el usuario de `MIGRATION_DATABASE_URL` y `DATABASE_URL` con `make_url` (mismo parser que el engine, decodifica `%XX`); si alguna no se puede interpretar falla (fail-closed) sin mostrar la URL; dos URL sin usuario cuentan como mismo rol.
+- **Deuda de T6 (security-reviewer, para la spec 002 / T7):**
+  - M2: antes del piloto, verificación al arrancar de que el rol de la aplicación no tiene `rolsuper` ni `rolbypassrls`.
+  - Patrón RLS en `migrations/`: `REVOKE` a `anon`/`authenticated`/`service_role` en Supabase; `USAGE` en secuencias; tablas globales sin `tenant_id`; el `downgrade` solo en dev/CI; prueba global de que toda tabla con `tenant_id` tenga RLS + `FORCE` + política.
+  - El nombre del rol en SQL se cita con `identifier_preparer.quote`.
+  - `file_template` de `alembic.ini` sin slug.
+  - T7: `MIGRATION_DATABASE_URL` y `TEST_MIGRATION_DATABASE_URL` en `.env.example`.
 
 ---
 
