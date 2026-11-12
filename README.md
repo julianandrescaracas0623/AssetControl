@@ -38,6 +38,18 @@ Fase: definición de arquitectura y alcance del MVP. Fundación técnica en curs
 
 La justificación está en [ADR-001](docs/adr/ADR-001-stack.md) y [ADR-002](docs/adr/ADR-002-solo-online-cliente-web.md).
 
+## Arranque rápido
+
+Requisitos: Git, Docker y Node 24 (`^24.15.0`, fijado en `web/package.json`). Desde la raíz, en bash o Git Bash:
+
+```sh
+sh scripts/setup-hooks.sh                      # hooks de Git (una vez por clon)
+cp .env.example .env                           # completa los valores (alfanuméricos)
+docker compose up --build -d                   # PostgreSQL 17 + API en http://localhost:5000
+curl http://localhost:5000/health              # 200 con "db": "ok"
+cd web && npm ci && npm run dev                # web en http://localhost:5173
+```
+
 ## Entorno local con Docker
 
 1. Copia `.env.example` a `.env` y completa los valores (`.env` está ignorado por git).
@@ -81,6 +93,72 @@ docker compose exec \
 ```
 
 `TEST_DATABASE_URL` usa el rol de la aplicación y `TEST_MIGRATION_DATABASE_URL` el rol migrador (necesita `CREATEDB` para la prueba de migraciones).
+
+### Si el rol de la aplicación no existe
+
+Síntoma: `db` no queda sano (`docker compose ps`) y la API no arranca. Pasa cuando el volumen `pgdata` se creó antes del script de init o cambiaste `APP_DB_USER`. Dos salidas:
+
+```sh
+docker compose down -v && docker compose up --build -d                      # borra SOLO los datos locales de desarrollo
+docker compose exec db bash /docker-entrypoint-initdb.d/01-app-role.sh      # o: crea el rol sin borrar el volumen
+```
+
+El script usa bashismos: ejecútalo siempre con `bash`, nunca con `sh`. Es idempotente.
+
+## CI (GitHub Actions)
+
+Los workflows de `.github/workflows/` corren en cada PR hacia `main`, `develop` y las ramas encadenadas `feat/**` y `docs/**`, y en cada push a `main` y `develop`:
+
+- **Backend:** `ruff`, rol de la aplicación creado con `bash docker/postgres/init/01-app-role.sh`, comprobación de que `TEST_DATABASE_URL` no es superusuario ni tiene `BYPASSRLS`, migraciones con el rol migrador (subir, bajar, subir) y `pytest` sobre PostgreSQL 17.
+- **Web (Node 24.x):** `npm ci`, `lint`, `typecheck`, `test` y `build`.
+- **Repositorio:** enlaces de la documentación, índice de ADR, ausencia de datos de la clínica y del arnés local, `scripts/check-attribution.sh` sobre los commits del PR y que el servicio `api` del compose no reciba la URL del rol migrador.
+
+Las credenciales del CI son valores efímeros de un PostgreSQL desechable; no hay secretos reales en los workflows.
+
+## Producción (antes del piloto)
+
+No hay despliegue en esta fase; esto queda escrito para cuando lo haya.
+
+### Rol de la aplicación en Supabase
+
+Supabase solo aporta el PostgreSQL administrado. El operador crea el rol de la aplicación **una vez**, con el rol administrador del proyecto (que también ejecuta Alembic), desde `psql`. La contraseña se escribe en el aviso de `\password`, no en el SQL ni en el historial:
+
+```sql
+CREATE ROLE assetcontrol_app LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+\password assetcontrol_app
+GRANT CONNECT ON DATABASE postgres TO assetcontrol_app;
+GRANT USAGE ON SCHEMA public TO assetcontrol_app;
+-- Debe devolver f | f y ninguna membresía:
+SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'assetcontrol_app';
+SELECT roleid::regrole FROM pg_auth_members WHERE member = 'assetcontrol_app'::regrole;
+```
+
+- El rol no puede ser miembro de `postgres`, `service_role`, `authenticated` ni `anon`, ni dueño de las tablas (con dueño o `BYPASSRLS`, RLS no se aplica).
+- Aquí solo se dan `CONNECT` y `USAGE`: los permisos por tabla del rol de la aplicación (`SELECT, INSERT, UPDATE`, nunca `DELETE`) los da cada migración de Alembic junto con su RLS ([backend/migrations/README.md](backend/migrations/README.md)), no el operador a mano.
+- `DATABASE_URL` de la API usa este rol; `MIGRATION_DATABASE_URL` (solo Alembic) usa el administrador. Los valores viven en el gestor de secretos del alojamiento, nunca en el repositorio.
+
+### Cerrar la API automática de Supabase
+
+Flask es el único backend: los roles `anon` y `authenticated` de Supabase no deben poder leer ni escribir el esquema `public`. Con el rol administrador, una vez y de nuevo tras cada migración que cree tablas:
+
+```sql
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+-- Debe devolver 0 filas:
+SELECT grantee, table_name, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_schema = 'public' AND grantee IN ('anon', 'authenticated');
+```
+
+Además, desactiva la Data API en el panel del proyecto (*Project Settings → Data API*) o, como mínimo, quita `public` de los esquemas expuestos.
+
+### Servidor de la API
+
+- El comando de producción es **`gunicorn`**, nunca `flask run` (el `CMD` de `backend/Dockerfile` es solo para desarrollo). Escucha solo en local, detrás del proxy inverso, con workers `gthread` o suficientes para que un `/health` lento no bloquee la API, por ejemplo: `gunicorn --worker-class gthread --workers 2 --threads 4 --bind 127.0.0.1:5000 "app:create_app()"`. Si el proxy corre en otra máquina o contenedor, fija `--forwarded-allow-ips` con su IP exacta (nunca `*`) para que las cabeceras `X-Forwarded-*` solo se acepten de él. `gunicorn` aún no es dependencia del proyecto: se añade, con aprobación, en la spec de despliegue.
+- `ENVIRONMENT=production`, sin `FLASK_DEBUG` ni `--reload`; el compose de este repositorio es solo para desarrollo.
+- **`/health` es anónimo y hace ping a la base:** limita su tasa en el proxy inverso (p. ej. unas pocas peticiones por segundo por IP) para que no sirva para saturar la base.
+- **Logs:** pueden arrastrar detalles de PostgreSQL (valores de fila, host). Restringe el acceso a quien opera el servicio y fija una retención acotada (p. ej. 14–30 días) en el alojamiento; nunca los copies a canales abiertos.
+- **Qué no se registra nunca:** la cabecera `Authorization`, cookies, tokens de invitación, URLs de conexión (`DATABASE_URL`, `MIGRATION_DATABASE_URL`), correos, teléfonos ni seriales de activos de la clínica. Sin `echo=True` en SQLAlchemy y con `log_statement = none` en PostgreSQL.
 
 ## Trabajo con asistentes de IA
 

@@ -176,6 +176,17 @@
 - **Deuda heredada de T3 (2026-11-11):** el script de init usa bashismos: se ejecuta con `bash`, no con `sh`. En CI se crea el rol de la aplicación con ese mismo script antes de `pytest`, y `TEST_DATABASE_URL` nunca puede ser el superusuario del servicio de PostgreSQL.
 - **Deuda heredada de T4 (2026-11-11):** el comando de producción es `gunicorn` (workers `gthread` o suficientes), nunca `flask run`; el README documenta rate limit de `/health` en el proxy y acceso/retención acotados de logs. Detalle en `plan.md` §4 "Deuda de operación (heredada de T4)".
 - **Deuda heredada de T9 (2026-11-12):** fijar la versión de Node: CI con `actions/setup-node` en 24.x y `engines` en `web/package.json` o `.nvmrc` (jsdom 31 exige `^22.22.2 || ^24.15.0 || >=26`). Revisar `npm audit` (15 avisos solo en dev) antes del piloto.
+- **Implementada (2026-11-12), aprobada por reviewer y security-reviewer** (sin bloqueantes). Workflows `ci-backend`, `ci-web` y `ci-repo` validados con `actionlint`; `npm ci`, `lint`, `typecheck`, `test` y `build` en verde; paso "api sin `MIGRATION_DATABASE_URL`" probado en verde y en rojo con una copia temporal del compose. Ajustes de seguridad aplicados: sin exención de `backend/tests/fixtures/`, extensiones prohibidas ampliadas (`xlsb`, `ods`, `csv`, `sql`), contraseñas efímeras distintas por rol, `cancel-in-progress` solo en PR, y README con cierre de la Data API de Supabase, `gunicorn` en `127.0.0.1` y qué no se registra en logs.
+- **Deuda y decisiones pendientes de T10:**
+  - Escáner de secretos sobre el rango del PR: herramienta nueva, requiere aprobación humana.
+  - Fijar acciones de GitHub por SHA y activar Dependabot: decisión humana.
+  - Chequeo en CI de membresías y propiedad de tablas del rol de pruebas (hoy solo `rolsuper`/`rolbypassrls`).
+  - `/ready` y límites de tasa de `/auth`: van en las specs de auth, no en esta.
+  - Paridad del migrador (superusuario en CI vs. administrador de Supabase): validar a mano antes del piloto.
+  - Excepción aceptada: instalar `uv` con `pip` fijado solo como bootstrap en CI; el proyecto sigue sin usar `pip`.
+  - Protección de `main` con checks obligatorios y revisión requerida sobre `.github/**`: la configura el humano.
+  - Pruebas de aislamiento RLS recomendadas por seguridad en la primera spec con tablas de negocio.
+  - Verificación en GitHub real pendiente: rama con fallo intencional en rojo, PR con base `feat/**` y PR solo de docs.
 
 ---
 

@@ -8,7 +8,10 @@ datos/
 *.xlsx
 *.xls
 *.xlsm
-!backend/tests/fixtures/*.xlsx
+*.xlsb
+*.ods
+*.csv
+*.sql
 
 # Python (backend)
 __pycache__/
