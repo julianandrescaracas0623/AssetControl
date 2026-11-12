@@ -38,7 +38,7 @@ Esta spec construye solo el andamiaje. **No implementa autenticación, catálogo
 - Estructura del monorepo (`backend/`, `web/`).
 - Backend Flask con *application factory*, configuración por entorno y blueprint `meta`.
 - SQLAlchemy 2 + Alembic con PostgreSQL.
-- Punto central de acceso a datos que exige un tenant (base del filtro central).
+- Punto central de acceso a datos que exige un tenant (base del filtro central), con aislamiento obligatorio por Row Level Security de PostgreSQL y un rol de base de datos de la aplicación distinto del rol que migra (ver R4).
 - Endpoint `/health` y manejo uniforme de errores.
 - Arnés de pruebas con `pytest` contra PostgreSQL real, con rollback por prueba.
 - Revisión inicial de Alembic, reversible.
@@ -76,9 +76,19 @@ Esta spec construye solo el andamiaje. **No implementa autenticación, catálogo
 
 Variables obligatorias: `DATABASE_URL`, `SECRET_KEY`, `ENVIRONMENT`.
 
+`DATABASE_URL` usa el rol de la aplicación (R4c). La URL del rol migrador la lee solo Alembic y no es obligatoria para arrancar la API (nombre propuesto en `plan.md` §2).
+
 ### R4 — Acceso a datos con tenant
 
 **El sistema** debe ofrecer un único punto de acceso a datos que reciba el `tenant_id` y lo aplique a toda consulta sobre una tabla de negocio, y que falle si se invoca sin tenant.
+
+**R4a — Aislamiento en la base (obligatorio).** **Cuando** se abra el punto de acceso con un tenant, **el sistema** debe fijar ese tenant en la transacción de PostgreSQL (`SET LOCAL` vía `set_config`, parametrizado), y toda tabla de negocio debe tener Row Level Security habilitada y forzada (`ENABLE` + `FORCE ROW LEVEL SECURITY`) con una política que compare su `tenant_id` con el tenant fijado, tanto al leer (`USING`) como al escribir (`WITH CHECK`).
+
+**R4b — Sin tenant, nada.** **Cuando** una conexión de la aplicación consulte o escriba una tabla de negocio sin tenant fijado, **la base** no debe devolver filas ni aceptar escrituras.
+
+**R4c — Rol de la aplicación.** **El sistema** debe conectarse a PostgreSQL con un rol propio de la aplicación que no sea superusuario, no tenga `BYPASSRLS` y no sea dueño de las tablas de negocio (o, si lo fuera, con `FORCE ROW LEVEL SECURITY`); las migraciones deben correr con otro rol, dueño del esquema. Aplica en Docker local, en CI y en Supabase.
+
+**R4d — Filtro en Python como complemento.** **El sistema** debe aplicar además el filtro estándar de SQLAlchemy (`with_loader_criteria` sobre las entidades con tenant) y asignar el `tenant_id` al insertar; este filtro no sustituye a RLS.
 
 ### R5 — Salud
 
@@ -127,7 +137,8 @@ Variables obligatorias: `DATABASE_URL`, `SECRET_KEY`, `ENVIRONMENT`.
 | A1 | El repo tiene `backend/` y `web/` y cada una compila | `ls` + build |
 | A2 | `create_app` se importa sin efectos secundarios | `uv run pytest tests/test_app_factory.py` |
 | A3 | Falta de variable obligatoria falla con mensaje claro | prueba unitaria |
-| A4 | El acceso a datos sin tenant falla; con tenant filtra | prueba con dos tenants |
+| A4 | El acceso a datos sin tenant falla; con tenant filtra; RLS bloquea a otro tenant incluso por vías que el filtro de Python no cubre (`get_bind`, engine, SQL crudo con el rol de app, API *bulk* heredada, `join` explícito) | prueba con dos tenants (`test_tenant_scope.py`) |
+| A4a | El rol de la aplicación no es superusuario, no tiene `BYPASSRLS` y la tabla de prueba tiene RLS forzada | prueba que consulta `pg_roles` y `pg_class` |
 | A5 | `/health` responde 200 con DB arriba y 503 con DB abajo | prueba de integración |
 | A6 | Un error no controlado devuelve JSON uniforme sin traza | prueba unitaria |
 | A7 | `pytest` corre en limpio y no deja datos | ejecución local, dos veces |
@@ -148,6 +159,7 @@ Esta spec no implementa dominio, pero deja listas las bases:
 
 - `tenant_id` será obligatorio en toda tabla de negocio.
 - El filtro por tenant es único y central (R4); ningún endpoint filtra a mano.
+- La base de datos hace cumplir el tenant con RLS (R4a–R4c); toda tabla de negocio futura nace con RLS forzada y su política.
 - Dinero siempre con `Decimal` (la web no calculará totales).
 
 ---
@@ -159,6 +171,8 @@ Esta spec no implementa dominio, pero deja listas las bases:
 | Sobrecargar la fundación con dominio | Prohibido crear tablas de negocio en esta spec |
 | Entorno local no reproducible | Docker + `.env.example` + CI desde el primer día |
 | Aislamiento por tenant "para después" | El punto central y su prueba con dos tenants se crean ahora |
+| Barrera de aislamiento solo en Python con fugas (SQLAlchemy ofrece demasiadas vías) | RLS de PostgreSQL como barrera; Python solo como filtro estándar (R4a–R4d) |
+| Rol de la aplicación con `BYPASSRLS` o superusuario anula RLS en silencio | Prueba A4a que lo verifica en cada corrida |
 | Pruebas con SQLite que no reflejan Postgres | `pytest` siempre contra PostgreSQL |
 | Dependencias de shadcn/ui que cambian | Fijar versiones; añadir componentes con la CLI solo cuando se usan |
 | Arnés local publicado por descuido | Hooks versionados, `pre-commit` y chequeo en CI |
@@ -182,3 +196,12 @@ Esta spec no implementa dominio, pero deja listas las bases:
 - Offline.
 
 Si una tarea de esta spec empieza a tocar esos temas, se detiene y se convierte en otra spec.
+
+La tabla con `tenant_id` y su política que usa T3 se crea solo dentro de las pruebas; no es una tabla de negocio ni entra en las migraciones.
+
+---
+
+## 10. Registro de cambios
+
+- 2026-11-11: aislamiento por RLS + filtro simple (decisión humana tras 3 revisiones de T3). R4 se amplía con R4a–R4d; A4 se amplía y se añade A4a; se descarta la barrera en Python que recorría el árbol de cada sentencia (ver `plan.md` §7). ADR-001 actualizado: RLS pasa de opcional a obligatoria.
+- 2026-11-11: T3 aprobada (RLS). Nota: en la reescritura el código se escribió antes que las pruebas; el rojo se obtuvo restaurando el código anterior.
