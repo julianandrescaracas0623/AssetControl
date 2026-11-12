@@ -8,6 +8,11 @@ Primer cliente: Biotecnologia Dental (Cartago, Colombia). El diseño es multi-te
 
 Fase: definición de arquitectura y alcance del MVP. Todavía no hay código de aplicación.
 
+## Estructura
+
+- `backend/` — API Flask.
+- `web/` — cliente React responsive.
+
 ## Documentos
 
 | Documento | Contenido |
