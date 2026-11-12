@@ -1,6 +1,6 @@
 # Plan 002 — Acceso y usuarios
 
-> **Estado:** Propuesta, pendiente de aprobación humana (G1–G3). Incorpora las decisiones humanas de la ronda G1 (Q1–Q8, Q10, Q12–Q18) y los dos veredictos del `security-reviewer`. Backend en 10 tareas (T1–T10). Siguen abiertas Q9 y Q11 (`[RECOMENDACIÓN, pendiente de confirmación humana]`), los umbrales de Q10 y Q19 (solo 002b); ver `spec.md` §Preguntas abiertas. Cubre el backend (T1–T10); OpenAPI y web están en `specs/002b-acceso-web/`.
+> **Estado:** Aprobada (G1–G3, 2026-11-12). **Condición:** T1 no empieza hasta que el humano aplique los cambios 1–5 a `docs/03` y P0 (`auth_owner` en el init); T10 no empieza hasta que aplique el cambio 6 (`limite_tasa`). Incorpora las decisiones humanas de la ronda G1 (Q1–Q18 salvo Q19) y los dos veredictos del `security-reviewer`. Backend en 10 tareas (T1–T10). Siguen abiertas Q19 (solo 002b) y C8 (antes del piloto); ver `spec.md` §Preguntas abiertas. Cubre el backend (T1–T10); OpenAPI y web están en `specs/002b-acceso-web/`.
 
 ## 1. Enfoque
 
@@ -68,9 +68,9 @@ Las `tenant_isolation` de la aplicación son `TO <rol de aplicación>` explícit
 - **Tokens:** acceso JWT `HS256`, claims `sub`, `tenant`, `exp`, `iss` (el `rol` del claim es informativo para la web, no se usa para autorizar); clave derivada de `SECRET_KEY` con contexto propio; TTL acceso 15 min y refresh 7 días; invitación 72 h (bootstrap 24 h) (Q7, DECIDIDO). Refresh e invitación opacos, `secrets.token_urlsafe`.
 - **Cookie:** `__Secure-` (implica `Secure`), `HttpOnly`, `SameSite=Lax`, `Path=/auth`. Solo con `ENVIRONMENT=development` explícito se omite `Secure` (y entonces el prefijo `__Secure-` no se usa en desarrollo; el nombre lo decide T4/T6).
 - **Errores:** JSON uniforme de la spec 001; códigos `credenciales_invalidas`, `no_autenticado` (401), `prohibido` (403), `invitacion_invalida`, `demasiadas_solicitudes` (429), `cuerpo_demasiado_grande` (413).
-- **Cabeceras y límites (T4):** `Cache-Control: no-store` y `Referrer-Policy: no-referrer` en `/auth/*` e `/invitaciones/*` (T4 implementa y prueba el mecanismo; la prueba por ruta de cada endpoint va en T6/T8/T9 cuando existan); límite de tamaño de cuerpo (`MAX_CONTENT_LENGTH`) y de longitud de contraseña; contraseña de 10 a 128 caracteres `[RECOMENDACIÓN, pendiente de confirmación humana, Q9]`; cuerpo máximo `[PENDIENTE]` en T4 (referencia no vinculante: ≤ 4 KB).
+- **Cabeceras y límites (T4):** `Cache-Control: no-store` y `Referrer-Policy: no-referrer` en `/auth/*` e `/invitaciones/*` (T4 implementa y prueba el mecanismo; la prueba por ruta de cada endpoint va en T6/T8/T9 cuando existan); límite de tamaño de cuerpo (`MAX_CONTENT_LENGTH`) y de longitud de contraseña; contraseña de 10 a 128 caracteres con rechazo de una lista corta de comunes que fija T4 (Q9 DECIDIDO); cuerpo máximo de 4 KB en los endpoints de auth.
 - **Logs:** `DBAPIError` con tipo y `sqlstate`; sin tokens, hashes ni contraseñas; el enlace del script solo va a stdout.
-- **Arranque:** valida `SECRET_KEY` (≥ 32 bytes, `[RECOMENDACIÓN, pendiente de confirmación humana, Q11]`) y `rolsuper`/`rolbypassrls` del `current_user`.
+- **Arranque:** valida `SECRET_KEY` (≥ 32 bytes, Q11 DECIDIDO) y `rolsuper`/`rolbypassrls` del `current_user`.
 
 ### 2.3 Script del operador
 
@@ -100,9 +100,9 @@ Tabla de **infraestructura**, no de negocio: sin `tenant_id` porque el login, la
 | `ventana_inicio` | `timestamptz` NOT NULL | inicio de la ventana fija |
 | `intentos` | `integer` NOT NULL DEFAULT 0, `CHECK (intentos >= 0)` | contador |
 
-PK `(ambito, clave_hash, ventana_inicio)`. Incremento atómico con `INSERT ... ON CONFLICT (...) DO UPDATE SET intentos = limite_tasa.intentos + 1 RETURNING intentos`, en una **transacción propia** (autocommit) para que el fallo de la petición no revierta el contador. Umbrales y duración de ventana: `[PENDIENTE]`, se fijan en T10 con el humano.
+PK `(ambito, clave_hash, ventana_inicio)`. Incremento atómico con `INSERT ... ON CONFLICT (...) DO UPDATE SET intentos = limite_tasa.intentos + 1 RETURNING intentos`, en una **transacción propia** (autocommit) para que el fallo de la petición no revierta el contador. Ventana de 15 min; umbrales (Q10 DECIDIDO; referencia, ajustables por configuración): login 5 fallidos por cuenta y 20 por IP; validar y aceptar invitación 10 por IP; refresh 30 por IP; `429` genérico; los emails inexistentes también cuentan, sin oráculo.
 
-- **RLS y `GRANT` mínimos:** `ENABLE` + `FORCE ROW LEVEL SECURITY`; una política por comando `TO <rol de aplicación>` (`SELECT`, `INSERT`, `UPDATE`), sin `PUBLIC` ni `FOR ALL`; `GRANT SELECT, INSERT, UPDATE (intentos)` al rol de aplicación (el `SELECT` de tabla completa es necesario para el `RETURNING`; la tabla solo guarda hashes y contadores); **sin `DELETE`** (constitución §6) y `REVOKE` a `anon`/`authenticated`/`service_role`. Como la tabla no tiene datos de negocio ni de tenant, la política no filtra por tenant: su defensa es el privilegio mínimo y el hash de la clave. Las ventanas vencidas se ignoran; la purga (único `DELETE`, con `GRANT DELETE` solo al migrador) es una tarea operativa fuera de esta spec `[PENDIENTE]`.
+- **RLS y `GRANT` mínimos:** `ENABLE` + `FORCE ROW LEVEL SECURITY`; una política por comando `TO <rol de aplicación>` (`SELECT`, `INSERT`, `UPDATE`), sin `PUBLIC` ni `FOR ALL`; `GRANT SELECT, INSERT, UPDATE (intentos)` al rol de aplicación (el `SELECT` de tabla completa es necesario para el `RETURNING`; la tabla solo guarda hashes y contadores); **sin `DELETE`** (constitución §6) y `REVOKE` a `anon`/`authenticated`/`service_role`. Como la tabla no tiene datos de negocio ni de tenant, la política no filtra por tenant: su defensa es el privilegio mínimo y el hash de la clave. Las ventanas vencidas se ignoran; la purga (único `DELETE`, con `GRANT DELETE` solo al migrador) es el comando operativo documentado `purgar-limite-tasa`, ejecutado por el operador (responsable) con el rol migrador (DECIDIDO); T10 lo deja escrito en el `README.md` previsto.
 - **Excepción a la constitución §4** (toda tabla de negocio lleva `tenant_id`): se justifica porque no es una tabla de negocio. Queda en la lista cerrada de A2 con prueba propia (sin `DELETE`, solo `intentos` actualizable, sin columnas en claro).
 - Migración `0005_limite_tasa` (T10).
 
@@ -202,15 +202,15 @@ Concurrencia (A9), atomicidad (A20, A22), auth (A10, A13, A14, A21), JWT/cabecer
 | T1 | `docs/03` actualizado por el humano (cambios 1–5), P0 (init con `auth_owner`) |
 | T2 | T1; revisión del SQL de políticas por el `security-reviewer` |
 | T3 | T2 |
-| T4 | Q9 (valores) y Q11 (valor); versiones exactas y parámetros de Argon2id (se fijan en la tarea) |
+| T4 | T1; versiones exactas y parámetros de Argon2id y lista corta de contraseñas comunes (se fijan en la tarea) |
 | T5 | T3, T4 |
 | T6 | T3, T4 |
 | T7 | T6 |
 | T8 | T6 |
-| T9 | Q9 (lista de comunes), T3, T6, T8 |
-| T10 | Cambio 6 a `docs/03` (`limite_tasa`) por el humano; umbrales de Q10 |
+| T9 | T3, T6, T8 |
+| T10 | Cambio 6 a `docs/03` (`limite_tasa`) por el humano |
 
-Decididas: Q1–Q8, Q10 (almacenamiento), Q12–Q18. Q19 solo afecta a 002b.
+Decididas: Q1–Q18 (incluidas Q9, Q10 completa y Q11). Q19 solo afecta a 002b.
 
 ## 9. Alternativa descartada
 

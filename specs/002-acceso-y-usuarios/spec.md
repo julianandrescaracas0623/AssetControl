@@ -1,10 +1,10 @@
 # Spec 002 — Acceso y usuarios
 
-> **Estado:** Propuesta, pendiente de aprobación humana (G1–G3). Fecha: 2026-11-12. Incorpora las decisiones humanas de la ronda G1 (Q1–Q8, Q10, Q12–Q18; ver tabla) y los veredictos CAMBIOS del `security-reviewer` (primera revisión: B1, I1–I11, C1–C10; segunda: script bajo FORCE RLS, Q4=B completa, ventana de gracia, `membresia`, partición de tareas).
+> **Estado:** Aprobada (G1–G3, 2026-11-12). **Condición:** T1 no empieza hasta que el humano aplique los cambios 1–5 a `docs/03` y P0 (`auth_owner` en el init); T10 no empieza hasta que aplique el cambio 6 (`limite_tasa`). Incorpora las decisiones humanas de la ronda G1 (Q1–Q18 salvo Q19; ver tabla) y los veredictos CAMBIOS del `security-reviewer` (primera revisión: B1, I1–I11, C1–C10; segunda: script bajo FORCE RLS, Q4=B completa, ventana de gracia, `membresia`, partición de tareas).
 > **Depende de:** spec 001 (T1–T10), `docs/01-alcance-mvp.md`, `docs/02-arquitectura.md`, `docs/03-modelo-datos.md` (con los cambios propuestos de abajo, que aplica el humano antes de T1), `docs/07-casos-de-uso-y-modulos.md` (M1: CU-ACC-01..04), ADR-001 (RLS obligatoria), ADR-002.
 > **Objetivo:** que un admin invite a un contador por enlace, ambos inicien sesión, el servidor verifique rol y tenant en cada petición, y quede probado que un tenant no ve a otro.
-> **Convención:** `[PENDIENTE]` = decisión humana sin tomar. `[RECOMENDACIÓN, pendiente de confirmación humana]` = propuesta del `security-reviewer`; la spec la asume pero no es vinculante hasta confirmarla. `[DECIDIDO]` = decisión humana.
-> **Partición (Q18, DECIDIDO):** esta spec cubre el **backend** (T1–T10). OpenAPI + tipos TS (R17) y web mínima (R18) pasan a `specs/002b-acceso-web/` (estado Propuesta). B2 y B5 de la deuda de T7 (spec 001) quedan diferidos.
+> **Convención:** `[PENDIENTE]` = decisión humana sin tomar. `[DECIDIDO]` = decisión humana.
+> **Partición (Q18, DECIDIDO):** esta spec cubre el **backend** (T1–T10). OpenAPI + tipos TS (R17) y web mínima (R18) pasan a `specs/002b-acceso-web/` (aún sin aprobar; Q19 abierta). B2 y B5 de la deuda de T7 (spec 001) quedan diferidos.
 
 ---
 
@@ -19,7 +19,7 @@
 | Q6 | **[DECIDIDO]** Con varias membresías activas el login falla cerrado. |
 | Q7 | **[DECIDIDO]** Invitación 72 h (bootstrap 24 h), acceso 15 min, refresh 7 días con rotación. |
 | Q8 | **[DECIDIDO]** Hash de contraseñas con `argon2-cffi` (no `werkzeug.security`) y `PyJWT` como dependencias nuevas de backend, con versiones exactas (`plan.md` §6). Sin `Flask-Limiter`. |
-| Q10 | **[DECIDIDO]** Límites de tasa en una tabla de PostgreSQL (contador por IP y por cuenta); sin Flask-Limiter ni Redis. Tabla nueva de infraestructura sin `tenant_id`: esquema propuesto en `plan.md` §3.1 y sexto cambio a `docs/03` (abajo). |
+| Q10 | **[DECIDIDO]** Límites de tasa en una tabla de PostgreSQL (contador por IP y por cuenta); sin Flask-Limiter ni Redis. Tabla nueva de infraestructura sin `tenant_id`: esquema propuesto en `plan.md` §3.1 y sexto cambio a `docs/03` (abajo). **Umbrales (referencia, ajustables por configuración):** login 5 fallidos/15 min por cuenta y 20/15 min por IP; validar y aceptar invitación 10/15 min por IP; refresh 30/15 min por IP; `429` genérico; los emails inexistentes también cuentan, sin oráculo. **Purga:** comando operativo documentado `purgar-limite-tasa`, ejecutado por el operador con el rol migrador (único con `DELETE`, solo sobre `limite_tasa`); la aplicación no tiene `DELETE`. |
 | Q12 | **[DECIDIDO]** `/health` intacto y `/ready` nuevo. |
 | Q13 | **[DECIDIDO]** El token va en el fragmento del enlace (`/invitacion#<token>`). |
 | Q14 | **[DECIDIDO]** Mismo sitio + `SameSite=Lax` + cabecera personalizada + comprobación de `Origin`/`Sec-Fetch-Site`. |
@@ -27,7 +27,8 @@
 | Q16 | **[DECIDIDO]** Email existente al aceptar: respuesta idéntica a enlace inválido, `ON CONFLICT DO NOTHING` + excepción estática. |
 | Q17 | **[DECIDIDO]** `creada_por` NULL solo por `crear_tenant`; política `RESTRICTIVE` en la aplicación. Exige cambio en `docs/03` (punto 3 abajo). |
 | Q18-ii | **[DECIDIDO]** Alcance extra sobre `docs/07` M1 (M6) aceptado. |
-| Q9, Q11 | **Sin decidir.** `[RECOMENDACIÓN, pendiente de confirmación humana]`: contraseña de 10 a 128 caracteres; `SECRET_KEY` ≥ 32 bytes. |
+| Q9 | **[DECIDIDO]** Contraseña de 10 a 128 caracteres; rechazo de una lista corta de contraseñas comunes (la fija T4); cuerpo máximo de 4 KB en los endpoints de auth. |
+| Q11 | **[DECIDIDO]** `SECRET_KEY` de al menos 32 bytes. |
 | Q4 | **B:** el admin (o el script) fija el email al invitar; columna `email` en `invitacion`. **Consecuencia (b):** el invitado no escribe el email; `POST /invitaciones/aceptar` recibe `{token, nombre, password}` y `acceso.aceptar_invitacion` toma el email de la invitación. |
 | Q18 | Partición 002 (backend) / 002b (OpenAPI + tipos TS + web mínima); B2 y B5 de la spec 001 diferidos. |
 
@@ -117,13 +118,13 @@ La fundación (spec 001) dejó el patrón de aislamiento (RLS, rol de aplicació
 
 **R11 — Aceptar invitación (CU-ACC-03).** Cuando el invitado envíe un token vigente y no usado con nombre y contraseña (`POST /invitaciones/aceptar` recibe `{token, nombre, password}`, **sin email**: lo fijó el admin y no se vuelve a pedir), el sistema debe ejecutar **una sola operación atómica en la base** (`acceso.aceptar_invitacion(p_clave, p_nombre, p_password_hash)`) que: marque `usada_en` con `UPDATE` condicional devolviendo el `email`, `tenant_id` y `rol` de la invitación, cree el `usuario` con **ese email**, y cree la `membresia` con el rol de la invitación. No existe la GUC `app.auth_email_nuevo`. `acceso.validar_invitacion` sigue devolviendo solo vigente o no (sin email, tenant ni rol). Si cualquier paso falla, se revierte completo y la invitación **sigue sin usar**. La emisión de sesión ocurre **después** del `COMMIT`; si falla, la cuenta existe, la respuesta es `500` genérico y el invitado entra con el login normal. Enlace vencido, usado o inexistente responden el mismo error. Con dos aceptaciones concurrentes, solo una gana. Email ya existente (Q16): `INSERT ... ON CONFLICT DO NOTHING` y excepción estática, respuesta indistinguible de `invitacion_invalida` (Q16, DECIDIDO). El token viaja siempre en el cuerpo.
 
-**R12 — Contraseñas.** Solo se guarda el hash **Argon2id** con `argon2-cffi` (Q8, DECIDIDO; no `werkzeug.security`); nunca la contraseña en claro ni en logs o respuestas. Parámetros de Argon2id y hash simulado del mismo costo: `plan.md` §6 y T4. Política de longitud `[RECOMENDACIÓN, pendiente de confirmación humana, Q9]`: mínimo 10 y máximo 128 caracteres; lista de contraseñas comunes y tamaño máximo de cuerpo `[PENDIENTE]` (T4; referencia no vinculante: cuerpo ≤ 4 KB).
+**R12 — Contraseñas.** Solo se guarda el hash **Argon2id** con `argon2-cffi` (Q8, DECIDIDO; no `werkzeug.security`); nunca la contraseña en claro ni en logs o respuestas. Parámetros de Argon2id y hash simulado del mismo costo: `plan.md` §6 y T4. Política (Q9, DECIDIDO): mínimo 10 y máximo 128 caracteres; rechazo de una lista corta de contraseñas comunes (la fija T4); cuerpo máximo de 4 KB en los endpoints de auth.
 
-**R13 — Límites de tasa.** Si se exceden los intentos de login, refresh, validación o aceptación por IP o cuenta, responde `429` sin revelar si la cuenta existe. Almacenamiento (Q10, DECIDIDO): tabla `limite_tasa` de PostgreSQL (contador por IP y por cuenta), sin Flask-Limiter ni Redis; el contador se escribe en una transacción propia para que el fallo del login no lo revierta. Umbrales y ventanas: `[PENDIENTE]` (se fijan en T10 y se confirman con el humano).
+**R13 — Límites de tasa.** Si se exceden los intentos de login, refresh, validación o aceptación por IP o cuenta, responde `429` sin revelar si la cuenta existe. Almacenamiento (Q10, DECIDIDO): tabla `limite_tasa` de PostgreSQL (contador por IP y por cuenta), sin Flask-Limiter ni Redis; el contador se escribe en una transacción propia para que el fallo del login no lo revierta. Umbrales (Q10, DECIDIDO; referencia, ajustables por configuración, ventana de 15 min): login 5 fallidos por cuenta y 20 por IP; validar y aceptar invitación 10 por IP; refresh 30 por IP; `429` genérico; los emails inexistentes también cuentan, sin oráculo.
 
 **R14 — Secretos en logs y cabeceras.** No se registran tokens de invitación (ruta, query, cuerpo), de acceso, refresh, contraseñas ni `token_hash`. Errores de base con tipo y `sqlstate`, no `str(orig)`. Las respuestas de `/auth` y `/invitaciones` llevan `Cache-Control: no-store` y `Referrer-Policy: no-referrer`. Prueba con `caplog` incluyendo `validar` y `aceptar`.
 
-**R15 — Configuración.** Si `SECRET_KEY` es débil (longitud mínima `[RECOMENDACIÓN, pendiente de confirmación humana, Q11]`: 32 bytes), el sistema falla al arrancar fuera de pruebas, sin imprimir su valor. Al arrancar verifica que el rol de `DATABASE_URL` no tiene `rolsuper` ni `rolbypassrls`. `ENVIRONMENT` por defecto es producción: cookie `Secure` salvo `ENVIRONMENT=development` explícito; `docker-compose.yml` y `.env.example` lo fijan. **JWT:** algoritmo fijo `HS256` (rechaza `none` y cualquier otro), `exp` e `iss` obligatorios, clave de firma derivada de `SECRET_KEY` con un contexto propio (no se reutiliza cruda en otros usos).
+**R15 — Configuración.** Si `SECRET_KEY` es débil (longitud mínima, Q11 DECIDIDO: 32 bytes), el sistema falla al arrancar fuera de pruebas, sin imprimir su valor. Al arrancar verifica que el rol de `DATABASE_URL` no tiene `rolsuper` ni `rolbypassrls`. `ENVIRONMENT` por defecto es producción: cookie `Secure` salvo `ENVIRONMENT=development` explícito; `docker-compose.yml` y `.env.example` lo fijan. **JWT:** algoritmo fijo `HS256` (rechaza `none` y cualquier otro), `exp` e `iss` obligatorios, clave de firma derivada de `SECRET_KEY` con un contexto propio (no se reutiliza cruda en otros usos).
 
 **R16 — Readiness.** `GET /ready` verifica la base con respuesta cacheada unos segundos y sin detalles. `/health` no cambia (Q12, DECIDIDO).
 
@@ -197,21 +198,16 @@ A16 y A17 pasan a la spec 002b.
 
 ## Preguntas abiertas
 
-Estado tras la ronda G1. **Decididas:** Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q10 (almacenamiento), Q12, Q13, Q14, Q15, Q16, Q17, Q18 (incluido Q18-ii). **Siguen abiertas:** Q9 y Q11 (valores), Q10 (umbrales y ventanas, purga) PENDIENTE, Q19 (solo 002b), prerrequisitos humanos antes de T1 y C8 antes del piloto. "Bloquea" coincide con `tasks.md` y `plan.md` §8.
-
-**Para pedir la aprobación (G1–G3) falta:** (1) que el humano confirme o ajuste Q9 y Q11, y fije los umbrales y ventanas de Q10; además, la purga de ventanas vencidas de `limite_tasa` necesita un responsable definido antes de T10 (propuesta sin decidir: tarea operativa con el rol migrador); (2) aplicar los cambios a `docs/03` (los cinco de arriba antes de T1; el sexto, `limite_tasa`, antes de T10) y P0 (`auth_owner` en el init); (3) fijar la versión exacta de `argon2-cffi` y `PyJWT` en T4 (aprobadas en Q8). La spec **no** pasa a "Aprobada" hasta que el humano la apruebe explícitamente.
+Spec aprobada (G1–G3, 2026-11-12). **Decididas:** Q1–Q18 (incluidos Q9, Q10 completa y Q11). **Siguen abiertas:** Q19 (solo 002b) y C8 (antes del piloto). **Condiciones previas del humano:** T1 no empieza hasta aplicar los cambios 1–5 a `docs/03` y P0 (`auth_owner` en el init); T10 no empieza hasta aplicar el cambio 6 (`limite_tasa`). T4 fija las versiones exactas de `argon2-cffi` y `PyJWT` (Q8) y la lista corta de contraseñas comunes. "Bloquea" coincide con `tasks.md` y `plan.md` §8.
 
 | Pregunta | Estado | Bloquea |
 |---|---|---|
 | **Cambios a `docs/03`** (los cinco primeros, con el formato `bytea` del hash) y **P0** (ampliar `docker/postgres/init/01-app-role.sh` con `auth_owner`; A0) | Los aplica el humano antes de T1 | T1 |
 | **Cambio 6 a `docs/03`** (`limite_tasa`, `plan.md` §3.1) | Los aplica el humano antes de T10 | T10 |
 | **Q1 — detalle** de las políticas y GUC exactas (I2/I3), incluidas las de `crear_tenant` y `membresia` | Diseño decidido; el `security-reviewer` revisa el SQL concreto en T2 | T2, T3 |
-| **Q3, Q5, Q6, Q7, Q12–Q18** | **[DECIDIDO]** (tabla de decisiones) | — |
+| **Q3, Q5, Q6, Q7, Q9, Q10, Q11, Q12–Q18** | **[DECIDIDO]** (tabla de decisiones) | — |
 | **Q8** Dependencias `argon2-cffi` y `PyJWT` | **[DECIDIDO]**; falta fijar versiones exactas y parámetros de Argon2id en T4 | T4 |
-| **Q9** Política de contraseña: mínimo 10 y máximo 128; lista de comunes y tamaño de cuerpo | `[RECOMENDACIÓN, pendiente de confirmación humana]` (longitudes); resto `[PENDIENTE]` | T4, T9 |
-| **Q10** Umbrales y ventanas de los límites de tasa y responsable de la purga de ventanas vencidas (el almacenamiento está DECIDIDO; propuesta sin decidir para la purga: tarea operativa con el rol migrador) | `[PENDIENTE]` | T10 |
-| **Q11** Longitud mínima de `SECRET_KEY`: 32 bytes | `[RECOMENDACIÓN, pendiente de confirmación humana]` | T4 |
 | **Q19** (solo 002b) Origen en desarrollo: proxy de Vite | `[PENDIENTE]` | 002b |
 | **P17** (`docs/05`) Desactivar, recuperar, vincular | Abierta; fuera de 002 | — |
-| **T5 / T10** de `docs/05` (invitación sin correo; hosting) | Propuesta / abierta | — |
+| **T5 / T10** de `docs/05` (invitación sin correo; hosting) | Abiertas en `docs/05` | — |
 | **C8** Validar con `postgres` real de Supabase | Antes del piloto, no bloquea T1–T10 | Piloto |

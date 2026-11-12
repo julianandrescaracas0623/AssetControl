@@ -1,7 +1,7 @@
 # Tasks 002 — Acceso y usuarios
 
-> **Estado:** Propuesta, pendiente de aprobación humana (G1–G3). Máximo 10 tareas, cada una ≤ 1 día, una a la vez, **tests primero en cada tarea** (se escriben y se ven fallar antes del código). Backend únicamente; OpenAPI/tipos y web están en `specs/002b-acceso-web/`.
-> Las tareas asumen las decisiones humanas de la ronda G1 (Q1–Q8, Q10, Q12–Q18) y las recomendaciones aún sin confirmar (Q9, Q11) de `spec.md`; si el humano decide otra cosa, se ajusta con `/sdd-change` antes de implementar. Solo `argon2-cffi` y `PyJWT` (Q8) pueden instalarse, con versiones exactas (`plan.md` §6).
+> **Estado:** Aprobada (G1–G3, 2026-11-12). **Condición:** T1 no empieza hasta que el humano aplique los cambios 1–5 a `docs/03` y P0 (`auth_owner` en el init); T10 no empieza hasta que aplique el cambio 6 (`limite_tasa`). Máximo 10 tareas, cada una ≤ 1 día, una a la vez, **tests primero en cada tarea** (se escriben y se ven fallar antes del código). Backend únicamente; OpenAPI/tipos y web están en `specs/002b-acceso-web/`.
+> Las tareas asumen las decisiones humanas de la ronda G1 (Q1–Q18, incluidas Q9, Q10 y Q11) de `spec.md`; si el humano decide otra cosa, se ajusta con `/sdd-change` antes de implementar. Solo `argon2-cffi` y `PyJWT` (Q8) pueden instalarse, con versiones exactas (`plan.md` §6).
 > "Depende de" lista tareas y preguntas que deben seguir respondiéndose antes de empezar (coincide con `plan.md` §8 y `spec.md`); las decididas no se repiten.
 > **Prerrequisitos globales (los aplica el humano, antes de T1):**
 > 1. Cambios 1–5 a `docs/03` de `spec.md` (incluido el formato `bytea` del hash). El cambio 6 (`limite_tasa`) se aplica antes de T10.
@@ -39,11 +39,11 @@
 
 ### T4 — Credenciales, tokens, configuración segura y logs
 
-- **Resultado:** (a) hash **Argon2id** con `argon2-cffi` (Q8; versiones exactas de `argon2-cffi` y `PyJWT` fijadas con `==` en `pyproject.toml` y `uv.lock`; parámetros de Argon2id medidos y revisados por el `security-reviewer`, `plan.md` §6) y verificación de contraseña con **hash simulado de los mismos parámetros** calculado al arrancar, longitud máxima y política (Q9: 10–128 `[RECOMENDACIÓN, pendiente de confirmación humana]`); comprobación de que la imagen del `api` instala la rueda binaria sin compilar; generación y doble hash (`sha256` → `sha256`, `bytea`) de tokens de invitación y refresh; JWT `HS256` fijo con `exp` e `iss` obligatorios, clave derivada de `SECRET_KEY`, rechazo de `alg` distinto y de `none`. (b) `SECRET_KEY` validada (B3 de T7; ≥ 32 bytes `[RECOMENDACIÓN, pendiente de confirmación humana, Q11]`); verificación del rol de aplicación al arrancar (M2); `ENVIRONMENT` por defecto producción, cookie `__Secure-`/`Secure` salvo `development` explícito (B4 de T7) con `docker-compose.yml` y `.env.example` fijándolo; `Cache-Control: no-store` y `Referrer-Policy: no-referrer` en `/auth` e `/invitaciones`; límite de tamaño de cuerpo (`413`); redacción de `DBAPIError` (tipo y `sqlstate`); `caplog` sin secretos.
+- **Resultado:** (a) hash **Argon2id** con `argon2-cffi` (Q8; versiones exactas de `argon2-cffi` y `PyJWT` fijadas con `==` en `pyproject.toml` y `uv.lock`; parámetros de Argon2id medidos y revisados por el `security-reviewer`, `plan.md` §6) y verificación de contraseña con **hash simulado de los mismos parámetros** calculado al arrancar, longitud máxima y política (Q9 DECIDIDO: 10–128 caracteres y rechazo de una lista corta de contraseñas comunes que fija esta tarea); comprobación de que la imagen del `api` instala la rueda binaria sin compilar; generación y doble hash (`sha256` → `sha256`, `bytea`) de tokens de invitación y refresh; JWT `HS256` fijo con `exp` e `iss` obligatorios, clave derivada de `SECRET_KEY`, rechazo de `alg` distinto y de `none`. (b) `SECRET_KEY` validada (B3 de T7; ≥ 32 bytes, Q11 DECIDIDO); verificación del rol de aplicación al arrancar (M2); `ENVIRONMENT` por defecto producción, cookie `__Secure-`/`Secure` salvo `development` explícito (B4 de T7) con `docker-compose.yml` y `.env.example` fijándolo; `Cache-Control: no-store` y `Referrer-Policy: no-referrer` en `/auth` e `/invitaciones`; límite de tamaño de cuerpo de 4 KB en los endpoints de auth (`413`, Q9); redacción de `DBAPIError` (tipo y `sqlstate`); `caplog` sin secretos.
 - **Tests primero:** `test_credentials.py`, `test_config.py`, `test_log_redaction.py`.
 - **Archivos probables:** `backend/app/auth/credentials.py`, `backend/app/config.py`, `backend/app/db.py`, `backend/app/errors.py`, `backend/pyproject.toml` y lock (solo dependencias aprobadas), `docker-compose.yml`, `.env.example`, `backend/tests/test_credentials.py`, `backend/tests/test_config.py`, `backend/tests/test_log_redaction.py`.
 - **Verificación:** `cd backend && uv run pytest tests/test_credentials.py tests/test_config.py tests/test_log_redaction.py && uv run ruff check .`
-- **Depende de:** T1; valores de Q9 y Q11 (confirmación humana pendiente); Q7 y Q8 decididos.
+- **Depende de:** T1; Q7, Q8, Q9 y Q11 decididos.
 - **Nota:** de T4 solo se prueba el mecanismo de las cabeceras (`no-store`, `no-referrer`); las pruebas por ruta de `/auth` e `/invitaciones` se escriben en T6/T8/T9, cuando existan las rutas. Si T4 pasa de un día, se parte con `/sdd-change` (p. ej. configuración y logs aparte de credenciales).
 - **Riesgo:** costo de hash lento en pruebas (costo bajo solo en tests); imprimir `SECRET_KEY`; romper el arranque local.
 
@@ -89,23 +89,23 @@
 - **Tests primero:** `test_invitaciones_aceptar.py`, `test_invitaciones_concurrencia.py`.
 - **Archivos probables:** `backend/app/invitaciones/routes.py`, `backend/app/invitaciones/service.py`, `backend/tests/test_invitaciones_aceptar.py`, `backend/tests/test_invitaciones_concurrencia.py`.
 - **Verificación:** `cd backend && uv run pytest tests/test_invitaciones_aceptar.py tests/test_invitaciones_concurrencia.py`
-- **Depende de:** T3, T6, T8; Q9 (lista de contraseñas comunes; Q16 decidido).
+- **Depende de:** T3, T6, T8 (política de contraseña de T4; Q9 y Q16 decididos).
 - **Riesgo:** carrera en el uso único; revelar email existente por mensaje o tiempo.
 
 ### T10 — Límites de tasa, `/ready` y secretos en logs
 
-- **Resultado:** migración `0005_limite_tasa` (tabla de infraestructura sin `tenant_id`, `plan.md` §3.1, con RLS forzada, política y `GRANT` mínimos, sin `DELETE`) y prueba propia en el catálogo (la excepción ya figura desde T1); `429` por IP y cuenta en login, refresh, validar y aceptar con contador en esa tabla, en transacción propia, sin Flask-Limiter ni Redis (Q10; umbrales y ventanas a confirmar con el humano); `GET /ready` cacheado (Q12); sin dependencias nuevas; prueba `caplog` de que ningún log contiene tokens, hashes ni contraseñas, incluidos `validar` y `aceptar`; cierre de A18: `git grep` de secretos y revisión de que `.env.example` lista las variables nuevas sin valores.
+- **Resultado:** migración `0005_limite_tasa` (tabla de infraestructura sin `tenant_id`, `plan.md` §3.1, con RLS forzada, política y `GRANT` mínimos, sin `DELETE`) y prueba propia en el catálogo (la excepción ya figura desde T1); `429` por IP y cuenta en login, refresh, validar y aceptar con contador en esa tabla, en transacción propia, sin Flask-Limiter ni Redis (Q10 DECIDIDO; ventana de 15 min, umbrales de referencia ajustables por configuración: login 5/cuenta y 20/IP, validar y aceptar 10/IP, refresh 30/IP; `429` genérico; los emails inexistentes también cuentan, sin oráculo); comando operativo documentado `purgar-limite-tasa`, ejecutado por el **operador** (responsable) con el rol migrador, único con `DELETE` y solo sobre `limite_tasa`, sin `DELETE` para la app, y documentado en el `README.md` previsto; `GET /ready` cacheado (Q12); sin dependencias nuevas; prueba `caplog` de que ningún log contiene tokens, hashes ni contraseñas, incluidos `validar` y `aceptar`; cierre de A18: `git grep` de secretos y revisión de que `.env.example` lista las variables nuevas sin valores.
 - **Tests primero:** `test_rate_limits.py`, `test_ready.py`, `test_no_secrets_in_logs.py`.
 - **Archivos probables:** `backend/migrations/versions/0005_limite_tasa.py`, `backend/tests/test_catalog_rls.py`, `backend/app/auth/limits.py`, `backend/app/meta/routes.py`, `backend/tests/test_rate_limits.py`, `backend/tests/test_ready.py`, `backend/tests/test_no_secrets_in_logs.py`, `README.md`.
 - **Verificación:** `cd backend && uv run alembic upgrade head && uv run alembic downgrade base && uv run alembic upgrade head && uv run pytest tests/test_rate_limits.py tests/test_ready.py tests/test_no_secrets_in_logs.py tests/test_catalog_rls.py && uv run pytest && uv run ruff check . && git grep -nEi "(secret|password|token)[a-z_]*\s*=\s*['\"][^'\"]+['\"]" -- . ':!*/tests/*'` (sin coincidencias reales; criterio A18)
-- **Depende de:** T6–T9; cambio 6 a `docs/03` (`limite_tasa`) aplicado por el humano; umbrales de Q10 (Q12 decidido).
+- **Depende de:** T6–T9; cambio 6 a `docs/03` (`limite_tasa`) aplicado por el humano (T10 no empieza sin él); Q10 y Q12 decididos.
 - **Riesgo:** `X-Forwarded-For` falsificable; el contador revertido por el fallo de la petición; tabla sin `tenant_id` mal acotada (privilegio mínimo y prueba propia).
 
 ---
 
 ## Fuera de esta spec
 
-Spec `002b-acceso-web` (Propuesta): OpenAPI + tipos TS y web mínima; depende de T10. B2 y B5 de la spec 001 diferidos. C8 (validación con `postgres` real de Supabase) antes del piloto.
+Spec `002b-acceso-web` (aún sin aprobar; Q19 abierta): OpenAPI + tipos TS y web mínima; depende de T10. B2 y B5 de la spec 001 diferidos. C8 (validación con `postgres` real de Supabase) antes del piloto.
 
 ## Resumen
 
@@ -114,13 +114,13 @@ Spec `002b-acceso-web` (Propuesta): OpenAPI + tipos TS y web mínima; depende de
 | T1 | `docs/03` (1–5) actualizado; P0 (A0) | `alembic up/down/up` + catálogo de tablas |
 | T2 | T1; `security-reviewer` | `pytest` aislamiento y atributos, dos veces |
 | T3 | T2 | `pytest` funciones + catálogo cerrado |
-| T4 | T1; valores Q9 y Q11 | `pytest test_credentials test_config test_log_redaction` |
+| T4 | T1 | `pytest test_credentials test_config test_log_redaction` |
 | T5 | T3, T4 | `pytest test_cli_tenant` + manual |
 | T6 | T3, T4 | `pytest test_auth_login` |
 | T7 | T6 | `pytest test_auth_refresh_logout` |
 | T8 | T6 | `pytest test_roles test_invitaciones_crear` |
-| T9 | T3, T6, T8; Q9 (comunes) | `pytest test_invitaciones_*` |
-| T10 | T6–T9; `docs/03` cambio 6; umbrales Q10 | `alembic up/down/up` + `pytest test_rate_limits test_ready test_no_secrets_in_logs test_catalog_rls` |
+| T9 | T3, T6, T8 | `pytest test_invitaciones_*` |
+| T10 | T6–T9; `docs/03` cambio 6 | `alembic up/down/up` + `pytest test_rate_limits test_ready test_no_secrets_in_logs test_catalog_rls` |
 
 ## Reglas de ejecución
 
