@@ -64,7 +64,7 @@ Si la sesión ya está cerrada, la API responde `409 sesion_cerrada`.
 
 ## Multi-tenant
 
-Todas las tablas de negocio tienen `tenant_id`. Las consultas del backend se filtran por el tenant del usuario autenticado en **un solo punto** de la capa de datos, para no depender de que cada endpoint lo recuerde. Cada endpoint tiene una prueba que verifica que no devuelve datos de otro tenant.
+Todas las tablas de negocio tienen `tenant_id`. Las consultas del backend se filtran por el tenant del usuario autenticado en **un solo punto** de la capa de datos, para no depender de que cada endpoint lo recuerde. La barrera la pone PostgreSQL con Row Level Security obligatoria y un rol de aplicación sin `BYPASSRLS` (2026-11-11, [ADR-001](adr/ADR-001-stack.md)). Cada endpoint tiene una prueba que verifica que no devuelve datos de otro tenant.
 
 ## Despliegue
 
@@ -81,5 +81,5 @@ Un contenedor para la API (que también sirve los estáticos de `web/` o los sir
 | Precios inconsistentes en la importación | Pantalla de revisión; ningún precio se importa sin confirmación |
 | Fuga de datos entre tenants | Filtro central + prueba por endpoint |
 | Alta por el contador con precio mal digitado y sin revisión (P11): entra al valor total | El admin corrige el precio (`precio_cambiado` con antes/después; no altera sesiones cerradas, ADR-003) y el historial (visible al admin) muestra quién dio de alta. Con P13 el contador no ve su precio después y no puede verificarlo: la corrección depende del admin. Filtro de "altas recientes" para el admin: `[PENDIENTE]`, decide el humano |
-| Uso de Supabase como infraestructura: exposición accidental de datos o fotos fuera de Flask | `[PENDIENTE]` revisión del `security-reviewer`: (1) el acceso a la base es solo desde el backend; (2) la API y las claves públicas de Supabase no se usan ni se exponen; (3) si se activa RLS, el rol de conexión no tiene `BYPASSRLS`; (4) las fotos no son públicas (bucket privado). La configuración concreta no está decidida |
+| Uso de Supabase como infraestructura: exposición accidental de datos o fotos fuera de Flask | `[PENDIENTE]` revisión del `security-reviewer`: (1) el acceso a la base es solo desde el backend; (2) la API y las claves públicas de Supabase no se usan ni se exponen; (3) RLS es obligatoria (decidido 2026-11-11, [ADR-001](adr/ADR-001-stack.md)): toda tabla de negocio con `ENABLE` + `FORCE ROW LEVEL SECURITY` y política por `tenant_id`; Flask se conecta con un rol propio sin superusuario ni `BYPASSRLS`, distinto del que migra; (4) las fotos no son públicas (bucket privado). La configuración concreta no está decidida |
 | Un campo de precio se filtra al contador por un endpoint olvidado | Filtrado por rol en el servidor (no en la UI) y prueba por endpoint de que la respuesta al contador no trae precios; revisión del `security-reviewer` |

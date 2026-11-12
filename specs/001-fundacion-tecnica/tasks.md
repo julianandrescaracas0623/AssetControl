@@ -26,23 +26,37 @@
 
 ---
 
-### T3 — Backend: sesión de datos y punto central de tenant
+### T3 — Backend: sesión de datos y aislamiento por tenant (RLS + filtro simple)
 
-- **Depende de:** T2
-- **Archivos:** `backend/app/db.py`, `backend/tests/test_tenant_scope.py`
-- **Criterio:** `tenant_session(tenant_id)` aplica el tenant a toda consulta de una tabla de negocio de prueba, falla sin tenant y no deja ver filas de otro tenant (prueba con dos tenants).
-- **Verificación:** `cd backend && uv run pytest tests/test_tenant_scope.py`
-- **Riesgo:** exponer la sesión sin filtro al resto del código.
+> Reescrita el 2026-11-11 (decisión humana tras 3 revisiones). Ver `spec.md` R4–R4d y `plan.md` §2 y §7.
+
+- **Depende de:** T2. Adelanta de T7 el script de init del rol de la aplicación y su montaje en `docker-compose.yml`; no requiere T6 (la tabla de prueba no pasa por Alembic).
+- **Archivos:** `backend/app/db.py`, `backend/tests/test_tenant_scope.py`, `backend/tests/conftest.py` (fixtures con conexión del rol de la aplicación y del rol migrador; enmascarar también las URL nuevas), `docker/postgres/init/01-app-role.sh` (ruta `[PROPUESTA]`), `docker-compose.yml` (solo montar el script y pasar `APP_DB_USER`/`APP_DB_PASSWORD`).
+- **Criterio:**
+  - Se crea el rol de la aplicación (`LOGIN`, `NOSUPERUSER`, `NOBYPASSRLS`, no dueño) con el script de init; `TEST_DATABASE_URL` se conecta con él.
+  - `tenant_session(tenant_id)` valida el UUID, abre transacción y ejecuta `set_config('app.tenant_id', :tenant_id, true)` con parámetro enlazado; falla sin tenant.
+  - Mixin `TenantScoped`; `with_loader_criteria` en `do_orm_execute`; asignación de `tenant_id` al insertar; rechazo de `text()` y `Session.connection()` dentro de `tenant_session`.
+  - Se eliminan `_check_statement_elements` y la verificación por `SELECT` en `before_flush`.
+  - La tabla de prueba con `tenant_id`, `ENABLE` + `FORCE ROW LEVEL SECURITY`, su política `USING`/`WITH CHECK` y sus `GRANT` se crean solo en las pruebas, con el rol migrador.
+  - Con dos tenants, conectado como rol de la aplicación: el ORM solo ve su tenant; un `INSERT` con otro `tenant_id` es rechazado; sin tenant fijado no hay filas ni escritura (también en una conexión del pool que ya tuvo tenant); RLS bloquea al otro tenant por `get_bind()`, engine, SQL crudo por conexión del rol de la aplicación, API *bulk* heredada y `join()` explícito.
+  - Prueba de atributos: `rolsuper` y `rolbypassrls` falsos para el rol de la aplicación; `relrowsecurity` y `relforcerowsecurity` verdaderos en la tabla de prueba.
+- **Verificación:** `docker compose up -d db` (si el volumen `pgdata` ya existía sin el rol, recrearlo con `docker compose down -v`, que borra solo datos locales de desarrollo) y luego `cd backend && uv run pytest tests/test_tenant_scope.py && uv run ruff check .`
+- **Riesgo:** rol de la aplicación con `BYPASSRLS`, superusuario o dueño sin `FORCE` (anula RLS en silencio; lo detecta la prueba de atributos); `set_config` de sesión en lugar de local (fuga entre peticiones por el pool); `SET LOCAL` que sobrevive a un *savepoint* en la transacción externa de las pruebas; `''::uuid` sin `NULLIF` en la política.
 
 ---
 
 ### T4 — Backend: salud y errores
 
 - **Depende de:** T2, T3
-- **Archivos:** `backend/app/meta/routes.py`, `backend/app/errors.py`, `backend/tests/test_health.py`, `backend/tests/test_errors.py`
+- **Archivos:** `backend/app/meta/__init__.py`, `backend/app/meta/routes.py`, `backend/app/errors.py`, `backend/app/version.py`, `backend/tests/test_health.py`, `backend/tests/test_errors.py`
 - **Criterio:** `/health` responde 200 con `{status, db, version}` y 503 si la base falla; un error no controlado responde JSON uniforme con `request_id` y sin traza.
 - **Verificación:** `cd backend && uv run pytest tests/test_health.py tests/test_errors.py`
 - **Riesgo:** exponer detalles internos en el mensaje de error.
+- **Deuda heredada de T3 (2026-11-11):** el manejador de errores nunca devuelve `str(exc)` de psycopg/SQLAlchemy (puede incluir SQL, host o base): mensaje genérico + `request_id`. `/health` hace el ping por una función de `app/db.py` sin tenant (p. ej. `ping_database()`), no con `tenant_session` (ahí `connection()` y `text()` están rechazados).
+- **Implementada y aprobada (2026-11-11):** 100 pruebas pasan con base real; aprobada por reviewer y security-reviewer.
+  - `backend/app/version.py` guarda la versión en código porque uv no instala el proyecto; una prueba en `test_health.py` verifica que coincide con `pyproject.toml`.
+  - **Decisión humana (2026-11-11):** `connect_timeout` fijo de 5 s como constante `CONNECT_TIMEOUT_SECONDS` en `app/db.py`, global al engine; no configurable por ahora (solo si Supabase en producción lo exige).
+  - Deuda de operación heredada de T4: ver `plan.md` §4 "Deuda de operación (heredada de T4)"; la parte de despliegue se cierra en T10.
 
 ---
 
@@ -53,6 +67,7 @@
 - **Criterio:** cada prueba corre en una transacción con rollback sobre PostgreSQL; `pytest` se puede correr dos veces seguidas sin residuos; hay fixtures de app y de cliente HTTP.
 - **Verificación:** `cd backend && uv run pytest && uv run pytest`
 - **Riesgo:** dejar datos de prueba entre corridas.
+- **Deuda heredada de T3 (2026-11-11):** decidir y anotar en `conftest.py` si se mantiene "crear/borrar tablas por prueba" (como hace hoy T3) en lugar de "transacción con rollback por prueba" (`plan.md` §2), y el riesgo de `SET LOCAL` con *savepoints* (`plan.md` §4).
 
 ---
 
@@ -60,9 +75,9 @@
 
 - **Depende de:** T2
 - **Archivos:** `backend/alembic.ini`, `backend/migrations/env.py`, `backend/migrations/versions/0001_baseline.py`
-- **Criterio:** `upgrade head` y `downgrade base` funcionan sobre una base vacía; no crea tablas de negocio.
+- **Criterio:** `upgrade head` y `downgrade base` funcionan sobre una base vacía; no crea tablas de negocio. `env.py` se conecta con `MIGRATION_DATABASE_URL` (rol migrador, nombre `[PROPUESTA]`), nunca con el rol de la aplicación. Queda documentado en `migrations/` (comentario o README corto) el **patrón obligatorio de toda tabla de negocio** para la spec 002: en el mismo `upgrade`, `ENABLE` + `FORCE ROW LEVEL SECURITY`, política `tenant_isolation` con `USING`/`WITH CHECK` sobre `NULLIF(current_setting('app.tenant_id', true), '')::uuid` y `GRANT` mínimos al rol de la aplicación; el `downgrade` los revierte (`plan.md` §2 y §6).
 - **Verificación:** `cd backend && uv run alembic upgrade head && uv run alembic downgrade base && uv run alembic upgrade head`
-- **Riesgo:** `env.py` leyendo una URL distinta a la de la app.
+- **Riesgo:** `env.py` usando por error la URL del rol de la aplicación (sin permisos de DDL) o la aplicación usando la del migrador (dueño: RLS no se le aplicaría sin `FORCE`).
 
 ---
 
@@ -70,9 +85,15 @@
 
 - **Depende de:** T2, T3, T6
 - **Archivos:** `docker-compose.yml`, `backend/Dockerfile`, `.env.example`
-- **Criterio:** `docker compose up` levanta la API con recarga y PostgreSQL; el `Dockerfile` instala las dependencias con uv desde `pyproject.toml` y su lock; `.env.example` lista las variables sin valores reales; `.env` está ignorado.
+- **Criterio:** `docker compose up` levanta la API con recarga y PostgreSQL con la imagen `postgres:17` (igual versión mayor que Supabase, 17.11 confirmada el 2026-11-11); la API se conecta con el rol de la aplicación creado por el script de init de T3; el `Dockerfile` instala las dependencias con uv desde `pyproject.toml` y su lock; `.env.example` lista las variables sin valores reales, incluidas las nuevas de `plan.md` §2 (`MIGRATION_DATABASE_URL`, `APP_DB_USER`, `APP_DB_PASSWORD`, `TEST_MIGRATION_DATABASE_URL`); `.env` está ignorado.
 - **Verificación:** `docker compose up --build` + `curl http://localhost:5000/health`
 - **Riesgo:** `localhost` dentro del contenedor no apunta al host.
+- **Deuda heredada de T3 (2026-11-11):**
+  - `docker-compose.yml` publica el puerto de PostgreSQL solo en `127.0.0.1` (`"127.0.0.1:5432:5432"`).
+  - *Healthcheck* con `pg_isready` y verificación de que existe el rol `APP_DB_USER` con `rolsuper` y `rolbypassrls` falsos.
+  - `.gitattributes` con `docker/**/*.sh text eol=lf` (sin esto un clon en Windows deja el script en CRLF y el init falla).
+  - `.env.example` con `APP_DB_USER` (valor sugerido `assetcontrol_app` solo como comentario), `APP_DB_PASSWORD`, `MIGRATION_DATABASE_URL`, `TEST_DATABASE_URL` y `TEST_MIGRATION_DATABASE_URL`, sin valores.
+  - README: `docker compose down -v` si el volumen no tiene el rol, y `APP_DB_USER` debe ser distinto de `POSTGRES_USER`.
 
 ---
 
@@ -100,9 +121,11 @@
 
 - **Depende de:** T2–T9
 - **Archivos:** `.github/workflows/*.yml`, `README.md`, `scripts/`
-- **Criterio:** el CI corre `ruff`, `pytest`, migraciones, `lint`, `typecheck`, `test` y `build`; corre `check-attribution.sh` sobre el rango del PR; un clon nuevo instala los hooks con `sh scripts/setup-hooks.sh`; el README explica el arranque en menos de 10 líneas; `MEMORY.md` refleja el estado.
+- **Criterio:** el CI crea el rol de la aplicación con el script de init de T3 antes de `pytest` y corre `ruff`, `pytest`, migraciones (con el rol migrador), `lint`, `typecheck`, `test` y `build`; el README explica cómo recrear el volumen si el rol no existe y cómo crear el rol en Supabase; corre `check-attribution.sh` sobre el rango del PR; un clon nuevo instala los hooks con `sh scripts/setup-hooks.sh`; el README explica el arranque en menos de 10 líneas; `MEMORY.md` refleja el estado.
 - **Verificación:** PR de prueba con un fallo intencional → CI rojo; corregido → CI verde; commit de prueba con `Co-Authored-By: Claude` → CI rojo.
 - **Riesgo:** CI que no corre por la configuración de ramas.
+- **Deuda heredada de T3 (2026-11-11):** el script de init usa bashismos: se ejecuta con `bash`, no con `sh`. En CI se crea el rol de la aplicación con ese mismo script antes de `pytest`, y `TEST_DATABASE_URL` nunca puede ser el superusuario del servicio de PostgreSQL.
+- **Deuda heredada de T4 (2026-11-11):** el comando de producción es `gunicorn` (workers `gthread` o suficientes), nunca `flask run`; el README documenta rate limit de `/health` en el proxy y acceso/retención acotados de logs. Detalle en `plan.md` §4 "Deuda de operación (heredada de T4)".
 
 ---
 
@@ -112,7 +135,7 @@
 |---|---|---|
 | T1 | — | estructura + `git check-ignore` |
 | T2 | T1 | `uv run pytest test_app_factory test_config` |
-| T3 | T2 | `uv run pytest test_tenant_scope` |
+| T3 | T2 (adelanta el rol de app de T7) | `docker compose up -d db` + `uv run pytest test_tenant_scope` |
 | T4 | T2, T3 | `uv run pytest test_health test_errors` |
 | T5 | T2–T4 | `uv run pytest` dos veces |
 | T6 | T2 | `uv run alembic upgrade/downgrade/upgrade` |
@@ -127,3 +150,5 @@
 - No se abre T8 antes de cerrar T5: la fundación del backend manda.
 - Si una tarea crece más de un día, se divide y se actualiza este archivo con `/sdd-change`.
 - T6 no crea tablas de negocio. Si aparece esa necesidad, es otra spec.
+- La tabla de prueba de T3 y su política viven solo en las pruebas; no se migran.
+- Toda tabla de negocio futura nace con RLS forzada, política y `GRANT` mínimos en su misma migración (patrón de T6).
