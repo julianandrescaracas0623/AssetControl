@@ -110,6 +110,7 @@
   - `.env.example` con `APP_DB_USER` (valor sugerido `assetcontrol_app` solo como comentario), `APP_DB_PASSWORD`, `MIGRATION_DATABASE_URL`, `TEST_DATABASE_URL` y `TEST_MIGRATION_DATABASE_URL`, sin valores.
   - README: `docker compose down -v` si el volumen no tiene el rol, y `APP_DB_USER` debe ser distinto de `POSTGRES_USER`.
 - **Implementada (2026-11-12), pendiente de revisión:** `docker compose up --build` deja `db` sano (healthcheck con `pg_isready` y rol de la aplicación sin `rolsuper` ni `rolbypassrls`) y `GET /health` responde `200` con `db: ok`; la API usa el host `db` y el rol de la aplicación; recarga verificada; 131 pruebas pasan dentro del contenedor `api`.
+  - Cambios del reviewer (2026-11-12): `.env.example` añadido; README con el comando de pruebas dentro del contenedor `api` (`TEST_DATABASE_URL` y `TEST_MIGRATION_DATABASE_URL` sobre `assetcontrol_test`). Pendiente de security-reviewer.
 
 ---
 

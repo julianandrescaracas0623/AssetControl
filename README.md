@@ -50,6 +50,26 @@ Dentro de los contenedores la API se conecta a la base por el host `db`, no `loc
 - **El rol de la aplicación solo se crea con el volumen vacío.** El script `docker/postgres/init/01-app-role.sh` corre únicamente la primera vez que se inicializa el volumen `pgdata`. Si el volumen ya existía sin ese rol (o cambiaste `APP_DB_USER`), el servicio `db` no queda sano y la API no arranca. Recrea el volumen con `docker compose down -v` (borra los datos locales de la base) y vuelve a levantar; o ejecuta el mismo script a mano dentro del contenedor `db`.
 - Si una contraseña lleva caracteres especiales (`@ : / ? # %`), codifícala en las URL de `.env`.
 
+### Pruebas dentro del contenedor `api`
+
+Las pruebas usan una base aparte, `assetcontrol_test`, en el mismo servidor `db`. Si no existe, créala con el rol migrador (las credenciales salen del entorno del contenedor):
+
+```sh
+docker compose exec db sh -c 'createdb -U "$POSTGRES_USER" assetcontrol_test'
+```
+
+Con los servicios levantados, desde la raíz del repositorio (bash/Git Bash). Las variables se leen de `.env`; no escribas los valores en el comando ni los imprimas:
+
+```sh
+set -a; . ./.env; set +a
+docker compose exec \
+  -e TEST_DATABASE_URL="postgresql+psycopg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/assetcontrol_test" \
+  -e TEST_MIGRATION_DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/assetcontrol_test" \
+  api uv run pytest
+```
+
+`TEST_DATABASE_URL` usa el rol de la aplicación y `TEST_MIGRATION_DATABASE_URL` el rol migrador (necesita `CREATEDB` para la prueba de migraciones).
+
 ## Trabajo con asistentes de IA
 
 El método está en [Orquestacion/](Orquestacion/README.md). La configuración de Claude Code y Cursor (`.claude/`, `.cursor/`, `AGENTS.md`, `CLAUDE.md`, `MEMORY.md`) es **local** y no se publica ([ADR-004](docs/adr/ADR-004-arnes-local-y-autoria-humana.md)). Tras clonar, instala los hooks de Git:
