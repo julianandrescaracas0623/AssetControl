@@ -9,9 +9,12 @@ En ``/auth`` e ``/invitaciones`` (y todo lo que cuelga de ellas):
   ``Content-Length``.
 
 Las pruebas por ruta se escriben en T6/T8/T9, cuando existan las rutas.
+
+``is_same_site_request`` (T7, Q14) la usan ``/auth/refresh`` y ``/auth/logout``.
 """
 
 import io
+from urllib.parse import urlsplit
 
 from flask import Flask, abort, request
 from flask.wrappers import Response
@@ -22,6 +25,10 @@ AUTH_PATH_PREFIXES: tuple[str, ...] = ("/auth", "/invitaciones")
 AUTH_MAX_BODY_BYTES = 4096
 REFRESH_COOKIE_SECURE_NAME = "__Secure-refresh"
 REFRESH_COOKIE_DEVELOPMENT_NAME = "refresh"
+# Q14: cabecera personalizada obligatoria en /auth/refresh y /auth/logout. Un sitio
+# ajeno no puede enviarla sin un preflight CORS, que la API no responde.
+CSRF_HEADER = "X-AssetControl-CSRF"
+CSRF_HEADER_VALUE = "1"
 
 
 def is_auth_path(path: str) -> bool:
@@ -38,6 +45,33 @@ def refresh_cookie_options(config: Config) -> dict[str, object]:
         "samesite": "Lax",
         "path": "/auth",
     }
+
+
+_SAME_SITE_FETCH = frozenset({"same-origin", "same-site"})
+
+
+def is_same_site_request() -> bool:
+    """Q14: la petición trae la cabecera personalizada y viene del mismo sitio.
+
+    - ``X-AssetControl-CSRF: 1`` es obligatoria (la barrera principal: un sitio
+      ajeno no la puede mandar sin un preflight CORS que la API no responde).
+    - ``Sec-Fetch-Site``, si llega, manda: solo ``same-origin`` o ``same-site``
+      (``cross-site`` y ``none`` se rechazan).
+    - Sin ``Sec-Fetch-Site`` (navegador antiguo), si llega ``Origin`` su host debe
+      ser el de la petición (sin mirar el puerto: el proxy de Vite cambia de
+      puerto); ``Origin: null`` se rechaza.
+    - Sin ninguna de las dos (cliente que no es navegador) basta la cabecera.
+    """
+    if request.headers.get(CSRF_HEADER) != CSRF_HEADER_VALUE:
+        return False
+    fetch_site = request.headers.get("Sec-Fetch-Site")
+    if fetch_site is not None:
+        return fetch_site.strip().lower() in _SAME_SITE_FETCH
+    origin = request.headers.get("Origin")
+    if origin is None:
+        return True
+    origin_host = urlsplit(origin.strip()).hostname
+    return origin_host is not None and origin_host == urlsplit(request.host_url).hostname
 
 
 def register_auth_http_policy(app: Flask) -> None:

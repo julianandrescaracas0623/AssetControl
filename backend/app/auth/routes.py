@@ -1,17 +1,26 @@
-"""Rutas ``/auth`` (spec 002, T6): ``POST /auth/login`` y ``GET /auth/me``.
+"""Rutas ``/auth`` (spec 002, T6–T7): login, usuario actual, refresh y logout.
 
 Las cabeceras ``no-store``/``no-referrer`` y el límite de 4 KB los pone
 ``app.auth.http`` para todo ``/auth``. Toda falla de credenciales responde
 ``401`` ``credenciales_invalidas`` con el mismo mensaje; un cuerpo mal formado
 (independiente de la cuenta) es ``400`` ``solicitud_invalida``.
+
+``POST /auth/refresh`` y ``POST /auth/logout`` (T7) exigen la cabecera
+personalizada y el mismo sitio (Q14, ``403`` antes de mirar la cookie). El
+refresh responde lo mismo que el login y rota la cookie; cualquier rechazo es un
+``401`` ``no_autenticado`` idéntico y sin ``Set-Cookie`` (borrarla haría que la
+pestaña que pierde una carrera dentro de la ventana de gracia cerrara la sesión
+de la que ganó). El logout siempre responde ``204`` y limpia la cookie, haya o
+no una válida. El valor de la cookie no se registra.
 """
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, abort, current_app, jsonify, request
 from flask.typing import ResponseReturnValue
+from flask.wrappers import Response
 
 from app.auth import service
 from app.auth.credentials import ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL
-from app.auth.http import refresh_cookie_options
+from app.auth.http import is_same_site_request, refresh_cookie_options
 from app.config import get_config
 from app.errors import error_response
 
@@ -20,6 +29,29 @@ bp = Blueprint("auth", __name__, url_prefix="/auth")
 INVALID_CREDENTIALS = ("credenciales_invalidas", "Correo o contraseña incorrectos.")
 NOT_AUTHENTICATED = ("no_autenticado", "Debes iniciar sesión.")
 BAD_REQUEST = ("solicitud_invalida", "La solicitud no es válida.")
+
+
+def _session_response(result: service.LoginResult) -> Response:
+    """Cuerpo común de login y refresh, con la cookie de refresh nueva."""
+    response = jsonify(
+        access_token=result.access_token,
+        token_type="Bearer",  # noqa: S106 - tipo de token (RFC 6750), no un secreto
+        expires_in=int(ACCESS_TOKEN_TTL.total_seconds()),
+        **result.user.to_json(),
+    )
+    options = refresh_cookie_options(get_config(current_app))
+    response.set_cookie(
+        options.pop("key"),
+        result.refresh_cookie_value,
+        max_age=int(REFRESH_TOKEN_TTL.total_seconds()),
+        **options,
+    )
+    return response
+
+
+def _refresh_cookie_value() -> str | None:
+    name = refresh_cookie_options(get_config(current_app))["key"]
+    return request.cookies.get(name)
 
 
 @bp.post("/login")
@@ -34,20 +66,27 @@ def login() -> ResponseReturnValue:
     result = service.login(email, password)
     if result is None:
         return error_response(401, *INVALID_CREDENTIALS)
+    return _session_response(result)
 
-    response = jsonify(
-        access_token=result.access_token,
-        token_type="Bearer",  # noqa: S106 - tipo de token (RFC 6750), no un secreto
-        expires_in=int(ACCESS_TOKEN_TTL.total_seconds()),
-        **result.user.to_json(),
-    )
+
+@bp.post("/refresh")
+def refresh() -> ResponseReturnValue:
+    if not is_same_site_request():
+        abort(403)
+    result = service.refresh(_refresh_cookie_value())
+    if result is None:
+        return error_response(401, *NOT_AUTHENTICATED)
+    return _session_response(result)
+
+
+@bp.post("/logout")
+def logout() -> ResponseReturnValue:
+    if not is_same_site_request():
+        abort(403)
+    service.logout(_refresh_cookie_value())
+    response = Response(status=204)
     options = refresh_cookie_options(get_config(current_app))
-    response.set_cookie(
-        options.pop("key"),
-        result.refresh_cookie_value,
-        max_age=int(REFRESH_TOKEN_TTL.total_seconds()),
-        **options,
-    )
+    response.delete_cookie(options.pop("key"), **options)
     return response
 
 

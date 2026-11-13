@@ -1,4 +1,4 @@
-"""Login y usuario actual (spec 002, T6; R7, Q6, Q7; plan.md §2.2).
+"""Login, usuario actual, refresh y logout (spec 002, T6–T7; R7, R8, Q6, Q7, Q15; plan.md §2.2).
 
 **Login.** ``acceso.buscar_login`` corre sin tenant y en su propia transacción
 (``app.db.buscar_login``), nunca dentro de ``tenant_session``. La contraseña se
@@ -20,14 +20,20 @@ y ``expira_en = now() + 7 días`` (Q7). La cookie lleva ``<tenant_id>.<secreto>`
 ``membresia`` y ``activo`` de ``usuario`` en cada petición; el ``rol`` del claim
 no se usa. Lo generalizan ``require_auth``/``require_role`` en T8.
 
+**Refresh y logout (T7).** Ver ``refresh`` y ``logout``: rotación atómica con
+familia, ventana de gracia de reuso (Q15) y revocación de la familia de la
+cookie; todo bajo ``tenant_session`` con el tenant de la cookie.
+
 Nada de este módulo registra contraseñas, tokens, hashes ni el email.
 """
 
+import re
 import uuid
 from dataclasses import dataclass
+from datetime import timedelta
 
 from flask import current_app
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.auth.credentials import (
     REFRESH_TOKEN_TTL,
@@ -151,6 +157,165 @@ def login(email: str, password: str) -> LoginResult | None:
         access_token=access_token,
         refresh_cookie_value=f"{user.tenant_id}.{secret}",
     )
+
+
+# --- Refresh y logout (T7; R8, Q2, Q15) --------------------------------------------
+
+# Q15: un refresh ya usado hace menos de esto responde 401 sin revocar (dos pestañas
+# que rotan a la vez); pasado este tiempo, su reuso revoca la familia.
+REFRESH_REUSE_GRACE = timedelta(seconds=10)
+# Holgado para el secreto de ``new_token`` (43 caracteres base64url).
+_REFRESH_SECRET = re.compile(r"[A-Za-z0-9_-]{1,128}")
+
+
+def parse_refresh_cookie(value: str | None) -> tuple[uuid.UUID, str] | None:
+    """``(tenant_id, secreto)`` de ``<tenant_id>.<secreto>``, o ``None`` si no tiene la forma.
+
+    El ``tenant_id`` debe ser un UUID en forma canónica; solo propone el tenant:
+    el secreto se busca bajo RLS de ese tenant.
+    """
+    if not value:
+        return None
+    tenant_part, sep, secret = value.partition(".")
+    if not sep or not _REFRESH_SECRET.fullmatch(secret):
+        return None
+    try:
+        tenant_id = uuid.UUID(tenant_part)
+    except ValueError:
+        return None
+    if str(tenant_id) != tenant_part:
+        return None
+    return tenant_id, secret
+
+
+def refresh(cookie_value: str | None) -> LoginResult | None:
+    """Rota el refresh de la cookie y emite un acceso nuevo, o ``None`` (``401`` genérico).
+
+    1. ``tenant_session`` con el tenant de la cookie; RLS acota todo a ese tenant.
+    2. Un único ``UPDATE`` atómico marca ``usado_en`` solo si es nulo, no está
+       revocado y no venció. Con dos peticiones a la vez, la segunda espera el
+       candado de la fila, reevalúa el ``WHERE`` y no rota.
+    3. Si rota: se releen ``membresia`` (``rol``, ``activa``) y ``usuario.activo``
+       por la ``membresia_id`` del refresh; si siguen activos se inserta el
+       siguiente de la misma ``familia_id`` (7 días) y el acceso sale de
+       ``membresia``. Si no, el refresh queda usado y no se emite nada.
+    4. Si no rota y el hash existe ya usado fuera de la ventana de gracia
+       (Q15), se revoca toda su familia (solo esa) y se responde lo mismo.
+    """
+    parsed = parse_refresh_cookie(cookie_value)
+    if parsed is None:
+        return None
+    tenant_id, secret = parsed
+    stored = token_storage_hash(secret)
+    new_secret = new_token()
+
+    with tenant_session(tenant_id) as session:
+        rotated = session.execute(
+            update(RefreshToken)
+            .where(
+                RefreshToken.token_hash == stored,
+                RefreshToken.usado_en.is_(None),
+                RefreshToken.revocado_en.is_(None),
+                RefreshToken.expira_en > func.now(),
+            )
+            .values(usado_en=func.now())
+            .returning(RefreshToken.membresia_id, RefreshToken.familia_id),
+            execution_options={"synchronize_session": False},
+        ).one_or_none()
+
+        if rotated is None:
+            _revoke_family_on_reuse(session, stored)
+            return None
+
+        membresia = session.get(Membresia, rotated.membresia_id)
+        if membresia is None:
+            return None
+        loaded = _load_current_user(session, membresia.usuario_id, tenant_id)
+        if loaded is None or loaded[0].id != membresia.id:
+            return None
+        membresia, user = loaded
+        session.add(
+            RefreshToken(
+                membresia_id=membresia.id,
+                familia_id=rotated.familia_id,
+                token_hash=token_storage_hash(new_secret),
+                expira_en=func.now() + REFRESH_TOKEN_TTL,
+            )
+        )
+
+    access_token = encode_access_token(
+        current_app.config["SECRET_KEY"],
+        sub=user.usuario_id,
+        tenant=user.tenant_id,
+        rol=user.rol,
+    )
+    return LoginResult(
+        user=user,
+        access_token=access_token,
+        refresh_cookie_value=f"{user.tenant_id}.{new_secret}",
+    )
+
+
+def _revoke_family_on_reuse(session, stored: bytes) -> None:
+    """Q15: si ``stored`` ya se usó fuera de la ventana de gracia, revoca su familia."""
+    reused = session.execute(
+        select(RefreshToken.familia_id).where(
+            RefreshToken.token_hash == stored,
+            RefreshToken.usado_en.is_not(None),
+            RefreshToken.revocado_en.is_(None),
+            RefreshToken.usado_en <= func.now() - REFRESH_REUSE_GRACE,
+        )
+    ).one_or_none()
+    if reused is None:
+        return
+    _revoke_family(session, reused.familia_id)
+
+
+_REVOKE_FAMILY_MAX_PASSES = 10
+
+
+def _revoke_family(session, familia_id: uuid.UUID) -> None:
+    """Revoca toda la familia, también el sucesor de una rotación en vuelo (M1, A11).
+
+    En READ COMMITTED cada ``UPDATE`` toma su propia instantánea: si otra
+    transacción rotó la familia y aún no confirmó, el ``UPDATE`` espera el candado
+    de la fila vieja, la revoca al confirmarse la otra y **no** ve el sucesor que
+    esta insertó. Por eso se repite la pasada hasta que no afecte filas: la
+    siguiente ya ve el sucesor confirmado, y una rotación posterior sobre una fila
+    ya revocada no prospera (su ``WHERE`` exige ``revocado_en IS NULL``). Cada
+    pasada con filas solo puede deberse a una rotación que confirmó mientras se
+    esperaba un candado; el tope evita un bucle sin fin.
+    """
+    for _ in range(_REVOKE_FAMILY_MAX_PASSES):
+        result = session.execute(
+            update(RefreshToken)
+            .where(RefreshToken.familia_id == familia_id, RefreshToken.revocado_en.is_(None))
+            .values(revocado_en=func.now()),
+            execution_options={"synchronize_session": False},
+        )
+        if result.rowcount == 0:
+            return
+
+
+def logout(cookie_value: str | None) -> None:
+    """Revoca la familia del refresh de la cookie (A11); sin cookie válida no hace nada.
+
+    No depende del token de acceso. **N4 (Q7/A11):** el JWT de acceso ya emitido
+    no se revoca: sigue sirviendo hasta su ``exp`` (15 min). Un login nuevo
+    tampoco revoca familias anteriores (N6: la spec no lo pide; varios
+    dispositivos).
+    """
+    parsed = parse_refresh_cookie(cookie_value)
+    if parsed is None:
+        return
+    tenant_id, secret = parsed
+    stored = token_storage_hash(secret)
+    with tenant_session(tenant_id) as session:
+        found = session.execute(
+            select(RefreshToken.familia_id).where(RefreshToken.token_hash == stored)
+        ).one_or_none()
+        if found is not None:
+            _revoke_family(session, found.familia_id)
 
 
 _BEARER_PREFIX = "bearer "

@@ -122,6 +122,25 @@
 - **Verificación:** `cd backend && uv run pytest tests/test_auth_refresh_logout.py`
 - **Depende de:** T6 (Q7, Q14, Q15 decididos).
 - **Riesgo:** refresh que sobrevive al logout; condiciones de carrera en la rotación.
+- **Cierre (T7):** hecha (2026-11-13); aprobada por `reviewer` y `security-reviewer`; 784 pruebas verdes. M1 (carrera logout/reuso contra una rotación en vuelo) corregido repitiendo el `UPDATE` de revocación hasta 0 filas (tope 10 pasadas), con 2 pruebas.
+- **Decisiones ratificadas por el humano (2026-11-13; la spec no las fijaba):** (a) cabecera `X-AssetControl-CSRF: 1` (la web de la 002b debe enviarla). (b) `is_same_site_request()`: cabecera obligatoria; con `Sec-Fetch-Site`, solo `same-origin`/`same-site`; sin él, hostname de `Origin` igual al de `request.host_url` sin comparar puerto; `Origin: null` rechazado; sin ninguna de las dos basta la cabecera; fallo 403 `sin_permiso` (se alinea con `prohibido` en T8). (c) Una cuenta desactivada consume el refresh sin revocar la familia. (d) Refresh vencido y no usado → 401 sin revocar; usado fuera de ventana revoca aunque esté vencido.
+- **Contrato:** refresh 200 = mismo cuerpo que login + cookie rotada; refresh 401 `no_autenticado` **sin** `Set-Cookie` (a propósito: la pestaña perdedora no borra la cookie ganadora); logout 204 siempre, con cookie borrada.
+- **Deuda y riesgos:**
+  - N4: el JWT de acceso sigue vivo hasta 15 min tras el logout (Q7). Propuesta del `security-reviewer`: añadirlo a la tabla de riesgos de la spec y reformular A11 como "el refresh y la cookie dejan de servir"; pendiente de aplicar en `spec.md` (decisión humana).
+  - N6: un login nuevo no revoca familias previas; ninguna Q lo decide. Recomendación: mantenerlo (multidispositivo) y que todo cambio de contraseña futuro revoque todas las familias; pendiente de ratificación humana.
+  - O1: la familia no tiene tope absoluto de vida (cada rotación da +7 días; una cookie robada y rotada a diario no vence; solo la detección de reuso la frena; Q7 no pide tope); decisión humana.
+  - O2: `Sec-Fetch-Site: same-site` acepta subdominios hermanos; la cabecera personalizada obliga a preflight y la API no responde `Access-Control-*`. En T8, prueba que fije que `/auth/*` no tiene cabeceras CORS; no añadir flask-cors.
+  - O3: el respaldo por `Origin` ignora esquema y puerto (deliberado, por el proxy de Vite).
+  - O4: un proxy que no preserve `Host` (o `changeOrigin` en Vite) hace fallar cerrado el respaldo por `Origin` en navegadores sin `Sec-Fetch-Site` (spec de despliegue).
+  - O5: `if membresia is None` y `loaded[0].id != membresia.id` son código defensivo inalcanzable (la FK compuesta lo garantiza).
+  - O6: al desactivar una membresía hay que revocar sus refresh (tarea de gestión de miembros).
+  - O7: el cliente web no debe llamar a logout tras un 401 de refresh ni reintentar refresh a ciegas pasados 10 s (revocaría la familia viva).
+  - M1 (opcional): `_revoke_family` termina en silencio si agota las 10 pasadas (irreal); recomendado `for ... else: raise RuntimeError` (2 líneas, falla cerrado). La espera fija de 1 s de las pruebas de M1 podría robustecerse esperando `wait_event_type='Lock'` en `pg_stat_activity`.
+- **Para T10:** el límite de refresh (30/IP en 15 min) toparía con una clínica de ~30 usuarios activos tras un NAT (cada uno refresca cada 15 min): contar solo los 401 o subir el umbral; el logout comparte contador; un `X-Forwarded-For` falso no evade el límite; 429 idéntico para cuentas existentes e inexistentes.
+- **Pruebas de aislamiento recomendadas:**
+  - T8: `require_auth` con JWT de tenant A y `sub` con membresía solo en B → 401; contador 403 en rutas de admin; rol/tenant del cuerpo, URL o cabecera ignorados; sin cabeceras `Access-Control-*` en `/auth/*`.
+  - T9: invitación de A usada con la cookie de B no activa nada en B; un solo ganador en aceptación paralela; expirada = mismo error genérico; usuario con membresía en otro tenant falla cerrado (Q6); aceptar no emite refresh hasta el login.
+  - T10: los contadores de refresh y logout no mezclan IPs ni cuentas; el rol de la app no puede borrar de `limite_tasa`.
 
 ### T8 — Autorización por rol e invitar
 
