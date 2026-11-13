@@ -11,22 +11,34 @@ los catálogos de PostgreSQL:
   ``limite_tasa``) tienen su prueba propia; ``limite_tasa`` se crea en T10 y la
   excepción es por nombre.
 - Las políticas de ``public`` y las ``RESTRICTIVE`` forman listas cerradas. Desde
-  T2 (0003) la lista incluye las políticas ``TO auth_owner`` por nombre, comando y
-  rol; su texto exacto lo fija el catálogo cerrado C6 de T3 y su comportamiento lo
-  prueba ``test_auth_tables_isolation.py``.
+  T2 (0003) la lista incluye las políticas ``TO auth_owner``, con su texto exacto
+  desde T3 (C6); su comportamiento lo prueban ``test_auth_tables_isolation.py`` y
+  ``test_auth_functions.py``.
 - ``auth_owner`` tiene exactamente sus ``GRANT`` por columna de 0003 (plan.md §2.1).
 - Los ``GRANT`` del rol de la aplicación son exactamente los de plan.md §3, por
   columna: nunca ``usuario.password_hash`` ni ``invitacion.token_hash``.
 - ``anon``, ``authenticated`` y ``service_role`` (roles de Supabase) no reciben
   nada aunque existan privilegios por defecto que se los den.
-- El esquema ``acceso`` existe, vacío, con ``USAGE`` solo para la aplicación y
-  ``auth_owner`` y sin ``CREATE`` para nadie más que su dueño.
+- El esquema ``acceso`` existe con ``USAGE`` solo para la aplicación y
+  ``auth_owner`` y sin ``CREATE`` para nadie más que su dueño; ni ``auth_owner``
+  conserva el ``CREATE`` transitorio ni el migrador su membresía (C5).
+- Catálogo cerrado C6 (T3): las funciones de ``acceso`` son exactamente las
+  cuatro de plan.md §2.1, con firma, resultado, ``SECURITY DEFINER``,
+  ``STRICT``, ``plpgsql``, dueña ``auth_owner``, ``search_path`` fijo, ``proacl``
+  exacto (solo la aplicación, o solo el migrador en ``crear_tenant``) y cuerpo
+  exacto (huella ``sha256``), sin leer GUC ni SQL dinámico y todo calificado; las
+  políticas ``TO auth_owner`` tienen su texto exacto.
+- C7: ``anon``, ``authenticated`` y ``service_role`` no pueden ejecutar las
+  funciones (ni con ``USAGE`` en ``acceso``); la aplicación no ejecuta
+  ``crear_tenant``.
 
 Los roles de Supabase no existen en local ni en la CI: la prueba los crea (solo
-los que falten), les da privilegios por defecto en la base temporal, migra y los
-borra al terminar.
+los que falten), les da privilegios por defecto en la base temporal (tablas de
+``public`` y ``EXECUTE`` de toda función nueva), migra y los borra al terminar.
 """
 
+import hashlib
+import re
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -38,7 +50,7 @@ from alembic.config import Config as AlembicConfig
 from conftest import BLOCKED, read_database_url
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import URL, Connection
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
 from app.auth import models
@@ -150,18 +162,140 @@ EXPECTED_APP_TABLE_PRIVILEGES = {
     "invitacion": set(),
     "refresh_token": {"SELECT", "INSERT"},
 }
-# Políticas del dueño (0003, T2): (tabla, nombre) -> (permissive, cmd, USING?, CHECK?).
+
+
+def _key_guc(guc: str) -> str:
+    """Texto de pg_policies (espacios normalizados) de la clave hex de ``guc`` (0003)."""
+    setting = f"current_setting('{guc}'::text, true)"
+    return (
+        f"CASE WHEN ({setting} ~ '^[0-9a-f]{{64}}$'::text) "
+        f"THEN sha256(decode({setting}, 'hex'::text)) ELSE NULL::bytea END"
+    )
+
+
+def _uuid_guc(guc: str) -> str:
+    """Texto de pg_policies (espacios normalizados) del UUID de ``guc`` (0003)."""
+    setting = f"current_setting('{guc}'::text, true)"
+    pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    return f"CASE WHEN ({setting} ~ '{pattern}'::text) THEN ({setting})::uuid ELSE NULL::uuid END"
+
+
+# Catálogo cerrado C6 (T3): políticas del dueño (0003) con su texto exacto, tal como lo
+# devuelve pg_policies con los espacios normalizados.
+# (tabla, nombre) -> (permissive, cmd, USING, WITH CHECK).
 EXPECTED_OWNER_POLICIES = {
-    ("invitacion", "dueno_invitacion_validar"): ("PERMISSIVE", "SELECT", True, False),
-    ("invitacion", "dueno_invitacion_aceptar"): ("PERMISSIVE", "SELECT", True, False),
-    ("invitacion", "dueno_invitacion_consumir"): ("PERMISSIVE", "UPDATE", True, True),
-    ("invitacion", "dueno_invitacion_crear_tenant"): ("PERMISSIVE", "INSERT", False, True),
-    ("usuario", "dueno_usuario_login"): ("PERMISSIVE", "SELECT", True, False),
-    ("usuario", "dueno_usuario_aceptar"): ("PERMISSIVE", "INSERT", False, True),
-    ("membresia", "dueno_membresia_login"): ("PERMISSIVE", "SELECT", True, False),
-    ("membresia", "dueno_membresia_aceptar"): ("PERMISSIVE", "INSERT", False, True),
-    ("tenant", "dueno_tenant_crear"): ("PERMISSIVE", "INSERT", False, True),
-    ("tenant", "dueno_tenant_recien_creado"): ("PERMISSIVE", "SELECT", True, False),
+    ("invitacion", "dueno_invitacion_validar"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"(token_hash = {_key_guc('app.auth_inv_validar')})",
+        None,
+    ),
+    ("invitacion", "dueno_invitacion_aceptar"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"(token_hash = {_key_guc('app.auth_inv_aceptar')})",
+        None,
+    ),
+    ("invitacion", "dueno_invitacion_consumir"): (
+        "PERMISSIVE",
+        "UPDATE",
+        f"((token_hash = {_key_guc('app.auth_inv_aceptar')}) AND (usada_en IS NULL) "
+        "AND (expira_en > now()))",
+        "(usada_en = now())",
+    ),
+    ("invitacion", "dueno_invitacion_crear_tenant"): (
+        "PERMISSIVE",
+        "INSERT",
+        None,
+        f"((tenant_id = {_uuid_guc('app.auth_tenant_nuevo')}) AND (rol = 'admin'::text) "  # noqa: S608
+        "AND (creada_por IS NULL) AND (usada_en IS NULL) "
+        "AND (expira_en <= (now() + '24:00:00'::interval)) "
+        "AND (EXISTS ( SELECT 1 FROM tenant t "
+        "WHERE ((t.id = invitacion.tenant_id) AND (t.creado_en = now())))))",
+    ),
+    ("usuario", "dueno_usuario_login"): (
+        "PERMISSIVE",
+        "SELECT",
+        "(email = NULLIF(current_setting('app.auth_email'::text, true), ''::text))",
+        None,
+    ),
+    ("usuario", "dueno_usuario_aceptar"): (
+        "PERMISSIVE",
+        "INSERT",
+        None,
+        "(EXISTS ( SELECT 1 FROM invitacion i "  # noqa: S608
+        f"WHERE ((i.token_hash = {_key_guc('app.auth_inv_aceptar')}) "
+        "AND (i.usada_en = now()) AND (i.email = usuario.email))))",
+    ),
+    ("membresia", "dueno_membresia_login"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"(usuario_id = {_uuid_guc('app.auth_usuario')})",
+        None,
+    ),
+    ("membresia", "dueno_membresia_aceptar"): (
+        "PERMISSIVE",
+        "INSERT",
+        None,
+        f"((usuario_id = {_uuid_guc('app.auth_usuario_nuevo')}) "  # noqa: S608
+        "AND (EXISTS ( SELECT 1 FROM invitacion i "
+        "WHERE ((i.tenant_id = membresia.tenant_id) "
+        f"AND (i.token_hash = {_key_guc('app.auth_inv_aceptar')}) "
+        "AND (i.usada_en = now()) AND (i.rol = membresia.rol)))))",
+    ),
+    ("tenant", "dueno_tenant_crear"): (
+        "PERMISSIVE",
+        "INSERT",
+        None,
+        f"(id = {_uuid_guc('app.auth_tenant_nuevo')})",
+    ),
+    ("tenant", "dueno_tenant_recien_creado"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"((id = {_uuid_guc('app.auth_tenant_nuevo')}) AND (creado_en = now()))",
+        None,
+    ),
+}
+
+# Catálogo cerrado C6 (T3): funciones de acceso (0004).
+# nombre -> (argumentos, resultado, GUC que fija, huella sha256 de prosrc, rol con EXECUTE).
+# La huella obliga a que todo cambio del cuerpo se revise también aquí.
+SEARCH_PATH = ["search_path=pg_catalog, pg_temp"]
+EXPECTED_FUNCTIONS = {
+    "buscar_login": (
+        "p_email text",
+        "TABLE(usuario_id uuid, password_hash text, activo boolean, tenant_id uuid, rol text)",
+        {"app.auth_email", "app.auth_usuario"},
+        "e2d65ea58fe28d0906cd6ecdc87126b3fe75f61105f6203bb15c93f4f8f1ae1c",
+        "app",
+    ),
+    "validar_invitacion": (
+        "p_clave text",
+        "boolean",
+        {"app.auth_inv_validar"},
+        "c51ab1560e578613b40021f4eec9e2b0134f9ec19256524bc49636cc748ef19d",
+        "app",
+    ),
+    "aceptar_invitacion": (
+        "p_clave text, p_nombre text, p_password_hash text",
+        "TABLE(usuario_id uuid, tenant_id uuid, rol text)",
+        {"app.auth_inv_aceptar", "app.auth_usuario_nuevo"},
+        "04aebfbb9e1aa4c96ddb0ffd18b70756f71e1db506b97e33f3e272a7daa95407",
+        "app",
+    ),
+    "crear_tenant": (
+        "p_nombre text, p_email text, p_clave text",
+        "uuid",
+        {"app.auth_tenant_nuevo"},
+        "d2f0e9fef94935d417a6b7a54ef5048951ace8df125fdcb2628ddc90fcfca589",
+        "migrator",
+    ),
+}
+FUNCTION_CALLS = {
+    "buscar_login": "select * from acceso.buscar_login('x@ejemplo.test')",
+    "validar_invitacion": "select acceso.validar_invitacion('" + "0" * 64 + "')",
+    "aceptar_invitacion": "select * from acceso.aceptar_invitacion('" + "0" * 64 + "', 'x', 'h')",
+    "crear_tenant": "select acceso.crear_tenant('x', 'x@ejemplo.test', '" + "0" * 64 + "')",
 }
 # GRANT de auth_owner (0003): tabla -> privilegio -> columnas; nada a nivel de tabla.
 EXPECTED_OWNER_COLUMNS = {
@@ -246,6 +380,10 @@ def catalog(database_residue_guard) -> Iterator[Catalog]:
                             f'GRANT ALL ON TABLES TO "{role}"'
                         )
                     )
+                    # Y EXECUTE de toda función nueva, en cualquier esquema (C7).
+                    conn.execute(
+                        text(f'ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO "{role}"')
+                    )
         finally:
             engine.dispose()
 
@@ -314,9 +452,13 @@ def _app_policies(conn: Connection) -> dict[tuple[str, str], tuple]:
     return {k: v for k, v in _policies(conn).items() if v[2] != OWNER_ROLES}
 
 
+def _normalize(expression: str | None) -> str | None:
+    return None if expression is None else " ".join(expression.split())
+
+
 def _owner_policies(conn: Connection) -> dict[tuple[str, str], tuple]:
     return {
-        k: (v[0], v[1], v[3] is not None, v[4] is not None)
+        k: (v[0], v[1], _normalize(v[3]), _normalize(v[4]))
         for k, v in _policies(conn).items()
         if v[2] == OWNER_ROLES
     }
@@ -635,16 +777,166 @@ def test_acceso_schema_is_owned_by_the_migrator_with_minimal_usage(conn, catalog
         ), role
 
 
-def test_acceso_schema_is_empty_until_t3(conn):
+def test_acceso_schema_has_no_relations_or_types(conn):
+    # Solo las funciones de C6: ni tablas, ni vistas, ni secuencias, ni tipos propios.
     objects = conn.scalar(
         text(
             "select (select count(*) from pg_class c join pg_namespace n "
             "on n.oid = c.relnamespace where n.nspname = 'acceso') + "
-            "(select count(*) from pg_proc p join pg_namespace n "
-            "on n.oid = p.pronamespace where n.nspname = 'acceso')"
+            "(select count(*) from pg_type t join pg_namespace n "
+            "on n.oid = t.typnamespace where n.nspname = 'acceso')"
         )
     )
     assert objects == 0
+
+
+def test_create_on_acceso_is_not_left_open_and_the_migrator_is_not_a_member(conn, catalog):
+    # C5: el CREATE y la membresía transitorios de 0004 se cierran en la misma migración.
+    assert not conn.scalar(text("select has_schema_privilege('auth_owner', 'acceso', 'CREATE')"))
+    members = conn.scalars(
+        text(
+            "select m.member::regrole::text from pg_auth_members m "
+            "where m.roleid = 'auth_owner'::regrole"
+        )
+    ).all()
+    assert catalog.migrator not in members
+    assert members == []
+
+
+# --- Catálogo cerrado C6: funciones de acceso (T3) -------------------------------
+
+
+def _functions(conn: Connection) -> dict[str, dict[str, object]]:
+    rows = conn.execute(
+        text(
+            "select p.proname, pg_get_function_identity_arguments(p.oid), "
+            "pg_get_function_result(p.oid), p.prosecdef, p.proisstrict, l.lanname, "
+            "p.provolatile, p.proowner::regrole::text, p.proconfig, p.prosrc, p.prokind "
+            "from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+            "join pg_language l on l.oid = p.prolang where n.nspname = 'acceso'"
+        )
+    ).all()
+    keys = ("args", "result", "secdef", "strict", "lang", "volatile", "owner", "config", "src")
+    return {row[0]: dict(zip(keys + ("kind",), row[1:], strict=True)) for row in rows}
+
+
+def _function_acl(conn: Connection, name: str) -> set[tuple[str, str, str, bool]]:
+    rows = conn.execute(
+        text(
+            # grantee 0 = PUBLIC. Sin proacl (NULL) valdría el defecto: EXECUTE a PUBLIC.
+            "select case when a.grantee = 0 then 'PUBLIC' else a.grantee::regrole::text end, "
+            "a.grantor::regrole::text, a.privilege_type, a.is_grantable "
+            "from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+            "cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a "
+            "where n.nspname = 'acceso' and p.proname = :n"
+        ),
+        {"n": name},
+    ).all()
+    return {tuple(row) for row in rows}
+
+
+def test_acceso_functions_are_a_closed_list(conn):
+    assert set(_functions(conn)) == set(EXPECTED_FUNCTIONS)
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED_FUNCTIONS))
+def test_acceso_function_signature_and_attributes(conn, name):
+    function = _functions(conn)[name]
+    args, result, _, _, _ = EXPECTED_FUNCTIONS[name]
+    assert (function["args"], function["result"]) == (args, result)
+    assert function["kind"] == "f"
+    assert function["secdef"] is True
+    assert function["strict"] is True
+    assert function["lang"] == "plpgsql"
+    assert function["volatile"] == "v"
+    assert function["owner"] == AUTH_OWNER
+    assert function["config"] == SEARCH_PATH
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED_FUNCTIONS))
+def test_acceso_function_acl_is_exact(conn, catalog, name):
+    # Solo auth_owner (dueña) y la aplicación, o el migrador en crear_tenant; nunca PUBLIC
+    # ni los roles de Supabase, aunque sus privilegios por defecto se lo dieran.
+    grantee = {"app": catalog.app_role, "migrator": catalog.migrator}[EXPECTED_FUNCTIONS[name][4]]
+    assert _function_acl(conn, name) == {
+        (AUTH_OWNER, AUTH_OWNER, "EXECUTE", False),
+        (grantee, AUTH_OWNER, "EXECUTE", False),
+    }
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED_FUNCTIONS))
+def test_acceso_function_body_is_exactly_the_reviewed_one(conn, name):
+    source = _functions(conn)[name]["src"]
+    assert hashlib.sha256(source.encode()).hexdigest() == EXPECTED_FUNCTIONS[name][3]
+
+
+_RELATION_REFERENCE = re.compile(r"\b(?:FROM|JOIN|UPDATE|INTO)\s+([A-Za-z_][\w]*)(\.)?", re.I)
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED_FUNCTIONS))
+def test_acceso_function_body_is_static_qualified_and_reads_no_guc(conn, name):
+    source = _functions(conn)[name]["src"]
+    lowered = source.lower()
+    # Nunca lee una GUC: no depende de una que quien llama fijó antes (revisión de T3).
+    assert "current_setting" not in lowered
+    # SQL estático.
+    assert re.search(r"\bexecute\b", lowered) is None
+    assert "format(" not in lowered
+    # Toda relación calificada: public.<tabla> o pg_catalog.<función>; INTO de plpgsql
+    # solo a variables v_*.
+    for match in _RELATION_REFERENCE.finditer(source):
+        word, qualified = match.group(1), match.group(2)
+        if qualified:
+            assert word in ("public", "pg_catalog"), match.group(0)
+        else:
+            assert word.startswith("v_"), match.group(0)
+    # Fija sus GUC y vacía las seis al empezar y al terminar.
+    for guc in EXPECTED_FUNCTIONS[name][2]:
+        assert f"pg_catalog.set_config('{guc}'," in source, guc
+    assert source.count("pg_catalog.set_config(g, '', true)") >= 2
+
+
+def test_functions_are_not_executable_by_public(conn):
+    for name in EXPECTED_FUNCTIONS:
+        assert not any(entry[0] == "PUBLIC" for entry in _function_acl(conn, name)), name
+
+
+def test_app_executes_only_the_login_and_invitation_functions(conn, catalog):
+    for name, (args, *_rest) in EXPECTED_FUNCTIONS.items():
+        signature = f"acceso.{name}({', '.join(a.split()[-1] for a in args.split(', '))})"
+        allowed = conn.scalar(
+            text("select has_function_privilege(:r, :f, 'EXECUTE')"),
+            {"r": catalog.app_role, "f": signature},
+        )
+        assert allowed is (name != "crear_tenant"), name
+
+
+# --- C7: los roles de Supabase no ejecutan nada de acceso --------------------------
+
+
+@pytest.mark.parametrize("role", SUPABASE_ROLES)
+@pytest.mark.parametrize("name", sorted(EXPECTED_FUNCTIONS))
+def test_supabase_roles_cannot_execute_acceso_functions(catalog, role, name):
+    engine = create_engine(catalog.url, poolclass=NullPool)
+    try:
+        with engine.connect() as connection:
+            for with_usage in (False, True):
+                tx = connection.begin()
+                try:
+                    if with_usage:
+                        # Aun con USAGE en el esquema, el REVOKE de la función lo frena.
+                        connection.exec_driver_sql(f'GRANT USAGE ON SCHEMA acceso TO "{role}"')
+                    connection.exec_driver_sql(f'SET LOCAL ROLE "{role}"')
+                    with pytest.raises(DBAPIError) as excinfo:
+                        connection.execute(text(FUNCTION_CALLS[name]))
+                finally:
+                    tx.rollback()
+                message = str(excinfo.value.orig)
+                assert excinfo.value.orig.sqlstate == "42501", message
+                expected = "permission denied for " + ("function" if with_usage else "schema")
+                assert expected in message, message
+    finally:
+        engine.dispose()
 
 
 def test_no_own_functions_in_public(conn):

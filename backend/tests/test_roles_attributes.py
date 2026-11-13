@@ -2,9 +2,9 @@
 
 Solo ``pg_roles`` (y ``pg_has_role`` para la membresía): el rol de la
 aplicación y ``auth_owner`` no son superusuarios ni tienen ``BYPASSRLS``,
-``auth_owner`` no inicia sesión y la aplicación no es miembro de ``auth_owner``
-(no puede hacer ``SET ROLE auth_owner``) ni al revés. La comprobación al
-arrancar con un rol inseguro es de T4.
+``CREATEROLE``, ``CREATEDB`` ni ``REPLICATION``, ``auth_owner`` no inicia sesión
+y la aplicación no es miembro de ``auth_owner`` (no puede hacer ``SET ROLE
+auth_owner``) ni al revés. La comprobación al arrancar con un rol inseguro es de T4.
 """
 
 from collections.abc import Iterator
@@ -17,7 +17,7 @@ from sqlalchemy.pool import NullPool
 AUTH_OWNER = "auth_owner"
 
 _ATTRIBUTES = text(
-    "select rolsuper, rolbypassrls, rolcanlogin, rolcreaterole, rolcreatedb "
+    "select rolsuper, rolbypassrls, rolcanlogin, rolcreaterole, rolcreatedb, rolreplication "
     "from pg_roles where rolname = :r"
 )
 
@@ -34,12 +34,12 @@ def migrator_conn(migration_database_url: URL) -> Iterator[Connection]:
 
 def test_app_role_does_not_skip_rls(migrator_conn, app_database_url):
     row = migrator_conn.execute(_ATTRIBUTES, {"r": app_database_url.username}).one()
-    assert row == (False, False, True, False, False)
+    assert row == (False, False, True, False, False, False)
 
 
 def test_auth_owner_does_not_skip_rls_and_cannot_log_in(migrator_conn):
     row = migrator_conn.execute(_ATTRIBUTES, {"r": AUTH_OWNER}).one()
-    assert row == (False, False, False, False, False)
+    assert row == (False, False, False, False, False, False)
 
 
 def test_app_role_sees_its_own_attributes_without_super_or_bypassrls(app_database_url):

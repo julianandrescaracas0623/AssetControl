@@ -39,8 +39,10 @@ ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
 BASELINE = "0001_baseline"
 ACCESO = "0002_acceso_y_usuarios"
 POLITICAS = "0003_politicas_del_dueno"
+FUNCIONES = "0004_funciones_de_acceso"
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
+MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
 APP_ROLE_VAR = "APP_DB_USER"
 AUTH_TABLES = ["invitacion", "membresia", "refresh_token", "tenant", "usuario"]
 
@@ -180,11 +182,12 @@ def test_revision_chain():
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == [POLITICAS]
-    assert [r.revision for r in revisions] == [POLITICAS, ACCESO, BASELINE]
-    assert revisions[0].down_revision == ACCESO
-    assert revisions[1].down_revision == BASELINE
-    assert revisions[2].down_revision is None
+    assert script.get_heads() == [FUNCIONES]
+    assert [r.revision for r in revisions] == [FUNCIONES, POLITICAS, ACCESO, BASELINE]
+    assert revisions[0].down_revision == POLITICAS
+    assert revisions[1].down_revision == ACCESO
+    assert revisions[2].down_revision == BASELINE
+    assert revisions[3].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -302,7 +305,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [POLITICAS])
+    assert _public_state(migrate_env) == (with_auth, [FUNCIONES])
     assert _schema_exists(migrate_env, "acceso")
 
     command.downgrade(config, "base")
@@ -311,7 +314,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [POLITICAS])
+    assert _public_state(migrate_env) == (with_auth, [FUNCIONES])
     assert _schema_exists(migrate_env, "acceso")
 
 
@@ -604,11 +607,18 @@ def temp_roles(migration_database_url) -> Iterator:
 
     def create(unsafe: str | None = None) -> str:
         # Inerte (como auth_owner) salvo, si se pide, un atributo inseguro.
-        safe = {"SUPERUSER": "NOSUPERUSER", "BYPASSRLS": "NOBYPASSRLS", "LOGIN": "NOLOGIN"}
+        safe = {
+            "SUPERUSER": "NOSUPERUSER",
+            "BYPASSRLS": "NOBYPASSRLS",
+            "LOGIN": "NOLOGIN",
+            "CREATEROLE": "NOCREATEROLE",
+            "CREATEDB": "NOCREATEDB",
+            "REPLICATION": "NOREPLICATION",
+        }
         options = " ".join(unsafe if key == unsafe else value for key, value in safe.items())
         name = f"prueba_atrib_{uuid.uuid4().hex[:10]}"
         with admin.connect() as conn:
-            conn.exec_driver_sql(f"CREATE ROLE {quote(name)} {options} NOCREATEDB NOCREATEROLE")
+            conn.exec_driver_sql(f"CREATE ROLE {quote(name)} {options}")
         created.append(name)
         return name
 
@@ -727,3 +737,255 @@ def test_0003_downgrade_without_auth_owner_fails_with_a_clear_message(
     error = _run_with_owner(migration_database_url, monkeypatch, "downgrade", missing)
     assert "01-app-role.sh" in str(error)
     assert "0003" not in str(error)  # no llegó a ejecutar ninguna sentencia
+
+
+# --- 0004_funciones_de_acceso (spec 002, T3) -------------------------------------
+
+
+def _load_migration_0004():
+    spec = importlib.util.spec_from_file_location("migration_0004_under_test", MIGRATION_0004)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _acceso_state(url: URL) -> tuple[list[str], bool, list[str]]:
+    """Funciones de acceso, CREATE de auth_owner en acceso y miembros de auth_owner."""
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            functions = list(
+                conn.scalars(
+                    text(
+                        "select p.proname from pg_proc p join pg_namespace n "
+                        "on n.oid = p.pronamespace where n.nspname = 'acceso' order by 1"
+                    )
+                )
+            )
+            can_create = bool(
+                conn.scalar(
+                    text(
+                        "select exists (select 1 from pg_namespace where nspname = 'acceso') "
+                        "and has_schema_privilege('auth_owner', 'acceso', 'CREATE')"
+                    )
+                )
+            )
+            members = list(
+                conn.scalars(
+                    text(
+                        "select member::regrole::text from pg_auth_members "
+                        "where roleid = 'auth_owner'::regrole order by 1"
+                    )
+                )
+            )
+    finally:
+        engine.dispose()
+    return functions, can_create, members
+
+
+FUNCTION_NAMES = ["aceptar_invitacion", "buscar_login", "crear_tenant", "validar_invitacion"]
+
+
+def test_0004_creates_the_functions_and_leaves_no_create_nor_membership(migrate_env):
+    command.upgrade(alembic_config(), "head")
+    assert _acceso_state(migrate_env) == (FUNCTION_NAMES, False, [])
+
+
+def test_downgrade_0004_removes_only_the_functions(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, "head")
+    policies, grants = _owner_state(migrate_env)
+
+    command.downgrade(config, POLITICAS)
+
+    assert _acceso_state(migrate_env) == ([], False, [])
+    assert _schema_exists(migrate_env, "acceso")
+    assert _owner_state(migrate_env) == (policies, grants)
+    with_auth = sorted(["alembic_version", *AUTH_TABLES])
+    assert _public_state(migrate_env) == (with_auth, [POLITICAS])
+
+    command.upgrade(config, "head")
+    assert _acceso_state(migrate_env) == (FUNCTION_NAMES, False, [])
+
+
+def test_0004_missing_auth_owner_fails_with_a_clear_message(migration_database_url):
+    migration = _load_migration_0004()
+    assert migration.AUTH_OWNER == "auth_owner"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            migration.require_auth_owner(conn)
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.require_auth_owner(conn, name=f"auth_owner_falta_{uuid.uuid4().hex[:6]}")
+    finally:
+        engine.dispose()
+
+    message = str(excinfo.value)
+    assert "auth_owner" in message
+    assert "01-app-role.sh" in message
+
+
+def test_0004_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration_0004()
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+
+    message = str(excinfo.value)
+    assert "0004" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+def _check_attributes_0004(migration_database_url, name: str | None = None) -> None:
+    migration = _load_migration_0004()
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            migration.require_owner_attributes(conn, name=name)
+    finally:
+        engine.dispose()
+
+
+UNSAFE_ATTRIBUTES = ["SUPERUSER", "BYPASSRLS", "LOGIN", "CREATEROLE", "CREATEDB", "REPLICATION"]
+
+
+def test_0004_accepts_the_real_auth_owner_and_a_safe_role(migration_database_url, temp_roles):
+    _check_attributes_0004(migration_database_url)
+    _check_attributes_0004(migration_database_url, temp_roles())
+
+
+@pytest.mark.parametrize("attribute", UNSAFE_ATTRIBUTES)
+def test_0004_rejects_auth_owner_with_an_unsafe_attribute(
+    migration_database_url, temp_roles, attribute
+):
+    name = temp_roles(attribute)
+    with pytest.raises(RuntimeError) as excinfo:
+        _check_attributes_0004(migration_database_url, name)
+    message = str(excinfo.value)
+    for word in UNSAFE_ATTRIBUTES:
+        assert word in message, word
+    assert "membresía" in message
+    assert name not in message
+    assert "auth_owner" not in message
+
+
+def test_0004_rejects_auth_owner_that_is_member_of_another_role(migration_database_url, temp_roles):
+    name, group = temp_roles(), temp_roles()
+    temp_roles.grant(group, name)
+    with pytest.raises(RuntimeError) as excinfo:
+        _check_attributes_0004(migration_database_url, name)
+    assert name not in str(excinfo.value)
+
+
+def test_0004_attribute_check_treats_a_missing_role_as_unsafe(migration_database_url):
+    # Falla cerrado: un rol inexistente no se da por inerte (revisión de seguridad de T2).
+    missing = f"auth_owner_falta_{uuid.uuid4().hex[:6]}"
+    with pytest.raises(RuntimeError) as excinfo:
+        _check_attributes_0004(migration_database_url, missing)
+    assert missing not in str(excinfo.value)
+    assert "01-app-role.sh" in str(excinfo.value)
+
+
+def test_0004_upgrade_fails_if_the_app_role_is_member_of_auth_owner(
+    migration_database_url, app_database_url, temp_roles, monkeypatch
+):
+    # La aplicación nunca puede hacer SET ROLE al dueño (A6): 0004 no concede EXECUTE
+    # si el rol de la aplicación es miembro de él. El GRANT se revierte con la transacción.
+    owner = temp_roles()
+    migration = _load_migration_0004()
+    monkeypatch.setenv("APP_DB_USER", app_database_url.username)
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                quote = conn.dialect.identifier_preparer.quote
+                conn.exec_driver_sql(f"GRANT {quote(owner)} TO {quote(app_database_url.username)}")
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "AUTH_OWNER", owner)
+                with pytest.raises(RuntimeError) as excinfo:
+                    migration.upgrade()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    message = str(excinfo.value)
+    assert "APP_DB_USER" in message
+    assert "miembro" in message
+    assert owner not in message
+    assert app_database_url.username not in message
+    assert "0004" not in message  # no llegó a ejecutar ninguna sentencia
+
+
+def _run_0004_with_owner(migration_database_url, monkeypatch, step: str, owner: str):
+    """Ejecuta ``upgrade``/``downgrade`` de 0004 con otro nombre de dueño; se revierte."""
+    migration = _load_migration_0004()
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "AUTH_OWNER", owner)
+                with pytest.raises(RuntimeError) as excinfo:
+                    getattr(migration, step)()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    return excinfo.value
+
+
+@pytest.mark.parametrize("attribute", ["CREATEROLE", "CREATEDB", "REPLICATION"])
+def test_0004_upgrade_checks_the_auth_owner_attributes(
+    migration_database_url, temp_roles, monkeypatch, attribute
+):
+    name = temp_roles(attribute)
+    error = _run_0004_with_owner(migration_database_url, monkeypatch, "upgrade", name)
+    assert name not in str(error)
+    assert attribute in str(error)
+    assert "0004" not in str(error)  # no llegó a ejecutar ninguna sentencia
+
+
+@pytest.mark.parametrize("step", ["upgrade", "downgrade"])
+def test_0004_without_auth_owner_fails_with_a_clear_message(
+    migration_database_url, monkeypatch, step
+):
+    missing = f"auth_owner_falta_{uuid.uuid4().hex[:6]}"
+    error = _run_0004_with_owner(migration_database_url, monkeypatch, step, missing)
+    assert "01-app-role.sh" in str(error)
+    assert "0004" not in str(error)
+
+
+def test_0004_fails_if_the_migrator_stays_member_of_auth_owner(
+    migration_database_url, temp_roles, monkeypatch
+):
+    # Una membresía previa del migrador en el dueño (como createrole_self_grant en
+    # Supabase, C8) no se da por buena: la comprobación final de 0004 falla. Todo se
+    # revierte (también el GRANT del rol temporal, que es transaccional).
+    owner = temp_roles()
+    migration = _load_migration_0004()
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                quote = conn.dialect.identifier_preparer.quote
+                migrator = conn.scalar(text("select current_user"))
+                conn.exec_driver_sql(f"GRANT {quote(owner)} TO {quote(migrator)}")
+                monkeypatch.setattr(migration, "AUTH_OWNER", owner)
+                with pytest.raises(RuntimeError) as excinfo:
+                    migration.require_no_leftover_privileges(conn)
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "C8" in str(excinfo.value)
+    assert owner not in str(excinfo.value)

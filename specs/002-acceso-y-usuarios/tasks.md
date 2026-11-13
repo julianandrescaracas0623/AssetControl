@@ -36,6 +36,13 @@
 - **Archivos probables:** `backend/migrations/versions/0004_funciones_de_acceso.py`, `backend/tests/test_auth_functions.py`, `backend/tests/test_catalog_rls.py`.
 - **Verificación:** `cd backend && uv run pytest tests/test_auth_functions.py tests/test_catalog_rls.py && uv run pytest && uv run ruff check .`
 - **Depende de:** T2 (Q3, 24 h, y Q16 ya decididos).
+- **Deuda (T3):** `require_owner_attributes` de `0003_politicas_del_dueno` (ya integrada en `develop`) sigue sin rechazar `CREATEROLE`/`CREATEDB`/`REPLICATION` y da por bueno un rol inexistente; no se toca una migración aplicada. Lo cubre 0004, que corre en la misma cadena: rechaza esos atributos, trata el rol inexistente como fallo y falla si el rol de la aplicación es miembro (directo o indirecto) de `auth_owner`. Si se quiere en 0003, decisión humana.
+- **Deuda (auditoría de seguridad de T3):**
+  - H1 (baja, falla abierto): 0004:246-249, `to_regrole(current_user)` da NULL si el migrador tiene mayúsculas o caracteres especiales y C5 no detecta la membresía residual; usar `(select oid from pg_roles where rolname = current_user)` o `current_user::regrole`, con prueba (migrador con mayúsculas/guion miembro de `auth_owner` → la migración falla). Al inicio de T4 o antes del piloto.
+  - H2 (baja, C8): `_app_role` no comprueba aplicación miembro del migrador, ni `CREATEROLE`/`REPLICATION` en la aplicación, ni terceros miembros de `auth_owner`; cubrir en C8 (excepción documentada de Supabase).
+  - H3 (info, T4): el arranque verifica atributos y membresías de `auth_owner` (`ALTER ROLE` posterior a migrar).
+  - H5 (info, T9): unificar código HTTP y cuerpo de "email ocupado" (`ON CONFLICT DO NOTHING`) y clave inválida, con tiempos comparables.
+  - H6 (info, C8): la clave viaja como parámetro SQL; fijar logs sin parámetros (`log_statement`, `auto_explain`, `pg_stat_statements`).
 - **Riesgo:** función expuesta a `anon`; contexto que sobrevive a un savepoint; si no cabe en un día, se divide con `/sdd-change` (catálogo C6 como tarea propia y se mueven límites/`/ready` a 002b), no se recorta cobertura.
 
 ### T4 — Credenciales, tokens, configuración segura y logs
