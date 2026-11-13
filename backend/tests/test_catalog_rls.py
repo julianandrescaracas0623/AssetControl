@@ -10,7 +10,11 @@ los catálogos de PostgreSQL:
 - Las excepciones (``alembic_version``, ``tenant``, ``usuario`` y
   ``limite_tasa``) tienen su prueba propia; ``limite_tasa`` se crea en T10 y la
   excepción es por nombre.
-- Las políticas de ``public`` y las ``RESTRICTIVE`` forman listas cerradas.
+- Las políticas de ``public`` y las ``RESTRICTIVE`` forman listas cerradas. Desde
+  T2 (0003) la lista incluye las políticas ``TO auth_owner`` por nombre, comando y
+  rol; su texto exacto lo fija el catálogo cerrado C6 de T3 y su comportamiento lo
+  prueba ``test_auth_tables_isolation.py``.
+- ``auth_owner`` tiene exactamente sus ``GRANT`` por columna de 0003 (plan.md §2.1).
 - Los ``GRANT`` del rol de la aplicación son exactamente los de plan.md §3, por
   columna: nunca ``usuario.password_hash`` ni ``invitacion.token_hash``.
 - ``anon``, ``authenticated`` y ``service_role`` (roles de Supabase) no reciben
@@ -146,6 +150,41 @@ EXPECTED_APP_TABLE_PRIVILEGES = {
     "invitacion": set(),
     "refresh_token": {"SELECT", "INSERT"},
 }
+# Políticas del dueño (0003, T2): (tabla, nombre) -> (permissive, cmd, USING?, CHECK?).
+EXPECTED_OWNER_POLICIES = {
+    ("invitacion", "dueno_invitacion_validar"): ("PERMISSIVE", "SELECT", True, False),
+    ("invitacion", "dueno_invitacion_aceptar"): ("PERMISSIVE", "SELECT", True, False),
+    ("invitacion", "dueno_invitacion_consumir"): ("PERMISSIVE", "UPDATE", True, True),
+    ("invitacion", "dueno_invitacion_crear_tenant"): ("PERMISSIVE", "INSERT", False, True),
+    ("usuario", "dueno_usuario_login"): ("PERMISSIVE", "SELECT", True, False),
+    ("usuario", "dueno_usuario_aceptar"): ("PERMISSIVE", "INSERT", False, True),
+    ("membresia", "dueno_membresia_login"): ("PERMISSIVE", "SELECT", True, False),
+    ("membresia", "dueno_membresia_aceptar"): ("PERMISSIVE", "INSERT", False, True),
+    ("tenant", "dueno_tenant_crear"): ("PERMISSIVE", "INSERT", False, True),
+    ("tenant", "dueno_tenant_recien_creado"): ("PERMISSIVE", "SELECT", True, False),
+}
+# GRANT de auth_owner (0003): tabla -> privilegio -> columnas; nada a nivel de tabla.
+EXPECTED_OWNER_COLUMNS = {
+    "alembic_version": {},
+    # SELECT solo de id y creado_en, y solo de la fila creada en su transacción (I2);
+    # creado_en nunca en INSERT.
+    "tenant": {"INSERT": {"id", "nombre"}, "SELECT": {"id", "creado_en"}},
+    "usuario": {
+        "SELECT": {"id", "email", "password_hash", "activo"},
+        "INSERT": {"id", "email", "nombre", "password_hash"},
+    },
+    # Sin INSERT de id en membresia ni invitacion (M3): lo pone el DEFAULT.
+    "membresia": {
+        "SELECT": {"id", "tenant_id", "usuario_id", "rol", "activa"},
+        "INSERT": {"tenant_id", "usuario_id", "rol"},
+    },
+    "invitacion": {
+        "SELECT": {"tenant_id", "email", "rol", "token_hash", "expira_en", "usada_en"},
+        "UPDATE": {"usada_en"},
+        "INSERT": {"tenant_id", "email", "rol", "token_hash", "expira_en"},
+    },
+    "refresh_token": {},
+}
 TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
 COLUMN_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "REFERENCES")
 
@@ -266,6 +305,21 @@ def _policies(conn: Connection) -> dict[tuple[str, str], tuple]:
         )
     )
     return {(r[0], r[1]): (r[2], r[3], r[4], r[5], r[6]) for r in rows}
+
+
+OWNER_ROLES = "{" + AUTH_OWNER + "}"
+
+
+def _app_policies(conn: Connection) -> dict[tuple[str, str], tuple]:
+    return {k: v for k, v in _policies(conn).items() if v[2] != OWNER_ROLES}
+
+
+def _owner_policies(conn: Connection) -> dict[tuple[str, str], tuple]:
+    return {
+        k: (v[0], v[1], v[3] is not None, v[4] is not None)
+        for k, v in _policies(conn).items()
+        if v[2] == OWNER_ROLES
+    }
 
 
 def _expected_policies(app_role: str) -> dict[tuple[str, str], tuple]:
@@ -400,7 +454,9 @@ def test_tables_are_owned_by_the_migrator(conn, catalog):
 
 
 def test_public_policies_are_a_closed_list(conn, catalog):
-    assert _policies(conn) == _expected_policies(catalog.app_role)
+    assert _app_policies(conn) == _expected_policies(catalog.app_role)
+    assert _owner_policies(conn) == EXPECTED_OWNER_POLICIES
+    assert len(_policies(conn)) == len(EXPECTED_POLICIES) + len(EXPECTED_OWNER_POLICIES)
 
 
 def test_restrictive_policies_are_a_closed_list(conn, catalog):
@@ -408,11 +464,32 @@ def test_restrictive_policies_are_a_closed_list(conn, catalog):
     assert restrictive == {("invitacion", "invitacion_creada_por_no_nula")}
 
 
-def test_no_policy_targets_public_or_auth_owner_yet(conn):
-    # Las políticas TO auth_owner llegan en T2 (0003) y amplían esta lista cerrada.
+def test_no_policy_targets_public_and_each_targets_a_single_role(conn, catalog):
+    # Cada política es de un solo rol: la aplicación o auth_owner, nunca los dos ni PUBLIC.
     for (table, name), (_, _, roles, _, _) in _policies(conn).items():
         assert "public" not in roles, (table, name)
-        assert AUTH_OWNER not in roles, (table, name)
+        assert roles in ("{" + catalog.app_role + "}", OWNER_ROLES), (table, name)
+
+
+def test_owner_policies_are_never_for_all(conn):
+    for key, (_, cmd, _, _) in _owner_policies(conn).items():
+        assert cmd != "ALL", key
+
+
+def _compact(expression: str | None) -> str:
+    return "".join((expression or "").split())
+
+
+def test_bootstrap_invitation_is_bound_to_a_tenant_created_now(conn):
+    # I2: la invitación de crear_tenant exige un tenant creado en la misma transacción,
+    # y auth_owner solo lee esa fila. El texto completo lo fija el catálogo C6 de T3.
+    policies = _policies(conn)
+    check = _compact(policies[("invitacion", "dueno_invitacion_crear_tenant")][4])
+    assert "EXISTS(SELECT1FROMtenanttWHERE((t.id=invitacion.tenant_id)AND" in check, check
+    assert "(t.creado_en=now())" in check, check
+    using = _compact(policies[("tenant", "dueno_tenant_recien_creado")][3])
+    assert "(creado_en=now())" in using, using
+    assert "app.auth_tenant_nuevo" in using, using
 
 
 # --- GRANT por columna del rol de la aplicación --------------------------------
@@ -481,7 +558,12 @@ def test_exception_alembic_version_is_closed_to_the_app(conn, catalog):
 def test_exception_tenant(conn, catalog):
     assert "tenant_id" not in _columns(conn, "tenant")
     assert _rls_flags(conn, "tenant") == (True, True)
-    tenant_policies = {k: v for k, v in _policies(conn).items() if k[0] == "tenant"}
+    tenant_policies = {k: v for k, v in _app_policies(conn).items() if k[0] == "tenant"}
+    owner_tenant = {k for k in _owner_policies(conn) if k[0] == "tenant"}
+    assert owner_tenant == {
+        ("tenant", "dueno_tenant_crear"),
+        ("tenant", "dueno_tenant_recien_creado"),
+    }
     assert tenant_policies == {
         ("tenant", "tenant_isolation"): _expected_policies(catalog.app_role)[
             ("tenant", "tenant_isolation")
@@ -495,7 +577,7 @@ def test_exception_usuario(conn, catalog):
     assert "tenant_id" not in columns
     assert set(columns) == {"id", "email", "nombre", "password_hash", "activo"}
     assert _rls_flags(conn, "usuario") == (True, True)
-    usuario_policies = {k: v for k, v in _policies(conn).items() if k[0] == "usuario"}
+    usuario_policies = {k: v for k, v in _app_policies(conn).items() if k[0] == "usuario"}
     # Solo lectura acotada a la membresía del tenant fijado; sin INSERT/UPDATE.
     assert set(usuario_policies) == {("usuario", "usuario_por_membresia")}
     assert usuario_policies[("usuario", "usuario_por_membresia")][1] == "SELECT"
@@ -522,11 +604,13 @@ def test_supabase_roles_receive_nothing(conn):
         ), role
 
 
-def test_auth_owner_has_no_table_privileges_yet(conn):
-    # Sus GRANT por columna llegan en T2 (0003).
+def test_auth_owner_privileges_are_exactly_its_column_grants(conn):
+    # GRANT por columna de 0003 (T2); ninguno a nivel de tabla.
+    assert set(_public_tables(conn)) == set(EXPECTED_OWNER_COLUMNS)
     for table in _public_tables(conn):
-        assert _table_privileges(conn, AUTH_OWNER, table) == set(), table
-        assert _column_privileges(conn, AUTH_OWNER, table) == {}, table
+        assert _acl_table_privileges(conn, AUTH_OWNER, table) == set(), table
+        expected = EXPECTED_OWNER_COLUMNS[table]
+        assert _column_privileges(conn, AUTH_OWNER, table) == expected, table
 
 
 # --- Esquema acceso -------------------------------------------------------------
