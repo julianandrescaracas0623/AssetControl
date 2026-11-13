@@ -49,7 +49,7 @@ La función calcula `token_hash = sha256(decode(p_clave, 'hex'))` con la funció
 
 Las `tenant_isolation` de la aplicación son `TO <rol de aplicación>` explícito, sin políticas `PUBLIC` (I4). **`invitacion` y `creada_por`:** la restricción `creada_por IS NOT NULL` es una política **`RESTRICTIVE` `FOR INSERT TO <rol de aplicación>`** (`invitacion_creada_por_no_nula`), o bien `tenant_isolation` separada por comando; nunca una permisiva adicional ni `FOR ALL`, porque las permisivas se combinan con OR. Al ser `TO` el rol de aplicación, no afecta a `auth_owner`.
 
-**Privilegios por columna (I5).** Aplicación: `usuario` `SELECT (id, email, nombre, activo)`; `invitacion` `SELECT` de todo salvo `token_hash` e `INSERT (id, tenant_id, rol, email, token_hash, expira_en, creada_por)` sin `usada_en`. El dueño: solo las columnas que cada función necesita (incluye `token_hash` en `invitacion`, requerido por su `WHERE`; ajuste fino en T2). Ninguno con `DELETE`.
+**Privilegios por columna (I5).** Aplicación: `usuario` `SELECT (id, email, nombre, activo)`; `invitacion` `SELECT` de todo salvo `token_hash` e `INSERT (id, tenant_id, rol, email, token_hash, expira_en, creada_por)` sin `usada_en`; `refresh_token` `SELECT` incluido `token_hash` (Q20). El dueño: solo las columnas que cada función necesita (incluye `token_hash` en `invitacion`, requerido por su `WHERE`; ajuste fino en T2). Ninguno con `DELETE`.
 
 **`set_config` (I6):** `set_config(<guc>, <valor>, true)` al inicio de la función, local a la transacción; la función no deja contexto utilizable por la aplicación y el contexto no sobrevive a la transacción ni a un savepoint (prueba).
 
@@ -84,7 +84,7 @@ Las `tenant_isolation` de la aplicación son `TO <rol de aplicación>` explícit
 | `usuario` | no | forzada; `SELECT` si tiene membresía en el tenant fijado | `SELECT (id, email, nombre, activo)`; sin `password_hash`, `INSERT` ni `UPDATE` | `email` único, normalizado, CHECK `lower(btrim())` |
 | `membresia` | sí | `tenant_isolation` `TO` aplicación | `SELECT` | `UNIQUE (tenant_id, usuario_id)`, `UNIQUE (tenant_id, id)`; CHECK `rol` |
 | `invitacion` | sí | `tenant_isolation` `TO` aplicación + política `RESTRICTIVE` `FOR INSERT TO` aplicación (`creada_por IS NOT NULL`) | `SELECT` (sin `token_hash`), `INSERT` columnas sin `usada_en` | FK compuesta `(tenant_id, creada_por)`; `email` normalizado; CHECK `rol`; `token_hash` `bytea(32)` con índice único |
-| `refresh_token` | sí | `tenant_isolation` `TO` aplicación | `SELECT`, `INSERT`, `UPDATE (usado_en, revocado_en)` | FK compuesta `(tenant_id, membresia_id)`; `token_hash` `bytea(32)` con índice único; índice `familia_id` |
+| `refresh_token` | sí | `tenant_isolation` `TO` aplicación | `SELECT` (incluye `token_hash`, Q20), `INSERT`, `UPDATE (usado_en, revocado_en)` | FK compuesta `(tenant_id, membresia_id)`; `token_hash` `bytea(32)` con índice único; índice `familia_id` |
 
 - Ninguna tabla con `DELETE`. `REVOKE` a `anon`/`authenticated`/`service_role` en cada tabla (deuda T6).
 - Lista de excepciones de la prueba de catálogo: `alembic_version`, `tenant`, `usuario`, `limite_tasa` (cada una con prueba propia). La prueba de T1 ya incluye `limite_tasa` en la lista aunque la tabla aún no exista (se crea en T10): la excepción es por nombre, no exige que esté presente, y T10 añade su prueba propia.
@@ -154,7 +154,7 @@ Las dependencias de 002b están en su propia spec.
 Tests primero; `uv run pytest` contra PostgreSQL real, con el rol de aplicación y dos tenants sintéticos.
 
 ### 7.1 Catálogo cerrado (A2, C6)
-Falla si: una tabla de `public` fuera de la lista de excepciones carece de `tenant_id`, RLS, FORCE o `tenant_isolation` `TO` aplicación; hay `DELETE` para cualquier rol; el conjunto de funciones de `acceso` no coincide exactamente con la lista cerrada (`prosecdef`, dueño `auth_owner`, `proconfig` = `search_path` fijo, `proacl` solo aplicación); el conjunto de políticas `TO auth_owner` no coincide con la lista cerrada; existen funciones propias en `public`; la aplicación tiene `SELECT` sobre `password_hash` o `token_hash`.
+Falla si: una tabla de `public` fuera de la lista de excepciones carece de `tenant_id`, RLS, FORCE o `tenant_isolation` `TO` aplicación; hay `DELETE` para cualquier rol; el conjunto de funciones de `acceso` no coincide exactamente con la lista cerrada (`prosecdef`, dueño `auth_owner`, `proconfig` = `search_path` fijo, `proacl` solo aplicación); el conjunto de políticas `TO auth_owner` no coincide con la lista cerrada; existen funciones propias en `public`; la aplicación tiene `SELECT` sobre `usuario.password_hash` o `invitacion.token_hash`. La prueba fija explícitamente `refresh_token.token_hash` como **única** excepción permitida de columna de hash legible por la aplicación (Q20: la rotación de T7 la necesita en el `WHERE`) y falla si aparece cualquier otra.
 
 ### 7.2 Las 9 pruebas de aislamiento ampliadas (A26) más la 10 de T3
 > El `security-reviewer` recomendó 9 pruebas; se enumeran aquí según su veredicto y se ajustarán si su lista difiere.
@@ -165,7 +165,7 @@ Falla si: una tabla de `public` fuera de la lista de excepciones carece de `tena
 4. `membresia` `INSERT` por `auth_owner` sin invitación recién consumida falla; con ella, solo con `usada_en = now()`, ese tenant, esa clave, el `rol` de la invitación y el `usuario_id` de la GUC; una invitación consumida en otra transacción, otro rol u otro usuario falla.
 5. `usuario` `INSERT` por `auth_owner` con `email` distinto al de la invitación consumida falla.
 6. `auth_owner` no puede leer `tenant` ni filas con GUC vacía/nula/comodín (`%`, `_`); su `INSERT` en `tenant`/`invitacion` solo pasa con la GUC `app.auth_tenant_nuevo` y con `rol = 'admin'`, `creada_por` NULL y expiración ≤ 24 h. La aplicación no puede insertar `invitacion` con `creada_por` NULL aunque exista otra política permisiva (la `RESTRICTIVE` la frena).
-7. La aplicación no puede leer `password_hash` ni `token_hash`; el hash almacenado (doble) no autentica (I1).
+7. La aplicación no puede leer `usuario.password_hash` ni `invitacion.token_hash`; sí puede leer `refresh_token.token_hash` (única excepción, Q20), acotado por RLS a su tenant; el hash almacenado (doble) no autentica (I1).
 8. `SET ROLE auth_owner` falla para la aplicación; llamar a `acceso.*` con `SET ROLE anon`/`authenticated`/`service_role` → `permission denied` (C7).
 9. Tras cada función, el contexto local no sobrevive (transacción ni savepoint) y una consulta directa sin tenant devuelve cero. **Se ejecuta en T3**, cuando existen las funciones. En T2 solo se prueba, a nivel SQL, que las GUC de las políticas (`app.auth_*`) fijadas con `set_config(..., true)` no sobreviven al `COMMIT`/`ROLLBACK` ni a un `ROLLBACK TO SAVEPOINT`, y que con GUC vacía las políticas devuelven cero filas.
 10. (T3) `ON CONFLICT DO NOTHING` bajo `auth_owner` real no exige política `SELECT` en `usuario`; y `now()` es el de la transacción: una invitación consumida en una transacción anterior (o antes de un `SAVEPOINT` en otra) no satisface `usada_en = now()` de las políticas de `usuario` y `membresia`.
@@ -210,7 +210,7 @@ Concurrencia (A9), atomicidad (A20, A22), auth (A10, A13, A14, A21), JWT/cabecer
 | T9 | T3, T6, T8 |
 | T10 | Cambio 6 a `docs/03` (`limite_tasa`) por el humano |
 
-Decididas: Q1–Q18 (incluidas Q9, Q10 completa y Q11). Q19 solo afecta a 002b.
+Decididas: Q1–Q18 (incluidas Q9, Q10 completa y Q11) y Q20 (`SELECT` de `refresh_token.token_hash` para la aplicación). Q19 solo afecta a 002b.
 
 ## 9. Alternativa descartada
 

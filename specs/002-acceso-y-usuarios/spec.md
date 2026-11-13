@@ -31,6 +31,7 @@
 | Q11 | **[DECIDIDO]** `SECRET_KEY` de al menos 32 bytes. |
 | Q4 | **B:** el admin (o el script) fija el email al invitar; columna `email` en `invitacion`. **Consecuencia (b):** el invitado no escribe el email; `POST /invitaciones/aceptar` recibe `{token, nombre, password}` y `acceso.aceptar_invitacion` toma el email de la invitación. |
 | Q18 | Partición 002 (backend) / 002b (OpenAPI + tipos TS + web mínima); B2 y B5 de la spec 001 diferidos. |
+| Q20 | **[DECIDIDO 2026-11-12, `/sdd-change`] Opción A:** la aplicación **sí** tiene `SELECT` sobre `refresh_token.token_hash`, porque la rotación (T7) es `UPDATE ... WHERE token_hash = :h` y PostgreSQL exige `SELECT` sobre las columnas del `WHERE`. Es aceptable porque lo guardado es `sha256(sha256(secreto))` (I1), que no autentica, y RLS acota por tenant. Siguen **sin** `SELECT` para la aplicación `usuario.password_hash` e `invitacion.token_hash`. **Descartadas:** B, función `SECURITY DEFINER` `acceso.rotar_refresh` (más superficie en `acceso` y en la lista cerrada C6 sin ganancia real); C, cookie con el `id` de la fila (cambia el formato L1 de Q2 y sigue exigiendo comparar el hash). |
 
 ## Cambios propuestos a docs/03 (los aplica el humano antes de T1)
 
@@ -100,7 +101,7 @@ La fundación (spec 001) dejó el patrón de aislamiento (RLS, rol de aplicació
 - **R4b Privilegios de funciones.** Orden de la migración (C3): `CREATE FUNCTION`, `REVOKE ALL ... FROM PUBLIC, anon, authenticated, service_role`, `GRANT EXECUTE` solo al rol de aplicación (`buscar_login`, `validar_invitacion`, `aceptar_invitacion`) o solo al rol migrador (`crear_tenant`, nunca al de aplicación), `ALTER FUNCTION ... OWNER TO auth_owner`. Se cierra la Data API de Supabase para el esquema `acceso` y se revoca lo heredado en `public` (`REVOKE` en cada tabla nueva a `anon`, `authenticated`, `service_role`; deuda T6).
 - **R4c Cuerpo de las funciones (C2, I6).** `SET search_path = pg_catalog, pg_temp`; todos los objetos calificados con esquema y ninguno resuelto vía `public`; `STRICT`; SQL estático (sin `EXECUTE` ni `format`); `set_config(..., true)` local al inicio de la función; una GUC distinta por función y tabla (I2).
 - **R4d Políticas del dueño (I2, I3, I4).** Políticas por comando (`SELECT`/`INSERT`/`UPDATE`; nunca `FOR ALL`), todas `TO auth_owner`, acotadas por la GUC de la función. Concretamente: `invitacion` `UPDATE USING (token_hash = clave AND usada_en IS NULL AND expira_en > now()) WITH CHECK (usada_en IS NOT NULL)` con `GRANT UPDATE (usada_en)`; `membresia` `INSERT WITH CHECK` ligado a la invitación recién consumida: existe una `invitacion` con ese `tenant_id`, el `token_hash` de la clave de la función, `usada_en = now()` (la de esta transacción), `rol` igual al de la membresía, y `usuario_id` igual al de la GUC `app.auth_usuario_nuevo` que la función fija tras crear el usuario; `usuario` `INSERT WITH CHECK` (existe una invitación consumida en esta transacción con esa clave y `email` igual al del usuario; el email sale de la invitación, sin GUC de email nuevo); `tenant` y `invitacion` reciben además `INSERT` del dueño **solo** para `crear_tenant` (R6). Las políticas `tenant_isolation` de la aplicación no cambian y no hay políticas `PUBLIC`.
-- **R4e Privilegios por columna (I5).** Aplicación: `usuario` `SELECT (id, email, nombre, activo)` (sin `password_hash`); `invitacion` sin `token_hash` en `SELECT` e `INSERT` limitado a columnas sin `usada_en`; sin `INSERT`/`UPDATE` sobre `usuario`, `tenant` ni `membresia`.
+- **R4e Privilegios por columna (I5).** Aplicación: `usuario` `SELECT (id, email, nombre, activo)` (sin `password_hash`); `invitacion` sin `token_hash` en `SELECT` e `INSERT` limitado a columnas sin `usada_en`; `refresh_token` con `SELECT` que **sí** incluye `token_hash` (única excepción, Q20); sin `INSERT`/`UPDATE` sobre `usuario`, `tenant` ni `membresia`.
 - **R4f Tablas globales.** `tenant` y `usuario` no llevan `tenant_id` de negocio; RLS forzada con lectura solo por membresía en el tenant fijado. Ninguna tabla se omite sin estar en la lista cerrada de excepciones de la prueba de catálogo, con prueba propia.
 - **R4g Supabase (C8).** El diseño se valida con el rol `postgres` real de Supabase (no superusuario) antes del piloto; es condición de salida de la fase, no de T1.
 
@@ -198,14 +199,14 @@ A16 y A17 pasan a la spec 002b.
 
 ## Preguntas abiertas
 
-Spec aprobada (G1–G3, 2026-11-12). **Decididas:** Q1–Q18 (incluidos Q9, Q10 completa y Q11). **Siguen abiertas:** Q19 (solo 002b) y C8 (antes del piloto). **Condiciones previas del humano:** T1 no empieza hasta aplicar los cambios 1–5 a `docs/03` y P0 (`auth_owner` en el init); T10 no empieza hasta aplicar el cambio 6 (`limite_tasa`). T4 fija las versiones exactas de `argon2-cffi` y `PyJWT` (Q8) y la lista corta de contraseñas comunes. "Bloquea" coincide con `tasks.md` y `plan.md` §8.
+Spec aprobada (G1–G3, 2026-11-12). **Decididas:** Q1–Q18 (incluidos Q9, Q10 completa y Q11) y Q20 (`/sdd-change`). **Siguen abiertas:** Q19 (solo 002b) y C8 (antes del piloto). **Condiciones previas del humano:** T1 no empieza hasta aplicar los cambios 1–5 a `docs/03` y P0 (`auth_owner` en el init); T10 no empieza hasta aplicar el cambio 6 (`limite_tasa`). T4 fija las versiones exactas de `argon2-cffi` y `PyJWT` (Q8) y la lista corta de contraseñas comunes. "Bloquea" coincide con `tasks.md` y `plan.md` §8.
 
 | Pregunta | Estado | Bloquea |
 |---|---|---|
 | **Cambios a `docs/03`** (los cinco primeros, con el formato `bytea` del hash) y **P0** (ampliar `docker/postgres/init/01-app-role.sh` con `auth_owner`; A0) | Los aplica el humano antes de T1 | T1 |
 | **Cambio 6 a `docs/03`** (`limite_tasa`, `plan.md` §3.1) | Los aplica el humano antes de T10 | T10 |
 | **Q1 — detalle** de las políticas y GUC exactas (I2/I3), incluidas las de `crear_tenant` y `membresia` | Diseño decidido; el `security-reviewer` revisa el SQL concreto en T2 | T2, T3 |
-| **Q3, Q5, Q6, Q7, Q9, Q10, Q11, Q12–Q18** | **[DECIDIDO]** (tabla de decisiones) | — |
+| **Q3, Q5, Q6, Q7, Q9, Q10, Q11, Q12–Q18, Q20** | **[DECIDIDO]** (tabla de decisiones) | — |
 | **Q8** Dependencias `argon2-cffi` y `PyJWT` | **[DECIDIDO]**; falta fijar versiones exactas y parámetros de Argon2id en T4 | T4 |
 | **Q19** (solo 002b) Origen en desarrollo: proxy de Vite | `[PENDIENTE]` | 002b |
 | **P17** (`docs/05`) Desactivar, recuperar, vincular | Abierta; fuera de 002 | — |
