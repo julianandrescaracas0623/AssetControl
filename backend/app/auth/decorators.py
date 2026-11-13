@@ -62,8 +62,10 @@ def require_role(*roles: str) -> Callable[[Callable[..., Any]], Callable[..., An
                 try:
                     return view(*args, **kwargs)
                 finally:
-                    # La sesión no sobrevive a la transacción ni la ven los after_request.
+                    # Ni la sesión ni el usuario sobreviven a la vista (H4 de T8): no los
+                    # ven los after_request ni otro código de la misma petición.
                     g.pop(_SESSION_KEY, None)
+                    g.pop(_USER_KEY, None)
 
         wrapped.required_roles = allowed  # type: ignore[attr-defined]
         return wrapped

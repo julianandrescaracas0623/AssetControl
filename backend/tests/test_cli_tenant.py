@@ -491,6 +491,9 @@ def test_command_rejects_the_app_role_as_migrator(operador):
         ("Clínica sintética", "@ejemplo.test"),
         ("Clínica sintética", "admin@"),
         ("Clínica sintética", "   "),
+        # N1/H3 (T9): mismo normalizador que la API; antes, error de CHECK.
+        ("Clínica sintética", "admin\u1c89@ejemplo.test"),
+        ("Clínica sintética", "admin\x00@ejemplo.test"),
     ],
 )
 def test_invalid_input_creates_nothing(operador, nombre, email):

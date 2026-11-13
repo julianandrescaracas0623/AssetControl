@@ -32,8 +32,8 @@ NOT_AUTHENTICATED = ("no_autenticado", "Debes iniciar sesión.")
 BAD_REQUEST = ("solicitud_invalida", "La solicitud no es válida.")
 
 
-def _session_response(result: service.LoginResult) -> Response:
-    """Cuerpo común de login y refresh, con la cookie de refresh nueva."""
+def session_response(result: service.LoginResult) -> Response:
+    """Cuerpo común de login, refresh y aceptar invitación (T9), con la cookie de refresh nueva."""
     response = jsonify(
         access_token=result.access_token,
         token_type="Bearer",  # noqa: S106 - tipo de token (RFC 6750), no un secreto
@@ -67,7 +67,7 @@ def login() -> ResponseReturnValue:
     result = service.login(email, password)
     if result is None:
         return error_response(401, *INVALID_CREDENTIALS)
-    return _session_response(result)
+    return session_response(result)
 
 
 @bp.post("/refresh")
@@ -77,7 +77,7 @@ def refresh() -> ResponseReturnValue:
     result = service.refresh(_refresh_cookie_value())
     if result is None:
         return error_response(401, *NOT_AUTHENTICATED)
-    return _session_response(result)
+    return session_response(result)
 
 
 @bp.post("/logout")

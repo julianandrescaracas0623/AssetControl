@@ -391,8 +391,19 @@ def test_decorators_declare_their_roles():
     assert cualquiera.required_roles == frozenset({"admin", "contador"})
 
 
-# Endpoints sin token, cerrados. Añadir uno aquí exige justificarlo en la spec.
-PUBLIC_ENDPOINTS = frozenset({"static", "meta.health", "auth.login", "auth.refresh", "auth.logout"})
+# Endpoints sin token, cerrados. Añadir uno aquí exige justificarlo en la spec. Sin la ruta
+# ``static`` de Flask (H7 de T8: ``static_folder=None``); validar y aceptar invitación son
+# públicos por plan.md §4 (T9).
+PUBLIC_ENDPOINTS = frozenset(
+    {
+        "meta.health",
+        "auth.login",
+        "auth.refresh",
+        "auth.logout",
+        "invitaciones.validar",
+        "invitaciones.aceptar",
+    }
+)
 # Todo endpoint protegido, con sus roles. Añadir uno exige su prueba de rol (401/403)
 # y de aislamiento (A12) en este archivo o en el de su recurso.
 PROTECTED_ENDPOINTS = {
@@ -419,6 +430,68 @@ def test_every_endpoint_is_public_by_list_or_declares_its_roles(roles_app):
     assert PUBLIC_ENDPOINTS <= set(roles_app.view_functions)
 
 
+def test_flask_static_route_is_disabled(roles_app):
+    """H7 de T8: sin ``static_folder`` no hay ruta ``/static`` fuera del catálogo."""
+    assert "static" not in roles_app.view_functions
+    assert not any(rule.rule.startswith("/static") for rule in roles_app.url_map.iter_rules())
+
+
+def _protected_routes(flask_app: Flask) -> list[tuple[str, str, str]]:
+    routes = []
+    for rule in flask_app.url_map.iter_rules():
+        if rule.endpoint in PROTECTED_ENDPOINTS:
+            for method in sorted(rule.methods - {"HEAD", "OPTIONS"}):
+                routes.append((rule.endpoint, method, rule.rule))
+    return routes
+
+
+def test_every_protected_route_is_401_anonymous_and_403_for_a_missing_role(client, roles_app):
+    """Catálogo conductual: no basta con declarar ``required_roles``; hay que cumplirlo."""
+    routes = _protected_routes(roles_app)
+    assert {endpoint for endpoint, _, _ in routes} == set(PROTECTED_ENDPOINTS)
+
+    for endpoint, method, path in routes:
+        anonymous = client.open(path, method=method, json={})
+        assert anonymous.status_code == 401, (endpoint, method)
+        assert error_code(anonymous) == "no_autenticado"
+
+        as_contador = client.open(
+            path, method=method, json={}, headers=bearer(CONTADOR_A, TENANT_A, rol="contador")
+        )
+        if "contador" in PROTECTED_ENDPOINTS[endpoint]:
+            assert as_contador.status_code not in (401, 403), (endpoint, method)
+        else:
+            assert as_contador.status_code == 403, (endpoint, method)
+            assert error_code(as_contador) == "prohibido"
+
+
+# --- H4: el usuario actual no sobrevive a la vista -----------------------------------
+
+
+@pytest.mark.parametrize("raises", [False, True], ids=["vuelve", "lanza"])
+def test_current_user_is_cleared_after_the_protected_view(roles_app, raises):
+    seen = []
+
+    @require_auth
+    def view():
+        seen.append(decorators.current_user().usuario_id)
+        if raises:
+            raise RuntimeError("fallo sintético de la vista")
+        return ""
+
+    with roles_app.test_request_context("/", headers=bearer(ADMIN_A, TENANT_A)):
+        if raises:
+            with pytest.raises(RuntimeError, match="sintético"):
+                view()
+        else:
+            view()
+        assert seen == [ADMIN_A.usuario_id]
+        with pytest.raises(RuntimeError):
+            decorators.current_user()
+        with pytest.raises(RuntimeError):
+            decorators.current_session()
+
+
 # --- O2: sin CORS en /auth/* ni /invitaciones ----------------------------------------
 
 
@@ -436,15 +509,22 @@ def _auth_rules(flask_app: Flask) -> list[str]:
     )
 
 
-def test_there_are_auth_routes_to_check(roles_app):
-    assert {"/auth/login", "/auth/refresh", "/auth/logout", ME, INVITAR} <= set(
-        _auth_rules(roles_app)
-    )
-
-
-@pytest.mark.parametrize(
-    "path", ["/auth/login", "/auth/refresh", "/auth/logout", "/auth/me", "/invitaciones"]
+AUTH_RULES = (
+    "/auth/login",
+    "/auth/refresh",
+    "/auth/logout",
+    "/auth/me",
+    "/invitaciones",
+    "/invitaciones/validar",
+    "/invitaciones/aceptar",
 )
+
+
+def test_there_are_auth_routes_to_check(roles_app):
+    assert set(AUTH_RULES) <= set(_auth_rules(roles_app))
+
+
+@pytest.mark.parametrize("path", AUTH_RULES)
 def test_no_cors_headers_nor_valid_preflight(client, path):
     origin = "https://sitio-ajeno.example"
     preflight = client.options(
@@ -467,5 +547,4 @@ def test_no_cors_headers_nor_valid_preflight(client, path):
 
 
 def test_all_auth_rules_are_covered_by_the_cors_test(roles_app):
-    covered = {"/auth/login", "/auth/refresh", "/auth/logout", "/auth/me", "/invitaciones"}
-    assert set(_auth_rules(roles_app)) == covered
+    assert set(_auth_rules(roles_app)) == set(AUTH_RULES)

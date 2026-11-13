@@ -29,6 +29,7 @@ Nada de este módulo registra contraseñas, tokens, hashes ni el email.
 """
 
 import re
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -74,11 +75,22 @@ class LoginResult:
     refresh_cookie_value: str
 
 
-def normalize_email(email: str) -> str | None:
-    """``lower(btrim())`` como la base; ``None`` si no puede ser un email guardado.
+# N1/H3 (T9): categorías que impiden garantizar que la salida cumple el CHECK
+# ``email = lower(btrim(email))`` de la base. ``Cn``: sin asignar en la base de
+# Unicode de Python (15.0 en 3.12), pero PostgreSQL 17 puede conocerlo y pasarlo a
+# minúsculas (U+1C89, U+A7CB, U+10D50...). ``Lu``/``Lt``: mayúscula o titular que
+# ``lower()`` deja igual y otra tabla de Unicode podría convertir.
+_UNSTABLE_CASE_CATEGORIES = frozenset({"Cn", "Lu", "Lt"})
 
-    Un sustituto suelto (no codificable en UTF-8) o un NUL harían fallar la
-    consulta con un ``500``: se tratan como cuenta inexistente.
+
+def normalize_email(email: str) -> str | None:
+    """Único normalizador de email (login, invitaciones, script del operador y T10).
+
+    ``strip().lower()`` y ``None`` si no se puede garantizar que el resultado cumple
+    ``email = lower(btrim(email))`` de la base (``test_email_normalization`` lo
+    comprueba con todos los code points contra PostgreSQL), o si haría fallar la
+    consulta: vacío, NUL o sustituto suelto (no codificable en UTF-8). El login lo
+    trata como cuenta inexistente; las altas responden ``400``.
     """
     value = email.strip().lower()
     if not value or "\x00" in value:
@@ -86,6 +98,8 @@ def normalize_email(email: str) -> str | None:
     try:
         value.encode("utf-8")
     except UnicodeEncodeError:
+        return None
+    if any(unicodedata.category(char) in _UNSTABLE_CASE_CATEGORIES for char in value):
         return None
     return value
 
@@ -131,11 +145,19 @@ def login(email: str, password: str) -> LoginResult | None:
                 account.usuario_id,
             )
         return None
-    tenant_id = active[0].tenant_id
+    return issue_session(account.usuario_id, active[0].tenant_id)
 
+
+def issue_session(usuario_id: uuid.UUID, tenant_id: uuid.UUID) -> LoginResult | None:
+    """Acceso y refresh nuevos (familia nueva) para la membresía activa en ``tenant_id``.
+
+    Lo usan el login y la aceptación de invitación (T9, después del ``COMMIT`` de
+    ``aceptar_invitacion``, R11/A22). Bajo ``tenant_session`` relee ``membresia`` y
+    ``usuario.activo``; ``None`` si ya no están activos.
+    """
     secret = new_token()
     with tenant_session(tenant_id) as session:
-        loaded = _load_current_user(session, account.usuario_id, tenant_id)
+        loaded = _load_current_user(session, usuario_id, tenant_id)
         if loaded is None:
             return None
         membresia, user = loaded

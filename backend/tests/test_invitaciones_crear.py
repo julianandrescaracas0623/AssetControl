@@ -271,6 +271,11 @@ INVALID_BODIES = {
     "email_con_espacio": {"email": "a b@ejemplo.test", "rol": "contador"},
     "email_con_nul": {"email": "a\x00@ejemplo.test", "rol": "contador"},
     "email_sustituto": {"email": "a\ud800@ejemplo.test", "rol": "contador"},
+    # N1/H3 (T9): PostgreSQL 17 las pasa a minúsculas y el CHECK daba 500.
+    "email_u1c89": {"email": "a\u1c89@ejemplo.test", "rol": "contador"},
+    "email_ua7cb": {"email": "a\ua7cb@ejemplo.test", "rol": "contador"},
+    "email_u10d50": {"email": "a\U00010d50@ejemplo.test", "rol": "contador"},
+    "email_mayuscula_sin_minuscula": {"email": "a\u03d2@ejemplo.test", "rol": "contador"},
     "rol_desconocido": {"email": "x@ejemplo.test", "rol": "superadmin"},
     "rol_mayusculas": {"email": "x@ejemplo.test", "rol": "Admin"},
     "rol_vacio": {"email": "x@ejemplo.test", "rol": ""},

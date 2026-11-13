@@ -33,7 +33,9 @@ def create_app(config: Config | None = None) -> Flask:
     if config is None:
         config = load_config()
 
-    app = Flask(__name__)
+    # Sin carpeta estática: la API no sirve archivos y la ruta ``static`` quedaría fuera
+    # del catálogo de roles (H7 de T8).
+    app = Flask(__name__, static_folder=None)
     app.config.update(config.to_flask())
     app.extensions[CONFIG_EXTENSION_KEY] = config
     if config.is_test:

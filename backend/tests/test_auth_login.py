@@ -480,6 +480,8 @@ GENERIC_CASES = {
     "email_con_nul": ("admin\x00.a6@ejemplo.test", PASSWORD),
     "email_vacio": ("", PASSWORD),
     "email_comodin": ("%", PASSWORD),
+    # N1/H3 (T9): mayúscula que solo PostgreSQL conoce; mismo genérico, nunca 500.
+    "email_mayuscula_solo_postgres": ("admin\u1c89.a6@ejemplo.test", PASSWORD),
 }
 
 EXPECTED_GENERIC = {

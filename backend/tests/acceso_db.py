@@ -1,6 +1,7 @@
-"""Base temporal de acceso para las pruebas de T8 (spec 002).
+"""Base temporal de acceso para las pruebas de T8–T9 (spec 002).
 
-La usan ``test_roles`` y ``test_invitaciones_crear``.
+La usan ``test_roles``, ``test_invitaciones_crear``, ``test_invitaciones_aceptar`` y
+``test_invitaciones_concurrencia``.
 
 Crea una base nueva migrada a ``head``, siembra dos tenants sintéticos (A y B) con
 el rol migrador (que debe ver todas las filas bajo ``FORCE RLS``) y la borra al

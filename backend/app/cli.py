@@ -32,19 +32,11 @@ from app.config import (
     SameDatabaseRoleError,
     load_migration_url,
 )
+from app.invitaciones.service import normalize_invitation_email
 
 INVITATION_LINK_PREFIX = "/invitacion#"
 CONNECT_TIMEOUT_SECONDS = 5
 _CREAR_TENANT = text("select acceso.crear_tenant(:nombre, :email, :clave)")
-
-
-def _normalize_email(email: str) -> str | None:
-    """Email en minúsculas y sin espacios (CHECK de ``invitacion``); ``None`` si no vale."""
-    value = email.strip().lower()
-    local, at, domain = value.partition("@")
-    if not at or not local or not domain or "@" in domain or any(c.isspace() for c in value):
-        return None
-    return value
 
 
 def _database_error_summary(exc: BaseException) -> str:
@@ -66,7 +58,8 @@ def create_tenant_command(nombre: str, email: str) -> None:
     nombre = nombre.strip()
     if not nombre:
         raise click.ClickException("El nombre del tenant no puede estar vacío.")
-    normalized_email = _normalize_email(email)
+    # Mismo normalizador que la API (N1/H3 de T9): su salida cumple el CHECK de la base.
+    normalized_email = normalize_invitation_email(email)
     if normalized_email is None:
         raise click.ClickException("El email del primer admin no es válido.")
 

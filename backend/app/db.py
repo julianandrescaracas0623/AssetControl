@@ -38,7 +38,8 @@ activa) y deja en el logger emisor un filtro que descarta los registros DEBUG
 
 Las funciones ``acceso.*`` (antes de conocer el tenant) se llaman con funciones
 propias de este módulo sin tenant y en su propia transacción, como
-``buscar_login`` (spec 002, T6; plan.md §2), nunca dentro de ``tenant_session``.
+``buscar_login`` (spec 002, T6; plan.md §2), ``validar_invitacion`` y
+``aceptar_invitacion`` (T9), nunca dentro de ``tenant_session``.
 
 El engine se crea en ``init_db`` (llamado por ``create_app``), nunca al importar.
 ``create_engine`` no abre conexiones; la primera se abre al usar la sesión.
@@ -55,7 +56,7 @@ from typing import Any
 from flask import Flask, current_app, has_app_context
 from sqlalchemy import Uuid, create_engine, event, text
 from sqlalchemy.engine import Connection, Engine
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlalchemy.orm import (
     Mapped,
     ORMExecuteState,
@@ -305,6 +306,67 @@ def buscar_login(email: str) -> list[LoginRow]:
         )
         for row in rows
     ]
+
+
+_VALIDAR_INVITACION = text("select acceso.validar_invitacion(:clave)")
+_ACEPTAR_INVITACION = text(
+    "select usuario_id, tenant_id, rol "
+    "from acceso.aceptar_invitacion(:clave, :nombre, :password_hash)"
+)
+# Excepción estática de aceptar_invitacion (Q16): email ya existente; revierte el consumo.
+_INVITACION_INVALIDA = ("P0001", "invitacion_invalida")
+
+
+@dataclass(frozen=True)
+class AcceptedInvitation:
+    """Lo que devuelve ``acceso.aceptar_invitacion``: la cuenta creada y su membresía."""
+
+    usuario_id: uuid.UUID
+    tenant_id: uuid.UUID
+    rol: str
+
+
+def validar_invitacion(clave: str) -> bool:
+    """``acceso.validar_invitacion`` sin tenant, en su propia transacción (T9).
+
+    Solo dice si la invitación de ``clave`` (``sha256(token)`` en hex) está vigente;
+    no consume ni devuelve email, tenant o rol.
+    """
+    database = _get_database()
+    with database.engine.begin() as connection:
+        return connection.scalar(_VALIDAR_INVITACION, {"clave": clave}) is True
+
+
+def _is_invitacion_invalida(exc: DBAPIError) -> bool:
+    orig = exc.orig
+    message = getattr(getattr(orig, "diag", None), "message_primary", None)
+    return (getattr(orig, "sqlstate", None), message) == _INVITACION_INVALIDA
+
+
+def aceptar_invitacion(clave: str, nombre: str, password_hash: str) -> AcceptedInvitation | None:
+    """``acceso.aceptar_invitacion`` sin tenant, en su propia transacción (T9, R11).
+
+    Una sola operación atómica de la base: consume la invitación y crea usuario y
+    membresía con el email, el tenant y el rol de la invitación. ``None`` (nada
+    creado, la invitación sigue como estaba) si la clave no existe, está usada,
+    vencida o mal formada (cero filas), o si el email ya tiene cuenta (excepción
+    estática, Q16). Cualquier otro error de base se propaga (``500``). Nunca se llama
+    dentro de ``tenant_session``.
+    """
+    database = _get_database()
+    params = {"clave": clave, "nombre": nombre, "password_hash": password_hash}
+    rejected = False
+    row = None
+    try:
+        with database.engine.begin() as connection:
+            row = connection.execute(_ACEPTAR_INVITACION, params).one_or_none()
+    except DBAPIError as exc:
+        if not _is_invitacion_invalida(exc):
+            raise
+        rejected = True
+    if rejected or row is None:
+        return None
+    return AcceptedInvitation(usuario_id=row.usuario_id, tenant_id=row.tenant_id, rol=row.rol)
 
 
 def _session_tenant(session: Session) -> uuid.UUID:
