@@ -28,6 +28,14 @@ Cada conexión nueva del engine comprueba que su ``current_user`` no es
 ``SUPERUSER`` ni tiene ``BYPASSRLS`` (``InsecureDatabaseRoleError``; spec 002,
 T4, R15). Las conexiones se reciclan cada ``POOL_RECYCLE_SECONDS`` (B6).
 
+Logs de SQLAlchemy (M1 de T6-endurecimiento): con ``sqlalchemy.engine`` en DEBUG
+el engine escribe filas completas (``Row (...)``), con hashes Argon2 y emails;
+``hide_parameters`` solo oculta parámetros. ``init_db`` fija ``sqlalchemy.engine``
+y ``sqlalchemy.pool`` en ``WARNING`` antes de ``create_engine``, crea el engine con
+``echo=False`` y ``echo_pool=False`` literales (ninguna variable de entorno los
+activa) y deja en el logger emisor un filtro que descarta los registros DEBUG
+(``Row``/``Col``) aunque luego alguien suba el nivel o active ``echo``.
+
 Las funciones ``acceso.*`` (antes de conocer el tenant) se llaman con funciones
 propias de este módulo sin tenant y en su propia transacción, como
 ``buscar_login`` (spec 002, T6; plan.md §2), nunca dentro de ``tenant_session``.
@@ -37,6 +45,7 @@ El engine se crea en ``init_db`` (llamado por ``create_app``), nunca al importar
 Ningún mensaje de este módulo incluye la URL de la base ni credenciales.
 """
 
+import logging
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -66,6 +75,10 @@ CONNECT_TIMEOUT_SECONDS = 5
 # B6 de T4: una conexión del pool vive como mucho 30 min; la siguiente vuelve a pasar
 # verify_connection_role, lo que acota la ventana tras un ALTER ROLE ... BYPASSRLS.
 POOL_RECYCLE_SECONDS = 30 * 60
+# M1 de T6-endurecimiento: niveles mínimos de los loggers de SQLAlchemy.
+_QUIET_SQLALCHEMY_LOGGERS = ("sqlalchemy.engine", "sqlalchemy.pool")
+# Logger que emite las filas (sin ``logging_name``, que no se usa).
+_ENGINE_EMITTER_LOGGER = "sqlalchemy.engine.Engine"
 
 
 class MissingTenantError(ValueError):
@@ -150,6 +163,29 @@ class _TenantSession(Session):
         )
 
 
+class _DropRowRecords(logging.Filter):
+    """Descarta los registros DEBUG del engine: son las filas (``Row``) y columnas (``Col``).
+
+    Un filtro de logger solo se aplica a lo que ese logger emite, por eso va en
+    ``sqlalchemy.engine.Engine``; también cubre ``echo=True``/``"debug"``, que
+    salta el nivel pero no los filtros.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.levelno > logging.DEBUG
+
+
+def _quiet_sqlalchemy_logs() -> None:
+    """Sube a ``WARNING`` los loggers de SQLAlchemy y deja el filtro de filas (idempotente)."""
+    for name in _QUIET_SQLALCHEMY_LOGGERS:
+        logger = logging.getLogger(name)
+        if logger.level < logging.WARNING:
+            logger.setLevel(logging.WARNING)
+    emitter = logging.getLogger(_ENGINE_EMITTER_LOGGER)
+    if not any(isinstance(f, _DropRowRecords) for f in emitter.filters):
+        emitter.addFilter(_DropRowRecords())
+
+
 @dataclass(frozen=True)
 class _Database:
     engine: Engine
@@ -158,8 +194,12 @@ class _Database:
 
 def init_db(app: Flask) -> None:
     """Crea el engine y la fábrica de sesiones de ``app`` sin conectar."""
+    # Antes de create_engine: el engine y el pool fijan su logger al construirse.
+    _quiet_sqlalchemy_logs()
     engine = create_engine(
         app.config["DATABASE_URL"],
+        echo=False,
+        echo_pool=False,
         pool_pre_ping=True,
         pool_recycle=POOL_RECYCLE_SECONDS,
         hide_parameters=True,

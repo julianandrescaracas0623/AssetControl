@@ -914,3 +914,102 @@ def test_login_and_me_do_not_log_passwords_tokens_or_hashes(client, caplog):
     secret = refresh_cookie(ok)[1].split(".", 1)[1]
     for value in (PASSWORD, WRONG_PASSWORD, token, secret, token_storage_hash(secret).hex()):
         assert value not in caplog.text
+
+
+# --- M1 de T6-endurecimiento: filas de SQLAlchemy fuera de los logs -------------------
+
+SQLALCHEMY_LOGGERS = ("sqlalchemy.engine", "sqlalchemy.engine.Engine", "sqlalchemy.pool")
+
+
+@pytest.fixture
+def sqlalchemy_debug():
+    """Pone los loggers de SQLAlchemy en DEBUG **antes** de crear la app y los restaura.
+
+    Simula a quien activa el log del engine para depurar (``logging.basicConfig`` o
+    ``dictConfig`` con ``sqlalchemy.engine: DEBUG``). Restaura nivel, filtros y
+    manejadores (``echo=True`` agrega uno propio a ``sqlalchemy.engine.Engine``).
+    """
+    saved = {}
+    for name in SQLALCHEMY_LOGGERS:
+        logger = logging.getLogger(name)
+        saved[name] = (logger.level, list(logger.filters), list(logger.handlers))
+    for name in ("sqlalchemy.engine", "sqlalchemy.pool"):
+        logging.getLogger(name).setLevel(logging.DEBUG)
+    yield
+    for name, (level, filters, handlers) in saved.items():
+        logger = logging.getLogger(name)
+        logger.setLevel(level)
+        logger.filters[:] = filters
+        for handler in logger.handlers[:]:
+            if handler not in handlers:
+                logger.removeHandler(handler)
+
+
+def _login_secrets(ok) -> list[str]:
+    secret = refresh_cookie(ok)[1].split(".", 1)[1]
+    stored = token_storage_hash(secret)
+    return [
+        "$argon2",
+        ADMIN_A.email,
+        PASSWORD,
+        secret,
+        stored.hex(),
+        repr(stored),
+        ok.get_json()["access_token"],
+    ]
+
+
+def _leaks(secrets: list[str], *texts: str) -> list[str]:
+    joined = "\n".join(texts)
+    return [value for value in secrets if value in joined]
+
+
+def _login_and_me(flask_app) -> object:
+    client = flask_app.test_client()
+    ok = login(client, ADMIN_A.email)
+    assert ok.status_code == 200, ok.get_json()
+    login(client, NO_EXISTE)
+    me(client, ok.get_json()["access_token"])
+    return ok
+
+
+def test_sqlalchemy_debug_before_create_app_does_not_log_rows(
+    login_db, sqlalchemy_debug, caplog, capfd
+):
+    flask_app = make_app(login_db)
+    try:
+        with caplog.at_level(logging.DEBUG):
+            ok = _login_and_me(flask_app)
+    finally:
+        flask_app.extensions["assetcontrol.db"].engine.dispose()
+
+    out, err = capfd.readouterr()
+    assert _leaks(_login_secrets(ok), caplog.text, out, err) == []
+    assert "Row " not in caplog.text
+    engine = flask_app.extensions["assetcontrol.db"].engine
+    assert engine.echo is False
+    assert engine.pool.echo is False
+    for name in ("sqlalchemy.engine", "sqlalchemy.pool"):
+        assert logging.getLogger(name).level == logging.WARNING, name
+
+
+def test_sqlalchemy_debug_after_create_app_still_drops_rows(
+    login_db, sqlalchemy_debug, caplog, capfd
+):
+    # Alguien vuelve a subir el nivel (o activa echo="debug") con la app ya creada.
+    flask_app = make_app(login_db)
+    engine = flask_app.extensions["assetcontrol.db"].engine
+    for name in ("sqlalchemy.engine", "sqlalchemy.pool"):
+        logging.getLogger(name).setLevel(logging.DEBUG)
+    try:
+        with caplog.at_level(logging.DEBUG):
+            ok = _login_and_me(flask_app)
+            engine.echo = "debug"
+            ok_echo = _login_and_me(flask_app)
+    finally:
+        engine.dispose()
+
+    out, err = capfd.readouterr()
+    secrets = _login_secrets(ok) + _login_secrets(ok_echo)
+    assert _leaks(secrets, caplog.text, out, err) == []
+    assert "Row " not in caplog.text + out + err
