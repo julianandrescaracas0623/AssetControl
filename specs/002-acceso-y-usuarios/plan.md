@@ -37,13 +37,14 @@ La función calcula `token_hash = sha256(decode(p_clave, 'hex'))` con la funció
 | Tabla | Comando | Política (esquema; SQL exacto lo fija T2 con el `security-reviewer`) |
 |---|---|---|
 | `invitacion` | SELECT | `token_hash` = clave de la función (lectura de `tenant_id`, `rol`, `email`, `expira_en`, `usada_en`) |
-| `invitacion` | UPDATE | `USING (token_hash = clave AND usada_en IS NULL AND expira_en > now()) WITH CHECK (usada_en IS NOT NULL)`; `GRANT UPDATE (usada_en)` |
+| `invitacion` | UPDATE | `USING (token_hash = clave AND usada_en IS NULL AND expira_en > now()) WITH CHECK (usada_en = now())` (consumo en esta transacción, no `IS NOT NULL`); `GRANT UPDATE (usada_en)` |
 | `usuario` | SELECT | `email = clave` (login) |
 | `usuario` | INSERT | `WITH CHECK (EXISTS (invitacion con token_hash = clave de la función, usada_en = now() y email = usuario.email))` (el email sale de la invitación; sin GUC de email) |
 | `membresia` | SELECT | `usuario_id = clave` (login) |
 | `membresia` | INSERT | `WITH CHECK (EXISTS (invitacion con tenant_id = membresia.tenant_id, token_hash = clave de la función, usada_en = now() (la de esta transacción) y rol = membresia.rol) AND usuario_id = app.auth_usuario_nuevo)`: rol y usuario ligados a la invitación recién consumida |
-| `tenant` | INSERT | `WITH CHECK (id = app.auth_tenant_nuevo)`; `GRANT INSERT` mínimo; solo lo usa `crear_tenant` (R6). Sin `SELECT`, `UPDATE` ni `DELETE` |
-| `invitacion` | INSERT | `WITH CHECK (tenant_id = app.auth_tenant_nuevo AND rol = 'admin' AND creada_por IS NULL AND usada_en IS NULL AND expira_en <= now() + interval '24 hours')`; solo `crear_tenant` |
+| `tenant` | INSERT | `WITH CHECK (id = app.auth_tenant_nuevo)`; `GRANT INSERT (id, nombre)` (sin `creado_en`, que fija el `DEFAULT now()`); solo lo usa `crear_tenant` (R6). Sin `UPDATE` ni `DELETE` |
+| `tenant` | SELECT | Q21: `USING (id = app.auth_tenant_nuevo AND creado_en = now())`, con `GRANT SELECT (id, creado_en)`: `auth_owner` solo lee la fila creada en su misma transacción (la necesita el `EXISTS` de la política `INSERT` de `invitacion`) |
+| `invitacion` | INSERT | `WITH CHECK (tenant_id = app.auth_tenant_nuevo AND rol = 'admin' AND creada_por IS NULL AND usada_en IS NULL AND expira_en <= now() + interval '24 hours' AND EXISTS (SELECT 1 FROM tenant t WHERE t.id = invitacion.tenant_id AND t.creado_en = now()))`; solo `crear_tenant` y solo para el tenant creado en la misma transacción (Q21) |
 
 **Por qué `crear_tenant` y no INSERT directo del migrador (consecuencia de Q1).** El migrador no es superusuario ni `BYPASSRLS` y, bajo `FORCE RLS`, las `tenant_isolation` de `tenant` e `invitacion` son `TO <rol de aplicación>`: no hay política que cubra su INSERT. Se resuelve con el mismo patrón A1. Las políticas del dueño para `crear_tenant` están en la lista cerrada de A2/C6 y **el `security-reviewer` las revisa en T2** junto con las demás.
 
@@ -55,7 +56,7 @@ Las `tenant_isolation` de la aplicación son `TO <rol de aplicación>` explícit
 
 **Orden de la migración (C3):** `CREATE FUNCTION` → `REVOKE ALL ... FROM PUBLIC, anon, authenticated, service_role` → `GRANT EXECUTE ... TO <rol de aplicación>` (las tres funciones de login/invitación) o `TO <rol migrador>` (`crear_tenant`; el migrador es `current_user` al migrar, no se hardcodea) → `GRANT CREATE ON SCHEMA acceso TO auth_owner` y membresía transitoria (§2.1, Rol y esquema) → `ALTER FUNCTION ... OWNER TO auth_owner` → `REVOKE CREATE ON SCHEMA acceso FROM auth_owner` y fin de la membresía, de inmediato (C5: `CREATE` no queda abierto). El rol migrador de la CI es superusuario, así que la prueba de T5 usa un migrador de prueba y le otorga `EXECUTE` y `USAGE` sobre `acceso` explícitamente. Nombres de roles con `identifier_preparer.quote`.
 
-**Validación (C8):** con el rol `postgres` real de Supabase (no superusuario) antes del piloto; no bloquea T1–T10.
+**Validación (C8):** con el rol `postgres` real de Supabase (no superusuario) antes del piloto; no bloquea T1–T10. **Nota (revisión de seguridad de T2):** en Supabase el creador de `auth_owner` recibe la membresía con `INHERIT` por `createrole_self_grant`; esa membresía hereda los `GRANT` y las políticas `TO auth_owner`, así que C8 debe comprobarla y quitarla (o dejarla `INHERIT FALSE`). La migración 0003 ya falla si `auth_owner` es miembro de otro rol, pero no mide esta membresía inversa.
 
 ### 2.2 Flujos
 
@@ -164,7 +165,7 @@ Falla si: una tabla de `public` fuera de la lista de excepciones carece de `tena
 3. `WITH CHECK`: `tenant_id` ajeno falla en `invitacion` y `refresh_token`; `UPDATE` de `tenant_id` falla.
 4. `membresia` `INSERT` por `auth_owner` sin invitación recién consumida falla; con ella, solo con `usada_en = now()`, ese tenant, esa clave, el `rol` de la invitación y el `usuario_id` de la GUC; una invitación consumida en otra transacción, otro rol u otro usuario falla.
 5. `usuario` `INSERT` por `auth_owner` con `email` distinto al de la invitación consumida falla.
-6. `auth_owner` no puede leer `tenant` ni filas con GUC vacía/nula/comodín (`%`, `_`); su `INSERT` en `tenant`/`invitacion` solo pasa con la GUC `app.auth_tenant_nuevo` y con `rol = 'admin'`, `creada_por` NULL y expiración ≤ 24 h. La aplicación no puede insertar `invitacion` con `creada_por` NULL aunque exista otra política permisiva (la `RESTRICTIVE` la frena).
+6. `auth_owner` solo lee `tenant (id, creado_en)` de la fila creada en su misma transacción (Q21; cero filas para un tenant de otra transacción aunque su id esté en la GUC, y sin `nombre`) y ninguna fila con GUC vacía/nula/comodín (`%`, `_`); su `INSERT` en `tenant`/`invitacion` solo pasa con la GUC `app.auth_tenant_nuevo` y con `rol = 'admin'`, `creada_por` NULL, expiración ≤ 24 h y un tenant creado en la misma transacción; el `WITH CHECK` del consumo de la invitación es `usada_en = now()` (no `IS NOT NULL`). La aplicación no puede insertar `invitacion` con `creada_por` NULL aunque exista otra política permisiva (la `RESTRICTIVE` la frena).
 7. La aplicación no puede leer `usuario.password_hash` ni `invitacion.token_hash`; sí puede leer `refresh_token.token_hash` (única excepción, Q20), acotado por RLS a su tenant; el hash almacenado (doble) no autentica (I1).
 8. `SET ROLE auth_owner` falla para la aplicación; llamar a `acceso.*` con `SET ROLE anon`/`authenticated`/`service_role` → `permission denied` (C7).
 9. Tras cada función, el contexto local no sobrevive (transacción ni savepoint) y una consulta directa sin tenant devuelve cero. **Se ejecuta en T3**, cuando existen las funciones. En T2 solo se prueba, a nivel SQL, que las GUC de las políticas (`app.auth_*`) fijadas con `set_config(..., true)` no sobreviven al `COMMIT`/`ROLLBACK` ni a un `ROLLBACK TO SAVEPOINT`, y que con GUC vacía las políticas devuelven cero filas.
