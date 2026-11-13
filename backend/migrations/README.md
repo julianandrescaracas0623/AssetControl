@@ -5,6 +5,7 @@
 - Comandos, desde `backend/`: `uv run alembic upgrade head`, `uv run alembic downgrade base` (en local: `uv run --env-file ../.env alembic ...`).
 - `0001_baseline` está vacía: no crea tablas de negocio.
 - **Atención**: el `downgrade` de `0002_acceso_y_usuarios` destruye las tablas `tenant`, `usuario`, `membresia`, `invitacion` y `refresh_token` con todo su contenido (tenants, usuarios, membresías, invitaciones y refresh tokens) y el esquema `acceso`. Es solo para desarrollo y CI sobre bases desechables; nunca sobre datos reales (piloto o producción).
+- `0003_politicas_del_dueno` crea las políticas `TO auth_owner` (una por comando, con la GUC `app.auth_*` de su función) y los `GRANT` por columna de `auth_owner`; antes valida que `auth_owner` exista y no sea superusuario, ni tenga `BYPASSRLS` o `LOGIN`, ni sea miembro de otro rol. Su `downgrade` exige que `auth_owner` exista y solo quita esas políticas y `GRANT`, sin tocar datos.
 
 ## Patrón obligatorio de toda tabla de negocio (spec 002 en adelante)
 
