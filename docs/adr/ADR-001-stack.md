@@ -27,5 +27,5 @@ Sistema pequeño (una clínica, cientos de activos, pocos usuarios), mantenido p
 
 - Un solo cliente que mantener y desplegar; sin tiendas de aplicaciones.
 - Requiere HTTPS en todos los entornos por el acceso a la cámara.
-- La versión mayor de PostgreSQL local (Docker) debe coincidir con la de Supabase `[PENDIENTE: confirmar versión]`.
-- El aislamiento entre tenants depende del código: filtro centralizado y prueba por endpoint. Postgres RLS queda como defensa adicional opcional.
+- La versión mayor de PostgreSQL local (Docker) debe coincidir con la de Supabase (PostgreSQL 17; Supabase 17.11, confirmado el 2026-11-11; local con `postgres:17`).
+- El aislamiento entre tenants lo hace cumplir PostgreSQL con Row Level Security, obligatoria en toda tabla de negocio (`ENABLE` + `FORCE` y política por `tenant_id`), con un rol de aplicación sin `BYPASSRLS` ni superusuario, distinto del rol que migra; el código añade el filtro centralizado y la prueba por endpoint. *Cambio autorizado por el humano el 2026-11-11: RLS pasa de opcional a obligatoria porque una barrera solo en Python mostró fugas entre tenants en 3 revisiones de la spec 001 (T3).*
