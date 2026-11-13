@@ -8,8 +8,9 @@ from flask import Flask
 
 from app.auth.credentials import init_credentials
 from app.auth.http import register_auth_http_policy
+from app.auth.routes import bp as auth_bp
 from app.cli import register_cli
-from app.config import Config, load_config
+from app.config import CONFIG_EXTENSION_KEY, Config, load_config
 from app.db import init_db
 from app.errors import register_error_handlers
 from app.meta.routes import bp as meta_bp
@@ -33,6 +34,7 @@ def create_app(config: Config | None = None) -> Flask:
 
     app = Flask(__name__)
     app.config.update(config.to_flask())
+    app.extensions[CONFIG_EXTENSION_KEY] = config
     if config.is_test:
         app.logger.warning(
             "ENVIRONMENT=test: SECRET_KEY corta admitida y Argon2 de bajo costo; solo para pruebas."
@@ -42,5 +44,6 @@ def create_app(config: Config | None = None) -> Flask:
     register_error_handlers(app)
     register_auth_http_policy(app)
     app.register_blueprint(meta_bp)
+    app.register_blueprint(auth_bp)
     register_cli(app)
     return app

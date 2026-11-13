@@ -240,6 +240,8 @@ JWT_KEY_CONTEXT = "jwt-acceso"
 JWT_ALGORITHM = "HS256"
 JWT_ISSUER = "assetcontrol"
 ACCESS_TOKEN_TTL = timedelta(minutes=15)
+# Q7: refresh de 7 días (la rotación es de T7).
+REFRESH_TOKEN_TTL = timedelta(days=7)
 _REQUIRED_CLAIMS = ("exp", "iss", "sub", "tenant")
 
 

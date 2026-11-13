@@ -7,9 +7,13 @@ import os
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
+
+if TYPE_CHECKING:
+    from flask import Flask
 
 REQUIRED_VARS: tuple[str, ...] = ("DATABASE_URL", "SECRET_KEY", "ENVIRONMENT")
 
@@ -113,6 +117,14 @@ class Config:
             "ENVIRONMENT": self.environment,
             "TESTING": self.is_test,
         }
+
+
+CONFIG_EXTENSION_KEY = "assetcontrol.config"
+
+
+def get_config(app: "Flask") -> Config:
+    """``Config`` con la que se creó ``app`` (``create_app`` la guarda en ``extensions``)."""
+    return app.extensions[CONFIG_EXTENSION_KEY]
 
 
 MIGRATION_URL_VAR = "MIGRATION_DATABASE_URL"

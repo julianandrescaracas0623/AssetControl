@@ -28,6 +28,10 @@ Cada conexión nueva del engine comprueba que su ``current_user`` no es
 ``SUPERUSER`` ni tiene ``BYPASSRLS`` (``InsecureDatabaseRoleError``; spec 002,
 T4, R15). Las conexiones se reciclan cada ``POOL_RECYCLE_SECONDS`` (B6).
 
+Las funciones ``acceso.*`` (antes de conocer el tenant) se llaman con funciones
+propias de este módulo sin tenant y en su propia transacción, como
+``buscar_login`` (spec 002, T6; plan.md §2), nunca dentro de ``tenant_session``.
+
 El engine se crea en ``init_db`` (llamado por ``create_app``), nunca al importar.
 ``create_engine`` no abre conexiones; la primera se abre al usar la sesión.
 Ningún mensaje de este módulo incluye la URL de la base ni credenciales.
@@ -223,6 +227,44 @@ def ping_database() -> bool:
         current_app.logger.error("%s", exc)
         return False
     return True
+
+
+@dataclass(frozen=True)
+class LoginRow:
+    """Una fila de ``acceso.buscar_login`` (una por membresía activa, o una sin tenant)."""
+
+    usuario_id: uuid.UUID
+    password_hash: str
+    activo: bool
+    tenant_id: uuid.UUID | None
+    rol: str | None
+
+
+_BUSCAR_LOGIN = text(
+    "select usuario_id, password_hash, activo, tenant_id, rol from acceso.buscar_login(:email)"
+)
+
+
+def buscar_login(email: str) -> list[LoginRow]:
+    """Llama a ``acceso.buscar_login`` sin tenant, en su propia transacción (plan.md §2).
+
+    Antes del login no hay tenant: nunca se llama dentro de ``tenant_session``
+    (que además rechaza ``text()``). La función es de solo lectura; el ``email``
+    debe venir normalizado. Sin cuenta devuelve ``[]``.
+    """
+    database = _get_database()
+    with database.engine.begin() as connection:
+        rows = connection.execute(_BUSCAR_LOGIN, {"email": email}).all()
+    return [
+        LoginRow(
+            usuario_id=row.usuario_id,
+            password_hash=row.password_hash,
+            activo=row.activo,
+            tenant_id=row.tenant_id,
+            rol=row.rol,
+        )
+        for row in rows
+    ]
 
 
 def _session_tenant(session: Session) -> uuid.UUID:
