@@ -87,6 +87,108 @@ jobs:
           psql --version
           bash docker/postgres/init/01-app-role.sh
 
+      # Spec 002, P0 (A0): el script deja auth_owner NOLOGIN, sin contraseña, sin
+      # SUPERUSER, BYPASSRLS, CREATEROLE, CREATEDB ni REPLICATION, sin membresías
+      # con ningún rol, sin CREATE en esquemas ni bases y sin dependencias
+      # compartidas (pg_shdepend: dueño o ACL en cualquier base). Además repara un
+      # auth_owner manipulado y es idempotente.
+      # Debe ejecutarse antes de las migraciones (tras 0004 auth_owner será dueño de funciones).
+      - name: Rol auth_owner seguro, reparable e init idempotente
+        working-directory: .
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGPASSWORD: ci-migrador-efimera
+        run: |
+          set -euo pipefail
+          # login|super|bypassrls|createrole|createdb|replication|sin_password|
+          # membresias|create_esquemas|create_bases|shdepend
+          expected="f|f|f|f|f|f|t|0|0|0|0"
+          migrator_psql() {
+            psql -X -qtA -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" "$@"
+          }
+          auth_owner_state() {
+            # pg_authid (no pg_roles) para leer rolpassword; pg_database y pg_shdepend son
+            # catálogos compartidos: cubren todas las bases del clúster.
+            migrator_psql <<'EOSQL'
+          SELECT concat_ws('|',
+            a.rolcanlogin, a.rolsuper, a.rolbypassrls,
+            a.rolcreaterole, a.rolcreatedb, a.rolreplication,
+            a.rolpassword IS NULL,
+            (SELECT count(*) FROM pg_auth_members m WHERE a.oid IN (m.roleid, m.member)),
+            (SELECT count(*) FROM pg_namespace n WHERE has_schema_privilege(a.oid, n.oid, 'CREATE')),
+            (SELECT count(*) FROM pg_database d WHERE has_database_privilege(a.oid, d.oid, 'CREATE')),
+            (SELECT count(*) FROM pg_shdepend s
+              WHERE s.refclassid = 'pg_authid'::regclass AND s.refobjid = a.oid))
+          FROM pg_authid a WHERE a.rolname = 'auth_owner';
+          EOSQL
+          }
+          assert_state() {
+            local result
+            result=$(auth_owner_state)
+            if [ "$result" != "$expected" ]; then
+              echo "::error::auth_owner falta o es inseguro ($1): '${result}', se esperaba '${expected}'."
+              exit 1
+            fi
+          }
+          app_url="${DATABASE_URL/+psycopg/}"
+
+          # 1. Estado tras la primera ejecución (paso anterior).
+          assert_state "primera ejecución"
+
+          # 2. Manipulación como migrador: LOGIN, CREATEROLE, contraseña, membresías en
+          #    ambos sentidos con otros roles (también con otro grantor y con un rol
+          #    predefinido) y CREATE en el esquema y la base.
+          migrator_psql -v app_user="$APP_DB_USER" -v db_name="$POSTGRES_DB" <<'EOSQL'
+          ALTER ROLE auth_owner LOGIN CREATEROLE PASSWORD 'ci-auth-owner-efimera';
+          CREATE ROLE ci_otro_grantor NOLOGIN;
+          GRANT auth_owner TO ci_otro_grantor WITH ADMIN OPTION;
+          GRANT auth_owner TO :"app_user";
+          GRANT auth_owner TO :"app_user" GRANTED BY ci_otro_grantor;
+          GRANT pg_read_all_data TO auth_owner;
+          GRANT CREATE ON SCHEMA public TO auth_owner;
+          GRANT CREATE ON DATABASE :"db_name" TO auth_owner;
+          EOSQL
+          # La manipulación surte efecto: la aplicación puede asumir auth_owner.
+          psql "$app_url" -X -qtA -v ON_ERROR_STOP=1 -c 'SET ROLE auth_owner' >/dev/null
+          if [ "$(auth_owner_state)" = "$expected" ]; then
+            echo "::error::La manipulación de auth_owner no cambió su estado: la prueba no es válida."
+            exit 1
+          fi
+
+          # 3. Reejecución: el script repara todo.
+          bash docker/postgres/init/01-app-role.sh
+          assert_state "tras reparar"
+          if out=$(psql "$app_url" -X -qtA -v ON_ERROR_STOP=1 -c 'SET ROLE auth_owner' 2>&1); then
+            echo "::error::El rol de la aplicación todavía puede hacer SET ROLE auth_owner."
+            exit 1
+          fi
+          case "$out" in
+            *"permission denied to set role"*) ;;
+            *) echo "::error::SET ROLE auth_owner falló por otro motivo: ${out}"; exit 1 ;;
+          esac
+
+          # 3b. Sentido inverso (auth_owner miembro del rol de la aplicación). Va aparte:
+          #     PostgreSQL rechaza la membresía circular junto con la del paso 2.
+          echo 'GRANT :"app_user" TO auth_owner;' | migrator_psql -v app_user="$APP_DB_USER"
+          if [ "$(auth_owner_state)" = "$expected" ]; then
+            echo "::error::La membresía inversa no cambió el estado de auth_owner: la prueba no es válida."
+            exit 1
+          fi
+          bash docker/postgres/init/01-app-role.sh
+          assert_state "tras reparar el sentido inverso"
+
+          # 4. Idempotente: otra ejecución no cambia nada ni emite avisos.
+          rerun_err=$(mktemp)
+          bash docker/postgres/init/01-app-role.sh 2>"$rerun_err"
+          if grep -q 'WARNING' "$rerun_err"; then
+            cat "$rerun_err"
+            echo "::error::La reejecución del script emitió avisos."
+            exit 1
+          fi
+          assert_state "reejecución"
+          echo "auth_owner seguro, reparado tras manipularlo e init idempotente sin avisos."
+
       # TEST_DATABASE_URL nunca puede ser el superusuario del servicio ni el migrador.
       - name: Rol de pruebas sin SUPERUSER ni BYPASSRLS
         run: |
