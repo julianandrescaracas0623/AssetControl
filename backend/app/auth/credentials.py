@@ -29,6 +29,8 @@ import jwt
 from argon2.exceptions import InvalidHashError, VerificationError
 from flask import Flask, current_app
 
+from app import config as config_module
+
 # Argon2id. Perfil mínimo de OWASP (Password Storage Cheat Sheet; RFC 9106 §4 admite
 # perfiles de menor memoria): m = 19 MiB, t = 2, p = 1. Hash de 32 bytes y sal de 16.
 # Medido en T4 (ver tasks.md); lo revisa el security-reviewer antes del piloto.
@@ -41,7 +43,8 @@ ARGON2_PARAMS = argon2.Parameters(
     memory_cost=19 * 1024,
     parallelism=1,
 )
-# Solo con ENVIRONMENT=test (app.testing): costo mínimo para que las pruebas no tarden.
+# Solo con ENVIRONMENT=test (app.testing) y bajo pytest (M1 de T4): costo mínimo para
+# que las pruebas no tarden.
 ARGON2_TEST_PARAMS = argon2.Parameters(
     type=argon2.Type.ID,
     version=argon2.low_level.ARGON2_VERSION,
@@ -127,9 +130,22 @@ def _normalized(password: str) -> str:
     return unicodedata.normalize("NFKC", password).casefold()
 
 
+def _encodable(password: str) -> bool:
+    """``False`` si no se puede codificar en UTF-8 (sustituto suelto, p. ej. U+D800).
+
+    Argon2 codifica en UTF-8: sin esto, ``UnicodeEncodeError`` daría un ``500``.
+    """
+    try:
+        password.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 def check_password_policy(password: str) -> None:
     """Falla con ``PasswordPolicyError`` si la contraseña no cumple Q9."""
-    if not isinstance(password, str):
+    if not isinstance(password, str) or not _encodable(password):
+        # Fuera del except de _encodable: sin causa que arrastre el carácter (B1 de T4).
         raise PasswordPolicyError("contrasena_invalida", "La contraseña no es válida.")
     if len(password) < PASSWORD_MIN_LENGTH:
         raise PasswordPolicyError(
@@ -165,9 +181,14 @@ class Passwords:
         """``True`` solo si ``password`` corresponde a ``stored_hash``.
 
         Sin cuenta (``stored_hash`` ``None``) verifica contra el hash simulado y
-        devuelve ``False``. Sin texto o sobre el máximo, ``False`` sin hashear.
+        devuelve ``False``. Sin texto, sobre el máximo o no codificable en UTF-8
+        (sustituto suelto), ``False`` sin hashear, igual con y sin cuenta.
         """
-        if not isinstance(password, str) or len(password) > PASSWORD_MAX_LENGTH:
+        if (
+            not isinstance(password, str)
+            or len(password) > PASSWORD_MAX_LENGTH
+            or not _encodable(password)
+        ):
             return False
         target = self._dummy_hash if stored_hash is None else stored_hash
         try:
@@ -182,7 +203,9 @@ _EXTENSION_KEY = "assetcontrol.passwords"
 
 def init_credentials(app: Flask) -> None:
     """Crea ``Passwords`` al arrancar (calcula el hash simulado una vez)."""
-    params = ARGON2_TEST_PARAMS if app.testing else ARGON2_PARAMS
+    # Doble condición: TESTING puesto a mano fuera de pytest no abarata Argon2.
+    cheap = app.testing and config_module.is_test_context()
+    params = ARGON2_TEST_PARAMS if cheap else ARGON2_PARAMS
     app.extensions[_EXTENSION_KEY] = Passwords(params)
 
 

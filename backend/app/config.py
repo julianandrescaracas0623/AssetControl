@@ -4,6 +4,7 @@ Nunca incluye valores de las variables en mensajes de error ni en ``repr``.
 """
 
 import os
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
@@ -25,6 +26,39 @@ class MissingConfigError(RuntimeError):
 SECRET_KEY_MIN_BYTES = 32
 TEST_ENVIRONMENT = "test"
 DEVELOPMENT_ENVIRONMENT = "development"
+# Lista cerrada (M1 de T4): cualquier otro valor falla al arrancar.
+ALLOWED_ENVIRONMENTS: frozenset[str] = frozenset(
+    {DEVELOPMENT_ENVIRONMENT, TEST_ENVIRONMENT, "production", "staging"}
+)
+
+
+def is_test_context() -> bool:
+    """``True`` solo si el proceso corre bajo pytest (M1 de T4).
+
+    Las relajaciones de ``ENVIRONMENT=test`` (``SECRET_KEY`` corta, Argon2 barato,
+    ``TESTING``) dependen de esto: en un servidor o CLI real ``test`` no arranca.
+    No hay variable de entorno que lo active: quien puede fijar ``ENVIRONMENT``
+    también podría fijar esa variable.
+    """
+    return "pytest" in sys.modules
+
+
+class InvalidEnvironmentError(RuntimeError):
+    """``ENVIRONMENT`` fuera de la lista cerrada. No repite el valor recibido."""
+
+    def __init__(self) -> None:
+        allowed = ", ".join(sorted(ALLOWED_ENVIRONMENTS))
+        super().__init__(f"ENVIRONMENT no es válido; valores admitidos: {allowed}.")
+
+
+class UnsafeTestEnvironmentError(RuntimeError):
+    """``ENVIRONMENT=test`` fuera de pytest (M1 de T4). No muestra valores."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "ENVIRONMENT=test solo se admite al ejecutar las pruebas (pytest): desactiva "
+            "el mínimo de SECRET_KEY y abarata Argon2. Usa development, staging o production."
+        )
 
 
 class WeakSecretKeyError(RuntimeError):
@@ -41,8 +75,10 @@ class WeakSecretKeyError(RuntimeError):
 class Config:
     """Configuración validada al construirse (arranque, R15).
 
-    ``environment`` distinto de ``development`` se trata como producción: cookies
-    ``Secure``. Solo ``test`` admite una ``SECRET_KEY`` corta.
+    ``environment`` debe estar en ``ALLOWED_ENVIRONMENTS``; distinto de
+    ``development`` se trata como producción: cookies ``Secure``. Solo ``test``
+    admite una ``SECRET_KEY`` corta, y ``test`` solo vale bajo pytest
+    (``is_test_context``).
     """
 
     database_url: str = field(repr=False)
@@ -50,11 +86,20 @@ class Config:
     environment: str
 
     def __post_init__(self) -> None:
+        if self.environment not in ALLOWED_ENVIRONMENTS:
+            raise InvalidEnvironmentError()
+        if self.environment == TEST_ENVIRONMENT and not is_test_context():
+            raise UnsafeTestEnvironmentError()
         if (
             self.environment != TEST_ENVIRONMENT
             and len(self.secret_key.encode()) < SECRET_KEY_MIN_BYTES
         ):
             raise WeakSecretKeyError()
+
+    @property
+    def is_test(self) -> bool:
+        """``ENVIRONMENT=test`` y proceso bajo pytest; se reevalúa en cada uso."""
+        return self.environment == TEST_ENVIRONMENT and is_test_context()
 
     @property
     def secure_cookies(self) -> bool:
@@ -66,7 +111,7 @@ class Config:
             "DATABASE_URL": self.database_url,
             "SECRET_KEY": self.secret_key,
             "ENVIRONMENT": self.environment,
-            "TESTING": self.environment == TEST_ENVIRONMENT,
+            "TESTING": self.is_test,
         }
 
 

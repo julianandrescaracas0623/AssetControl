@@ -22,14 +22,20 @@ def create_app(config: Config | None = None) -> Flask:
 
     Si no se pasa ``config``, se lee del entorno y falla con
     ``MissingConfigError`` si falta una variable obligatoria o con
-    ``WeakSecretKeyError`` si ``SECRET_KEY`` es corta fuera de pruebas. Calcula
-    aquí el hash simulado de contraseñas (una vez por app).
+    ``WeakSecretKeyError`` si ``SECRET_KEY`` es corta fuera de pruebas,
+    ``InvalidEnvironmentError`` fuera de la lista cerrada y
+    ``UnsafeTestEnvironmentError`` con ``ENVIRONMENT=test`` fuera de pytest.
+    Calcula aquí el hash simulado de contraseñas (una vez por app).
     """
     if config is None:
         config = load_config()
 
     app = Flask(__name__)
     app.config.update(config.to_flask())
+    if config.is_test:
+        app.logger.warning(
+            "ENVIRONMENT=test: SECRET_KEY corta admitida y Argon2 de bajo costo; solo para pruebas."
+        )
     init_db(app)
     init_credentials(app)
     register_error_handlers(app)

@@ -13,18 +13,21 @@ la traza ni ``str(exc)``, que en psycopg/SQLAlchemy puede incluir SQL, host o
 nombre de la base. El detalle queda solo en el log del servidor, junto al
 ``request_id`` para correlacionarlo.
 
-Un ``DBAPIError`` (también encadenado en otra excepción) se registra solo con
-su tipo, el ``sqlstate`` y la ubicación en el código, sin traza con mensaje:
-el texto de PostgreSQL puede traer SQL o valores de fila (spec 002, T4).
+Un error de base de datos (``SQLAlchemyError``, incluidos ``DBAPIError`` y
+``StatementError``, o un ``psycopg.Error`` sin envolver; también encadenado en
+otra excepción) se registra solo con su tipo, el ``sqlstate`` y la ubicación en
+el código, sin traza con mensaje: el texto de PostgreSQL o de SQLAlchemy puede
+traer SQL, parámetros o valores de fila (spec 002, T4; B2).
 """
 
 import traceback
 import uuid
 from pathlib import Path
 
+import psycopg
 from flask import Flask, current_app, g, jsonify
 from flask.typing import ResponseReturnValue
-from sqlalchemy.exc import DBAPIError
+from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import HTTPException
 
 REQUEST_ID_HEADER = "X-Request-ID"
@@ -67,12 +70,19 @@ def _handle_http_exception(exc: HTTPException) -> ResponseReturnValue:
     return error_response(status, code, message)
 
 
-def _database_error_in_chain(exc: BaseException) -> DBAPIError | None:
-    """Primer ``DBAPIError`` de la cadena (``__cause__`` o ``__context__`` visible)."""
+_DATABASE_ERRORS = (SQLAlchemyError, psycopg.Error)
+
+
+def _database_error_in_chain(exc: BaseException) -> BaseException | None:
+    """Primer error de base de la cadena (``__cause__`` o ``__context__`` visible).
+
+    ``SQLAlchemyError`` (``DBAPIError``, ``StatementError`` y el resto) o
+    ``psycopg.Error`` sin envolver (p. ej. desde ``driver_connection``).
+    """
     seen: set[int] = set()
     current: BaseException | None = exc
     while current is not None and id(current) not in seen:
-        if isinstance(current, DBAPIError):
+        if isinstance(current, _DATABASE_ERRORS):
             return current
         seen.add(id(current))
         if current.__cause__ is not None:
@@ -84,12 +94,16 @@ def _database_error_in_chain(exc: BaseException) -> DBAPIError | None:
     return None
 
 
-def _log_database_error(exc: BaseException, database_error: DBAPIError) -> None:
+def _log_database_error(exc: BaseException, database_error: BaseException) -> None:
     """Solo tipo, ``sqlstate`` y ubicación en el código: nunca SQL, parámetros ni mensaje.
 
     El mensaje de PostgreSQL puede traer valores de fila (``Key (email)=(...)``).
+    En un ``psycopg.Error`` sin envolver el origen es el propio error.
     """
-    orig = database_error.orig
+    if isinstance(database_error, psycopg.Error):
+        orig: object = database_error
+    else:
+        orig = getattr(database_error, "orig", None)
     sqlstate = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None) or "desconocido"
     frames = traceback.extract_tb(exc.__traceback__)
     location = " <- ".join(f"{Path(f.filename).name}:{f.lineno} {f.name}" for f in frames[::-1])

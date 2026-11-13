@@ -26,7 +26,7 @@ Lo que hace Python es un complemento, no la barrera:
 
 Cada conexión nueva del engine comprueba que su ``current_user`` no es
 ``SUPERUSER`` ni tiene ``BYPASSRLS`` (``InsecureDatabaseRoleError``; spec 002,
-T4, R15).
+T4, R15). Las conexiones se reciclan cada ``POOL_RECYCLE_SECONDS`` (B6).
 
 El engine se crea en ``init_db`` (llamado por ``create_app``), nunca al importar.
 ``create_engine`` no abre conexiones; la primera se abre al usar la sesión.
@@ -59,6 +59,9 @@ _SET_TENANT = text("select set_config('app.tenant_id', :tenant_id, true)")
 _PING = text("select 1")
 # Sin tope, psycopg espera ~130 s si la base no responde y /health no llega a dar 503.
 CONNECT_TIMEOUT_SECONDS = 5
+# B6 de T4: una conexión del pool vive como mucho 30 min; la siguiente vuelve a pasar
+# verify_connection_role, lo que acota la ventana tras un ALTER ROLE ... BYPASSRLS.
+POOL_RECYCLE_SECONDS = 30 * 60
 
 
 class MissingTenantError(ValueError):
@@ -154,6 +157,7 @@ def init_db(app: Flask) -> None:
     engine = create_engine(
         app.config["DATABASE_URL"],
         pool_pre_ping=True,
+        pool_recycle=POOL_RECYCLE_SECONDS,
         hide_parameters=True,
         connect_args={"connect_timeout": CONNECT_TIMEOUT_SECONDS},
     )

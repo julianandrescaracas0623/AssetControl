@@ -19,7 +19,9 @@ from app.config import (
     load_config,
 )
 from app.db import (
+    POOL_RECYCLE_SECONDS,
     InsecureDatabaseRoleError,
+    _get_database,
     ping_database,
     tenant_session,
     verify_connection_role,
@@ -104,7 +106,8 @@ def test_secret_key_minimum_is_32_bytes():
     assert SECRET_KEY_MIN_BYTES == 32
 
 
-@pytest.mark.parametrize("environment", ["production", "development", "staging", "prod"])
+# "prod" y otros valores fuera de la lista cerrada fallan antes (test_environment.py, M1).
+@pytest.mark.parametrize("environment", ["production", "development", "staging"])
 def test_short_secret_key_fails_outside_tests_without_leaking_it(environment):
     weak = "valor-secreto-de-31-bytes-xxxxx"
     assert len(weak.encode()) == 31
@@ -145,8 +148,7 @@ def test_short_secret_key_is_allowed_only_in_tests():
         ("production", True),
         ("test", True),
         ("staging", True),
-        ("Development", True),  # solo el valor exacto "development" quita Secure
-        ("desarrollo", True),
+        # "Development", "desarrollo" y otros valores ya no arrancan (lista cerrada, M1).
     ],
 )
 def test_cookies_are_secure_unless_development_is_explicit(environment, secure):
@@ -360,3 +362,19 @@ def test_other_paths_are_not_limited_to_4_kb():
     response = _http_app().test_client().post("/otra/_prueba", data=b"x" * 10_000)
 
     assert response.status_code == 200
+
+
+# --- B6 de T4: reciclar conexiones del pool ------------------------------------------------
+
+
+def test_engine_recycles_pooled_connections_every_30_minutes():
+    # Acota la ventana en que una conexión vieja sigue viva tras un ALTER ROLE ... BYPASSRLS:
+    # cada conexión nueva vuelve a pasar verify_connection_role.
+    assert POOL_RECYCLE_SECONDS == 30 * 60
+    flask_app = create_app(
+        Config(database_url=OFFLINE_DB, secret_key=LONG_SECRET, environment="production")
+    )
+    with flask_app.app_context():
+        engine = _get_database().engine
+        assert engine.pool._recycle == POOL_RECYCLE_SECONDS
+        assert engine.pool._pre_ping is True

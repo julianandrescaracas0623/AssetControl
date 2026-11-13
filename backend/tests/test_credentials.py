@@ -253,6 +253,65 @@ def test_hash_applies_the_policy_before_hashing(passwords, monkeypatch):
             passwords.hash(bad)
 
 
+# --- Sustitutos sueltos (B1 de T4): nunca un 500 por UnicodeEncodeError ----------------
+
+LONE_SURROGATES = ["\ud800", "caballo-bateria-\ud800", "\udfff" + "x" * 20, "a\udc80" * 6]
+
+
+@pytest.mark.parametrize("password", LONE_SURROGATES)
+def test_policy_rejects_lone_surrogates_without_echoing_them(password):
+    with pytest.raises(PasswordPolicyError) as excinfo:
+        check_password_policy(password)
+
+    assert excinfo.value.code == "contrasena_invalida"
+    message = str(excinfo.value)
+    assert "contraseña" in message.lower()
+    for char in ("\ud800", "\udfff", "\udc80", "ud800", "udfff", "udc80"):
+        assert char not in message
+    # Sin causa ni contexto: el UnicodeEncodeError trae el carácter y su posición.
+    assert excinfo.value.__cause__ is None
+    assert excinfo.value.__context__ is None
+
+
+def test_hash_rejects_lone_surrogates_with_the_policy_error(passwords):
+    with pytest.raises(PasswordPolicyError) as excinfo:
+        passwords.hash("caballo-bateria-\ud800")
+    assert excinfo.value.code == "contrasena_invalida"
+
+
+@pytest.mark.parametrize("password", LONE_SURROGATES)
+def test_verify_returns_false_for_lone_surrogates_with_and_without_account(
+    passwords, monkeypatch, password
+):
+    stored = passwords.hash(GOOD_PASSWORD)
+    calls: list[str] = []
+    original = argon2.PasswordHasher.verify
+
+    def spy(self, *args, **kwargs):
+        calls.append("verify")
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(argon2.PasswordHasher, "verify", spy)
+
+    assert passwords.verify(stored, password) is False
+    assert passwords.verify(None, password) is False
+    # Mismo camino con y sin cuenta: ninguno llega a Argon2 (no distingue cuentas).
+    assert calls == []
+
+
+def test_lone_surrogates_are_not_logged(passwords, caplog):
+    caplog.set_level(logging.DEBUG)
+    password = "caballo-bateria-\ud800"
+
+    passwords.verify(passwords.hash(GOOD_PASSWORD), password)
+    passwords.verify(None, password)
+    with pytest.raises(PasswordPolicyError):
+        passwords.hash(password)
+
+    assert "\ud800" not in caplog.text
+    assert "ud800" not in caplog.text
+
+
 def test_policy_messages_are_in_spanish_and_do_not_echo_the_password():
     with pytest.raises(PasswordPolicyError) as excinfo:
         check_password_policy("1234567890")
