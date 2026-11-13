@@ -12,7 +12,8 @@ UNREACHABLE_DB = "postgresql+psycopg://user:pw@db.invalid:5432/assetcontrol"
 def make_config(**overrides) -> Config:
     values = {
         "database_url": UNREACHABLE_DB,
-        "secret_key": "clave-de-prueba",
+        # Fuera de "test" la clave debe tener al menos 32 bytes (spec 002, T4).
+        "secret_key": "clave-de-prueba-de-al-menos-32-bytes",
         "environment": "test",
     }
     values.update(overrides)
@@ -32,7 +33,7 @@ def test_create_app_returns_flask_app_without_connecting(no_network):
     app = create_app(make_config())
 
     assert isinstance(app, Flask)
-    assert app.config["SECRET_KEY"] == "clave-de-prueba"
+    assert app.config["SECRET_KEY"] == "clave-de-prueba-de-al-menos-32-bytes"
     assert app.config["DATABASE_URL"] == UNREACHABLE_DB
     assert app.config["ENVIRONMENT"] == "test"
 

@@ -12,12 +12,19 @@ Un error no controlado responde siempre ``500`` con un mensaje genérico: nunca
 la traza ni ``str(exc)``, que en psycopg/SQLAlchemy puede incluir SQL, host o
 nombre de la base. El detalle queda solo en el log del servidor, junto al
 ``request_id`` para correlacionarlo.
+
+Un ``DBAPIError`` (también encadenado en otra excepción) se registra solo con
+su tipo, el ``sqlstate`` y la ubicación en el código, sin traza con mensaje:
+el texto de PostgreSQL puede traer SQL o valores de fila (spec 002, T4).
 """
 
+import traceback
 import uuid
+from pathlib import Path
 
 from flask import Flask, current_app, g, jsonify
 from flask.typing import ResponseReturnValue
+from sqlalchemy.exc import DBAPIError
 from werkzeug.exceptions import HTTPException
 
 REQUEST_ID_HEADER = "X-Request-ID"
@@ -32,7 +39,8 @@ _HTTP_ERRORS: dict[int, tuple[str, str]] = {
     403: ("sin_permiso", "No tienes permiso para esta acción."),
     404: ("no_encontrado", "El recurso no existe."),
     405: ("metodo_no_permitido", "Método no permitido para este recurso."),
-    413: ("contenido_demasiado_grande", "El contenido enviado es demasiado grande."),
+    # Código de la spec 002 (plan.md §2.2, Errores).
+    413: ("cuerpo_demasiado_grande", "El contenido enviado es demasiado grande."),
     415: ("tipo_no_soportado", "El tipo de contenido no es compatible."),
 }
 
@@ -59,7 +67,48 @@ def _handle_http_exception(exc: HTTPException) -> ResponseReturnValue:
     return error_response(status, code, message)
 
 
+def _database_error_in_chain(exc: BaseException) -> DBAPIError | None:
+    """Primer ``DBAPIError`` de la cadena (``__cause__`` o ``__context__`` visible)."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        if isinstance(current, DBAPIError):
+            return current
+        seen.add(id(current))
+        if current.__cause__ is not None:
+            current = current.__cause__
+        elif current.__suppress_context__:
+            current = None
+        else:
+            current = current.__context__
+    return None
+
+
+def _log_database_error(exc: BaseException, database_error: DBAPIError) -> None:
+    """Solo tipo, ``sqlstate`` y ubicación en el código: nunca SQL, parámetros ni mensaje.
+
+    El mensaje de PostgreSQL puede traer valores de fila (``Key (email)=(...)``).
+    """
+    orig = database_error.orig
+    sqlstate = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None) or "desconocido"
+    frames = traceback.extract_tb(exc.__traceback__)
+    location = " <- ".join(f"{Path(f.filename).name}:{f.lineno} {f.name}" for f in frames[::-1])
+    current_app.logger.error(
+        "Error de base de datos no controlado (request_id=%s, tipo=%s, origen=%s, "
+        "sqlstate=%s, en=%s)",
+        current_request_id(),
+        type(database_error).__name__,
+        type(orig).__name__ if orig is not None else "desconocido",
+        sqlstate,
+        location or "desconocido",
+    )
+
+
 def _handle_unexpected(exc: Exception) -> ResponseReturnValue:
+    database_error = _database_error_in_chain(exc)
+    if database_error is not None:
+        _log_database_error(exc, database_error)
+        return error_response(500, INTERNAL_ERROR_CODE, INTERNAL_ERROR_MESSAGE)
     current_app.logger.error(
         "Error no controlado (request_id=%s, tipo=%s)",
         current_request_id(),

@@ -24,6 +24,10 @@ Lo que hace Python es un complemento, no la barrera:
   vías (``get_bind()``, el engine, API *bulk*, ``join()`` explícito): de esas se
   encarga RLS.
 
+Cada conexión nueva del engine comprueba que su ``current_user`` no es
+``SUPERUSER`` ni tiene ``BYPASSRLS`` (``InsecureDatabaseRoleError``; spec 002,
+T4, R15).
+
 El engine se crea en ``init_db`` (llamado por ``create_app``), nunca al importar.
 ``create_engine`` no abre conexiones; la primera se abre al usar la sesión.
 Ningún mensaje de este módulo incluye la URL de la base ni credenciales.
@@ -73,6 +77,44 @@ class DatabaseNotInitializedError(RuntimeError):
     """No hay base de datos configurada en la aplicación actual."""
 
 
+class InsecureDatabaseRoleError(RuntimeError):
+    """El rol de ``DATABASE_URL`` se salta RLS (R15, A6; M2 de T6 de la spec 001)."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "El rol de DATABASE_URL es SUPERUSER o tiene BYPASSRLS y se saltaría la RLS: "
+            "la aplicación debe usar el rol de la aplicación (NOSUPERUSER NOBYPASSRLS)."
+        )
+
+
+# Sin fila para current_user (no debería pasar) cuenta como inseguro: falla cerrado.
+_ROLE_SKIPS_RLS = (
+    "select coalesce((select rolsuper or rolbypassrls from pg_catalog.pg_roles "
+    "where rolname = current_user), true)"
+)
+
+
+def verify_connection_role(dbapi_connection: Any, *, rollback: bool = True) -> None:
+    """Falla con ``InsecureDatabaseRoleError`` si el ``current_user`` se salta RLS.
+
+    Se ejecuta en cada conexión nueva del engine (evento ``connect``): el
+    arranque no abre conexiones (spec 001), así que la primera conexión hace de
+    verificación de arranque y un ``ALTER ROLE`` posterior se detecta en la
+    siguiente conexión. Deshace la transacción implícita que abre la consulta.
+    """
+    with dbapi_connection.cursor() as cursor:
+        cursor.execute(_ROLE_SKIPS_RLS)
+        row = cursor.fetchone()
+    if rollback:
+        dbapi_connection.rollback()
+    if row is None or bool(row[0]):
+        raise InsecureDatabaseRoleError()
+
+
+def _verify_role_on_connect(dbapi_connection: Any, connection_record: Any) -> None:
+    verify_connection_role(dbapi_connection)
+
+
 class TenantScoped:
     """Mixin de toda tabla de negocio: aporta ``tenant_id`` y activa el filtro."""
 
@@ -115,6 +157,7 @@ def init_db(app: Flask) -> None:
         hide_parameters=True,
         connect_args={"connect_timeout": CONNECT_TIMEOUT_SECONDS},
     )
+    event.listen(engine, "connect", _verify_role_on_connect)
     factory = sessionmaker(bind=engine, class_=_TenantSession, expire_on_commit=False)
     app.extensions[_EXTENSION_KEY] = _Database(engine=engine, session_factory=factory)
 
@@ -170,6 +213,10 @@ def ping_database() -> bool:
         with database.engine.connect() as connection:
             connection.execute(_PING)
     except SQLAlchemyError:
+        return False
+    except InsecureDatabaseRoleError as exc:
+        # Base alcanzable pero rol inseguro: /health no la da por buena y queda en el log.
+        current_app.logger.error("%s", exc)
         return False
     return True
 

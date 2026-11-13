@@ -243,9 +243,12 @@ _ROLE_UNSAFE = text(
 )
 # Miembro directo o indirecto: la aplicación podría hacer SET ROLE al dueño (A6).
 _APP_IS_OWNER_MEMBER = text("select pg_has_role(:app, :owner, 'MEMBER')")
+# Por rolname exacto, no con to_regrole: to_regrole interpreta el texto como identificador
+# (pasa a minúsculas) y da NULL con un migrador como "Migrador_X" (H1 de la auditoría de T3).
 _MIGRATOR_IS_MEMBER = text(
     "select exists (select 1 from pg_auth_members m "
-    "where m.roleid = to_regrole(:owner) and m.member = to_regrole(current_user))"
+    "where m.roleid = (select oid from pg_roles where rolname = :owner) "
+    "and m.member = (select oid from pg_roles where rolname = current_user))"
 )
 _OWNER_CAN_CREATE = text(
     "select case when to_regnamespace('acceso') is null then false "

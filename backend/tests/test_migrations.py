@@ -989,3 +989,34 @@ def test_0004_fails_if_the_migrator_stays_member_of_auth_owner(
         engine.dispose()
     assert "C8" in str(excinfo.value)
     assert owner not in str(excinfo.value)
+
+
+@pytest.mark.parametrize("prefix", ["Migrador_Prueba_", "migrador-prueba-"])
+def test_0004_detects_the_membership_of_a_migrator_with_a_quoted_name(
+    migration_database_url, temp_roles, monkeypatch, prefix
+):
+    # H1 (auditoría de T3): to_regrole(current_user) da NULL con mayúsculas o guion y C5
+    # no veía la membresía. El migrador de nombre citado se crea y se usa con SET LOCAL ROLE
+    # dentro de la transacción; CREATE ROLE y GRANT se revierten con ella.
+    owner = temp_roles()
+    migration = _load_migration_0004()
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    migrator = f"{prefix}{uuid.uuid4().hex[:6]}"
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                quote = conn.dialect.identifier_preparer.quote
+                conn.exec_driver_sql(f"CREATE ROLE {quote(migrator)} NOLOGIN")
+                conn.exec_driver_sql(f"GRANT {quote(owner)} TO {quote(migrator)}")
+                conn.exec_driver_sql(f"SET LOCAL ROLE {quote(migrator)}")
+                assert conn.scalar(text("select current_user")) == migrator
+                monkeypatch.setattr(migration, "AUTH_OWNER", owner)
+                with pytest.raises(RuntimeError) as excinfo:
+                    migration.require_no_leftover_privileges(conn)
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "C8" in str(excinfo.value)
+    assert migrator not in str(excinfo.value)

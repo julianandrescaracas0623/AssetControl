@@ -46,7 +46,9 @@ services:
       # La API usa el rol de la aplicación (sin SUPERUSER ni BYPASSRLS).
       DATABASE_URL: postgresql+psycopg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${POSTGRES_DB}
       SECRET_KEY: ${SECRET_KEY:?falta SECRET_KEY en .env}
-      ENVIRONMENT: ${ENVIRONMENT:-development}
+      # Fijo y explícito: este compose es solo de desarrollo (cookies sin Secure sobre
+      # http local). Fuera de aquí, cualquier otro valor se trata como producción (B4).
+      ENVIRONMENT: development
     # Código montado para la recarga; el entorno virtual vive en /opt/venv (imagen).
     volumes:
       - ./backend:/app

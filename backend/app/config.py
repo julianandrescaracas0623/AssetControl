@@ -22,18 +22,51 @@ class MissingConfigError(RuntimeError):
         super().__init__(f"Faltan variables de entorno obligatorias: {names}")
 
 
+SECRET_KEY_MIN_BYTES = 32
+TEST_ENVIRONMENT = "test"
+DEVELOPMENT_ENVIRONMENT = "development"
+
+
+class WeakSecretKeyError(RuntimeError):
+    """``SECRET_KEY`` demasiado corta fuera de pruebas (R15, Q11). Nunca muestra su valor."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            f"SECRET_KEY debe tener al menos {SECRET_KEY_MIN_BYTES} bytes; genera una con "
+            '`python -c "import secrets; print(secrets.token_urlsafe(48))"`.'
+        )
+
+
 @dataclass(frozen=True)
 class Config:
+    """Configuración validada al construirse (arranque, R15).
+
+    ``environment`` distinto de ``development`` se trata como producción: cookies
+    ``Secure``. Solo ``test`` admite una ``SECRET_KEY`` corta.
+    """
+
     database_url: str = field(repr=False)
     secret_key: str = field(repr=False)
     environment: str
+
+    def __post_init__(self) -> None:
+        if (
+            self.environment != TEST_ENVIRONMENT
+            and len(self.secret_key.encode()) < SECRET_KEY_MIN_BYTES
+        ):
+            raise WeakSecretKeyError()
+
+    @property
+    def secure_cookies(self) -> bool:
+        """``Secure`` salvo ``ENVIRONMENT=development`` exacto (B4 de T7 de la spec 001)."""
+        return self.environment != DEVELOPMENT_ENVIRONMENT
 
     def to_flask(self) -> dict[str, object]:
         return {
             "DATABASE_URL": self.database_url,
             "SECRET_KEY": self.secret_key,
             "ENVIRONMENT": self.environment,
-            "TESTING": self.environment == "test",
+            "TESTING": self.environment == TEST_ENVIRONMENT,
         }
 
 

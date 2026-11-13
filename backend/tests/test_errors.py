@@ -21,7 +21,12 @@ LEAKY_ORIG = 'connection to server at "10.0.0.9", port 5432 failed: password aut
 
 def make_app(environment: str = "test"):
     app = create_app(
-        Config(database_url=UNREACHABLE_DB, secret_key="clave-de-prueba", environment=environment)
+        Config(
+            database_url=UNREACHABLE_DB,
+            # Fuera de "test" la clave debe tener al menos 32 bytes (spec 002, T4).
+            secret_key="clave-de-prueba-de-al-menos-32-bytes",
+            environment=environment,
+        )
     )
 
     @app.get("/_boom")

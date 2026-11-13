@@ -54,6 +54,16 @@
 - **Depende de:** T1; Q7, Q8, Q9 y Q11 decididos.
 - **Nota:** de T4 solo se prueba el mecanismo de las cabeceras (`no-store`, `no-referrer`); las pruebas por ruta de `/auth` e `/invitaciones` se escriben en T6/T8/T9, cuando existan las rutas. Si T4 pasa de un día, se parte con `/sdd-change` (p. ej. configuración y logs aparte de credenciales).
 - **Riesgo:** costo de hash lento en pruebas (costo bajo solo en tests); imprimir `SECRET_KEY`; romper el arranque local.
+- **Cierre (T4):** hecha; H1 cerrado (0004 `_MIGRATOR_IS_MEMBER` por `rolname` exacto); 578 pruebas verdes; Argon2id m=19 MiB t=2 p=1 aceptado para el piloto por el `security-reviewer` (antes de producción: medir en el host de destino y subir a ~m=46 MiB t=1 o m=64 MiB t=3 p=1, 50–100 ms; solo seguro con `needs_rehash` de T6).
+- **Siguiente: T4-endurecimiento** (inmediata, tests primero):
+  - M1 (media): `ENVIRONMENT=test` en un proceso real desactiva el mínimo de `SECRET_KEY` y baja Argon2 (`config.py` `__post_init__` ~l.48-53, `credentials.py:185`, `ci-backend.yml:52`); relajaciones de `test` solo con `"pytest" in sys.modules` o flag explícito que ponen conftest y CI; lista cerrada de `ENVIRONMENT` (development, test, production, staging), fallar en otro valor; chequeo en CI/despliegue (C8) y warning al arrancar con `test`.
+  - B1 (baja): contraseña con sustituto suelto revienta con `UnicodeEncodeError` (`credentials.py:130-147,162,174`); validar `encode("utf-8")` en `check_password_policy` y `verify`.
+  - B2 (baja): la redacción de logs debe cubrir `SQLAlchemyError` y `psycopg.Error`, no solo `DBAPIError` (`errors.py` `_database_error_in_chain` ~l.70-111).
+  - B6 (info): `pool_recycle` moderado (~30 min) en el engine para acotar la ventana de `ALTER ROLE ... BYPASSRLS`.
+- **Deuda para T6:** B3 `needs_rehash` tras login correcto (requisito para subir parámetros de Argon2); `/auth/refresh` solo `POST` (cookie `SameSite=Lax`); B5 prueba por ruta de `no-store`, `no-referrer` y `413` bajo `/auth` e `/invitaciones`.
+- **Deuda para T6–T9 (aislamiento):** token con `tenant` de otro tenant no accede; `rol` falsificado en el claim no eleva privilegios; membresía inactiva no accede con JWT válido; unificar código/cuerpo de "email ocupado" y clave inválida (H5, T9).
+- **Info/opcionales (T4):** B4 exigir `str(uuid) == claim` en `sub`/`tenant`; B7 rechazar `SECRET_KEY` de un solo carácter repetido; B8 la prueba de tiempos con margen 0,5x–2x puede flaquear en CI cargada (más muestras o marcarla lenta); verificación manual pendiente de `docker compose build api` (se probó con `--no-build`); `ENVIRONMENT` obligatoria sin defecto (más estricto que la spec, que pedía producción por defecto); `prohibido` vs `sin_permiso` se alinea en T8; proxy delante de gunicorn por cuerpos chunked lentos.
+- **Pendiente del humano (T4):** `.env.example` debe fijar `ENVIRONMENT=development` y avisar que `SECRET_KEY` necesita ≥ 32 bytes (`python -c "import secrets; print(secrets.token_urlsafe(48))"`); sus permisos impiden que lo editen los agentes.
 
 ### T5 — Script del operador: tenant y primera invitación admin
 

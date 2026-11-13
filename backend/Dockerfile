@@ -17,8 +17,10 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /app
 
 # Primero solo los archivos de dependencias: la capa se reutiliza mientras no cambien.
+# --no-build: solo ruedas binarias (argon2-cffi-bindings, cffi, psycopg); la imagen no
+# tiene compilador y la construcción falla si alguna dependencia exigiera compilar (T4).
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project
+RUN uv sync --frozen --no-install-project --no-build
 
 COPY . .
 
