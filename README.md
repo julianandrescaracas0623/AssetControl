@@ -38,6 +38,50 @@ Fase: definición de arquitectura y alcance del MVP. Fundación técnica en curs
 
 La justificación está en [ADR-001](docs/adr/ADR-001-stack.md) y [ADR-002](docs/adr/ADR-002-solo-online-cliente-web.md).
 
+## Entorno local con Docker
+
+1. Copia `.env.example` a `.env` y completa los valores (`.env` está ignorado por git).
+2. `docker compose up --build` levanta PostgreSQL 17 (`db`, solo en `127.0.0.1:5432`) y la API con recarga (`api`, en `http://localhost:5000`).
+3. Comprueba la API con `curl http://localhost:5000/health` (`200`, `"db": "ok"`).
+
+Dentro de los contenedores la API se conecta a la base por el host `db`, no `localhost`, y con el rol de la aplicación (`APP_DB_USER`), nunca con el superusuario.
+
+- **`APP_DB_USER` debe ser distinto de `POSTGRES_USER`.** `POSTGRES_USER` es el rol migrador (dueño del esquema, ejecuta Alembic); `APP_DB_USER` es el rol de la aplicación, sin `SUPERUSER` ni `BYPASSRLS`, y el script de init falla si son el mismo.
+- **El rol de la aplicación solo se crea con el volumen vacío.** El script `docker/postgres/init/01-app-role.sh` corre únicamente la primera vez que se inicializa el volumen `pgdata`. Si el volumen ya existía sin ese rol (o cambiaste `APP_DB_USER`), el servicio `db` no queda sano y la API no arranca. Recrea el volumen con `docker compose down -v` (borra los datos locales de la base) y vuelve a levantar; o ejecuta el mismo script a mano dentro del contenedor `db`.
+- Si una contraseña lleva caracteres especiales (`@ : / ? # %`), codifícala en las URL de `.env`.
+- **Usa contraseñas alfanuméricas en `.env` (solo desarrollo local).** Los comandos de migración y de pruebas cargan `.env` en el shell con `. ./.env`: caracteres como `& ; $ ( ) # \` o espacios lo rompen o se interpretan. Además, los valores quedan en los argumentos del proceso `docker compose` del host, visibles para otros usuarios de la máquina mientras corre.
+
+### Migraciones dentro de Docker
+
+El contenedor `api` solo recibe la URL del rol de la aplicación; la del rol migrador (`MIGRATION_DATABASE_URL`) no queda en su entorno. Para aplicar las migraciones, pásala solo a un contenedor efímero, desde la raíz del repositorio (bash/Git Bash) y sin escribir ni imprimir los valores:
+
+```sh
+set -a; . ./.env; set +a
+docker compose run --rm \
+  -e MIGRATION_DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}" \
+  api uv run alembic upgrade head
+```
+
+### Pruebas dentro del contenedor `api`
+
+Las pruebas usan una base aparte, `assetcontrol_test`, en el mismo servidor `db`. Si no existe, créala con el rol migrador (las credenciales salen del entorno del contenedor):
+
+```sh
+docker compose exec db sh -c 'createdb -U "$POSTGRES_USER" assetcontrol_test'
+```
+
+Con los servicios levantados, desde la raíz del repositorio (bash/Git Bash). Las variables se leen de `.env`; no escribas los valores en el comando ni los imprimas:
+
+```sh
+set -a; . ./.env; set +a
+docker compose exec \
+  -e TEST_DATABASE_URL="postgresql+psycopg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/assetcontrol_test" \
+  -e TEST_MIGRATION_DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/assetcontrol_test" \
+  api uv run pytest
+```
+
+`TEST_DATABASE_URL` usa el rol de la aplicación y `TEST_MIGRATION_DATABASE_URL` el rol migrador (necesita `CREATEDB` para la prueba de migraciones).
+
 ## Trabajo con asistentes de IA
 
 El método está en [Orquestacion/](Orquestacion/README.md). La configuración de Claude Code y Cursor (`.claude/`, `.cursor/`, `AGENTS.md`, `CLAUDE.md`, `MEMORY.md`) es **local** y no se publica ([ADR-004](docs/adr/ADR-004-arnes-local-y-autoria-humana.md)). Tras clonar, instala los hooks de Git:
