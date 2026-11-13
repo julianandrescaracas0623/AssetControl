@@ -63,8 +63,17 @@ scripts/
 7. El implementer ejecuta una sola tarea con tests primero.
 8. /sdd-validate <spec>
 9. reviewer + domain-guardian + security-reviewer auditan.
-10. El humano mergea.
+10. Con la aprobación, el implementer hace commit y push de la rama feat/* o docs/*
+    y abre el PR contra la base que indica el coordinator.
+11. El humano mergea.
 ```
+
+### Regla de git: commit + push de ramas
+
+- **Puede (solo el implementer, tras aprobación del reviewer y, si aplica, de security-reviewer/domain-guardian):** crear la rama desde la base indicada, `git add` con rutas explícitas (nunca `git add -A` ni `git add .`), commit con mensaje convencional en español, `git push -u origin feat/*|docs/*` y `gh pr create --base <base>`.
+- **Antes de cada push:** `git status --short` para confirmar que no se publican `.claude/`, `.cursor/`, `AGENTS.md`, `CLAUDE.md`, `MEMORY.md`, `.env` ni `datos/`.
+- **Nunca:** push a `main` ni a `develop`; push forzado (`--force`, `-f`, `--force-with-lease`); `git merge` ni `gh pr merge`; `rebase`, `reset --hard`, `commit --amend`, `filter-branch`/`filter-repo` u otra reescritura de historial; borrar ramas remotas; `--no-verify`.
+- **Autoría:** el commit sale con el `user.name`/`user.email` del humano, sin `Co-Authored-By` ni `Generated with` (principio 8, ADR-004). El merge sigue siendo del humano.
 
 ### Cambio pequeño
 
@@ -98,7 +107,7 @@ Nota: en Claude Code, la ausencia de `Write`/`Edit` en `reviewer`, `domain-guard
 
 Además:
 
-- **Claude Code:** `deny` > `ask` > `allow` en `.claude/settings.json`. `git push`, `git commit`, `gh pr merge`, `rm`, `uv run alembic` y las instalaciones de dependencias piden confirmación. `.env`, claves y `datos/` están denegados.
+- **Claude Code:** `deny` > `ask` > `allow` en `.claude/settings.json`. `git commit -m`, `git switch`, `git fetch`, `git push [-u] origin feat/*|docs/*` y `gh pr create` están permitidos; cualquier otro `git push`, `git checkout`, `git reset --hard`, `git clean`, `rm`, `alembic` y las instalaciones de dependencias piden confirmación; el push a `main`/`develop`, el push forzado o de borrado, `git merge`, `gh pr merge`, `rebase`, `filter-branch`/`filter-repo`, `commit --amend` y `--no-verify` están denegados. `.env`, claves y `datos/` están denegados.
 - **Cursor:** `readonly: true` restringe ediciones y comandos que cambian estado. No hay agente por defecto: `00-core.mdc` obliga a la sesión principal a actuar como `coordinator` y delegar.
 
 ---
