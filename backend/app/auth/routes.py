@@ -20,6 +20,7 @@ from flask.wrappers import Response
 
 from app.auth import service
 from app.auth.credentials import ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL
+from app.auth.decorators import current_user, require_auth
 from app.auth.http import is_same_site_request, refresh_cookie_options
 from app.config import get_config
 from app.errors import error_response
@@ -91,8 +92,6 @@ def logout() -> ResponseReturnValue:
 
 
 @bp.get("/me")
+@require_auth
 def me() -> ResponseReturnValue:
-    user = service.authenticate(request.headers.get("Authorization"))
-    if user is None:
-        return error_response(401, *NOT_AUTHENTICATED)
-    return jsonify(user.to_json())
+    return jsonify(current_user().to_json())

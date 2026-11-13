@@ -39,7 +39,8 @@ INTERNAL_ERROR_MESSAGE = (
 _HTTP_ERRORS: dict[int, tuple[str, str]] = {
     400: ("solicitud_invalida", "La solicitud no es válida."),
     401: ("no_autenticado", "Debes iniciar sesión."),
-    403: ("sin_permiso", "No tienes permiso para esta acción."),
+    # Código de la spec 002 (plan.md §2.2, Errores; T8): rol insuficiente o CSRF.
+    403: ("prohibido", "No tienes permiso para esta acción."),
     404: ("no_encontrado", "El recurso no existe."),
     405: ("metodo_no_permitido", "Método no permitido para este recurso."),
     # Código de la spec 002 (plan.md §2.2, Errores).

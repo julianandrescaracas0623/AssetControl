@@ -15,10 +15,11 @@ lo que devolvió ``buscar_login`` solo elige el tenant. En esa transacción se
 guarda el refresh: ``familia_id`` nueva, ``token_hash = sha256(sha256(secreto))``
 y ``expira_en = now() + 7 días`` (Q7). La cookie lleva ``<tenant_id>.<secreto>``.
 
-**Usuario actual.** ``authenticate`` valida el JWT (``HS256``, ``exp``, ``iss``,
-``sub``, ``tenant``), fija el tenant del claim y lee ``rol`` y ``activa`` de
-``membresia`` y ``activo`` de ``usuario`` en cada petición; el ``rol`` del claim
-no se usa. Lo generalizan ``require_auth``/``require_role`` en T8.
+**Usuario actual (T8).** ``access_claims`` valida el JWT (``HS256``, ``exp``,
+``iss``, ``sub``, ``tenant``) y ``load_current_user`` lee, bajo la
+``tenant_session`` del tenant del claim, ``rol`` y ``activa`` de ``membresia`` y
+``activo`` de ``usuario`` en cada petición; el ``rol`` del claim no se usa. Los
+combinan ``require_auth``/``require_role`` (``app.auth.decorators``).
 
 **Refresh y logout (T7).** Ver ``refresh`` y ``logout``: rotación atómica con
 familia, ventana de gracia de reuso (Q15) y revocación de la familia de la
@@ -37,6 +38,7 @@ from sqlalchemy import func, select, update
 
 from app.auth.credentials import (
     REFRESH_TOKEN_TTL,
+    AccessClaims,
     InvalidAccessTokenError,
     decode_access_token,
     encode_access_token,
@@ -321,17 +323,27 @@ def logout(cookie_value: str | None) -> None:
 _BEARER_PREFIX = "bearer "
 
 
-def authenticate(authorization: str | None) -> CurrentUser | None:
-    """Usuario del ``Authorization: Bearer <jwt>``, o ``None`` si no autentica."""
+def access_claims(authorization: str | None) -> AccessClaims | None:
+    """Claims del ``Authorization: Bearer <jwt>`` válido, o ``None`` (``401``).
+
+    Solo proponen ``sub`` y ``tenant``: el rol y la vigencia se leen de la base
+    con ``load_current_user`` (``app.auth.decorators``).
+    """
     if not authorization or not authorization[: len(_BEARER_PREFIX)].lower() == _BEARER_PREFIX:
         return None
     token = authorization[len(_BEARER_PREFIX) :].strip()
     if not token:
         return None
     try:
-        claims = decode_access_token(current_app.config["SECRET_KEY"], token)
+        return decode_access_token(current_app.config["SECRET_KEY"], token)
     except InvalidAccessTokenError:
         return None
-    with tenant_session(claims.tenant) as session:
-        loaded = _load_current_user(session, claims.sub, claims.tenant)
+
+
+def load_current_user(session, usuario_id: uuid.UUID, tenant_id: uuid.UUID) -> CurrentUser | None:
+    """Usuario con membresía y cuenta activas en el tenant de ``session``, o ``None``.
+
+    ``session`` es la ``tenant_session`` de ``tenant_id``: RLS acota la lectura.
+    """
+    loaded = _load_current_user(session, usuario_id, tenant_id)
     return None if loaded is None else loaded[1]

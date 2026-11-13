@@ -869,7 +869,7 @@ def test_cross_site_requests_are_403_before_touching_the_cookie(client, refresh_
     response = route(client, value, headers=CSRF_REJECTED[case])
 
     assert response.status_code == 403
-    assert response.get_json()["error"]["code"] == "sin_permiso"
+    assert response.get_json()["error"]["code"] == "prohibido"
     assert "Set-Cookie" not in response.headers
     assert row_of(refresh_db, value) == before
     assert refresh(client, value).status_code == 200

@@ -13,6 +13,7 @@ from app.cli import register_cli
 from app.config import CONFIG_EXTENSION_KEY, Config, load_config
 from app.db import init_db
 from app.errors import register_error_handlers
+from app.invitaciones.routes import bp as invitaciones_bp
 from app.meta.routes import bp as meta_bp
 from app.version import __version__
 
@@ -45,5 +46,6 @@ def create_app(config: Config | None = None) -> Flask:
     register_auth_http_policy(app)
     app.register_blueprint(meta_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(invitaciones_bp)
     register_cli(app)
     return app

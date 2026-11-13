@@ -62,7 +62,11 @@ class Invitacion(TenantScoped, Base):
     rol: Mapped[str] = mapped_column(Text)
     token_hash: Mapped[bytes] = mapped_column(LargeBinary, deferred=True, deferred_raiseload=True)
     expira_en: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    usada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # FetchedValue: el ORM no la incluye en el INSERT (la aplicación no tiene
+    # INSERT sobre usada_en; nace NULL en la base y solo la marca aceptar_invitacion).
+    usada_en: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=FetchedValue()
+    )
     creada_por: Mapped[uuid.UUID | None] = mapped_column(Uuid)
 
 
