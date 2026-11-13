@@ -6,7 +6,7 @@ Primer cliente: Biotecnologia Dental (Cartago, Colombia). El diseño es multi-te
 
 ## Estado
 
-Fase: definición de arquitectura y alcance del MVP. Todavía no hay código de aplicación.
+Fase: definición de arquitectura y alcance del MVP. Fundación técnica en curso (spec 001).
 
 ## Estructura
 
