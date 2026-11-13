@@ -11,6 +11,7 @@ borran al terminar: la base de pruebas compartida no recibe ``alembic_version``
 (el guardián de residuos de T5 lo detectaría como cambio).
 """
 
+import importlib.util
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -19,6 +20,7 @@ import pytest
 from alembic import command
 from alembic.config import Config as AlembicConfig
 from alembic.script import ScriptDirectory
+from conftest import BLOCKED, read_database_url
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL
 from sqlalchemy.exc import SQLAlchemyError
@@ -35,6 +37,10 @@ from app.config import (
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
 BASELINE = "0001_baseline"
+ACCESO = "0002_acceso_y_usuarios"
+MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
+APP_ROLE_VAR = "APP_DB_USER"
+AUTH_TABLES = ["invitacion", "membresia", "refresh_token", "tenant", "usuario"]
 
 APP_URL = "postgresql+psycopg://assetcontrol_app:valor-secreto-app@db.invalid:5432/assetcontrol"
 MIGRATOR_URL = "postgresql+psycopg://postgres:valor-secreto-migr@db.invalid:5432/assetcontrol"
@@ -168,13 +174,14 @@ def test_env_py_rejects_the_app_role(monkeypatch):
     assert "valor-secreto" not in str(excinfo.value)
 
 
-def test_single_baseline_revision():
+def test_revision_chain():
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == [BASELINE]
-    assert [r.revision for r in revisions] == [BASELINE]
-    assert revisions[0].down_revision is None
+    assert script.get_heads() == [ACCESO]
+    assert [r.revision for r in revisions] == [ACCESO, BASELINE]
+    assert revisions[0].down_revision == BASELINE
+    assert revisions[1].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -191,6 +198,20 @@ def test_migrations_readme_documents_the_business_table_pattern():
         "DROP POLICY tenant_isolation",
         "REVOKE",
         MIGRATION_URL_VAR,
+    ):
+        assert fragment in readme, fragment
+
+
+def test_migrations_readme_warns_that_downgrading_0002_destroys_data():
+    readme = (BACKEND_DIR / "migrations" / "README.md").read_text(encoding="utf-8")
+
+    for fragment in (
+        "downgrade` de `0002_acceso_y_usuarios` destruye",
+        "tenants",
+        "usuarios",
+        "refresh tokens",
+        "solo para desarrollo y CI",
+        "nunca sobre datos reales",
     ):
         assert fragment in readme, fragment
 
@@ -238,19 +259,243 @@ def _public_state(url: URL) -> tuple[list[str], list[str]]:
     return tables, versions
 
 
-def test_upgrade_downgrade_upgrade_on_an_empty_database(empty_database, monkeypatch):
+def _schema_exists(url: URL, name: str) -> bool:
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            return bool(
+                conn.scalar(
+                    text("select exists (select 1 from pg_namespace where nspname = :n)"),
+                    {"n": name},
+                )
+            )
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture
+def app_role() -> str:
+    """Nombre del rol de la aplicación (usuario de ``TEST_DATABASE_URL``)."""
+    url = read_database_url("TEST_DATABASE_URL")
+    if url is None or not url.username:
+        pytest.fail(BLOCKED, pytrace=False)
+    return url.username
+
+
+@pytest.fixture
+def migrate_env(empty_database, app_role, monkeypatch) -> URL:
+    """Entorno de Alembic apuntando a la base temporal, con el rol de la aplicación."""
     monkeypatch.setenv(MIGRATION_URL_VAR, empty_database.render_as_string(hide_password=False))
     monkeypatch.delenv("DATABASE_URL", raising=False)
-    config = alembic_config()
+    monkeypatch.setenv(APP_ROLE_VAR, app_role)
+    return empty_database
 
-    assert _public_state(empty_database) == ([], [])
+
+def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
+    config = alembic_config()
+    with_auth = sorted(["alembic_version", *AUTH_TABLES])
+
+    assert _public_state(migrate_env) == ([], [])
+    assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(empty_database) == (["alembic_version"], [BASELINE])
+    assert _public_state(migrate_env) == (with_auth, [ACCESO])
+    assert _schema_exists(migrate_env, "acceso")
 
     command.downgrade(config, "base")
-    # Sin tablas de negocio: solo queda la tabla de control de Alembic, vacía.
-    assert _public_state(empty_database) == (["alembic_version"], [])
+    # Solo queda la tabla de control de Alembic, vacía; el esquema acceso desaparece.
+    assert _public_state(migrate_env) == (["alembic_version"], [])
+    assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(empty_database) == (["alembic_version"], [BASELINE])
+    assert _public_state(migrate_env) == (with_auth, [ACCESO])
+    assert _schema_exists(migrate_env, "acceso")
+
+
+def test_downgrade_to_baseline_removes_only_0002(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, "head")
+
+    command.downgrade(config, BASELINE)
+
+    assert _public_state(migrate_env) == (["alembic_version"], [BASELINE])
+    assert not _schema_exists(migrate_env, "acceso")
+
+
+@pytest.mark.parametrize("value", [None, "", "   "])
+def test_upgrade_requires_app_db_user_and_leaves_nothing(migrate_env, monkeypatch, value):
+    if value is None:
+        monkeypatch.delenv(APP_ROLE_VAR, raising=False)
+    else:
+        monkeypatch.setenv(APP_ROLE_VAR, value)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        command.upgrade(alembic_config(), "head")
+
+    assert APP_ROLE_VAR in str(excinfo.value)
+    # DDL transaccional: el fallo revierte todo, también alembic_version.
+    assert _public_state(migrate_env) == ([], [])
+    assert not _schema_exists(migrate_env, "acceso")
+
+
+def test_upgrade_fails_when_the_app_role_does_not_exist(migrate_env, monkeypatch):
+    missing = f"rol_inexistente_{uuid.uuid4().hex[:8]}"
+    monkeypatch.setenv(APP_ROLE_VAR, missing)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        command.upgrade(alembic_config(), "head")
+
+    message = str(excinfo.value)
+    assert APP_ROLE_VAR in message
+    assert missing not in message
+    assert _public_state(migrate_env) == ([], [])
+
+
+def test_upgrade_rejects_the_migrator_as_app_role(migrate_env, monkeypatch):
+    monkeypatch.setenv(APP_ROLE_VAR, migrate_env.username)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        command.upgrade(alembic_config(), "head")
+
+    assert APP_ROLE_VAR in str(excinfo.value)
+    assert _public_state(migrate_env) == ([], [])
+
+
+def test_upgrade_rejects_auth_owner_as_app_role(migrate_env, monkeypatch):
+    monkeypatch.setenv(APP_ROLE_VAR, "auth_owner")
+
+    with pytest.raises(RuntimeError) as excinfo:
+        command.upgrade(alembic_config(), "head")
+
+    assert APP_ROLE_VAR in str(excinfo.value)
+    assert _public_state(migrate_env) == ([], [])
+
+
+@pytest.fixture
+def temp_role(migration_database_url, migrate_env) -> Iterator:
+    """Crea roles NOLOGIN temporales de clúster y los borra al terminar.
+
+    Antes del ``DROP ROLE`` quita, con ``DROP OWNED BY``, los GRANT y las políticas
+    que la migración les haya dado en la base temporal (si no, el borrado falla).
+    """
+    admin = create_engine(migration_database_url, poolclass=NullPool, isolation_level="AUTOCOMMIT")
+    temp_db = create_engine(migrate_env, poolclass=NullPool, isolation_level="AUTOCOMMIT")
+    created: list[str] = []
+
+    def make(name: str, attributes: str = "") -> str:
+        quoted = admin.dialect.identifier_preparer.quote(name)
+        failure = None
+        try:
+            with admin.connect() as conn:
+                conn.exec_driver_sql(f"CREATE ROLE {quoted} NOLOGIN {attributes}")
+        except SQLAlchemyError as exc:
+            failure = (
+                f"bloqueado: el rol migrador no pudo crear un rol temporal ({type(exc).__name__})"
+            )
+        if failure is not None:
+            pytest.fail(failure, pytrace=False)
+        created.append(quoted)
+        return name
+
+    try:
+        yield make
+    finally:
+        try:
+            with temp_db.connect() as conn:
+                for quoted in created:
+                    conn.exec_driver_sql(f"DROP OWNED BY {quoted}")
+            with admin.connect() as conn:
+                for quoted in created:
+                    conn.exec_driver_sql(f"DROP ROLE IF EXISTS {quoted}")
+        finally:
+            temp_db.dispose()
+            admin.dispose()
+
+
+@pytest.mark.parametrize("attribute", ["BYPASSRLS", "SUPERUSER"])
+def test_upgrade_rejects_an_app_role_that_skips_rls(migrate_env, monkeypatch, temp_role, attribute):
+    name = temp_role(f"ac_tmp_{attribute.lower()}_{uuid.uuid4().hex[:8]}", attribute)
+    monkeypatch.setenv(APP_ROLE_VAR, name)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        command.upgrade(alembic_config(), "head")
+
+    message = str(excinfo.value)
+    assert APP_ROLE_VAR in message
+    assert "BYPASSRLS" in message
+    assert name not in message
+    assert _public_state(migrate_env) == ([], [])
+    assert not _schema_exists(migrate_env, "acceso")
+
+
+def test_upgrade_accepts_an_app_role_with_a_colon_in_its_name(migrate_env, monkeypatch, temp_role):
+    # Con op.execute(texto), ":palabra" (tras un carácter que no es de palabra) se
+    # tomaría como parámetro y el error de SQLAlchemy mostraría la sentencia con el
+    # nombre del rol.
+    name = temp_role(f"ac_tmp_{uuid.uuid4().hex[:8]} :palabra")
+    monkeypatch.setenv(APP_ROLE_VAR, name)
+    config = alembic_config()
+
+    command.upgrade(config, "head")
+    try:
+        engine = create_engine(migrate_env, poolclass=NullPool)
+        try:
+            with engine.connect() as conn:
+                roles = conn.scalars(
+                    text(
+                        "select distinct unnest(roles)::text from pg_policies "
+                        "where schemaname = 'public'"
+                    )
+                ).all()
+        finally:
+            engine.dispose()
+        assert roles == [name]
+    finally:
+        # Quita los GRANT y políticas del rol para poder borrarlo en el teardown.
+        command.downgrade(config, "base")
+
+
+def test_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration_0002()
+    secret = f"centinela_{uuid.uuid4().hex[:8]}:palabra"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+
+    message = str(excinfo.value)
+    assert "0002" in message
+    assert secret not in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+    assert excinfo.value.__suppress_context__
+
+
+def _load_migration_0002():
+    spec = importlib.util.spec_from_file_location("migration_0002_under_test", MIGRATION_0002)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_missing_auth_owner_fails_with_a_clear_message(migration_database_url):
+    # auth_owner es de todo el clúster: no se borra en una prueba. Se comprueba el
+    # mismo chequeo que usa upgrade() con un nombre de rol que no existe.
+    migration = _load_migration_0002()
+    assert migration.AUTH_OWNER == "auth_owner"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            migration.require_auth_owner(conn)  # existe (P0): no falla
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.require_auth_owner(conn, name=f"auth_owner_falta_{uuid.uuid4().hex[:6]}")
+    finally:
+        engine.dispose()
+
+    message = str(excinfo.value)
+    assert "auth_owner" in message
+    assert "01-app-role.sh" in message
