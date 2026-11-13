@@ -7,6 +7,9 @@
   ``tenant_session`` no sobrevive a su bloque dentro de la transacción externa.
 - ``pytest`` dos veces seguidas sin residuos: lo que escribe una prueba no lo ve
   la siguiente, y el guardián de residuos falla si queda una tabla de prueba.
+- Spec 002, T2: el guardián cuenta filas bajo FORCE RLS (o falla cerrado si no
+  puede), detecta roles ``prueba_*`` sin borrar y falla si un rol ``prueba_*``
+  es miembro de ``auth_owner`` (también un huérfano previo).
 """
 
 import os
@@ -24,7 +27,14 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.pool import NullPool
 
 from app.db import TenantScoped, tenant_session
-from tests.conftest import BLOCKED, create_rls_tables, read_database_url
+from tests.conftest import (
+    BLOCKED,
+    _schema_snapshot,
+    create_rls_tables,
+    read_database_url,
+    residue_problems,
+    role_sees_all_rows,
+)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 TENANT_A = uuid.UUID("00000000-0000-4000-8000-0000000000a5")
@@ -314,3 +324,125 @@ def test_residue_guard_fails_when_a_test_table_is_left_behind(tmp_path, migratio
     assert "1 passed, 1 error" in output, output
     assert "residuos" in output
     assert RESIDUE_TABLE in output
+
+
+# --- Guardián de residuos bajo FORCE RLS (spec 002, T2; plan.md §7.6) -------
+
+GUARD_TABLE = "prueba_guardian_t2"
+
+
+class GuardBase(DeclarativeBase):
+    """Metadata propia de la prueba del guardián."""
+
+
+class GuardActivo(TenantScoped, GuardBase):
+    __tablename__ = GUARD_TABLE
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+
+
+def _snapshot(**overrides):
+    base = {"tables": [], "policies": [], "rows": {}, "roles": [], "rows_complete": True}
+    base.update(overrides)
+    return base
+
+
+def test_residue_guard_counts_rows_of_every_tenant_under_force_rls(
+    migration_database_url, app_database_url
+):
+    migrator = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with migrator.begin() as conn:
+            create_rls_tables(conn, GuardBase.metadata, app_database_url.username)
+            for tenant in (TENANT_A, TENANT_B):
+                conn.execute(
+                    text(f"insert into {GUARD_TABLE} (id, tenant_id) values (:id, :t)"),  # noqa: S608
+                    {"id": uuid.uuid4(), "t": tenant},
+                )
+        snapshot = _schema_snapshot(migration_database_url)
+    finally:
+        with migrator.begin() as conn:
+            GuardBase.metadata.drop_all(conn)
+        migrator.dispose()
+
+    assert snapshot is not None
+    assert snapshot["rows_complete"] is True
+    # Sin app.tenant_id: con FORCE RLS y un rol que no se la salta, daría 0.
+    assert snapshot["rows"][GUARD_TABLE] == 2
+
+
+def test_role_sees_all_rows_is_false_for_a_role_under_rls(migration_database_url, app_database_url):
+    migrator = create_engine(migration_database_url, poolclass=NullPool)
+    preparer = migrator.dialect.identifier_preparer
+    try:
+        with migrator.begin() as conn:
+            assert role_sees_all_rows(conn) is True
+            conn.exec_driver_sql(f"SET LOCAL ROLE {preparer.quote(app_database_url.username)}")
+            assert role_sees_all_rows(conn) is False
+    finally:
+        migrator.dispose()
+
+
+def test_residue_guard_fails_closed_when_it_cannot_count_rows():
+    problems = residue_problems(_snapshot(rows_complete=False), _snapshot(rows_complete=False))
+    assert any("FORCE RLS" in problem for problem in problems)
+
+
+def test_residue_guard_detects_rows_left_in_a_business_table():
+    before = _snapshot(tables=[("membresia", "r")], rows={"membresia": 0})
+    after = _snapshot(tables=[("membresia", "r")], rows={"membresia": 1})
+    assert residue_problems(before, after) != []
+
+
+def test_residue_guard_detects_a_test_role_left_behind():
+    before = _snapshot(roles=["prueba_de_otro_proceso"])
+    after = _snapshot(roles=["prueba_de_otro_proceso", "prueba_dueno_abc"])
+    assert residue_problems(before, after) == ["rol de prueba sin borrar: prueba_dueno_abc"]
+
+
+def test_residue_guard_detects_a_new_auth_owner_membership():
+    # Las membresías son de todo el clúster: borrar la base temporal no las quita.
+    before = _snapshot(memberships=[])
+    after = _snapshot(memberships=[("auth_owner", "assetcontrol_app")])
+    problems = residue_problems(before, after)
+    assert len(problems) == 1
+    assert "auth_owner" in problems[0]
+
+
+def test_residue_snapshot_lists_no_auth_owner_membership(migration_database_url):
+    snapshot = _schema_snapshot(migration_database_url)
+    assert snapshot is not None
+    assert snapshot["memberships"] == []
+
+
+def test_residue_guard_fails_on_an_orphan_test_member_of_auth_owner():
+    # Huérfano de una corrida anterior: está antes y después; igual falla (I1).
+    orphan = [("auth_owner", "prueba_dueno_huerfano")]
+    problems = residue_problems(_snapshot(memberships=orphan), _snapshot(memberships=orphan))
+    assert problems == ["rol de prueba miembro de auth_owner: prueba_dueno_huerfano"]
+
+
+def _role_exists(conn, name: str) -> bool:
+    return bool(conn.scalar(text("select count(*) from pg_roles where rolname = :n"), {"n": name}))
+
+
+def test_residue_snapshot_detects_a_real_test_member_of_auth_owner(migration_database_url):
+    name = f"prueba_miembro_{uuid.uuid4().hex[:10]}"
+    admin = create_engine(migration_database_url, poolclass=NullPool, isolation_level="AUTOCOMMIT")
+    quoted = admin.dialect.identifier_preparer.quote(name)
+    try:
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f"CREATE ROLE {quoted} NOLOGIN")
+            conn.exec_driver_sql(f"GRANT auth_owner TO {quoted}")
+        snapshot = _schema_snapshot(migration_database_url)
+    finally:
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f"DROP ROLE IF EXISTS {quoted}")
+            left = _role_exists(conn, name)
+        admin.dispose()
+
+    assert left is False
+    assert snapshot is not None
+    assert ("auth_owner", name) in snapshot["memberships"]
+    problems = residue_problems(_snapshot(), snapshot)
+    assert f"rol de prueba miembro de auth_owner: {name}" in problems

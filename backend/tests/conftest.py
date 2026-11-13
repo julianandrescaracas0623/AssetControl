@@ -51,13 +51,26 @@ antes de la primera prueba con base y falla al final de la corrida si quedó una
 tabla ``prueba_*`` creada en ella o si cambió algo fuera de esas tablas. Así ``pytest`` se puede
 correr dos veces seguidas con el mismo resultado.
 
-Limitación conocida del guardián (deuda, resolver antes de la spec 002): las
-tablas de negocio llevan ``FORCE ROW LEVEL SECURITY``, que también aplica al
-migrador (dueño). Sin ``app.tenant_id`` la política no deja ver ninguna fila, así
-que el conteo de filas por tabla da 0 y el guardián **no detecta filas
-residuales en tablas de negocio**; hoy solo detecta tablas, políticas y filas en
-tablas sin RLS. Opciones a decidir: contar por tenant, contar con un rol con
-``BYPASSRLS`` solo para pruebas o leer ``pg_stat_user_tables``.
+Conteo bajo FORCE RLS (spec 002, T2; decisión del implementer, plan.md §7.6):
+``FORCE ROW LEVEL SECURITY`` aplica al dueño de la tabla, pero no a un
+superusuario ni a un rol con ``BYPASSRLS``. El guardián cuenta con el rol
+migrador de ``TEST_MIGRATION_DATABASE_URL``, que en local y en la CI es
+``POSTGRES_USER`` (superusuario): ve todas las filas de todos los tenants sin
+crear ningún rol nuevo. Si el migrador no puede saltarse RLS (p. ej. un
+migrador no superusuario, como el de Supabase en C8), el conteo daría 0 en
+silencio; por eso la foto registra ``rows_complete`` y el guardián **falla
+cerrado** en vez de dar por buena una corrida que no pudo contar. Se
+descartaron ``pg_stat_user_tables`` (estadística aproximada y asíncrona) y un
+rol ``BYPASSRLS`` solo para pruebas (rol nuevo que habría que aprobar).
+
+El guardián también detecta roles de clúster ``prueba_*`` creados durante la
+corrida y no borrados (p. ej. los roles temporales de las pruebas de atributos
+de ``auth_owner``) y cualquier cambio en las membresías de ``auth_owner``:
+roles y membresías son de todo el clúster y sobreviven al borrado de una base
+temporal. Además falla si **existe** un rol ``prueba_*`` miembro de
+``auth_owner``, aunque ya estuviera antes de la corrida (huérfano de una corrida
+anterior): ninguna prueba lo necesita, porque actúan como ``auth_owner`` con
+``SET LOCAL ROLE`` desde el migrador (I1 de la revisión de seguridad de T2).
 
 Uso local: ``uv run --env-file ../.env pytest`` desde ``backend``.
 """
@@ -199,6 +212,26 @@ _SNAPSHOT_POLICIES = text(
     "select tablename, policyname from pg_policies where schemaname = 'public' "
     "order by tablename, policyname"
 )
+_SNAPSHOT_ROLES = text(
+    "select rolname from pg_roles where rolname like :prefix escape '\\' order by rolname"
+)
+# Membresías de auth_owner (en cualquier sentido), como (rol concedido, miembro): son de
+# todo el clúster y sobreviven al borrado de una base temporal.
+_SNAPSHOT_AUTH_OWNER_MEMBERSHIPS = text(
+    "select g.rolname, m.rolname from pg_auth_members a "
+    "join pg_roles g on g.oid = a.roleid join pg_roles m on m.oid = a.member "
+    "where 'auth_owner' in (g.rolname, m.rolname) "
+    "order by 1, 2"
+)
+# Superusuario o BYPASSRLS: solo así el conteo ve todas las filas bajo FORCE RLS.
+_ROLE_SEES_ALL_ROWS = text(
+    "select rolsuper or rolbypassrls from pg_roles where rolname = current_user"
+)
+
+
+def role_sees_all_rows(conn: Connection) -> bool:
+    """``True`` si el ``current_user`` de ``conn`` se salta RLS (también la forzada)."""
+    return bool(conn.scalar(_ROLE_SEES_ALL_ROWS))
 
 
 _GUARD_URL_KEY = pytest.StashKey[URL | None]()
@@ -243,6 +276,9 @@ def _schema_snapshot(url: URL) -> dict[str, object] | None:
         with engine.connect() as conn:
             tables = [tuple(row) for row in conn.execute(_SNAPSHOT_TABLES)]
             policies = [tuple(row) for row in conn.execute(_SNAPSHOT_POLICIES)]
+            roles = list(conn.scalars(_SNAPSHOT_ROLES, {"prefix": "prueba\\_%"}))
+            memberships = [tuple(row) for row in conn.execute(_SNAPSHOT_AUTH_OWNER_MEMBERSHIPS)]
+            rows_complete = role_sees_all_rows(conn)
             preparer = conn.dialect.identifier_preparer
             rows = {
                 name: conn.scalar(text(f"select count(*) from {preparer.quote(name)}"))  # noqa: S608
@@ -254,7 +290,14 @@ def _schema_snapshot(url: URL) -> dict[str, object] | None:
         return None
     finally:
         engine.dispose()
-    return {"tables": tables, "policies": policies, "rows": rows}
+    return {
+        "tables": tables,
+        "policies": policies,
+        "rows": rows,
+        "roles": roles,
+        "memberships": memberships,
+        "rows_complete": rows_complete,
+    }
 
 
 def _without_test_tables(snapshot: dict[str, object]) -> dict[str, object]:
@@ -278,6 +321,33 @@ def residue_problems(before: dict[str, object], after: dict[str, object]) -> lis
         for name, _ in after["tables"]
         if name.startswith(RESIDUE_PREFIX) and name not in existing
     ]
+    existing_roles = set(before.get("roles", []))
+    problems += [
+        f"rol de prueba sin borrar: {name}"
+        for name in after.get("roles", [])
+        if name not in existing_roles
+    ]
+    # Absoluto, no diferencia: también un huérfano de una corrida anterior.
+    test_members = sorted(
+        {
+            member
+            for snapshot in (before, after)
+            for granted, member in snapshot.get("memberships", [])
+            if granted == "auth_owner" and member.startswith(RESIDUE_PREFIX)
+        }
+    )
+    problems += [f"rol de prueba miembro de auth_owner: {name}" for name in test_members]
+    if before.get("memberships", []) != after.get("memberships", []):
+        problems.append(
+            "cambiaron las membresías de auth_owner: antes "
+            f"{before.get('memberships', [])}, después {after.get('memberships', [])}"
+        )
+    for label, snapshot in (("antes", before), ("después", after)):
+        if not snapshot.get("rows_complete", False):
+            problems.append(
+                f"el guardián no pudo contar filas bajo FORCE RLS ({label}): el rol de "
+                "TEST_MIGRATION_DATABASE_URL debe ser superusuario o tener BYPASSRLS"
+            )
     clean_before, clean_after = _without_test_tables(before), _without_test_tables(after)
     for key in ("tables", "policies", "rows"):
         if clean_before[key] != clean_after[key]:
