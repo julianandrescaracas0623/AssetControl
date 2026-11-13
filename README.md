@@ -74,6 +74,37 @@ docker compose run --rm \
   api uv run alembic upgrade head
 ```
 
+### Crear un tenant y su primer admin (operador, spec 002)
+
+`flask create-tenant <nombre> <email>` crea el tenant y la invitación `admin` de su primer usuario (vence en 24 h) llamando a `acceso.crear_tenant` con el rol migrador. Lo ejecuta el operador, nunca la API:
+
+- Las credenciales del migrador llegan **solo** por la variable de entorno `MIGRATION_DATABASE_URL`; el comando no acepta URL, contraseña ni rol por argumentos y falla si esa URL usa el mismo rol que `DATABASE_URL`. El servicio `api` no la recibe, así que `docker compose exec api flask create-tenant ...` falla: se usa un contenedor efímero.
+- En el ejemplo, `-e MIGRATION_DATABASE_URL` va **sin valor**: Docker la toma del shell, y la URL no queda en los argumentos del proceso `docker compose` (a diferencia del ejemplo de migraciones).
+- El enlace `/invitacion#<token>` se muestra **una sola vez** por la salida estándar y no se guarda: la base solo guarda `sha256(sha256(token))`. Sale **relativo**: antepón `https://<dominio-de-la-web>` (nunca `http` en producción) y compártelo solo con esa persona. Si se pierde, se crea otra invitación.
+- No redirijas la salida estándar a un archivo ni a logs de CI, ni la pegues en tickets: el token vale 24 h. Usa `docker compose run -T` solo si capturas la salida de forma segura.
+- Solo crea el rol `admin`; nombre y email no son secretos (el email se guarda en minúsculas).
+- La contraseña va **codificada** dentro de la URL (caracteres como `@` o `/` se escriben `%40`, `%2F`).
+
+Desde la raíz del repositorio (bash/Git Bash), dentro de un subshell `( ... )` para que los secretos de `.env` no queden en tu shell:
+
+```sh
+(
+  set -a; . ./.env; set +a
+  export MIGRATION_DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+  docker compose run --rm -e MIGRATION_DATABASE_URL \
+    api uv run flask --app app create-tenant "Clínica de ejemplo" admin@ejemplo.test
+  unset MIGRATION_DATABASE_URL
+)
+```
+
+En producción no escribas la URL literal en un `export` (queda en el historial del shell); léela sin eco:
+
+```sh
+read -rs MIGRATION_DATABASE_URL; export MIGRATION_DATABASE_URL
+```
+
+En producción el migrador no es superusuario ni tiene `BYPASSRLS` (Q5); la migración `0004` le concede `EXECUTE` sobre `acceso.crear_tenant`, que es lo único que necesita.
+
 ### Pruebas dentro del contenedor `api`
 
 Las pruebas usan una base aparte, `assetcontrol_test`, en el mismo servidor `db`. Si no existe, créala con el rol migrador (las credenciales salen del entorno del contenedor):

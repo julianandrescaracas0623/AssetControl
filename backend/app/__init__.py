@@ -8,6 +8,7 @@ from flask import Flask
 
 from app.auth.credentials import init_credentials
 from app.auth.http import register_auth_http_policy
+from app.cli import register_cli
 from app.config import Config, load_config
 from app.db import init_db
 from app.errors import register_error_handlers
@@ -41,4 +42,5 @@ def create_app(config: Config | None = None) -> Flask:
     register_error_handlers(app)
     register_auth_http_policy(app)
     app.register_blueprint(meta_bp)
+    register_cli(app)
     return app

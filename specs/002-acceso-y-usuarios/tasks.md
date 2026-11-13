@@ -81,6 +81,17 @@
 - **Verificación:** `cd backend && uv run pytest tests/test_cli_tenant.py` y ejecución manual, comprobando que `invitacion` solo tiene `sha256(clave)`.
 - **Depende de:** T3, T4 (Q3, Q5, Q17 decididos).
 - **Riesgo:** enlace en logs o historial; credenciales en argv; prueba que pase solo por ser superusuario.
+- **Estado (2026-11-13, sin commit, pendiente de reviewer + security-reviewer):** `backend/app/cli.py` (`create-tenant`, registrado en `create_app`; exige además `DATABASE_URL`, `SECRET_KEY` y `ENVIRONMENT` porque `flask --app app` crea la app) con `load_migration_url` (solo entorno, rechaza el mismo rol que `DATABASE_URL`), `new_token`/`token_key` de T4, una transacción y enlace relativo `/invitacion#<token>` a stdout tras el `COMMIT`; errores de base solo con tipo y `sqlstate`. `test_cli_tenant.py` (24 pruebas, base temporal y migrador `prueba_migrador_*` `NOSUPERUSER NOBYPASSRLS` con solo `USAGE`/`EXECUTE`, incluido un proceso real `flask` con `ENVIRONMENT=development`). `.env.example` no cambia (`MIGRATION_DATABASE_URL` ya figura). README: sección del operador con `-e MIGRATION_DATABASE_URL` sin valor (fuera de argv). 650 verdes x2.
+- **Abierto (humano):** (1) URL base de la web para el enlace (no está en la spec; hoy se imprime la ruta relativa, igual en T8); (2) si el comando debe negarse a correr con un migrador superusuario o `BYPASSRLS` (Q5) aunque en local y CI el migrador es `POSTGRES_USER`; (3) confirmar que un contenedor efímero `docker compose run api` cuenta como "no corre en el contenedor `api`". Revisados por `reviewer` y `security-reviewer`: aceptables.
+- **Cierre (T5):** hecha (2026-11-13); aprobada por `reviewer` y `security-reviewer`; 650 pruebas verdes. README: subshell para `.env`, contraseña codificada en la URL, `read -rs` en producción, enlace con `https://<dominio-de-la-web>`, sin redirigir stdout (token 24 h).
+- **Deuda (hallazgo 5, decisión humana):** aviso por stderr no bloqueante si el migrador es `rolsuper` o `rolbypassrls` (`pg_roles` por `current_user`); opcional negarse si `ENVIRONMENT` no es `development`.
+- **Deuda (hallazgo 7):** tope de longitud (nombre ~200, email 254) y rechazo de caracteres de control en el nombre (`cli.py:66-71`).
+- **Documentado (hallazgo 6):** dos ejecuciones crean dos tenants independientes (`tenant.nombre` no es único); si `click.echo` falla tras el `COMMIT` (BrokenPipe) queda un tenant sin enlace: se crea otra invitación.
+- **Pruebas pendientes:** atomicidad (email que viole el CHECK → no queda tenant); dos ejecuciones con mismo email/nombre; prueba del aviso del hallazgo 5 si se implementa.
+- **Opcional (con T8/web):** `WEB_BASE_URL` para imprimir el enlace completo, exigiendo `https` fuera de `development`.
+- **Deuda (C8 / T4-I1):** `sha256(token)` es credencial equivalente al token y viaja como parámetro ligado a `crear_tenant`; fijar en el servidor `log_statement=none`, sin `pg_stat_statements` ni `auto_explain` con parámetros (`docker/postgres/init/01-app-role.sh:74-75` es solo un `SET` de sesión).
+- **Verificación manual pendiente:** `docker compose build api` y probar el ejemplo del README en el contenedor efímero.
+- **Fragilidad menor:** `test_command_rejects_credentials_or_role_in_argv` depende del texto "No such option" de click.
 
 ### T6 — Login y usuario actual
 
