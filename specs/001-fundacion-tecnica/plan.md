@@ -51,7 +51,7 @@ T1 → T2 → T3 → T4 → T5 → T6 → T7 → T8 → T9 → T10. La web (T8, 
 ## 5. Estrategia de pruebas
 
 - Backend: `uv run pytest` contra PostgreSQL (app factory, config, tenant con dos tenants, salud, errores).
-- Web: Vitest para la pantalla de salud; verificación manual a 375 px con captura.
+- Web: Vitest para la pantalla de salud; verificación manual a 375 px y 1440 px con capturas.
 - Aislamiento: la prueba de R4 se convierte en la plantilla de las pruebas por endpoint.
 
 ## 6. Migraciones y reversa

@@ -28,7 +28,7 @@ Tres piezas: un cliente web, una API y una base de datos. Sin colas, sin servici
 **Aplicación web (`web/`).** React + TypeScript + Vite, Tailwind CSS y shadcn/ui, datos con TanStack Query. Una sola aplicación con dos modos de uso:
 
 - *Conteo* (contador y admin): diseñada primero para teléfono. Escaneo por cámara, confirmación con un toque, alta por escaneo (ambos roles, sin revisión posterior del admin; P11, 2026-11-11).
-- *Administración* (admin): Inicio (dashboard con indicadores, gráficas y evolución entre conteos), catálogo, importación del Excel, discrepancias, cierre de sesión e informes. Diseñada para escritorio. El contador tiene su propio Inicio en el modo conteo, sin ningún precio (P13; decisión del 2026-11-11).
+- *Administración* (admin): Inicio (dashboard con indicadores, gráficas y evolución entre conteos), catálogo, importación del Excel, discrepancias, cierre de sesión e informes. Responsive (celular y computador). El contador tiene su propio Inicio en el modo conteo, sin ningún precio (P13; decisión del 2026-11-11).
 
 **API (`backend/`).** Flask. Expone REST, valida reglas de negocio y es la única fuente de verdad. SQLAlchemy para datos y Alembic para migraciones. Publica un esquema OpenAPI del que se generan los tipos TypeScript del cliente.
 

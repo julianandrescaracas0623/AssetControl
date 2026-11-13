@@ -216,7 +216,7 @@ La 001 ya existe (fundación). Cada spec es un slice vertical (API + web + prueb
 |---|---|---|---|---|---|
 | 001 | Fundación técnica | — | 0–1 | — | `docker compose up`, `/health`, CI verde (escrita) |
 | 002 | Acceso y usuarios | M1: CU-ACC-01..04; tablas `tenant`, `usuario`, `membresia`, `invitacion`; script de tenant + primer admin | 1 | 001 | Un admin invita a un contador por enlace; ambos entran; un contador recibe 403 en una ruta de admin; prueba de aislamiento entre dos tenants |
-| 003 | Ubicaciones y categorías | M2 completo; CU-CAT-09 (lista y semilla) | 2 | 002 | El admin crea sede > sala > box en `/admin`; el contador las ve en un selector a 375 px |
+| 003 | Ubicaciones y categorías | M2 completo; CU-CAT-09 (lista y semilla) | 2 | 002 | El admin crea sede > sala > box en `/admin`; el contador las ve en un selector a 375 px y 1440 px |
 | 004 | Activos: alta por escaneo | M3 parcial: CU-CAT-01..04; componente de escáner; `activo` + `activo_evento` (`creado`); entrada manual | 2 | 003 | Escanear un sticker real o simulado crea un activo en <30 s con nombre y precio; duplicado de `codigo` rechazado; reintento con mismo `id` no duplica. Mide P10 y cierra la prueba de P9/P4 con teléfonos reales |
 | 005 | Ciclo de vida e historial del activo | CU-CAT-05..08; M8: CU-HIS-01 (eventos de catálogo) | 2 | 004 | Editar con `412` ante conflicto; mover, cambiar estado y baja lógica dejan evento; la ficha muestra la línea de tiempo |
 | 006 | Sesiones y verificación | M4: CU-SES-01, 02, 04; M5: CU-VER-01, 03, 05, 06 | 3 | 005 | Abrir sesión y verificar activos escaneando desde el teléfono; reintento idempotente; `409 sesion_cerrada` probado; el historial muestra `verificado` |

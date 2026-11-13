@@ -25,6 +25,10 @@
 - **Decisión:** el autor es siempre el humano; el arnés (`.claude/`, `.cursor/`, `AGENTS.md`, `CLAUDE.md`, `MEMORY.md`) es local y los hooks y el CI lo hacen cumplir.
 - **Consecuencia:** un clon nuevo no trae el arnés; se instalan los hooks con `sh scripts/setup-hooks.sh`.
 
+## Notas del humano
+
+- 2026-11-11: web responsive (admin también en celular); Expo pospuesto hasta después del piloto.
+
 ---
 
 ## Pendientes de decisión

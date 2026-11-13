@@ -8,8 +8,8 @@
 
 1. **Profesional y sobrio**: la interfaz transmite control y precisión. Jerarquía por tipografía, espacio y peso, no por color ni decoración. Bordes finos antes que sombras; nada de degradados, ilustraciones ni íconos decorativos.
 2. **El dato es el protagonista**: cifras alineadas (`tabular-nums`), tablas legibles, etiquetas cortas. El color solo significa algo: acento = acción o selección; verde/rojo/ámbar = estado.
-3. **Un lenguaje, dos modos**: administración (escritorio, denso, app shell con barra lateral) y conteo (móvil, grande, una mano) comparten tipografía, color, radios, íconos y componentes. Cambia la densidad, no el estilo.
-4. **Cero digitación innecesaria** (constitución 7): cada pantalla de captura ofrece primero escanear, elegir, autocompletar o copiar; el teclado es el último recurso. En escritorio, filtros y acciones por fila evitan reescribir datos.
+3. **Un lenguaje, dos modos**: administración (responsive: celular y computador; densa en computador, app shell con barra lateral) y conteo (móvil primero, grande, una mano) comparten tipografía, color, radios, íconos y componentes. Cambia la densidad, no el estilo. **Toda la aplicación se usa y se ve bien en el celular y en el computador** (decisión del humano, 2026-11-11).
+4. **Cero digitación innecesaria** (constitución 7): cada pantalla de captura ofrece primero escanear, elegir, autocompletar o copiar; el teclado es el último recurso. En administración, filtros y acciones por fila evitan reescribir datos.
 5. **Una mano en conteo**: en `/contar/**` la acción principal vive fija en la zona del pulgar y los objetivos miden ≥ 44 px. Claridad bajo apuro: una acción principal por pantalla; el resultado se ve de inmediato.
 6. **El servidor manda** (constitución 3): la UI nunca muestra una cifra como definitiva si no viene del servidor; "No se pudo confirmar" se ve distinto de "Guardado". Las tarjetas de indicadores y las gráficas muestran lo que devuelve el servidor, no lo recalculan.
 7. **El precio es del admin** (P13): el diseño del contador no deja huecos, columnas vacías ni "•••" donde iría un precio; simplemente no existe.
@@ -50,9 +50,9 @@ Variables CSS de shadcn (`--background`, `--primary`, etc.) en un único archivo
 |---|---|---|
 | Radio base `--radius` | `0.5rem` (8 px) | Botones y campos `rounded-md`; tarjetas, sheets y diálogos `rounded-xl` |
 | Bordes y sombras | Tarjetas y tablas con borde de 1 px, sin sombra o `shadow-xs`; `shadow-lg` solo en sheet, diálogo y menú | Sin sombras de color |
-| Espaciado base | 4 px (escala Tailwind); bloques `gap-4` (16 px) en móvil, `gap-6` (24 px) en escritorio; márgenes de página 24–32 px en escritorio | Mucho blanco, nunca aire vacío sin propósito |
+| Espaciado base | 4 px (escala Tailwind); bloques `gap-4` (16 px) por debajo de `md`, `gap-6` (24 px) desde `md`; márgenes de página 24–32 px desde `md` | Mucho blanco, nunca aire vacío sin propósito |
 | Ancho de contenido admin | Fluido con máximo `[PENDIENTE: ~1280–1440 px]` | Tablas a ancho completo del área |
-| Objetivo táctil | `min-h-11` (44 px) en `/contar/**`; botón principal `h-12`–`h-14` | Escritorio: `h-8`/`h-9` |
+| Objetivo táctil | `min-h-11` (44 px) en `/contar/**` y en `/admin/**` por debajo de `md`; botón principal `h-12`–`h-14` en conteo | Admin desde `md`: `h-8`/`h-9` |
 | Separación entre objetivos | ≥ 8 px | Evita toques erróneos |
 
 ### 2.3 Tipografía
@@ -60,7 +60,7 @@ Variables CSS de shadcn (`--background`, `--primary`, etc.) en un único archivo
 - **Base**: pila del sistema, sin descargar nada: `ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`. Cifras con `tabular-nums`; códigos con `font-mono` del sistema.
 - **Fuente de producto** `[PENDIENTE]`: el estilo SaaS gana mucho con una sola familia cuidada. Recomendación: **Inter** o **Geist**, variable y **autoalojada** (servida desde la propia web, no desde un CDN de terceros, para no filtrar visitas ni depender de red externa). Es una **dependencia nueva** (paquete npm de la fuente o archivos en el repo, con su licencia) que el humano debe aprobar; hasta entonces se usa la pila del sistema y nada se rompe al cambiarla, porque la familia vive en una variable de tema.
 
-| Uso | Móvil (`/contar`) | Escritorio (`/admin`) |
+| Uso | Móvil (`/contar`, y `/admin` por debajo de `md`) | Computador (`/admin` desde `md`) |
 |---|---|---|
 | Cuerpo | 16 px mínimo (evita zoom automático en iOS) | 14 px |
 | Etiqueta / metadato / encabezado de tabla | 14 px mínimo | 12–13 px, `font-medium`, `--muted-foreground` |
@@ -73,7 +73,7 @@ Dinero: `$ 1.234.567,00` en `es-CO` (`Intl.NumberFormat`), siempre con la etique
 
 ### 2.4 Íconos
 
-Un solo juego de íconos de trazo fino en los dos modos, tamaño 16 px en escritorio y 20–24 px en conteo, siempre acompañando texto (salvo botones de ícono con `aria-label` y tooltip). La opción natural con shadcn/ui es **`lucide-react`**: varios componentes de shadcn la importan por sí mismos. Es una **dependencia a aprobar**; no se da por instalada.
+Un solo juego de íconos de trazo fino en los dos modos, tamaño: admin desde `md`, 16 px; admin por debajo de `md`, `[PENDIENTE]`; conteo, 20–24 px; siempre acompañando texto (salvo botones de ícono con `aria-label` y tooltip). La opción natural con shadcn/ui es **`lucide-react`**: varios componentes de shadcn la importan por sí mismos. Es una **dependencia a aprobar**; no se da por instalada.
 
 ## 3. Componentes
 
@@ -94,7 +94,7 @@ Copiar un componente de shadcn/ui no es "cero dependencias": muchos instalan paq
 | `badge` | Estado del activo, de la sesión, rol | — |
 | `dropdown-menu` | Menú de usuario, acciones por fila | Sí, Radix |
 | `sheet` | Inferior en conteo; panel lateral de edición en admin | Sí, Radix |
-| `dialog` / `alert-dialog` | Crear/editar en escritorio; acciones irreversibles | Sí, Radix |
+| `dialog` / `alert-dialog` | Crear/editar en admin desde `md`; acciones irreversibles | Sí, Radix |
 | `tabs` | Informe: resumen / por categoría / por ubicación | Sí, Radix |
 | `tooltip`, `separator`, `avatar` | Barra lateral colapsada, encabezado, menú de usuario | Sí, Radix |
 | `sonner` (toast) | Éxito breve y errores no bloqueantes | `sonner` |
@@ -128,12 +128,13 @@ Copiar un componente de shadcn/ui no es "cero dependencias": muchos instalan paq
 |---|---|
 | Móvil, acción rápida tras escanear (verificar, ubicación, "otra ubicación") | **Sheet inferior** |
 | Móvil, formulario corto (alta por escaneo) | Pantalla completa; botón principal fijo abajo |
-| Escritorio, crear o editar corto (ubicación, invitación) | Diálogo |
-| Escritorio, editar un activo desde la tabla | Sheet lateral derecho; la tabla sigue visible |
+| Admin desde `md`, crear o editar corto (ubicación, invitación) | Diálogo |
+| Admin desde `md`, editar un activo desde la tabla | Sheet lateral derecho; la tabla sigue visible |
+| Admin por debajo de `md`, crear o editar | `[PENDIENTE]` (recomendación: sheet inferior o pantalla completa, como en conteo) |
 | Confirmación destructiva o irreversible (cerrar sesión, dar de baja) | `alert-dialog` en ambos modos, con el efecto explícito |
 | Error que bloquea el flujo (sesión cerrada) | `alert` en pantalla, no toast |
 
-## 4. Layout de administración (`/admin/**`, escritorio)
+## 4. Layout de administración (`/admin/**`, responsive: celular y computador)
 
 ### 4.1 App shell
 
@@ -141,7 +142,7 @@ Copiar un componente de shadcn/ui no es "cero dependencias": muchos instalan paq
 - **Encabezado** (altura ~56 px, borde inferior): botón para colapsar la barra, **migas de pan** (`Sesiones / Conteo nov 2026 / Informe`), **buscador global** al centro o a la derecha, y **menú de usuario** (avatar con iniciales, nombre, rol, "Cerrar sesión").
 - **Buscador global**: abre un `command` (también con `Ctrl/⌘ K`) que busca activos por código o nombre y salta a su ficha; alcance más allá de activos `[PENDIENTE]` (recomendación MVP: solo activos y navegación a pantallas). La búsqueda la resuelve el servidor, filtrada por tenant.
 - **Área de contenido**: título de página + descripción corta a la izquierda, acciones de página a la derecha (una principal); debajo, tarjetas y tablas.
-- **Menos de 1024 px**: la barra lateral pasa a sheet (comportamiento del componente). Admin en móvil no se optimiza en el MVP `[PENDIENTE]`; debe ser usable, no cómodo.
+- **Por debajo de `md`**: la barra lateral se convierte en un menú tipo `sheet` que se abre desde el encabezado (componente `sheet` ya previsto en 3.1; sin dependencias nuevas). Reglas completas del modo celular en 4.4.
 - El menú lateral solo se muestra al `admin`; el contador que abre `/admin/**` recibe 403 del servidor (ocultar el menú no es seguridad).
 
 ### 4.2 Inicio / Resumen (`/admin`)
@@ -187,6 +188,29 @@ Patrón para Activos, Ubicaciones (vista lista), Sesiones, Discrepancias, Usuari
 - **Paginación** al pie: "1–25 de 200", tamaño de página y anterior/siguiente. Paginación, orden y filtro en cliente o en servidor `[PENDIENTE]`; con el volumen del primer cliente cabe en cliente, pero el contrato de la API se fija en la spec de cada módulo.
 - **Estados**: esqueleto de filas, vacío con acción y error con reintento (sección 8).
 - El patrón "data table" de shadcn/ui se apoya en **`@tanstack/react-table`**: es una **dependencia a aprobar**, no se da por instalada. Alternativa sin ella: `table` simple con orden y filtro propios (aceptable para pocas columnas).
+- **Por debajo de `md`**: lista de tarjetas o scroll horizontal con columnas prioritarias, según 4.4.
+
+### 4.4 Responsive: celular y computador
+
+Decisión del humano (2026-11-11): toda la aplicación, también `/admin/**`, se usa y se ve bien en el celular y en el computador. Se conserva el mismo estilo SaaS sobrio; cambia la disposición, no el lenguaje visual. `/contar/**` sigue siendo móvil primero (sección 5).
+
+- **Breakpoint**: `md` de Tailwind. Desde `md`, el layout de 4.1–4.3 tal cual; por debajo, las reglas de esta sección.
+- **Navegación**: la barra lateral se convierte en un menú tipo `sheet` abierto desde un botón del encabezado; mismos grupos y entradas. El buscador global se mantiene (ícono que abre el `command`).
+- **Tablas de datos**: pasan a **lista de tarjetas** (una tarjeta por fila, con los datos clave y el menú `⋯`) o a **scroll horizontal con columnas prioritarias** fijas a la izquierda. Criterio por pantalla:
+
+| Pantalla | Criterio por debajo de `md` |
+|---|---|
+| Activos | `[PENDIENTE]` |
+| Ubicaciones (vista lista) | `[PENDIENTE]` |
+| Sesiones | `[PENDIENTE]` |
+| Discrepancias | `[PENDIENTE]` |
+| Usuarios | `[PENDIENTE]` |
+| Informe (pestañas por categoría, por ubicación, no encontrados) | `[PENDIENTE]` |
+| Actividad reciente del Inicio | `[PENDIENTE]` |
+
+- **Formularios**: una sola columna; campos de 16 px mínimo (evita el zoom automático de iOS); objetivos táctiles de 44 px (`min-h-11`) y ≥ 8 px entre ellos.
+- **Inicio**: tarjetas de indicadores en una o dos columnas; **gráficas del dashboard apiladas** (una debajo de otra, a ancho completo), cada una con su rótulo de fuente y su "Ver como tabla".
+- **Verificación visual**: cada pantalla, de admin y de conteo, se revisa en navegador real a **375 px** y a **1440 px** (skill `browser-qa`) antes de mostrarse (sección 11).
 
 ## 5. Layout de conteo (`/contar/**`, móvil, 375 px)
 
@@ -196,6 +220,7 @@ Mismo lenguaje visual que admin (tipografía, color, radios, íconos, badges), c
 - **Contenido**: tarjeta con borde, sin sombra; datos en filas rótulo/valor; badges de estado iguales a los de admin.
 - **Barra de acción fija abajo**: fondo `--background`, borde superior, respeta el área segura del teléfono; contiene la acción principal a ancho completo y, si hace falta, una secundaria `outline` encima.
 - Sheets inferiores para elegir y confirmar; nada de diálogos centrados en móvil salvo `alert-dialog`.
+- **En computador** (desde `md`): columna centrada con ancho máximo `[PENDIENTE]`; mismo layout de una mano, verificado también a 1440 px.
 
 ## 6. Inventario de pantallas
 
@@ -214,7 +239,7 @@ Rutas **propuestas** (`[PENDIENTE]` de fijar en las specs 002–010). "Precios" 
 | `/contar/activo/:codigo/historial` | Línea de tiempo del activo | HIS-01 | **Contador no ve eventos ni valores de precio** |
 | (estado en todas) | "No se pudo confirmar / Reintentar"; "La sesión se cerró" | VER-06, SES-04 | — |
 
-### 6.2 Administración (`/admin/**`, escritorio; solo `admin`)
+### 6.2 Administración (`/admin/**`, responsive: celular y computador; solo `admin`)
 
 | Ruta | Pantalla | CU | Precios |
 |---|---|---|---|
@@ -233,7 +258,7 @@ El admin también puede usar `/contar/**` (con precio de referencia donde corres
 
 ## 7. Wireframes (texto)
 
-Convención: `[ Botón ]` = objetivo ≥ 44 px; `( )` = campo; `▓` = acción principal; `●` = chip de estado de red. Cifras y nombres ficticios.
+Convención: `[ Botón ]` = objetivo ≥ 44 px; `( )` = campo; `▓` = acción principal; `●` = chip de estado de red. Cifras y nombres ficticios. Los wireframes de admin (e)–(g) se dibujan a 1440 px; a 375 px siguen las reglas de 4.4 y se validan con capturas en la spec de sistema de diseño.
 
 ### 7.1 (a) Escáner, entrada manual y cámara denegada (375 px)
 
@@ -337,7 +362,7 @@ Contador (sin precio)             Admin (con precio de referencia)
 - "Descartar y seguir" pide confirmación: no se guardó (sin cola offline, ADR-002); cerrar la pestaña la pierde.
 - `409 sesion_cerrada`: se reemplaza por `alert` rojo "La sesión se cerró; esta verificación no se guardó", **sin** Reintentar (CU-SES-04).
 
-### 7.5 (e) Informe de sesión (≥ 1024 px, solo admin)
+### 7.5 (e) Informe de sesión (1440 px, solo admin)
 
 ```
 ┌────────────┬─────────────────────────────────────────────────────────┐
@@ -446,7 +471,7 @@ Tono: breve, directo, sin tecnicismos ni culpa al usuario. Tuteo.
 ## 9. Accesibilidad y móvil
 
 - **Foco**: anillo visible (`--ring`, 2 px) en todo control; orden de tabulación = orden visual; tras confirmar una verificación el foco vuelve al visor o a "Escanear otro". En admin, la barra lateral y el buscador son operables con teclado.
-- **Toque**: ≥ 44 × 44 px en `/contar/**`, ≥ 8 px entre objetivos; acción principal a ancho completo. Sin gestos como única vía.
+- **Toque**: ≥ 44 × 44 px en `/contar/**` y en `/admin/**` por debajo de `md`, ≥ 8 px entre objetivos; acción principal a ancho completo. Sin gestos como única vía.
 - **Una mano**: acciones principales y sheets en el tercio inferior; navegación superior solo de retroceso.
 - **Poca luz**: "Linterna" si el navegador lo permite; "Poca luz" tras ~3 s sin lectura `[PENDIENTE: umbral]`; siempre queda "Escribir código".
 - **Sol directo**: texto principal en `--foreground` casi negro, 16 px o más, sin gris claro para datos críticos; la acción principal es un botón sólido, no de contorno.
@@ -454,7 +479,7 @@ Tono: breve, directo, sin tecnicismos ni culpa al usuario. Tuteo.
 - **Lectores de pantalla**: resultados de verificación en `aria-live="polite"`; errores con `aria-describedby`; botones de ícono con `aria-label`; tablas con encabezados reales y orden anunciado (`aria-sort`).
 - **Formularios**: `inputmode`, `autocomplete` y `enterkeyhint` adecuados; 16 px mínimo en campos móviles; etiquetas visibles.
 - **Movimiento**: transiciones cortas (colapsar barra, abrir sheet); respetar `prefers-reduced-motion`.
-- **Verificación**: Playwright para el flujo de conteo; capturas en navegador real a 375 px y 1440 px (skill `browser-qa`); teléfonos reales de P4; contraste medido con herramienta.
+- **Verificación**: Playwright para el flujo de conteo; capturas en navegador real a 375 px y 1440 px de cada pantalla, de admin y de conteo (skill `browser-qa`); teléfonos reales de P4; contraste medido con herramienta.
 
 ## 10. Qué NO se diseña ahora y decisiones pendientes
 
@@ -478,7 +503,7 @@ Tono: breve, directo, sin tecnicismos ni culpa al usuario. Tuteo.
 7. Paginación, orden y filtro en cliente o en servidor.
 8. "Actividad reciente": ¿pantalla de actividad global o solo historial por activo? Discrepancias: ¿entrada propia en la barra lateral?
 9. Acción principal de la tabla de Activos ("Exportar" u otra) y ancho máximo del contenido.
-10. Admin en pantallas < 1024 px: usable sin optimizar (recomendado) u optimizado.
+10. Admin por debajo de `md` (resuelto el 2026-11-11: responsive, sección 4.4): falta el criterio por pantalla (tarjetas o scroll horizontal con columnas prioritarias) y el patrón de crear o editar.
 11. Vibración y sonido al verificar, y si el usuario puede apagarlos.
 12. Rutas definitivas (sección 6) y `inputmode` del campo de código (P9).
 13. Nombre y logo del producto (T9); hasta entonces, texto "AssetControl".
@@ -486,10 +511,11 @@ Tono: breve, directo, sin tecnicismos ni culpa al usuario. Tuteo.
 15. Vista previa "no definitiva" del informe con sesión abierta; "buscado y no hallado" frente a "sin verificar" (P16); umbral de "Poca luz".
 16. Nombre y número de la spec de sistema de diseño y app shell (sección 11).
 17. Inicio de admin: fuente por defecto de las gráficas por categoría y ubicación (P23), cuántos conteos muestra la evolución (P22) y base del % encontrado (P24).
+18. `/contar/**` en computador (desde `md`): ancho máximo de la columna centrada (sección 5). Tamaño de íconos de admin por debajo de `md` (sección 2.4).
 
 ## 11. Siguientes pasos
 
 1. **No más prototipos hechos a mano.** El diseño se valida sobre la web real, con los componentes reales.
 2. **Spec corta de "sistema de diseño y app shell"** `[PENDIENTE: nombre y número, decisión humana]`, **después de T8** de [specs/001-fundacion-tecnica](../specs/001-fundacion-tecnica/tasks.md). Monta el shell real (`AdminShell` y `CountShell`) con componentes de shadcn/ui, el tema de la sección 2 y **datos ficticios**, sin backend de negocio: Inicio, tabla de Activos, informe y las pantallas (a)–(d) de conteo como maquetas navegables. Declara para aprobación todas sus dependencias (las que arrastre `npx shadcn@latest add`, `lucide-react`, `@tanstack/react-table`, la fuente si se aprueba y `recharts` solo si la maqueta del Inicio incluye gráficas; si no, las gráficas llegan con la spec 010). T8 sigue limitada a su criterio (esqueleto, tema base y un componente); cualquier ajuste a T8 pasa por el planner y el humano.
-3. **Revisión antes de mostrar**: cada pantalla se revisa con capturas en navegador real a **375 px** y a **1440 px** (skill `browser-qa`), con contraste medido y estados (cargando, vacío, error, éxito) recorridos, **antes** de presentarla al humano.
+3. **Revisión antes de mostrar**: cada pantalla, de admin y de conteo, se revisa con capturas en navegador real a **375 px** y a **1440 px** (skill `browser-qa`), con contraste medido y estados (cargando, vacío, error, éxito) recorridos, **antes** de presentarla al humano.
 4. **Aprobación humana con las capturas**: el humano aprueba o pide cambios sobre las capturas; con eso se fijan los hex, la fuente y los `[PENDIENTE]` que afecten a las specs 004 y 006 (escáner y verificación). Las pantallas reales con datos llegan en las specs 002–010.

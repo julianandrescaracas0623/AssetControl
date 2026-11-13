@@ -133,7 +133,7 @@ Variables obligatorias: `DATABASE_URL`, `SECRET_KEY`, `ENVIRONMENT`.
 | A7 | `pytest` corre en limpio y no deja datos | ejecución local, dos veces |
 | A8 | `alembic upgrade head` y `downgrade base` funcionan | ejecución local |
 | A9 | `docker compose up` levanta la API | ejecución local + `curl /health` |
-| A10 | La web compila y muestra el estado de `/health` | `npm run build` + captura a 375 px |
+| A10 | La web compila y muestra el estado de `/health` | `npm run build` + capturas a 375 px y 1440 px |
 | A11 | `npm run lint`, `typecheck` y `npm test` pasan | ejecución local |
 | A12 | El CI falla si una compuerta falla | PR de prueba |
 | A13 | No hay secretos ni datos de la clínica en el repo | `git grep` + `git ls-files` |

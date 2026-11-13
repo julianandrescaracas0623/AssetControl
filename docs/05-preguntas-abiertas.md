@@ -30,7 +30,7 @@ Las preguntas P11–P26, surgidas de los casos de uso y del cambio de alcance de
 | T5 | Invitaciones: enlace de un solo uso compartido por WhatsApp, sin proveedor de correo. | Sí para el MVP. | Propuesta |
 | T6 | Eventos tardíos para sesión cerrada: rechazar con `sesion_cerrada` y avisar en la app. | Sí. | Propuesta |
 | T7 | Valor total: informe de sesión congelado al cierre + vista en tiempo real separada. | Sí. | Propuesta |
-| T8 | Un solo cliente web (React + Vite + Tailwind + shadcn/ui), móvil primero para contar y escritorio para administrar. | Sí. Ver [ADR-001](adr/ADR-001-stack.md). | Propuesta |
+| T8 | Un solo cliente web (React + Vite + Tailwind + shadcn/ui), móvil primero para contar; toda la web, también la administración, es responsive (celular y computador; decisión del 2026-11-11). | Sí. Ver [ADR-001](adr/ADR-001-stack.md). | Propuesta |
 | T9 | Nombre de la app y del repositorio remoto. | Por decidir. | Abierta |
 | T10 | Dónde se aloja el backend y quién paga el hosting. | **Parcial (2026-11-11):** base de datos y fotos en Supabase (solo como PostgreSQL administrado y almacenamiento; sin Supabase Auth ni API automática; Flask sigue siendo el único backend). Backend: `[PENDIENTE]`. Costo: `[PENDIENTE]`. | Abierta |
 | T11 | Gestor de dependencias de Python. | **Decidido (2026-11-11): uv** con `pyproject.toml` (spec 001). | Decidido |
@@ -63,6 +63,11 @@ Origen: [07-casos-de-uso-y-modulos.md](07-casos-de-uso-y-modulos.md). La numerac
 | P24 | Evolución: ¿el "% encontrado" se mide en unidades o en valor? | 010 | En unidades (`unidades_encontrado / unidades_registrado`); el valor ya se muestra en la serie de valor registrado. | Abierta. **Decisión por defecto (revisable, 2026-11-11):** el % lo calcula el servidor, en unidades por defecto; si se decidiera en valor, con `Decimal`, nunca `float`. Precisión de presentación: `[PENDIENTE]` (recomendación: un decimal). |
 | P25 | Inicio del contador: ¿qué ve exactamente y en qué ruta? | 010 | Total de activos, avance del conteo abierto y actividad reciente sin precios, en `/contar` (`/admin/**` es solo admin). Sin gráficas ni evolución, tampoco en unidades o porcentaje. | Abierta |
 | P26 | Indicador "dañados o en reparación" (CU-DSH-01): ¿de qué verificación sale "dañado"? | 010 | Activos con estado `en_reparacion` más los que tienen `estado_fisico=danado` en su verificación R3 de la sesión abierta o, sin sesión abierta, de la última cerrada. | Abierta. **Decisión por defecto (revisable, 2026-11-11):** el indicador rotula su fuente en la tarjeta (estado vigente del activo + `estado_fisico` de la sesión indicada por su nombre). |
+
+### Decisión registrada: web responsive; React Native/Expo pospuesto (2026-11-11)
+
+- React Native/Expo evaluado el 2026-11-11 y pospuesto: primera vez del equipo con React Native/Expo; se reevalúa después del piloto. Toda la web es responsive.
+- Se mantiene la web React única de [ADR-001](adr/ADR-001-stack.md) y [ADR-002](adr/ADR-002-solo-online-cliente-web.md) (sin cambios en los ADR). `/contar/**` sigue siendo móvil primero; `/admin/**` pasa de "escritorio" a responsive (celular y computador). Detalle de diseño en [08-diseno-visual.md](08-diseno-visual.md) (sección 4.4).
 
 ### Decisión registrada: Dashboard completo y desglose congelado (2026-11-11)
 

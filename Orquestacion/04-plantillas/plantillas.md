@@ -104,7 +104,7 @@ YYYY-MM-DD
 ## Cómo se verificó
 - [ ] `uv run pytest`
 - [ ] `npm test`
-- [ ] Captura a 375 px
+- [ ] Capturas a 375 px y 1440 px
 - [ ] Prueba de aislamiento entre tenants
 - [ ] Total comparado con la suma de las partes (si toca informes)
 

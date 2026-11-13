@@ -80,8 +80,8 @@
 
 - **Depende de:** T5
 - **Archivos:** `web/package.json`, `web/tsconfig.json`, `web/vite.config.ts`, `web/src/main.tsx`, `web/src/App.tsx`, `web/components.json`, `web/src/components/ui/`
-- **Criterio:** compila en TypeScript estricto; Tailwind activo; shadcn/ui inicializado con al menos un componente añadido por la CLI; la pantalla muestra el estado de `/health` (cargando, error, éxito) y se ve bien a 375 px.
-- **Verificación:** `cd web && npm run build` + captura a 375 px
+- **Criterio:** compila en TypeScript estricto; Tailwind activo; shadcn/ui inicializado con al menos un componente añadido por la CLI; la pantalla muestra el estado de `/health` (cargando, error, éxito) y se ve bien a 375 px y a 1440 px.
+- **Verificación:** `cd web && npm run build` + capturas a 375 px y 1440 px
 - **Riesgo:** acoplar la pantalla base a un diseño que aún no existe.
 
 ---
@@ -117,7 +117,7 @@
 | T5 | T2–T4 | `uv run pytest` dos veces |
 | T6 | T2 | `uv run alembic upgrade/downgrade/upgrade` |
 | T7 | T2, T3, T6 | `docker compose up` + `/health` |
-| T8 | T5 | `npm run build` + captura 375 px |
+| T8 | T5 | `npm run build` + capturas 375 y 1440 px |
 | T9 | T8 | `lint` + `typecheck` + `test` |
 | T10 | T2–T9 | CI rojo/verde + hooks instalados |
 

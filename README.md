@@ -25,7 +25,7 @@ Fase: definición de arquitectura y alcance del MVP. Todavía no hay código de 
 
 ## Stack
 
-- **Web:** React + TypeScript + Vite, Tailwind CSS y shadcn/ui, TanStack Query. Un solo cliente para conteo (móvil) y administración (escritorio).
+- **Web:** React + TypeScript + Vite, Tailwind CSS y shadcn/ui, TanStack Query. Un solo cliente web responsive: conteo móvil primero y administración en celular y computador.
 - **Backend:** Python con Flask, PostgreSQL, SQLAlchemy y Alembic.
 - **Fotos:** almacenamiento de objetos compatible con S3.
 - **CI/CD:** GitHub Actions.
