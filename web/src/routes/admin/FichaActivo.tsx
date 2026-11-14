@@ -5,6 +5,7 @@ import { Link, useParams, useSearchParams } from 'react-router'
 import { DarDeBaja, MoverActivo, Reactivar } from '@/components/app/AccionesActivo'
 import { EditarActivo } from '@/components/app/EditarActivo'
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
+import { HistorialActivo } from '@/components/app/LineaDeTiempo'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,7 +16,7 @@ import { etiquetaMotivo, useAlternarReparacion, useHistorial } from '@/lib/cambi
 import { formatCOP } from '@/lib/format'
 
 // Ficha del activo (spec 004, T9; destino de la lista, del alta y del buscador). Spec
-// 005: editar (T5), mover, reparación, baja y reactivar (T6). `?accion=editar|mover|baja`
+// 005: editar (T5), mover, reparación, baja y reactivar (T6) e historial (T7). `?accion=editar|mover|baja`
 // la abre con esa acción (menú de la lista). Un dado de baja es de solo lectura (Q1).
 
 type Accion = 'editar' | 'mover' | 'baja' | 'reactivar'
@@ -158,6 +159,12 @@ export default function FichaActivo() {
         <Dato etiqueta="Fecha de compra">{activo.fecha_compra ? fecha.format(new Date(`${activo.fecha_compra}T12:00:00`)) : null}</Dato>
         <Dato etiqueta="Registrado">{fecha.format(new Date(activo.creado_en))}</Dato>
       </dl>
+      <section aria-labelledby="titulo-historial" className="flex flex-col gap-4">
+        <h2 id="titulo-historial" className="text-lg font-semibold">
+          Historial
+        </h2>
+        <HistorialActivo activoId={activo.id} />
+      </section>
       <EditarActivo activo={activo} abierto={accion === 'editar' && !deBaja} onAbierto={(v) => abrir(v ? 'editar' : null)} />
       <MoverActivo activo={activo} abierto={accion === 'mover' && !deBaja} onAbierto={(v) => abrir(v ? 'mover' : null)} />
       <DarDeBaja activo={activo} abierto={accion === 'baja' && !deBaja} onAbierto={(v) => abrir(v ? 'baja' : null)} />

@@ -1,29 +1,27 @@
-import { ArrowLeftRight, Check, MapPin, Plus } from 'lucide-react'
+import { CircleAlert, RefreshCw } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 
 import { CountShell } from '@/components/app/CountShell'
+import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
+import { HistorialActivo } from '@/components/app/LineaDeTiempo'
 import { Button } from '@/components/ui/button'
-import { ACTIVOS } from '@/mocks/datos-ficticios'
+import { Skeleton } from '@/components/ui/skeleton'
+import { normalizarCodigo, useActivoPorCodigo } from '@/lib/activos'
+import { mensajeDeError } from '@/lib/api/cliente'
 
-// Historial del activo en el celular (docs/08 §6.1, CU-HIS-01). Sin eventos
-// ni valores de precio: el servidor no se los envía al contador (P13). El
-// historial real llega con la spec 005.
-
-const EVENTOS = [
-  { icono: Check, tono: 'bg-success-soft text-success border-success-border', titulo: 'Verificado', fecha: '13/11/2026', detalle: 'Conteo nov 2026 · Luis Pérez · ok' },
-  { icono: Check, tono: 'bg-success-soft text-success border-success-border', titulo: 'Verificado', fecha: '16/05/2026', detalle: 'Conteo may 2026 · Sofía Rojas · ok' },
-  { icono: MapPin, tono: 'bg-background text-foreground border-border', titulo: 'Ubicación cambiada', fecha: '24/11/2025', detalle: 'Consultorio 2 → actual · Ana Torres' },
-  { icono: ArrowLeftRight, tono: 'bg-warning-soft text-warning border-warning-border', titulo: 'En otra ubicación', fecha: '18/11/2025', detalle: 'Conteo nov 2025 · esperada Consultorio 2' },
-  { icono: Plus, tono: 'bg-brand-soft text-brand-strong border-brand-border', titulo: 'Activo creado', fecha: '03/03/2025', detalle: 'Ana Torres · escaneando el sticker' },
-]
+// Historial del activo en el celular (spec 005, T7; docs/08 §6.1, CU-HIS-01). Para el
+// contador, el servidor no envía eventos ni valores de precio (P13): aquí no se filtra.
 
 export default function Historial() {
-  const { codigo = '' } = useParams()
-  const activo = ACTIVOS.find((a) => a.codigo === codigo)
+  const { codigo: crudo = '' } = useParams()
+  const codigo = normalizarCodigo(crudo) ?? crudo
+  const consulta = useActivoPorCodigo(codigo)
+  const activo = consulta.data
+
   return (
     <CountShell
       titulo="Historial"
-      volver={`/contar/activo/${codigo}`}
+      volver={`/contar/activo/${encodeURIComponent(codigo)}`}
       estadoRed="en_linea"
       acciones={
         <Button asChild variant="outline">
@@ -31,29 +29,41 @@ export default function Historial() {
         </Button>
       }
     >
-      <div className="flex flex-col gap-1.5">
-        <h1 className="text-[22px] leading-7 font-semibold tracking-tight break-words">{activo?.nombre ?? 'Activo'}</h1>
-        <p className="text-sm text-muted-foreground">
-          <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-foreground">{codigo}</span> · {activo?.ubicacion}
-        </p>
-      </div>
-      <ol className="flex flex-col">
-        {EVENTOS.map((e, i) => (
-          <li key={i} className="relative flex gap-3 pb-5 last:pb-0">
-            {i < EVENTOS.length - 1 && <span className="absolute top-8 bottom-0 left-[15px] w-px bg-border" aria-hidden="true" />}
-            <span className={`flex size-8 shrink-0 items-center justify-center rounded-full border ${e.tono}`} aria-hidden="true">
-              <e.icono className="size-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="flex justify-between gap-2">
-                <span className="font-semibold">{e.titulo}</span>
-                <span className="text-sm text-muted-foreground tabular-nums">{e.fecha}</span>
-              </p>
-              <p className="text-sm text-muted-foreground">{e.detalle}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
+      {consulta.isPending ? (
+        <div role="status" aria-label="Cargando el activo" className="flex flex-col gap-3 pt-2">
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-28 rounded-xl" />
+        </div>
+      ) : consulta.isError ? (
+        <div className="flex flex-col items-start gap-3 pt-4">
+          <CircleAlert className="size-6 text-destructive" aria-hidden="true" />
+          <h1 className="text-xl font-semibold tracking-tight">No se pudo cargar el activo</h1>
+          <p className="text-base text-muted-foreground">{mensajeDeError(consulta.error)}</p>
+          <Button variant="outline" className="min-h-11" onClick={() => void consulta.refetch()}>
+            <RefreshCw />
+            Reintentar
+          </Button>
+        </div>
+      ) : !activo ? (
+        <div className="flex flex-col items-start gap-3 pt-4">
+          <h1 className="text-xl font-semibold tracking-tight">No encontramos ese código</h1>
+          <p className="text-base text-muted-foreground">
+            El código <span className="font-mono text-foreground">{codigo}</span> no está registrado en esta clínica.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-col gap-1.5">
+            <h1 className="text-[22px] leading-7 font-semibold tracking-tight break-words">{activo.nombre}</h1>
+            <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-foreground">{activo.codigo}</span>
+              <span>{activo.ubicacion.ruta}</span>
+              <EstadoActivoBadge estado={activo.estado} />
+            </p>
+          </div>
+          <HistorialActivo activoId={activo.id} />
+        </>
+      )}
     </CountShell>
   )
 }
