@@ -4,6 +4,7 @@ import { act } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Rol } from '@/lib/api/cliente'
+import { guardarSala } from '@/lib/conteo'
 import { routes } from '@/router'
 import { simularAncho } from '@/test/matchMedia'
 import { catalogoDemo, sesionDe } from '@/test/catalogo'
@@ -68,13 +69,14 @@ describe('Inicio del contador (spec 006, T6)', () => {
 describe('flujo de conteo', () => {
   it('escanear → verificar → verificado', async () => {
     lector.actual = lectorFalso()
+    guardarSala('00000000-0000-4000-8000-0000000000a2')
     await abrir('/contar/escanear')
     await screen.findByText('Cámara activa')
     act(() => lector.actual!.leer('000215'))
     expect(await screen.findByRole('heading', { level: 1, name: 'Impresora multifuncional' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('link', { name: 'Confirmar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Verificado' })).toBeTruthy()
-    expect(screen.getByRole('status').textContent).toBe('Guardado')
+    expect(screen.getAllByRole('status')[0].textContent).toBe('Guardado')
   })
 
   it('el contador no ve el precio al verificar; el admin ve el de referencia', async () => {
@@ -95,11 +97,12 @@ describe('flujo de conteo', () => {
   })
 
   it('«Está en otra ubicación» abre un panel que lo registra como diferencia', async () => {
+    guardarSala('00000000-0000-4000-8000-0000000000a2')
     await abrir('/contar/activo/000215')
     fireEvent.click(await screen.findByRole('button', { name: 'Está en otra ubicación' }))
     const panel = await screen.findByRole('dialog', { name: '¿Dónde lo encontraste?' })
     expect(panel.textContent).toContain('Se registra como diferencia')
-    expect(within(panel).getByRole('link', { name: /Confirmar en/ })).toBeTruthy()
+    expect(within(panel).getAllByRole('option').length).toBeGreaterThan(1)
   })
 
   it('un código que no existe ofrece crear el activo', async () => {
