@@ -143,6 +143,16 @@
 - **Verificación:** `cd web && npm test` + capturas a 375 px (y 1440 px con la columna centrada), `scrollWidth` (A8).
 - **Depende de:** T6, T7.
 - **Riesgo:** sobrediseñar el escáner antes de 004; solo visor simulado y "Escribir código".
+- **Implementada (2026-11-14), revisada (APROBADO con menores):**
+  - Rutas `/contar`, `/contar/escanear`, `/contar/escribir`, `/contar/activo/:codigo`, `/contar/activo/:codigo/historial`, `/contar/verificado/:codigo`, `/contar/no-confirmado/:codigo`, `/contar/nuevo?codigo=` y `/contar/pendientes`, todas sobre `CountShell`; los enlaces conservan `?rol=` (`useEnlace`).
+  - Inicio del contador sin ningún precio ni evento de precio; sala de trabajo con `LocationPicker`; pendientes y actividad; "Registrar activo nuevo" + "Escanear". Sin sesión abierta: "No hay una sesión abierta".
+  - Escáner simulado (visor en `bg-primary`, sin ZXing) con "Simular lectura"; escribir código (existe → verificar; nuevo → alta) y cámara denegada con `?estado=error`.
+  - Verificar con un toque: `AssetCard` (precio de referencia solo con `?rol=admin`), "Encontrada en" la sala, estado físico como `radiogroup` (Ok/Dañado, 44 px), `sheet` inferior "¿Dónde lo encontraste?" con lista desplazable, aviso "Se registra como diferencia" y botón fijo; código inexistente → "Crear activo con este código".
+  - Verificado (banda verde, chip "Guardado"); No confirmado con Reintentar (mismo UUID) y sesión cerrada (409) sin reintento; alta en una columna con los cuatro obligatorios (al copiar de un parecido, el contador no ve el precio: "El precio se copia del activo parecido"); pendientes por ubicación en pestañas tipo chip; historial sin eventos de precio.
+  - `CopiarDeParecido` pasa a `components/app/` (lo usan las dos altas). `AssetCard` acepta `titulo="h1"`. Textos de shadcn traducidos ("Cerrar", "Más", "Sugerencias", "Buscar"); cierre del `sheet` de 44 px y campo de `command` de 44 px en celular; `Toaster` también en conteo.
+  - Pruebas primero: `routes/contar/maquetas.test.tsx` (14, en rojo antes); total 153/153; lint, typecheck y build en verde.
+  - Navegador real: las 11 vistas de conteo a 375 px (y Verificar e Inicio a 1440 px, en la columna de 480 px) sin scroll horizontal; objetivos ≥ 44 px medidos.
+  - Menores: la casilla "Coincide" mide 16 px pero toda su etiqueta (44 px) es tocable; los elementos de la lista del `LocationPicker` bajan a 32 px desde `md` (en conteo en computador; aceptable con mouse).
 
 ### T10 — Verificación final y documentación
 

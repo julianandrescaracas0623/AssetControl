@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router'
 
 import { DatosFicticios } from '@/components/app/DatosFicticios'
+import { Toaster } from '@/components/ui/sonner'
 
 // Contenedor de las maquetas de /admin y /contar (spec 001b, T3).
 export default function Maqueta() {
@@ -10,6 +11,7 @@ export default function Maqueta() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Outlet />
       </div>
+      <Toaster position="top-center" />
     </div>
   )
 }

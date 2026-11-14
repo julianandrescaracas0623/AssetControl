@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { useSearchParams } from 'react-router'
 
 // Simulación de las maquetas (spec 001b, plan §4): el rol y el estado se eligen
@@ -30,4 +31,20 @@ export function leerSimulacion(params: URLSearchParams): Simulacion {
 export function useSimulacion(): Simulacion {
   const [params] = useSearchParams()
   return leerSimulacion(params)
+}
+
+/**
+ * Enlaces que conservan el rol simulado de la URL (?rol=) al navegar entre
+ * maquetas; el estado (?estado=) no se arrastra.
+ */
+export function useEnlace(): (ruta: string) => string {
+  const [params] = useSearchParams()
+  const rol = params.get('rol')
+  return useCallback(
+    (ruta: string) => {
+      if (!rol) return ruta
+      return `${ruta}${ruta.includes('?') ? '&' : '?'}rol=${encodeURIComponent(rol)}`
+    },
+    [rol],
+  )
 }

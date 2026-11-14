@@ -17,12 +17,12 @@ export interface ActivoTarjeta {
   precio?: string
 }
 
-export function AssetCard({ activo, rol }: { activo: ActivoTarjeta; rol: RolSimulado }) {
+export function AssetCard({ activo, rol, titulo: Titulo = 'h2' }: { activo: ActivoTarjeta; rol: RolSimulado; titulo?: 'h1' | 'h2' }) {
   const verPrecio = rol === 'admin' && activo.precio !== undefined
   return (
     <article className="flex min-w-0 flex-col gap-3">
       <div className="flex min-w-0 flex-col gap-2">
-        <h2 className="text-[22px] leading-7 font-semibold tracking-tight break-words md:text-lg">{activo.nombre}</h2>
+        <Titulo className="text-[22px] leading-7 font-semibold tracking-tight break-words md:text-lg">{activo.nombre}</Titulo>
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-lg md:text-sm">{activo.codigo}</span>
           <Badge variant="outline">{activo.categoria}</Badge>

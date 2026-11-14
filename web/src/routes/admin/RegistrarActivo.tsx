@@ -1,19 +1,18 @@
-import { Check, ChevronDown, CircleAlert, Copy, Loader2, ScanBarcode, TriangleAlert } from 'lucide-react'
+import { Check, ChevronDown, CircleAlert, Loader2, ScanBarcode, TriangleAlert } from 'lucide-react'
 import { useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
 
 import { EncabezadoPagina, ErrorCarga } from '@/components/app/ConEstado'
+import { CopiarDeParecido } from '@/components/app/CopiarDeParecido'
 import { LocationPicker } from '@/components/app/LocationPicker'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useSimulacion } from '@/lib/simulacion'
@@ -69,57 +68,6 @@ function Paso({ n, titulo, nota, children }: { n: number; titulo: string; nota?:
       </div>
       {children}
     </section>
-  )
-}
-
-function CopiarDeParecido({ onCopiar }: { onCopiar: (a: ActivoFicticio) => void }) {
-  const [abierto, setAbierto] = useState(false)
-  const [copiado, setCopiado] = useState<ActivoFicticio | null>(null)
-  const etiquetaId = useId()
-  return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <span id={etiquetaId} className="text-sm font-medium">
-        Copiar de un parecido <span className="font-normal text-muted-foreground">(opcional)</span>
-      </span>
-      <Popover open={abierto} onOpenChange={setAbierto}>
-        <PopoverTrigger asChild>
-          <Button variant="outline" role="combobox" aria-expanded={abierto} aria-labelledby={etiquetaId} className="h-11 w-full justify-between border-input font-normal md:h-9">
-            <span className="flex min-w-0 items-center gap-2">
-              <Copy className="text-muted-foreground" aria-hidden="true" />
-              <span className="truncate">
-                {copiado ? `${copiado.nombre} · ${copiado.codigo}` : 'Busca un activo parecido para copiar sus datos'}
-              </span>
-            </span>
-            <ChevronDown className="text-muted-foreground" aria-hidden="true" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-(--radix-popover-trigger-width) min-w-64 p-0" align="start">
-          <Command label="Buscar activo parecido">
-            <CommandInput placeholder="Nombre o código…" />
-            <CommandList className="max-h-[min(50dvh,18rem)]">
-              <CommandEmpty>Sin activos con ese nombre</CommandEmpty>
-              <CommandGroup heading="Copia categoría, nombre, marca, modelo, ubicación y precio">
-                {ACTIVOS.map((a) => (
-                  <CommandItem
-                    key={a.codigo}
-                    value={`${a.nombre} ${a.codigo}`}
-                    onSelect={() => {
-                      setCopiado(a)
-                      setAbierto(false)
-                      onCopiar(a)
-                    }}
-                    className="min-h-11 md:min-h-8"
-                  >
-                    <span className="min-w-0 flex-1 truncate">{a.nombre}</span>
-                    <span className="font-mono text-xs text-muted-foreground">{a.codigo}</span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    </div>
   )
 }
 

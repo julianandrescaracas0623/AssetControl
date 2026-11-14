@@ -34,8 +34,8 @@ function Command({
 }
 
 function CommandDialog({
-  title = "Command Palette",
-  description = "Search for a command to run...",
+  title = "Buscar",
+  description = "Escribe para buscar.",
   children,
   className,
   showCloseButton = false,
@@ -71,11 +71,11 @@ function CommandInput({
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
-      <InputGroup className="h-10! rounded-lg! border-border bg-muted shadow-none! *:data-[slot=input-group-addon]:pl-2! md:h-8!">
+      <InputGroup className="h-11! rounded-lg! border-border bg-muted shadow-none! *:data-[slot=input-group-addon]:pl-2! md:h-8!">
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
-            "w-full text-base outline-hidden disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+            "h-full w-full text-base outline-hidden disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
             className
           )}
           {...props}
@@ -95,6 +95,7 @@ function CommandList({
   return (
     <CommandPrimitive.List
       data-slot="command-list"
+      label="Sugerencias"
       className={cn(
         "no-scrollbar max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none",
         className

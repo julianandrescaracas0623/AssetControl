@@ -21,7 +21,7 @@ function renderAt(path: string) {
 describe('rutas', () => {
   it.each([
     ['/admin', 'Resumen'],
-    ['/contar', 'Conteo'],
+    ['/contar', 'Conteo nov 2026'],
     ['/login', 'Iniciar sesión'],
     ['/dev/componentes', 'Sistema de diseño · Grafito y Cobalto'],
   ])('%s muestra «%s»', async (path, heading) => {
