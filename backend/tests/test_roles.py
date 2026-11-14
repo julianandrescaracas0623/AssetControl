@@ -448,6 +448,7 @@ PROTECTED_ENDPOINTS = {
     # Spec 008: cerrar e informe solo admin (P5, P13).
     "sesiones.cerrar": frozenset({"admin"}),
     "sesiones.ver_informe": frozenset({"admin"}),
+    "valor.ver_valor_actual": frozenset({"admin"}),
 }
 
 

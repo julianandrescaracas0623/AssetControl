@@ -916,6 +916,8 @@ def test_sesiones_responses(client, contrato_db):
     check("post", "/sesiones/{id}/cerrar", client.post(f"{ruta}/cerrar", headers=admin))
     check("get", "/sesiones/{id}/informe", client.get(informe, headers=admin))
     check("get", "/sesiones", client.get("/sesiones", headers=admin))
+    for headers in (admin, contador, {}):
+        check("get", "/valor-actual", client.get("/valor-actual", headers=headers))
     cerrada = verificar({**cuerpo_v, "id": str(uuid.uuid4())})
     assert cerrada["error"]["code"] == "sesion_cerrada"
 

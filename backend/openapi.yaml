@@ -1082,6 +1082,27 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
           x-codigos: [sesion_abierta]
 
+  /valor-actual:
+    get:
+      tags: [activos]
+      operationId: valorActual
+      summary: Valor actual del inventario en vivo (solo admin; no es un informe)
+      description: >-
+        Suma en vivo de activo y en_reparacion (dado_de_baja no cuenta). Sigue los
+        cambios al instante y nunca lee el desglose congelado de una sesión.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Total, unidades, valor en reparación y desglose con nombres actuales.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ValorActual" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1902,6 +1923,36 @@ components:
         no_encontrados:
           type: array
           items: { $ref: "#/components/schemas/NoEncontrado" }
+    FilaValor:
+      type: object
+      required: [id, etiqueta, valor, unidades]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        etiqueta: { type: string }
+        valor: { $ref: "#/components/schemas/Precio" }
+        unidades: { type: integer, minimum: 0 }
+    ValorActual:
+      type: object
+      required: [total, unidades, en_reparacion, por_categoria, por_ubicacion, calculado_en]
+      additionalProperties: false
+      properties:
+        total: { $ref: "#/components/schemas/Precio" }
+        unidades: { type: integer, minimum: 0 }
+        en_reparacion:
+          type: object
+          required: [valor, unidades]
+          additionalProperties: false
+          properties:
+            valor: { $ref: "#/components/schemas/Precio" }
+            unidades: { type: integer, minimum: 0 }
+        por_categoria:
+          type: array
+          items: { $ref: "#/components/schemas/FilaValor" }
+        por_ubicacion:
+          type: array
+          items: { $ref: "#/components/schemas/FilaValor" }
+        calculado_en: { type: string, format: date-time }
     TipoEvento:
       type: string
       enum:

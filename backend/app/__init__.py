@@ -8,6 +8,7 @@ from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.activos.routes import bp as activos_bp
+from app.activos.valor import bp as valor_bp
 from app.auth.credentials import init_credentials
 from app.auth.http import register_auth_http_policy
 from app.auth.routes import bp as auth_bp
@@ -57,6 +58,7 @@ def create_app(config: Config | None = None) -> Flask:
     app.register_blueprint(categorias_bp)
     app.register_blueprint(activos_bp)
     app.register_blueprint(sesiones_bp)
+    app.register_blueprint(valor_bp)
     register_cli(app)
     if config.trusted_proxy_hops:
         # T10: la IP del cliente para el límite de tasa sale de X-Forwarded-For solo con

@@ -563,6 +563,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/valor-actual": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Valor actual del inventario en vivo (solo admin; no es un informe)
+         * @description Suma en vivo de activo y en_reparacion (dado_de_baja no cuenta). Sigue los cambios al instante y nunca lee el desglose congelado de una sesión.
+         */
+        get: operations["valorActual"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1009,6 +1029,25 @@ export interface components {
                 ubicaciones: components["schemas"]["FilaDesglose"][];
             };
             no_encontrados: components["schemas"]["NoEncontrado"][];
+        };
+        FilaValor: {
+            /** Format: uuid */
+            id: string;
+            etiqueta: string;
+            valor: components["schemas"]["Precio"];
+            unidades: number;
+        };
+        ValorActual: {
+            total: components["schemas"]["Precio"];
+            unidades: number;
+            en_reparacion: {
+                valor: components["schemas"]["Precio"];
+                unidades: number;
+            };
+            por_categoria: components["schemas"]["FilaValor"][];
+            por_ubicacion: components["schemas"]["FilaValor"][];
+            /** Format: date-time */
+            calculado_en: string;
         };
         /** @enum {string} */
         TipoEvento: "creado" | "importado" | "verificado" | "ubicacion_cambiada" | "precio_cambiado" | "estado_cambiado" | "categoria_cambiada" | "datos_cambiados" | "dado_de_baja" | "discrepancia_descartada";
@@ -2433,6 +2472,28 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    valorActual: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Total, unidades, valor en reparación y desglose con nombres actuales. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValorActual"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
         };
     };
 }
