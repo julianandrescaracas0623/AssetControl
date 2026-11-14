@@ -23,7 +23,7 @@ Base, luego la API con sus pruebas de rol, precio y aislamiento (el contrato de 
 ## 3. Dominio (funciones puras, T2)
 
 - `normalizar_codigo(texto) -> str | None`: recorta, pasa a mayúsculas y valida Q1.
-- `parsear_precio(texto | número) -> Decimal | None`: acepta `"1390000"`, `"1390000.50"` y `"1.390.000,50"` (formato colombiano); rechaza negativos, más de dos decimales, `NaN`, infinito y exponentes; nunca `float`.
+- `parsear_precio(texto) -> Decimal | None`: solo texto canónico (`"1390000"`, `"1390000.50"`); rechaza números JSON (con decimales llegan como `float`), negativos, más de dos decimales, `NaN`, infinito, exponentes y dígitos no ASCII. **Ajuste en T2:** el formato colombiano (`"1.390.000,50"`) lo convierte la web antes de enviar; el servidor no adivina separadores.
 
 ## 4. API (T3–T5)
 
