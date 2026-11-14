@@ -13,4 +13,4 @@
 
 ## Notas por tarea
 
-_(se completan al cerrar cada tarea)_
+- **T1 (hecha, 2026-11-14):** `backend/openapi.yaml` (OpenAPI 3.1, 9 operaciones, respuestas reutilizables y `x-codigos` por respuesta) y `tests/test_openapi.py` (16 pruebas): rutas de Flask = `paths`; respuestas reales de cada operación validadas con cabeceras obligatorias (`Set-Cookie`, `Retry-After`); todo estado declarado ejercitado salvo `500` de aceptar (A22, ya probado en `test_invitaciones_aceptar.py`); `429`/`503` con `increment_attempts` sustituido; enum de `ErrorCode` = códigos del backend (17). Probado que quitar un campo, un código o una respuesta rompe las pruebas. `pyyaml==6.0.3` en `dev`; `uv.lock` regenerado con uv 0.13.7 (la versión de la CI). Backend: 1202 pruebas en verde, ruff limpio.

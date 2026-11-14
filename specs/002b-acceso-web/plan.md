@@ -22,7 +22,7 @@ OpenAPI 3.1 escrito a mano. Cubre todas las rutas de Flask: `GET /health`, `GET 
 3. Respuestas reales: sobre una base temporal (`acceso_db.temporary_acceso_db`) se ejercita cada operación en sus casos de éxito y de error principales, y cada cuerpo se valida contra el esquema declarado para ese estado. Un validador pequeño en la prueba cubre el subconjunto que usa el contrato (`type`, `required`, `properties`, `additionalProperties`, `enum`, `format: uuid|date-time|email`, `$ref`); un estado no declarado falla.
 4. Códigos: el `enum` de `Error.code` es igual al conjunto de códigos que define el backend (`_HTTP_ERRORS`, constantes de rutas y `PasswordPolicyError`).
 
-**Dependencia nueva (solo desarrollo):** `pyyaml==6.0.3` en el grupo `dev` de `pyproject.toml` (leer el YAML en las pruebas). No entra en la imagen de producción.
+**Dependencia nueva (solo desarrollo):** `pyyaml==6.0.3` en el grupo `dev` de `pyproject.toml` (leer el YAML en las pruebas). Solo pruebas: la app no lo importa (la imagen de desarrollo instala el grupo `dev`, como pytest y ruff).
 
 ## 3. Tipos y cliente (T2)
 

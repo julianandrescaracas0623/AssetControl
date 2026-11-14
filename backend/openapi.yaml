@@ -1,0 +1,468 @@
+# Contrato de la API de AssetControl (spec 002b, T1; R17).
+#
+# Escrito a mano. tests/test_openapi.py lo ata al backend: rutas de Flask iguales a
+# `paths`, respuestas reales validadas contra estos esquemas y la lista de códigos
+# de error igual a la del backend. La web genera sus tipos de este archivo
+# (`cd web && npm run api:types`). Si cambias un endpoint, cambia aquí y regenera.
+#
+# En desarrollo la web llama a estas rutas con el prefijo /api (proxy de Vite).
+openapi: 3.1.0
+info:
+  title: AssetControl API
+  version: 0.1.0
+  description: >-
+    API de AssetControl. Toda respuesta lleva la cabecera X-Request-ID; los errores
+    tienen la forma {error: {code, message, request_id}}. /auth y /invitaciones
+    responden Cache-Control no-store y Referrer-Policy no-referrer y aceptan
+    cuerpos de hasta 4 KB.
+
+tags:
+  - name: meta
+  - name: auth
+  - name: invitaciones
+
+paths:
+  /health:
+    get:
+      tags: [meta]
+      operationId: health
+      summary: Estado de la API y de la base
+      responses:
+        "200":
+          description: La base responde.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: La base no responde.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  /ready:
+    get:
+      tags: [meta]
+      operationId: ready
+      summary: Lista para recibir tráfico (resultado guardado unos segundos)
+      responses:
+        "200":
+          description: Lista.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ready" }
+        "503":
+          description: No lista.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ready" }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Iniciar sesión con email y contraseña
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/SesionIniciada"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          description: Credenciales incorrectas (mismo mensaje para cualquier causa).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [credenciales_invalidas]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refresh
+      summary: Renovar la sesión con la cookie de refresh (la rota)
+      parameters:
+        - $ref: "#/components/parameters/Csrf"
+        - $ref: "#/components/parameters/RefreshCookie"
+      responses:
+        "200":
+          $ref: "#/components/responses/SesionIniciada"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Cerrar sesión (revoca el refresh y borra la cookie)
+      parameters:
+        - $ref: "#/components/parameters/Csrf"
+        - $ref: "#/components/parameters/RefreshCookie"
+      responses:
+        "204":
+          description: Sesión cerrada, haya o no una cookie válida.
+          headers:
+            Set-Cookie:
+              description: Borra la cookie de refresh.
+              required: true
+              schema: { type: string }
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /auth/me:
+    get:
+      tags: [auth]
+      operationId: me
+      summary: Usuario, tenant y rol de la sesión (leídos de la base en cada petición)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Usuario actual.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UsuarioActual" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /invitaciones:
+    post:
+      tags: [invitaciones]
+      operationId: crearInvitacion
+      summary: Invitar a una persona (solo admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvitarBody" }
+      responses:
+        "201":
+          description: >-
+            Invitación creada. El enlace sale solo en esta respuesta y vence en 72 horas.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitacionCreada" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /invitaciones/validar:
+    post:
+      tags: [invitaciones]
+      operationId: validarInvitacion
+      summary: Saber si un token de invitación está vigente (no lo consume)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ValidarBody" }
+      responses:
+        "200":
+          description: Vencida, usada, inexistente o mal formada dan el mismo false.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Vigencia" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /invitaciones/aceptar:
+    post:
+      tags: [invitaciones]
+      operationId: aceptarInvitacion
+      summary: Aceptar la invitación con nombre y contraseña (sin email)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AceptarBody" }
+      responses:
+        "201":
+          $ref: "#/components/responses/SesionIniciada"
+        "400":
+          description: >-
+            Cuerpo o nombre no válidos (solicitud_invalida), contraseña fuera de la
+            política (contrasena_*) o invitación no vigente (invitacion_invalida,
+            mismo mensaje para cualquier causa).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos:
+            - solicitud_invalida
+            - contrasena_invalida
+            - contrasena_corta
+            - contrasena_larga
+            - contrasena_comun
+            - invitacion_invalida
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "500":
+          description: >-
+            La cuenta se creó pero no se pudo emitir la sesión: la persona entra con
+            el login.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [error_interno]
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de acceso (15 minutos). Guárdalo solo en memoria.
+
+  parameters:
+    Csrf:
+      name: X-AssetControl-CSRF
+      in: header
+      required: true
+      description: Debe valer 1; además la petición debe venir del mismo sitio.
+      schema: { type: string, const: "1" }
+    RefreshCookie:
+      name: refresh
+      in: cookie
+      required: false
+      description: >-
+        Cookie HttpOnly de refresh (__Secure-refresh fuera de desarrollo), Path=/auth.
+      schema: { type: string }
+
+  responses:
+    SesionIniciada:
+      description: Sesión emitida; deja la cookie de refresh (HttpOnly, SameSite=Lax).
+      headers:
+        Set-Cookie:
+          description: Cookie de refresh nueva.
+          required: true
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Sesion" }
+    SolicitudInvalida:
+      description: El cuerpo no es JSON válido o le faltan campos.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [solicitud_invalida]
+    NoAutenticado:
+      description: Sin sesión válida.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [no_autenticado]
+    Prohibido:
+      description: Rol insuficiente o petición de otro sitio (sin cabecera CSRF).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [prohibido]
+    CuerpoDemasiadoGrande:
+      description: El cuerpo supera 4 KB.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [cuerpo_demasiado_grande]
+    DemasiadasSolicitudes:
+      description: Límite de tasa superado (igual exista o no la cuenta).
+      headers:
+        Retry-After:
+          description: Segundos de la ventana del límite.
+          required: true
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [demasiadas_solicitudes]
+    ServicioNoDisponible:
+      description: No se pudo contar el intento o el servidor está saturado.
+      headers:
+        Retry-After:
+          description: Segundos sugeridos antes de reintentar.
+          required: true
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [servicio_no_disponible]
+
+  schemas:
+    ErrorCode:
+      type: string
+      description: Código estable del error; el texto para la persona va en message.
+      enum:
+        - solicitud_invalida
+        - no_autenticado
+        - prohibido
+        - no_encontrado
+        - metodo_no_permitido
+        - cuerpo_demasiado_grande
+        - tipo_no_soportado
+        - error_http
+        - error_interno
+        - servicio_no_disponible
+        - demasiadas_solicitudes
+        - credenciales_invalidas
+        - invitacion_invalida
+        - contrasena_invalida
+        - contrasena_corta
+        - contrasena_larga
+        - contrasena_comun
+    Error:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          additionalProperties: false
+          properties:
+            code: { $ref: "#/components/schemas/ErrorCode" }
+            message: { type: string, description: Texto en español para mostrar. }
+            request_id: { type: string, format: uuid }
+
+    Rol:
+      type: string
+      enum: [admin, contador]
+    Usuario:
+      type: object
+      required: [id, email, nombre]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        nombre: { type: string }
+    Tenant:
+      type: object
+      required: [id, nombre]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+    UsuarioActual:
+      type: object
+      required: [usuario, tenant, rol]
+      additionalProperties: false
+      properties:
+        usuario: { $ref: "#/components/schemas/Usuario" }
+        tenant: { $ref: "#/components/schemas/Tenant" }
+        rol: { $ref: "#/components/schemas/Rol" }
+    Sesion:
+      type: object
+      required: [access_token, token_type, expires_in, usuario, tenant, rol]
+      additionalProperties: false
+      properties:
+        access_token: { type: string, description: JWT de acceso; solo en memoria. }
+        token_type: { type: string, const: Bearer }
+        expires_in: { type: integer, minimum: 1, description: Segundos de vida del token. }
+        usuario: { $ref: "#/components/schemas/Usuario" }
+        tenant: { $ref: "#/components/schemas/Tenant" }
+        rol: { $ref: "#/components/schemas/Rol" }
+
+    LoginBody:
+      type: object
+      required: [email, password]
+      additionalProperties: false
+      properties:
+        email: { type: string }
+        password: { type: string, format: password }
+    InvitarBody:
+      type: object
+      required: [email, rol]
+      additionalProperties: false
+      properties:
+        email: { type: string }
+        rol: { $ref: "#/components/schemas/Rol" }
+    ValidarBody:
+      type: object
+      required: [token]
+      additionalProperties: false
+      properties:
+        token: { type: string, description: Token del fragmento del enlace. }
+    AceptarBody:
+      type: object
+      required: [token, nombre, password]
+      additionalProperties: false
+      properties:
+        token: { type: string }
+        nombre: { type: string }
+        password:
+          type: string
+          format: password
+          minLength: 10
+          maxLength: 128
+
+    Invitacion:
+      type: object
+      required: [id, email, rol, expira_en]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        rol: { $ref: "#/components/schemas/Rol" }
+        expira_en: { type: string, format: date-time }
+    InvitacionCreada:
+      type: object
+      required: [invitacion, enlace]
+      additionalProperties: false
+      properties:
+        invitacion: { $ref: "#/components/schemas/Invitacion" }
+        enlace:
+          type: string
+          description: Ruta relativa /invitacion#<token>; se muestra una sola vez.
+    Vigencia:
+      type: object
+      required: [vigente]
+      additionalProperties: false
+      properties:
+        vigente: { type: boolean }
+
+    Health:
+      type: object
+      required: [status, db, version]
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, error] }
+        version: { type: string }
+    Ready:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [ok, error] }
