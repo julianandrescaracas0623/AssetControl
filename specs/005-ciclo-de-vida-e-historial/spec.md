@@ -1,6 +1,6 @@
 # Spec 005 — Ciclo de vida e historial del activo
 
-> **Estado:** Aprobada (G1–G3, 2026-11-14) con Q1–Q3 en la opción recomendada. Depende de la 004 (activos: alta por escaneo, hecha). Módulo M3 (resto): CU-CAT-05 a CU-CAT-08; M8: CU-HIS-01 (eventos de catálogo) de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Implementada (T1–T9, 2026-11-14); la prueba de dominio del valor en tiempo real de A3 pasa a la spec que construya ese cálculo. Aprobada (G1–G3, 2026-11-14) con Q1–Q3 en la opción recomendada. Depende de la 004 (activos: alta por escaneo, hecha). Módulo M3 (resto): CU-CAT-05 a CU-CAT-08; M8: CU-HIS-01 (eventos de catálogo) de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 

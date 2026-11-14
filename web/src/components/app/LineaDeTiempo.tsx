@@ -72,6 +72,7 @@ function vista(evento: EventoActivo): Vista {
         return { icono: ArchiveRestore, tono: 'exito', titulo: 'Reactivado', detalle: `${etiquetaMotivo(d.motivo)}${nota}` }
       }
       if (d.despues === 'en_reparacion') return { icono: Wrench, tono: 'aviso', titulo: 'Enviado a reparación' }
+      if (d.antes === 'en_reparacion') return { icono: Check, tono: 'exito', titulo: 'Volvió de reparación' }
       return { icono: Check, tono: 'exito', titulo: `Pasó a ${ESTADOS[String(d.despues)] ?? texto(d.despues)}` }
     }
     case 'dado_de_baja': {
@@ -95,14 +96,14 @@ export function LineaDeTiempo({ eventos, className }: { eventos: EventoActivo[];
               <v.icono className="size-4" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="flex flex-wrap justify-between gap-x-2">
-                <span className="font-semibold">{v.titulo}</span>
-                <time className="text-sm text-muted-foreground tabular-nums" dateTime={evento.ocurrido_en}>
+              <p className="font-semibold">{v.titulo}</p>
+              {v.detalle && <p className="text-sm break-words">{v.detalle}</p>}
+              <p className="text-sm text-muted-foreground">
+                {evento.autor.nombre || 'Usuario'} ·{' '}
+                <time className="tabular-nums" dateTime={evento.ocurrido_en}>
                   {fechaHora.format(new Date(evento.ocurrido_en))}
                 </time>
               </p>
-              {v.detalle && <p className="text-sm break-words">{v.detalle}</p>}
-              <p className="text-sm text-muted-foreground">{evento.autor.nombre || 'Usuario'}</p>
             </div>
           </li>
         )
