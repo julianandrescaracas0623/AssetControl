@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { Rol } from '@/lib/api/cliente'
 import { routes } from '@/router'
 import { simularAncho } from '@/test/matchMedia'
+import { catalogoDemo } from '@/test/catalogo'
 import { simularSesion } from '@/test/sesion'
 
 // Spec 001b, T9: maquetas de conteo a 375 px con datos ficticios. El contador
@@ -15,7 +16,7 @@ afterEach(cleanup)
 
 async function abrir(path: string, rol: Rol = 'contador') {
   simularAncho({ movil: true })
-  simularSesion(rol)
+  simularSesion(rol, catalogoDemo(rol).manejador)
   const router = createMemoryRouter(routes, { initialEntries: [path] })
   const { container } = render(<RouterProvider router={router} />)
   await screen.findByRole('heading', { level: 1 })
@@ -51,15 +52,16 @@ describe('flujo de conteo', () => {
 
   it('el contador no ve el precio al verificar; el admin ve el de referencia', async () => {
     const { container } = await abrir('/contar/activo/000215')
+    await screen.findByRole('heading', { level: 1, name: 'Impresora multifuncional' })
     expect(container.textContent).not.toContain('$')
     cleanup()
     await abrir('/contar/activo/000215', 'admin')
-    expect(screen.getByText('$ 1.390.000,00')).toBeTruthy()
+    expect(await screen.findByText('$ 1.390.000,00')).toBeTruthy()
   })
 
   it('el estado físico se elige con un toque', async () => {
     await abrir('/contar/activo/000215')
-    const grupo = screen.getByRole('radiogroup', { name: 'Estado físico' })
+    const grupo = await screen.findByRole('radiogroup', { name: 'Estado físico' })
     const danado = within(grupo).getByRole('radio', { name: /Dañado/ })
     fireEvent.click(danado)
     expect(danado.getAttribute('aria-checked')).toBe('true')
@@ -67,7 +69,7 @@ describe('flujo de conteo', () => {
 
   it('«Está en otra ubicación» abre un panel que lo registra como diferencia', async () => {
     await abrir('/contar/activo/000215')
-    fireEvent.click(screen.getByRole('button', { name: 'Está en otra ubicación' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Está en otra ubicación' }))
     const panel = await screen.findByRole('dialog', { name: '¿Dónde lo encontraste?' })
     expect(panel.textContent).toContain('Se registra como diferencia')
     expect(within(panel).getByRole('link', { name: /Confirmar en/ })).toBeTruthy()
@@ -75,19 +77,32 @@ describe('flujo de conteo', () => {
 
   it('un código que no existe ofrece crear el activo', async () => {
     await abrir('/contar/activo/000458')
-    expect(screen.getByRole('heading', { level: 1, name: 'No encontramos ese código' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'No encontramos ese código' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Crear activo con este código' }).getAttribute('href')).toBe('/contar/nuevo?codigo=000458')
   })
 })
 
 describe('escribir código', () => {
-  it('un código nuevo lleva al alta y uno existente a verificar', async () => {
+  it('un código nuevo ofrece el alta y uno existente abre el activo (spec 004)', async () => {
     const { router } = await abrir('/contar/escribir')
-    const campo = screen.getByRole('textbox', { name: 'Código del sticker' })
-    fireEvent.change(campo, { target: { value: '000458' } })
+    let campo = screen.getByRole('textbox', { name: 'Código del sticker' })
+    fireEvent.change(campo, { target: { value: ' 000458 ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Registrar activo' })).toBeTruthy()
-    expect(router.state.location.search).toContain('codigo=000458')
+    expect(await screen.findByRole('heading', { level: 1, name: 'No encontramos ese código' })).toBeTruthy()
+    expect(router.state.location.pathname).toBe('/contar/activo/000458')
+    cleanup()
+    await abrir('/contar/escribir')
+    campo = screen.getByRole('textbox', { name: 'Código del sticker' })
+    fireEvent.change(campo, { target: { value: '000215' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Impresora multifuncional' })).toBeTruthy()
+  })
+
+  it('un texto que no es código se explica sin buscar', async () => {
+    await abrir('/contar/escribir')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Código del sticker' }), { target: { value: 'con espacio' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
+    expect(screen.getByText(/Ese texto no es un código/)).toBeTruthy()
   })
 
   it('con la cámara denegada lo explica', async () => {
@@ -127,9 +142,9 @@ describe('alta por escaneo', () => {
     fireEvent.click(screen.getByRole('combobox', { name: /Copiar de un parecido/ }))
     const campo = await screen.findByRole('combobox', { name: 'Buscar activo parecido' })
     fireEvent.change(campo, { target: { value: 'silla' } })
-    fireEvent.keyDown(campo, { key: 'Enter' })
+    fireEvent.click(await screen.findByRole('option', { name: /Silla ergonómica/ }))
     expect(screen.queryByRole('textbox', { name: /Precio/ })).toBeNull()
-    expect(screen.getByText(/El precio se copia del activo parecido/)).toBeTruthy()
+    expect(screen.getByText(/El precio solo lo ven los administradores/)).toBeTruthy()
     expect(container.textContent).not.toContain('389')
   })
 

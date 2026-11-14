@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useSimulacion } from '@/lib/simulacion'
-import { ACTIVOS, RESUMEN } from '@/mocks/datos-ficticios'
+import { normalizarCodigo } from '@/lib/activos'
+import { RESUMEN } from '@/mocks/datos-ficticios'
 
 // Entrada manual del código (docs/08 §7.1, CU-VER-05). Con ?estado=error se
 // ve como cámara denegada. Mismo camino que un escaneo: existe → verificar;
@@ -23,12 +24,17 @@ export default function Escribir() {
 
   function buscar(evento: React.FormEvent) {
     evento.preventDefault()
-    const c = codigo.trim()
-    if (!c) {
+    if (!codigo.trim()) {
       setError('Escribe el código del sticker')
       return
     }
-    navigate(ACTIVOS.some((a) => a.codigo === c) ? `/contar/activo/${c}` : `/contar/nuevo?codigo=${encodeURIComponent(c)}`)
+    // Spec 004: el código se normaliza como en el servidor y la ficha lo resuelve.
+    const c = normalizarCodigo(codigo)
+    if (!c) {
+      setError('Ese texto no es un código: usa letras sin tilde, números o - . / _, sin espacios')
+      return
+    }
+    navigate(`/contar/activo/${encodeURIComponent(c)}`)
   }
 
   return (

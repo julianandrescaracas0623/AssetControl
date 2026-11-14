@@ -28,13 +28,16 @@ export class ErrorApi extends Error {
   readonly status: number
   readonly code: CodigoError
   readonly requestId: string | undefined
+  /** Cuerpo completo del error (p. ej. `activo` en `codigo_existente`). */
+  readonly cuerpo: unknown
 
-  constructor(status: number, code: CodigoError, message: string, requestId?: string) {
+  constructor(status: number, code: CodigoError, message: string, requestId?: string, cuerpo?: unknown) {
     super(message)
     this.name = 'ErrorApi'
     this.status = status
     this.code = code
     this.requestId = requestId
+    this.cuerpo = cuerpo
   }
 }
 
@@ -65,6 +68,8 @@ export interface Opciones<B> {
   cuerpo?: B
   /** Valores de la ruta (`/ubicaciones/{id}` → `{ id }`). */
   parametros?: Record<string, string>
+  /** Parámetros de consulta; los vacíos o `undefined` no se envían. */
+  consulta?: Record<string, string | number | undefined>
   /** Token de acceso (solo en memoria). */
   token?: string | null
   /** Cabecera `X-AssetControl-CSRF: 1` (refresh y logout, Q14). */
@@ -90,7 +95,7 @@ async function aError(respuesta: Response): Promise<ErrorApi> {
   }
   if (!esErrorDeApi(cuerpo)) return new ErrorApi(respuesta.status, 'error_interno', MENSAJE_INESPERADO)
   const { code, message, request_id } = cuerpo.error
-  return new ErrorApi(respuesta.status, code, message, request_id)
+  return new ErrorApi(respuesta.status, code, message, request_id, cuerpo)
 }
 
 export async function pedir<R extends Ruta, M extends MetodoDe<R>>(
@@ -108,12 +113,17 @@ export async function pedir<R extends Ruta, M extends MetodoDe<R>>(
     if (valor === undefined) throw new Error(`Falta el parámetro de ruta ${nombre}`)
     return encodeURIComponent(valor)
   })
+  const busqueda = new URLSearchParams()
+  for (const [clave, valor] of Object.entries(opciones.consulta ?? {})) {
+    if (valor !== undefined && valor !== '') busqueda.set(clave, String(valor))
+  }
+  const sufijo = busqueda.size > 0 ? `?${busqueda}` : ''
   const plazo = new AbortController()
   const reloj = setTimeout(() => plazo.abort(), TIEMPO_MAXIMO_MS)
   try {
     let respuesta: Response
     try {
-      respuesta = await fetch(`${API_BASE}${url}`, {
+      respuesta = await fetch(`${API_BASE}${url}${sufijo}`, {
         method: metodo.toUpperCase(),
         headers,
         body: opciones.cuerpo === undefined ? undefined : JSON.stringify(opciones.cuerpo),
@@ -154,4 +164,14 @@ export const api = {
   renombrarCategoria: (token: string, id: string, cuerpo: Esquemas['NombreBody']) =>
     pedir('patch', '/categorias/{id}', { token, cuerpo, parametros: { id } }),
   cargarCategoriasSugeridas: (token: string) => pedir('post', '/categorias/sugeridas', { token }),
+  // Spec 004: activos.
+  resolverCodigo: (token: string, codigo: string) =>
+    pedir('get', '/activos/por-codigo', { token, consulta: { codigo } }),
+  fichaActivo: (token: string, id: string) => pedir('get', '/activos/{id}', { token, parametros: { id } }),
+  buscarActivos: (token: string, consulta: { q?: string; estado?: string; pagina?: number }) =>
+    pedir('get', '/activos', { token, consulta }),
+  sugerenciasActivos: (token: string, campo: string, q: string) =>
+    pedir('get', '/activos/sugerencias', { token, consulta: { campo, q } }),
+  crearActivo: (token: string, cuerpo: Esquemas['CrearActivoBody'] | Esquemas['DuplicarActivoBody']) =>
+    pedir('post', '/activos', { token, cuerpo }),
 }

@@ -1,5 +1,5 @@
-import { Check, ChevronDown, CircleAlert, Info } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { Check, ChevronDown, CircleAlert, Info, RefreshCw, X } from 'lucide-react'
+import { type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
 import { CopiarDeParecido } from '@/components/app/CopiarDeParecido'
@@ -12,16 +12,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { type ErroresAlta, useAltaActivo } from '@/lib/altaActivo'
+import { useCategorias, useUbicaciones } from '@/lib/catalogo'
 import { useRol } from '@/lib/sesion'
-import { CATEGORIAS, UBICACIONES, rutaUbicacion, type ActivoFicticio, UBICACIONES_API } from '@/mocks/datos-ficticios'
 
-// Alta por escaneo (docs/08 §7.3, CU-CAT-02/03) a 375 px, en una columna.
-// El código llega del sticker y es fijo. Obligatorios: nombre, precio,
-// categoría y ubicación. El contador escribe el precio y después no lo ve;
-// si copia de un parecido, el precio lo copia el servidor y no se muestra (P13).
-
-type Errores = Partial<Record<'confirmado' | 'nombre' | 'precio' | 'categoria' | 'ubicacion', string>>
-const PRECIO = /^(\d{1,3}(\.\d{3})*|\d+)(,\d{1,2})?$/
+// Alta por escaneo (docs/08 §7.3, CU-CAT-02/03) a 375 px, en una columna (spec 004,
+// T6). El código llega del sticker y es fijo. Obligatorios: nombre, precio, categoría
+// y ubicación. El contador escribe el precio y después no lo ve; si copia de un
+// parecido, el servidor copia el precio sin mostrarlo (P13, Q3).
 
 function Campo({ id, etiqueta, error, ayuda, children }: { id: string; etiqueta: ReactNode; error?: string; ayuda?: string; children: ReactNode }) {
   return (
@@ -41,50 +39,23 @@ function Campo({ id, etiqueta, error, ayuda, children }: { id: string; etiqueta:
 }
 
 const Obligatorio = () => <span className="text-destructive" aria-hidden="true">*</span>
+const aria = (errores: ErroresAlta, campo: keyof ErroresAlta, ayuda = false) => ({
+  'aria-invalid': errores[campo] ? true : undefined,
+  'aria-describedby': errores[campo] ? `${campo}-error` : ayuda ? `${campo}-ayuda` : undefined,
+})
 
 export default function Alta() {
   const [params] = useSearchParams()
-  const codigo = params.get('codigo') ?? ''
   const rol = useRol()
-  const [confirmado, setConfirmado] = useState(false)
-  const [nombre, setNombre] = useState('')
-  const [precio, setPrecio] = useState('')
-  const [precioCopiado, setPrecioCopiado] = useState(false)
-  const [categoria, setCategoria] = useState('')
-  const [ubicacion, setUbicacion] = useState<string | undefined>()
-  const [errores, setErrores] = useState<Errores>({})
-  const [creado, setCreado] = useState(false)
+  const codigo = (params.get('codigo') ?? '').trim().toUpperCase()
+  const alta = useAltaActivo({ rol, codigoInicial: codigo, ubicacionInicial: params.get('ubicacion') ?? '' })
+  const categorias = useCategorias()
+  const ubicaciones = useUbicaciones()
+  const { campos, errores, copiado, duplicando } = alta
 
-  function copiar(a: ActivoFicticio) {
-    setNombre(a.nombre)
-    setCategoria(a.categoria)
-    setUbicacion(UBICACIONES.find((u) => rutaUbicacion(u.id) === a.ubicacion)?.id)
-    if (rol === 'contador') {
-      setPrecio('')
-      setPrecioCopiado(true)
-    } else {
-      setPrecio(a.precio.split('.')[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.'))
-    }
-  }
-
-  function guardar(evento: React.FormEvent) {
-    evento.preventDefault()
-    const e: Errores = {}
-    if (codigo && !confirmado) e.confirmado = 'Confirma que el código coincide con el sticker'
-    if (!nombre.trim()) e.nombre = 'Escribe el nombre'
-    if (!precioCopiado) {
-      if (!precio.trim()) e.precio = 'Escribe el precio'
-      else if (!PRECIO.test(precio.trim())) e.precio = 'Escribe el precio en pesos, por ejemplo 389.900'
-    }
-    if (!categoria) e.categoria = 'Elige la categoría'
-    if (!ubicacion) e.ubicacion = 'Elige la ubicación'
-    setErrores(e)
-    if (Object.keys(e).length === 0) setCreado(true)
-  }
-
-  if (creado) {
+  if (alta.creado) {
     return (
-      <CountShell titulo="Registrar activo" subtitulo="Conteo nov 2026" volver="/contar" estadoRed="guardado"
+      <CountShell titulo="Registrar activo" volver="/contar" estadoRed="guardado"
         acciones={
           <Button asChild className="min-h-14 font-semibold">
             <Link to="/contar/escanear">Escanear otro</Link>
@@ -96,7 +67,8 @@ export default function Alta() {
           <Check />
           <AlertTitle>Activo creado</AlertTitle>
           <AlertDescription>
-            {nombre} · <span className="font-mono">{codigo}</span> quedó registrado en {rutaUbicacion(ubicacion!)}.
+            {alta.creado.nombre} · <span className="font-mono">{alta.creado.codigo}</span> quedó registrado en{' '}
+            {alta.creado.ubicacion.ruta}.
           </AlertDescription>
         </Alert>
       </CountShell>
@@ -106,64 +78,115 @@ export default function Alta() {
   return (
     <CountShell
       titulo="Registrar activo"
-      subtitulo="Conteo nov 2026"
       volver="/contar/escribir"
       estadoRed="en_linea"
       acciones={
-        <Button type="submit" form="alta" className="min-h-14 font-semibold">
-          Guardar activo
+        <Button type="submit" form="alta" className="min-h-14 font-semibold" disabled={alta.guardando}>
+          {alta.guardando ? 'Guardando…' : 'Guardar activo'}
         </Button>
       }
     >
       <h1 className="sr-only">Registrar activo</h1>
-      <form id="alta" noValidate onSubmit={guardar} className="flex flex-col gap-4">
+      <form
+        id="alta"
+        noValidate
+        onSubmit={(evento) => {
+          evento.preventDefault()
+          alta.enviar()
+        }}
+        className="flex flex-col gap-4"
+      >
+        {alta.errorGeneral && (
+          <Alert variant="destructive">
+            <CircleAlert />
+            <AlertTitle>No se guardó</AlertTitle>
+            <AlertDescription className="flex flex-col items-start gap-3">
+              {alta.errorGeneral.mensaje}
+              {alta.errorGeneral.reintentable && (
+                <Button type="submit" variant="outline" className="min-h-11">
+                  <RefreshCw />
+                  Reintentar
+                </Button>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+        {alta.existente && (
+          <Alert variant="warning">
+            <Info />
+            <AlertTitle>Ese código ya está registrado</AlertTitle>
+            <AlertDescription className="flex flex-col items-start gap-3">
+              Es {alta.existente.nombre}. Ábrelo en vez de crear otro.
+              <Button asChild variant="outline" className="min-h-11">
+                <Link to={`/contar/activo/${encodeURIComponent(alta.existente.codigo)}`}>Abrir activo</Link>
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="flex items-center gap-3 rounded-xl border bg-muted/50 px-3 py-2">
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs text-muted-foreground">Código del sticker · nuevo</p>
-            <p className="font-mono text-lg tracking-wider">{codigo || '—'}</p>
+            <p className="font-mono text-lg tracking-wider break-all">{codigo || '—'}</p>
           </div>
           <label className="flex min-h-11 items-center gap-2 text-sm">
-            <Checkbox checked={confirmado} onCheckedChange={(v) => setConfirmado(v === true)} aria-invalid={Boolean(errores.confirmado)} aria-describedby={errores.confirmado ? 'confirmado-error' : undefined} />
+            <Checkbox checked={alta.confirmado} onCheckedChange={(v) => alta.setConfirmado(v === true)} {...aria(errores, 'confirmado')} />
             Coincide
           </label>
         </div>
-        {errores.confirmado && (
-          <p id="confirmado-error" className="-mt-2 flex items-center gap-1.5 text-sm text-destructive">
-            <CircleAlert className="size-4" aria-hidden="true" />
-            {errores.confirmado}
+        {(errores.confirmado || errores.codigo) && (
+          <p id={errores.confirmado ? 'confirmado-error' : 'codigo-error'} className="-mt-2 flex items-center gap-1.5 text-sm text-destructive">
+            <CircleAlert className="size-4 shrink-0" aria-hidden="true" />
+            {errores.confirmado ?? errores.codigo}
           </p>
         )}
-        <CopiarDeParecido onCopiar={copiar} className="h-12 text-base md:h-12" />
-        <Campo id="nombre" etiqueta={<>Nombre <Obligatorio /></>} error={errores.nombre}>
-          <Input id="nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="off" enterKeyHint="next" aria-invalid={Boolean(errores.nombre)} aria-describedby={errores.nombre ? 'nombre-error' : undefined} className="h-12 text-base" />
-        </Campo>
-        {precioCopiado ? (
+        <CopiarDeParecido onCopiar={alta.copiar} copiado={copiado} className="h-12 text-base md:h-12" />
+        {duplicando ? (
           <Alert variant="info">
             <Info />
-            <AlertDescription className="text-foreground">El precio se copia del activo parecido. Solo lo ven los administradores.</AlertDescription>
+            <AlertTitle>Se copia de {copiado!.nombre}</AlertTitle>
+            <AlertDescription className="flex flex-col items-start gap-2 text-foreground">
+              Nombre, categoría ({copiado!.categoria.nombre}), marca, modelo y precio se copian del original. El precio solo lo
+              ven los administradores.
+              <Button type="button" variant="ghost" className="min-h-11 px-1 text-brand-strong" onClick={alta.quitarCopia}>
+                <X />
+                Quitar la copia
+              </Button>
+            </AlertDescription>
           </Alert>
         ) : (
-          <Campo id="precio" etiqueta={<>Precio de compra (COP) <Obligatorio /></>} error={errores.precio} ayuda="Después de guardar, solo lo verán los administradores.">
-            <div className="relative">
-              <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" aria-hidden="true">$</span>
-              <Input id="precio" value={precio} onChange={(e) => setPrecio(e.target.value)} inputMode="decimal" autoComplete="off" aria-invalid={Boolean(errores.precio)} aria-describedby={errores.precio ? 'precio-error' : 'precio-ayuda'} className="h-12 pl-7 text-base tabular-nums" />
-            </div>
-          </Campo>
+          <>
+            <Campo id="nombre" etiqueta={<>Nombre <Obligatorio /></>} error={errores.nombre}>
+              <Input id="nombre" value={campos.nombre} onChange={(e) => alta.cambiar('nombre', e.target.value)} maxLength={120} autoComplete="off" enterKeyHint="next" {...aria(errores, 'nombre')} className="h-12 text-base" />
+            </Campo>
+            <Campo id="precio" etiqueta={<>Precio de compra (COP) <Obligatorio /></>} error={errores.precio} ayuda="Después de guardar, solo lo verán los administradores.">
+              <div className="relative">
+                <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" aria-hidden="true">$</span>
+                <Input id="precio" value={campos.precio} onChange={(e) => alta.cambiar('precio', e.target.value)} inputMode="decimal" autoComplete="off" {...aria(errores, 'precio', true)} className="h-12 pl-7 text-base tabular-nums" />
+              </div>
+            </Campo>
+            <Campo id="categoria" etiqueta={<>Categoría <Obligatorio /></>} error={errores.categoria}>
+              <Select value={campos.categoria} onValueChange={(v) => alta.cambiar('categoria', v)} disabled={categorias.isPending}>
+                <SelectTrigger id="categoria" className="h-12! w-full text-base" {...aria(errores, 'categoria')}>
+                  <SelectValue placeholder={categorias.isPending ? 'Cargando…' : 'Elige una categoría'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(categorias.data ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.id} className="min-h-11">{c.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Campo>
+          </>
         )}
-        <Campo id="categoria" etiqueta={<>Categoría <Obligatorio /></>} error={errores.categoria}>
-          <Select value={categoria} onValueChange={setCategoria}>
-            <SelectTrigger id="categoria" className="h-12! w-full text-base" aria-invalid={Boolean(errores.categoria)} aria-describedby={errores.categoria ? 'categoria-error' : undefined}>
-              <SelectValue placeholder="Elige una categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              {CATEGORIAS.map((c) => (
-                <SelectItem key={c} value={c} className="min-h-11">{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Campo>
-        <Campo id="ubicacion" etiqueta={<>Ubicación <Obligatorio /></>} error={errores.ubicacion} ayuda="Arriba aparece la sala donde estás contando.">
-          <LocationPicker id="ubicacion" ubicaciones={UBICACIONES_API} valor={ubicacion} ultimaUsada="administracion" onChange={setUbicacion} className="h-12 text-base md:h-12" />
+        <Campo id="ubicacion" etiqueta={<>Ubicación <Obligatorio /></>} error={errores.ubicacion} ayuda="Sala o box donde está el activo.">
+          <LocationPicker
+            id="ubicacion"
+            ubicaciones={ubicaciones.data ?? []}
+            cargando={ubicaciones.isPending}
+            valor={campos.ubicacion || undefined}
+            onChange={(v) => alta.cambiar('ubicacion', v)}
+            className="h-12 text-base md:h-12"
+          />
         </Campo>
         <Collapsible className="rounded-lg border">
           <CollapsibleTrigger className="group flex min-h-12 w-full items-center gap-2 px-3 text-left text-[15px] font-medium">
@@ -171,10 +194,17 @@ export default function Alta() {
             <span className="truncate">Más datos (opcional)</span>
           </CollapsibleTrigger>
           <CollapsibleContent className="flex flex-col gap-4 border-t p-3">
-            <Campo id="serial" etiqueta="Serial"><Input id="serial" className="h-12 font-mono text-base" /></Campo>
-            <Campo id="marca" etiqueta="Marca"><Input id="marca" className="h-12 text-base" /></Campo>
-            <Campo id="modelo" etiqueta="Modelo"><Input id="modelo" className="h-12 text-base" /></Campo>
-            <Campo id="fecha" etiqueta="Fecha de compra"><Input id="fecha" type="date" className="h-12 text-base" /></Campo>
+            <Campo id="serial" etiqueta="Serial" ayuda="No tiene que ser único.">
+              <Input id="serial" value={campos.serial} onChange={(e) => alta.cambiar('serial', e.target.value)} maxLength={120} autoComplete="off" className="h-12 font-mono text-base" />
+            </Campo>
+            {!duplicando && (
+              <>
+                <Campo id="marca" etiqueta="Marca"><Input id="marca" value={campos.marca} onChange={(e) => alta.cambiar('marca', e.target.value)} maxLength={120} autoComplete="off" className="h-12 text-base" /></Campo>
+                <Campo id="modelo" etiqueta="Modelo"><Input id="modelo" value={campos.modelo} onChange={(e) => alta.cambiar('modelo', e.target.value)} maxLength={120} autoComplete="off" className="h-12 text-base" /></Campo>
+                <Campo id="subtipo" etiqueta="Subtipo" ayuda="Por ejemplo: computador, fuente, video."><Input id="subtipo" value={campos.subtipo} onChange={(e) => alta.cambiar('subtipo', e.target.value)} maxLength={120} autoComplete="off" className="h-12 text-base" /></Campo>
+                <Campo id="fecha" etiqueta="Fecha de compra" error={errores.fecha}><Input id="fecha" type="date" value={campos.fecha} onChange={(e) => alta.cambiar('fecha', e.target.value)} {...aria(errores, 'fecha')} className="h-12 text-base" /></Campo>
+              </>
+            )}
           </CollapsibleContent>
         </Collapsible>
       </form>

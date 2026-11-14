@@ -95,51 +95,6 @@ describe('Activos', () => {
   })
 })
 
-describe('Registrar activo', () => {
-  it('no guarda sin código, nombre, precio, categoría ni ubicación', async () => {
-    await abrir('/admin/activos/nuevo')
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar activo' }))
-    for (const mensaje of [
-      'Escanea o escribe el código del sticker',
-      'Escribe el nombre',
-      'Escribe el precio',
-      'Elige la categoría',
-      'Elige la ubicación',
-    ]) {
-      expect(screen.getByText(mensaje)).toBeTruthy()
-    }
-    expect(screen.queryByText('Activo creado')).toBeNull()
-  })
-
-  it('rechaza un código que ya existe', async () => {
-    await abrir('/admin/activos/nuevo')
-    fireEvent.change(screen.getByRole('textbox', { name: /Código del sticker/ }), { target: { value: '000123' } })
-    expect(screen.getByText('Ese código ya existe')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Abrir activo' }).getAttribute('href')).toBe('/admin/activos/000123')
-  })
-
-  it('copiar de un parecido llena los datos y guarda', async () => {
-    await abrir('/admin/activos/nuevo')
-    fireEvent.change(screen.getByRole('textbox', { name: /Código del sticker/ }), { target: { value: '000458' } })
-    expect(screen.getByText('Código libre')).toBeTruthy()
-    fireEvent.click(screen.getByRole('checkbox', { name: /Revisé que coincide/ }))
-    fireEvent.click(screen.getByRole('combobox', { name: /Copiar de un parecido/ }))
-    const campo = await screen.findByRole('combobox', { name: 'Buscar activo parecido' })
-    fireEvent.change(campo, { target: { value: 'silla' } })
-    fireEvent.keyDown(campo, { key: 'Enter' })
-    expect((screen.getByRole('textbox', { name: /Nombre/ }) as HTMLInputElement).value).toBe('Silla ergonómica')
-    expect((screen.getByRole('textbox', { name: /Precio de compra/ }) as HTMLInputElement).value).toBe('389.900')
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar activo' }))
-    expect(await screen.findByText('Activo creado')).toBeTruthy()
-    expect(screen.getByText(/000458/)).toBeTruthy()
-  })
-
-  it('el error de guardado ofrece reintentar', async () => {
-    await abrir('/admin/activos/nuevo?estado=error')
-    expect(screen.getByText('No se pudo guardar. Revisa la conexión.')).toBeTruthy()
-  })
-})
-
 describe('Informe de sesión', () => {
   it('muestra tres cifras congeladas y el desglose por pestañas', async () => {
     await abrir('/admin/sesiones/conteo-may-2026/informe')

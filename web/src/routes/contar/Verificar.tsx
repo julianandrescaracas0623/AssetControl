@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Check, History, Plus, SearchX, TriangleAlert } from 'lucide-react'
+import { ArrowLeftRight, Check, History, Plus, RefreshCw, SearchX, TriangleAlert } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 
@@ -10,7 +10,10 @@ import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { useRol } from '@/lib/sesion'
-import { ACTIVOS, RESUMEN, UBICACIONES, rutaUbicacion } from '@/mocks/datos-ficticios'
+import { Skeleton } from '@/components/ui/skeleton'
+import { aTarjeta, normalizarCodigo, useActivoPorCodigo } from '@/lib/activos'
+import { mensajeDeError } from '@/lib/api/cliente'
+import { RESUMEN, UBICACIONES, rutaUbicacion } from '@/mocks/datos-ficticios'
 
 // Verificar con un toque (docs/08 §7.2, CU-VER-01..03). La ubicación encontrada
 // es la sala de trabajo; el estado físico, "ok". El contador no ve el precio;
@@ -96,10 +99,45 @@ function OtraUbicacion({ abierto, onAbierto, esperada, codigo }: { abierto: bool
 }
 
 export default function Verificar() {
-  const { codigo = '' } = useParams()
+  const { codigo: crudo = '' } = useParams()
+  const codigo = normalizarCodigo(crudo) ?? crudo
   const rol = useRol()
   const [otra, setOtra] = useState(false)
-  const activo = ACTIVOS.find((a) => a.codigo === codigo)
+  // Spec 004: el activo se resuelve en la API; verificar en una sesión llega con la 006.
+  const consulta = useActivoPorCodigo(codigo)
+  const activo = consulta.data ? aTarjeta(consulta.data) : null
+
+  if (consulta.isPending) {
+    return (
+      <CountShell titulo={RESUMEN.conteoAbierto.nombre} subtitulo={SALA} volver="/contar/escanear" estadoRed="en_linea">
+        <div role="status" aria-label="Buscando el código" className="flex flex-col gap-3 pt-2">
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-28 rounded-xl" />
+        </div>
+      </CountShell>
+    )
+  }
+
+  if (consulta.isError) {
+    return (
+      <CountShell titulo={RESUMEN.conteoAbierto.nombre} subtitulo={SALA} volver="/contar/escanear" estadoRed="en_linea"
+        acciones={
+          <Button asChild className="min-h-14 font-semibold">
+            <Link to="/contar/escribir">Escribir el código</Link>
+          </Button>
+        }
+      >
+        <div className="flex flex-col items-start gap-3 pt-4">
+          <h1 className="text-xl font-semibold tracking-tight">No se pudo buscar el código</h1>
+          <p className="text-base text-muted-foreground">{mensajeDeError(consulta.error)}</p>
+          <Button variant="outline" className="min-h-11" onClick={() => void consulta.refetch()}>
+            <RefreshCw />
+            Reintentar
+          </Button>
+        </div>
+      </CountShell>
+    )
+  }
 
   if (!activo) {
     return (
