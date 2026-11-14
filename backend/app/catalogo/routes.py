@@ -79,3 +79,50 @@ def actualizar(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del
     except service.ErrorCatalogo as exc:
         return _error(exc)
     return jsonify(ubicacion=actualizada.to_json())
+
+
+# --- Categorías (T3) ------------------------------------------------------------------
+
+categorias_bp = Blueprint("categorias", __name__, url_prefix="/categorias")
+
+
+@categorias_bp.get("")
+@require_auth
+def listar_categorias() -> ResponseReturnValue:
+    categorias = service.listar_categorias(current_session())
+    return jsonify(categorias=[c.to_json() for c in categorias])
+
+
+@categorias_bp.post("")
+@require_role("admin")
+def crear_categoria() -> ResponseReturnValue:
+    body = _cuerpo()
+    if body is None:
+        return error_response(400, *BAD_REQUEST)
+    try:
+        creada = service.crear_categoria(current_session(), nombre=body.get("nombre"))
+    except service.ErrorCatalogo as exc:
+        return _error(exc)
+    return jsonify(categoria=creada.to_json()), 201
+
+
+@categorias_bp.patch("/<uuid:id>")
+@require_role("admin")
+def renombrar_categoria(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del contrato
+    body = _cuerpo()
+    if body is None:
+        return error_response(400, *BAD_REQUEST)
+    try:
+        renombrada = service.renombrar_categoria(current_session(), id, nombre=body.get("nombre"))
+    except service.ErrorCatalogo as exc:
+        return _error(exc)
+    return jsonify(categoria=renombrada.to_json())
+
+
+@categorias_bp.post("/sugeridas")
+@require_role("admin")
+def cargar_sugeridas() -> ResponseReturnValue:
+    session = current_session()
+    creadas = service.cargar_sugeridas(session, current_user().tenant_id)
+    categorias = service.listar_categorias(session)
+    return jsonify(categorias=[c.to_json() for c in categorias], creadas=creadas)

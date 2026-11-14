@@ -469,6 +469,43 @@ def test_ubicaciones_responses(client):
     check("patch", "/ubicaciones/{id}", client.patch(path, data=grande, headers=admin))
 
 
+def test_categorias_responses(client):
+    admin, contador = bearer(ADMIN_A, TENANT_A), bearer(CONTADOR_A, TENANT_A)
+    grande = "x" * (AUTH_MAX_BODY_BYTES + 1)
+
+    def crear(body, headers=admin):
+        return check("post", "/categorias", client.post("/categorias", json=body, headers=headers))
+
+    nombre = f"Categoría {uuid.uuid4().hex[:6]}"
+    categoria = crear({"nombre": nombre})["categoria"]
+    crear({"nombre": nombre.upper()})
+    crear({"nombre": ""})
+    crear({"nombre": "X"}, headers={})
+    crear({"nombre": "X"}, headers=contador)
+    check("post", "/categorias", client.post("/categorias", data=grande, headers=admin))
+    check("get", "/categorias", client.get("/categorias", headers=contador))
+    check("get", "/categorias", client.get("/categorias"))
+
+    def patch(categoria_id, body, headers=admin):
+        response = client.patch(f"/categorias/{categoria_id}", json=body, headers=headers)
+        return check("patch", "/categorias/{id}", response)
+
+    otra = crear({"nombre": f"Otra {uuid.uuid4().hex[:6]}"})["categoria"]
+    patch(categoria["id"], {"nombre": f"{nombre} renombrada"})
+    patch(categoria["id"], {"nombre": otra["nombre"]})
+    patch(categoria["id"], {})
+    patch(categoria["id"], {"nombre": "X"}, headers={})
+    patch(categoria["id"], {"nombre": "X"}, headers=contador)
+    patch(uuid.uuid4(), {"nombre": "X"})
+    path = f"/categorias/{categoria['id']}"
+    check("patch", "/categorias/{id}", client.patch(path, data=grande, headers=admin))
+
+    sugeridas = "/categorias/sugeridas"
+    check("post", sugeridas, client.post(sugeridas, headers=admin))
+    check("post", sugeridas, client.post(sugeridas))
+    check("post", sugeridas, client.post(sugeridas, headers=contador))
+
+
 LIMITED = [
     ("post", "/auth/login", {"email": ADMIN_A.email, "password": PASSWORD}, {}),
     ("post", "/auth/refresh", None, CSRF),

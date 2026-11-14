@@ -415,6 +415,11 @@ PROTECTED_ENDPOINTS = {
     "ubicaciones.listar": frozenset({"admin", "contador"}),
     "ubicaciones.crear": frozenset({"admin"}),
     "ubicaciones.actualizar": frozenset({"admin"}),
+    # Spec 003 (T3): roles y aislamiento en test_categorias_api.py.
+    "categorias.listar_categorias": frozenset({"admin", "contador"}),
+    "categorias.crear_categoria": frozenset({"admin"}),
+    "categorias.renombrar_categoria": frozenset({"admin"}),
+    "categorias.cargar_sugeridas": frozenset({"admin"}),
 }
 
 

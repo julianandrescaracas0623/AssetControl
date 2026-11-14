@@ -18,6 +18,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from sqlalchemy import case, exists, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -227,3 +228,63 @@ class CategoriaVista:
 
 def _vista_categoria(categoria: Categoria) -> CategoriaVista:
     return CategoriaVista(id=categoria.id, nombre=categoria.nombre)
+
+
+# Lista de P8 (docs/05; decisión Q4 de la spec 003): se cargan con un botón, una vez.
+CATEGORIAS_SUGERIDAS = (
+    "Mobiliario",
+    "Electrónica",
+    "CPU",
+    "Periféricos",
+    "Electrodomésticos",
+    "Biomédicos",
+)
+
+
+def listar_categorias(session: Session) -> list[CategoriaVista]:
+    consulta = select(Categoria).order_by(Categoria.nombre_clave, Categoria.id)
+    return [_vista_categoria(c) for c in session.scalars(consulta)]
+
+
+def crear_categoria(session: Session, *, nombre: object) -> CategoriaVista:
+    visible, clave = nombre_y_clave(nombre)
+
+    def escribir() -> Categoria:
+        categoria = Categoria(nombre=visible, nombre_clave=clave)
+        session.add(categoria)
+        return categoria
+
+    return _vista_categoria(_guardar(session, escribir))
+
+
+def renombrar_categoria(
+    session: Session, categoria_id: uuid.UUID, *, nombre: object
+) -> CategoriaVista:
+    visible, clave = nombre_y_clave(nombre)
+    categoria = session.scalars(
+        select(Categoria).where(Categoria.id == categoria_id).with_for_update()
+    ).one_or_none()
+    if categoria is None:
+        raise NoEncontrado()
+
+    def escribir() -> Categoria:
+        categoria.nombre, categoria.nombre_clave = visible, clave
+        return categoria
+
+    return _vista_categoria(_guardar(session, escribir))
+
+
+def cargar_sugeridas(session: Session, tenant_id: uuid.UUID) -> int:
+    """Crea las sugeridas que falten (por clave); idempotente incluso con dos clics a la
+    vez (``ON CONFLICT DO NOTHING``). Devuelve cuántas creó."""
+    filas = [
+        {"tenant_id": tenant_id, "nombre": visible, "nombre_clave": clave}
+        for visible, clave in (nombre_y_clave(n) for n in CATEGORIAS_SUGERIDAS)
+    ]
+    resultado = session.execute(
+        insert(Categoria)
+        .values(filas)
+        .on_conflict_do_nothing(index_elements=[Categoria.tenant_id, Categoria.nombre_clave])
+        .returning(Categoria.id)
+    )
+    return len(resultado.all())

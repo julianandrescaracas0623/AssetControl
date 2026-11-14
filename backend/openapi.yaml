@@ -331,6 +331,100 @@ paths:
         "413":
           $ref: "#/components/responses/CuerpoDemasiadoGrande"
 
+  /categorias:
+    get:
+      tags: [catalogo]
+      operationId: listarCategorias
+      summary: Categorías del tenant, por nombre
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista cerrada de la clínica.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaCategorias" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+    post:
+      tags: [catalogo]
+      operationId: crearCategoria
+      summary: Crear una categoría (solo admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NombreBody" }
+      responses:
+        "201":
+          description: Creada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CategoriaRespuesta" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "409":
+          $ref: "#/components/responses/NombreDuplicado"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /categorias/{id}:
+    patch:
+      tags: [catalogo]
+      operationId: renombrarCategoria
+      summary: Renombrar una categoría (solo admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NombreBody" }
+      responses:
+        "200":
+          description: Renombrada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CategoriaRespuesta" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/NombreDuplicado"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /categorias/sugeridas:
+    post:
+      tags: [catalogo]
+      operationId: cargarCategoriasSugeridas
+      summary: Crear las 6 categorías sugeridas que falten (idempotente; solo admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista completa y cuántas se crearon ahora.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SugeridasCargadas" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -389,6 +483,12 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
       x-codigos: [no_encontrado]
+    NombreDuplicado:
+      description: Ya existe una con ese nombre (sin distinguir mayúsculas ni tildes).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [nombre_duplicado]
     Prohibido:
       description: Rol insuficiente o petición de otro sitio (sin cabecera CSRF).
       content:
@@ -619,6 +719,43 @@ components:
       properties:
         nombre: { $ref: "#/components/schemas/NombreVisible" }
         activa: { type: boolean }
+
+    Categoria:
+      type: object
+      required: [id, nombre]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+    CategoriaRespuesta:
+      type: object
+      required: [categoria]
+      additionalProperties: false
+      properties:
+        categoria: { $ref: "#/components/schemas/Categoria" }
+    ListaCategorias:
+      type: object
+      required: [categorias]
+      additionalProperties: false
+      properties:
+        categorias:
+          type: array
+          items: { $ref: "#/components/schemas/Categoria" }
+    SugeridasCargadas:
+      type: object
+      required: [categorias, creadas]
+      additionalProperties: false
+      properties:
+        categorias:
+          type: array
+          items: { $ref: "#/components/schemas/Categoria" }
+        creadas: { type: integer, minimum: 0 }
+    NombreBody:
+      type: object
+      required: [nombre]
+      additionalProperties: false
+      properties:
+        nombre: { $ref: "#/components/schemas/NombreVisible" }
 
     Health:
       type: object

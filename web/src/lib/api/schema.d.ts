@@ -192,6 +192,58 @@ export interface paths {
         patch: operations["actualizarUbicacion"];
         trace?: never;
     };
+    "/categorias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Categorías del tenant, por nombre */
+        get: operations["listarCategorias"];
+        put?: never;
+        /** Crear una categoría (solo admin) */
+        post: operations["crearCategoria"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/categorias/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Renombrar una categoría (solo admin) */
+        patch: operations["renombrarCategoria"];
+        trace?: never;
+    };
+    "/categorias/sugeridas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Crear las 6 categorías sugeridas que falten (idempotente; solo admin) */
+        post: operations["cargarCategoriasSugeridas"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -313,6 +365,24 @@ export interface components {
             nombre?: components["schemas"]["NombreVisible"];
             activa?: boolean;
         };
+        Categoria: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+        };
+        CategoriaRespuesta: {
+            categoria: components["schemas"]["Categoria"];
+        };
+        ListaCategorias: {
+            categorias: components["schemas"]["Categoria"][];
+        };
+        SugeridasCargadas: {
+            categorias: components["schemas"]["Categoria"][];
+            creadas: number;
+        };
+        NombreBody: {
+            nombre: components["schemas"]["NombreVisible"];
+        };
         Health: {
             /** @enum {string} */
             status: "ok" | "error";
@@ -357,6 +427,15 @@ export interface components {
         };
         /** @description No existe en este tenant (o es de otro). */
         NoEncontrado: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Ya existe una con ese nombre (sin distinguir mayúsculas ni tildes). */
+        NombreDuplicado: {
             headers: {
                 [name: string]: unknown;
             };
@@ -777,6 +856,111 @@ export interface operations {
                 };
             };
             413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    listarCategorias: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lista cerrada de la clínica. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaCategorias"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+        };
+    };
+    crearCategoria: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NombreBody"];
+            };
+        };
+        responses: {
+            /** @description Creada. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoriaRespuesta"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            409: components["responses"]["NombreDuplicado"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    renombrarCategoria: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NombreBody"];
+            };
+        };
+        responses: {
+            /** @description Renombrada. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoriaRespuesta"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            409: components["responses"]["NombreDuplicado"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    cargarCategoriasSugeridas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lista completa y cuántas se crearon ahora. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SugeridasCargadas"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
         };
     };
 }
