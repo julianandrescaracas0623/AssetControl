@@ -29,8 +29,11 @@ class SesionConteo(TenantScoped, Base):
     abierta_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=FetchedValue()
     )
-    cerrada_por: Mapped[uuid.UUID | None] = mapped_column(Uuid)
-    cerrada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Las pone el cierre (008); al insertar no se envían (la aplicación no tiene INSERT).
+    cerrada_por: Mapped[uuid.UUID | None] = mapped_column(Uuid, server_default=FetchedValue())
+    cerrada_en: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=FetchedValue()
+    )
 
 
 class Verificacion(TenantScoped, Base):

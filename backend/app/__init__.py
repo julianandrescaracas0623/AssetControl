@@ -14,6 +14,7 @@ from app.auth.routes import bp as auth_bp
 from app.catalogo.routes import categorias_bp, ubicaciones_bp
 from app.cli import register_cli
 from app.config import CONFIG_EXTENSION_KEY, Config, load_config
+from app.conteo.routes import bp as sesiones_bp
 from app.db import init_db
 from app.errors import register_error_handlers
 from app.invitaciones.routes import bp as invitaciones_bp
@@ -55,6 +56,7 @@ def create_app(config: Config | None = None) -> Flask:
     app.register_blueprint(ubicaciones_bp)
     app.register_blueprint(categorias_bp)
     app.register_blueprint(activos_bp)
+    app.register_blueprint(sesiones_bp)
     register_cli(app)
     if config.trusted_proxy_hops:
         # T10: la IP del cliente para el límite de tasa sale de X-Forwarded-For solo con

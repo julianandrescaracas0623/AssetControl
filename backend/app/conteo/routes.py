@@ -1,0 +1,62 @@
+"""Rutas ``/sesiones`` (spec 006; R1–R3, Q1; plan.md §3).
+
+Ambos roles ven la sesión abierta, la lista y el avance (sin precios); solo el admin
+abre (Q1). Una sesión de otro tenant es ``404``. Cuerpos JSON de 4 KB como máximo
+(``app.auth.http``).
+"""
+
+import uuid
+
+from flask import Blueprint, jsonify, request
+from flask.typing import ResponseReturnValue
+
+from app.auth.decorators import current_session, current_user, require_auth, require_role
+from app.conteo import service
+from app.errors import error_response
+
+bp = Blueprint("sesiones", __name__, url_prefix="/sesiones")
+
+
+def _error(exc: service.ErrorConteo) -> ResponseReturnValue:
+    return error_response(exc.status, exc.code, exc.message)
+
+
+@bp.post("")
+@require_role("admin")
+def abrir() -> ResponseReturnValue:
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return error_response(400, "solicitud_invalida", "La solicitud no es válida.")
+    session = current_session()
+    try:
+        nombre, fecha_corte = service.datos_de_apertura(body)
+        sesion = service.abrir(session, nombre, fecha_corte, current_user().usuario_id)
+    except service.ErrorConteo as exc:
+        return _error(exc)
+    return jsonify(sesion=service.vista(session, sesion)), 201
+
+
+@bp.get("")
+@require_auth
+def listar() -> ResponseReturnValue:
+    session = current_session()
+    return jsonify(sesiones=[service.vista(session, s) for s in service.listar(session)])
+
+
+@bp.get("/abierta")
+@require_auth
+def abierta() -> ResponseReturnValue:
+    session = current_session()
+    sesion = service.abierta(session)
+    return jsonify(sesion=service.vista(session, sesion) if sesion else None)
+
+
+@bp.get("/<uuid:id>")
+@require_auth
+def detalle(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del contrato
+    session = current_session()
+    try:
+        sesion = service.obtener(session, id)
+    except service.ErrorConteo as exc:
+        return _error(exc)
+    return jsonify(sesion=service.vista(session, sesion), avance=service.avance(session, sesion))

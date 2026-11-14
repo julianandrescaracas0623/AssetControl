@@ -28,6 +28,7 @@ SMALL_BODY_PATH_PREFIXES: tuple[str, ...] = (
     "/ubicaciones",
     "/categorias",
     "/activos",
+    "/sesiones",
 )
 AUTH_MAX_BODY_BYTES = 4096
 REFRESH_COOKIE_SECURE_NAME = "__Secure-refresh"

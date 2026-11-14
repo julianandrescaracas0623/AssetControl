@@ -385,6 +385,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sesiones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sesiones de conteo; la abierta primero y luego las más recientes */
+        get: operations["listarSesiones"];
+        put?: never;
+        /** Abrir una sesión de conteo (solo admin; una abierta por clínica) */
+        post: operations["abrirSesion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sesiones/abierta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** La sesión de conteo abierta, o null si no hay */
+        get: operations["sesionAbierta"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sesiones/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sesión y avance por ubicación (sin precios; no es el informe) */
+        get: operations["detalleSesion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -393,7 +445,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -609,6 +661,66 @@ export interface components {
              * @description No futura.
              */
             fecha_compra?: string | null;
+        };
+        Autor: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+        };
+        SesionConteo: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+            /** @enum {string} */
+            tipo: "conteo" | "importacion";
+            /** @enum {string} */
+            estado: "abierta" | "cerrada";
+            /** Format: date */
+            fecha_corte: string;
+            abierta_por: components["schemas"]["Autor"];
+            /** Format: date-time */
+            abierta_en: string;
+            cerrada_por: components["schemas"]["Autor"] | null;
+            /** Format: date-time */
+            cerrada_en: string | null;
+        };
+        SesionConteoRespuesta: {
+            sesion: components["schemas"]["SesionConteo"];
+        };
+        SesionAbierta: {
+            sesion: components["schemas"]["SesionConteo"] | null;
+        };
+        ListaSesiones: {
+            sesiones: components["schemas"]["SesionConteo"][];
+        };
+        AbrirSesionBody: {
+            nombre: components["schemas"]["NombreVisible"];
+            /**
+             * Format: date
+             * @description Fecha a la que se refiere el informe.
+             */
+            fecha_corte: string;
+        };
+        AvanceUbicacion: {
+            ubicacion: {
+                /** Format: uuid */
+                id: string;
+                ruta: string;
+            };
+            total: number;
+            verificados: number;
+            pendientes: number;
+        };
+        /** @description Activos activo o en_reparacion por su ubicación vigente y cuántos tienen verificación en la sesión. Información de trabajo; no es el informe. */
+        Avance: {
+            total: number;
+            verificados: number;
+            pendientes: number;
+            por_ubicacion: components["schemas"]["AvanceUbicacion"][];
+        };
+        DetalleSesion: {
+            sesion: components["schemas"]["SesionConteo"];
+            avance: components["schemas"]["Avance"];
         };
         /** @enum {string} */
         TipoEvento: "creado" | "importado" | "verificado" | "ubicacion_cambiada" | "precio_cambiado" | "estado_cambiado" | "categoria_cambiada" | "datos_cambiados" | "dado_de_baja";
@@ -1659,6 +1771,110 @@ export interface operations {
             412: components["responses"]["VersionDesactualizada"];
             413: components["responses"]["CuerpoDemasiadoGrande"];
             428: components["responses"]["FaltaVersion"];
+        };
+    };
+    listarSesiones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Todas las sesiones del tenant. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaSesiones"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+        };
+    };
+    abrirSesion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AbrirSesionBody"];
+            };
+        };
+        responses: {
+            /** @description Abierta. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SesionConteoRespuesta"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            /** @description Ya hay una sesión de conteo abierta. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    sesionAbierta: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La abierta o null. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SesionAbierta"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+        };
+    };
+    detalleSesion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La sesión y su avance. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetalleSesion"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
         };
     };
 }

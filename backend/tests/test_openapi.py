@@ -49,6 +49,7 @@ from app.auth.decorators import NOT_AUTHENTICATED
 from app.auth.http import AUTH_MAX_BODY_BYTES, CSRF_HEADER, CSRF_HEADER_VALUE
 from app.catalogo import service as catalogo_service
 from app.config import RateLimits
+from app.conteo import service as conteo_service
 from app.invitaciones import routes as invitaciones_routes
 
 CONTRACT_FILE = Path(__file__).resolve().parent.parent / "openapi.yaml"
@@ -93,6 +94,7 @@ SCHEMA_KEYWORDS = {
     "title",
     "minimum",
     "items",
+    "oneOf",
 }
 FORMATS = {"uuid", "date-time", "date", "email", "password"}
 
@@ -150,6 +152,15 @@ def validate(schema: dict, value: object, where: str = "$") -> None:
     if "$ref" in schema:
         validate(resolve(schema["$ref"]), value, where)
         return
+    if "oneOf" in schema:
+        coinciden = 0
+        for option in schema["oneOf"]:
+            try:
+                validate(option, value, where)
+            except AssertionError:
+                continue
+            coinciden += 1
+        assert coinciden == 1, f"{where}: {value!r} cumple {coinciden} opciones de oneOf"
     if "type" in schema:
         types = schema["type"] if isinstance(schema["type"], list) else [schema["type"]]
         assert any(_type_ok(t, value) for t in types), f"{where}: {value!r} no es {types}"
@@ -199,6 +210,16 @@ def _refs(node: object) -> Iterator[str]:
             yield from _refs(item)
 
 
+def test_one_of_accepts_exactly_one_option():
+    schema = {"oneOf": [{"type": "string"}, {"type": "null"}]}
+    validate(schema, "x")
+    validate(schema, None)
+    with pytest.raises(AssertionError):
+        validate(schema, 3)
+    with pytest.raises(AssertionError):
+        validate({"oneOf": [{"type": "string"}, {"type": "string"}]}, "x")
+
+
 def test_contract_is_openapi_31_and_every_ref_resolves():
     assert CONTRACT["openapi"] == "3.1.0"
     assert CONTRACT["info"]["title"] == "AssetControl API"
@@ -220,6 +241,8 @@ def _walk_schema(schema: dict, where: str) -> None:
         _walk_schema(sub, f"{where}.{name}")
     if "items" in schema:
         _walk_schema(schema["items"], f"{where}[]")
+    for index, option in enumerate(schema.get("oneOf", [])):
+        _walk_schema(option, f"{where}.oneOf[{index}]")
     if schema.get("type") == "object" and "properties" in schema:
         assert schema.get("additionalProperties") is False, f"{where}: objeto abierto"
 
@@ -693,6 +716,42 @@ def test_activos_responses(client, contrato_db):
     assert check("patch", "/ubicaciones/{id}", patch)["error"]["code"] == "tiene_activos"
 
 
+def test_sesiones_responses(client, contrato_db):
+    admin, contador = bearer(ADMIN_A, TENANT_A), bearer(CONTADOR_A, TENANT_A)
+    with contrato_db.migrator.begin() as conn:
+        conn.execute(text("delete from sesion_conteo where estado = 'abierta'"))
+    check("get", "/sesiones/abierta", client.get("/sesiones/abierta", headers=contador))
+    cuerpo = {"nombre": "Conteo del contrato", "fecha_corte": "2026-11-30"}
+    sesion = check("post", "/sesiones", client.post("/sesiones", json=cuerpo, headers=admin))
+    check("post", "/sesiones", client.post("/sesiones", json=cuerpo, headers=admin))
+    check("post", "/sesiones", client.post("/sesiones", json={"nombre": ""}, headers=admin))
+    check("post", "/sesiones", client.post("/sesiones", json=cuerpo, headers=contador))
+    check("post", "/sesiones", client.post("/sesiones", json=cuerpo, headers={}))
+    check(
+        "post",
+        "/sesiones",
+        client.post("/sesiones", data="x" * (AUTH_MAX_BODY_BYTES + 1), headers=admin),
+    )
+    check("get", "/sesiones/abierta", client.get("/sesiones/abierta", headers=contador))
+    check("get", "/sesiones/abierta", client.get("/sesiones/abierta", headers={}))
+    for headers in (admin, {}):
+        check("get", "/sesiones", client.get("/sesiones", headers=headers))
+    ruta = f"/sesiones/{sesion['sesion']['id']}"
+    for headers in (contador, {}):
+        check("get", "/sesiones/{id}", client.get(ruta, headers=headers))
+    check("get", "/sesiones/{id}", client.get(f"/sesiones/{uuid.uuid4()}", headers=admin))
+    # Una sesión cerrada (el cierre llega con la 008) también cumple el contrato.
+    with contrato_db.migrator.begin() as conn:
+        conn.execute(
+            text(
+                "update sesion_conteo set estado = 'cerrada', cerrada_en = now(), "
+                "cerrada_por = abierta_por where id = :s"
+            ),
+            {"s": sesion["sesion"]["id"]},
+        )
+    check("get", "/sesiones", client.get("/sesiones", headers=admin))
+
+
 LIMITED = [
     ("post", "/auth/login", {"email": ADMIN_A.email, "password": PASSWORD}, {}),
     ("post", "/auth/refresh", None, CSRF),
@@ -763,6 +822,7 @@ def backend_error_codes() -> set[str]:
     codes |= {error.code for error in catalogo_service.ERRORES}
     codes |= {error.code for error in (*activos_service.ERRORES, activos_service.CodigoExistente)}
     codes |= {error.code for error in activos_cambios.ERRORES}
+    codes |= {error.code for error in conteo_service.ERRORES}
     return codes | _policy_codes()
 
 

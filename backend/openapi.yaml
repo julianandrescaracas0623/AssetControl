@@ -754,6 +754,89 @@ paths:
         "428":
           $ref: "#/components/responses/FaltaVersion"
 
+  /sesiones:
+    get:
+      tags: [conteo]
+      operationId: listarSesiones
+      summary: Sesiones de conteo; la abierta primero y luego las más recientes
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Todas las sesiones del tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaSesiones" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+    post:
+      tags: [conteo]
+      operationId: abrirSesion
+      summary: Abrir una sesión de conteo (solo admin; una abierta por clínica)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AbrirSesionBody" }
+      responses:
+        "201":
+          description: Abierta.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SesionConteoRespuesta" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "409":
+          description: Ya hay una sesión de conteo abierta.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [sesion_abierta_existente]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /sesiones/abierta:
+    get:
+      tags: [conteo]
+      operationId: sesionAbierta
+      summary: La sesión de conteo abierta, o null si no hay
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: La abierta o null.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SesionAbierta" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /sesiones/{id}:
+    get:
+      tags: [conteo]
+      operationId: detalleSesion
+      summary: Sesión y avance por ubicación (sin precios; no es el informe)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: La sesión y su avance.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DetalleSesion" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -923,6 +1006,7 @@ components:
         - codigo_inmutable
         - activo_dado_de_baja
         - motivo_invalido
+        - sesion_abierta_existente
     Error:
       type: object
       required: [error]
@@ -1250,6 +1334,96 @@ components:
         modelo: { $ref: "#/components/schemas/TextoOpcional" }
         subtipo: { $ref: "#/components/schemas/TextoOpcional" }
         fecha_compra: { type: [string, "null"], format: date, description: No futura. }
+    Autor:
+      type: object
+      required: [id, nombre]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+    SesionConteo:
+      type: object
+      required: [id, nombre, tipo, estado, fecha_corte, abierta_por, abierta_en, cerrada_por, cerrada_en]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        tipo: { type: string, enum: [conteo, importacion] }
+        estado: { type: string, enum: [abierta, cerrada] }
+        fecha_corte: { type: string, format: date }
+        abierta_por: { $ref: "#/components/schemas/Autor" }
+        abierta_en: { type: string, format: date-time }
+        cerrada_por:
+          oneOf:
+            - { $ref: "#/components/schemas/Autor" }
+            - { type: "null" }
+        cerrada_en: { type: [string, "null"], format: date-time }
+    SesionConteoRespuesta:
+      type: object
+      required: [sesion]
+      additionalProperties: false
+      properties:
+        sesion: { $ref: "#/components/schemas/SesionConteo" }
+    SesionAbierta:
+      type: object
+      required: [sesion]
+      additionalProperties: false
+      properties:
+        sesion:
+          oneOf:
+            - { $ref: "#/components/schemas/SesionConteo" }
+            - { type: "null" }
+    ListaSesiones:
+      type: object
+      required: [sesiones]
+      additionalProperties: false
+      properties:
+        sesiones:
+          type: array
+          items: { $ref: "#/components/schemas/SesionConteo" }
+    AbrirSesionBody:
+      type: object
+      required: [nombre, fecha_corte]
+      additionalProperties: false
+      properties:
+        nombre: { $ref: "#/components/schemas/NombreVisible" }
+        fecha_corte: { type: string, format: date, description: Fecha a la que se refiere el informe. }
+    AvanceUbicacion:
+      type: object
+      required: [ubicacion, total, verificados, pendientes]
+      additionalProperties: false
+      properties:
+        ubicacion:
+          type: object
+          required: [id, ruta]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            ruta: { type: string }
+        total: { type: integer, minimum: 0 }
+        verificados: { type: integer, minimum: 0 }
+        pendientes: { type: integer, minimum: 0 }
+    Avance:
+      type: object
+      required: [total, verificados, pendientes, por_ubicacion]
+      additionalProperties: false
+      description: >-
+        Activos activo o en_reparacion por su ubicación vigente y cuántos tienen
+        verificación en la sesión. Información de trabajo; no es el informe.
+      properties:
+        total: { type: integer, minimum: 0 }
+        verificados: { type: integer, minimum: 0 }
+        pendientes: { type: integer, minimum: 0 }
+        por_ubicacion:
+          type: array
+          items: { $ref: "#/components/schemas/AvanceUbicacion" }
+    DetalleSesion:
+      type: object
+      required: [sesion, avance]
+      additionalProperties: false
+      properties:
+        sesion: { $ref: "#/components/schemas/SesionConteo" }
+        avance: { $ref: "#/components/schemas/Avance" }
     TipoEvento:
       type: string
       enum:
