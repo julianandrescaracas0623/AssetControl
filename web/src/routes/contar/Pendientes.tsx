@@ -6,12 +6,12 @@ import { EmptyState } from '@/components/app/EmptyState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { useCabeceraConteo, useSalaDeTrabajo } from '@/lib/conteo'
 import { usePendientes } from '@/lib/discrepancias'
 import { formatEntero } from '@/lib/format'
-import { pendientes as textoPendientes, useDetalleSesion, useSesionAbierta } from '@/lib/sesiones'
+import { useDetalleSesion, useSesionAbierta } from '@/lib/sesiones'
 
 // Pendientes por ubicación (spec 007, T7; docs/08 §6.1, CU-VER-04): los activos
 // `activo` o `en_reparacion` sin verificación en la sesión abierta, por su ubicación
@@ -99,7 +99,7 @@ export default function Pendientes() {
     >
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Pendientes</h1>
-        {total !== undefined && <p className="text-sm text-muted-foreground">{total === 0 ? 'Todo verificado' : `${textoPendientes(total)} sin verificar`}</p>}
+        {total !== undefined && <p className="text-sm text-muted-foreground">{total === 0 ? 'Todo verificado' : `${formatEntero(total)} sin verificar`}</p>}
       </div>
       {sesion.isPending || (sesion.data && detalle.isPending) ? (
         <div role="status" aria-label="Cargando pendientes" className="flex flex-col gap-2">
@@ -133,8 +133,9 @@ export default function Pendientes() {
               params.set('ubicacion', v)
               setParams(params, { replace: true })
             }}
+            className="gap-2"
           >
-            <TabsList className="h-auto w-full justify-start gap-2 overflow-x-auto bg-transparent p-0 [scrollbar-width:none]">
+            <TabsList className="h-auto w-full justify-start gap-2 overflow-x-auto rounded-none bg-transparent px-0.5 py-1 [scrollbar-width:none]">
               {filas.map((f) => (
                 <TabsTrigger
                   key={f.ubicacion.id}
@@ -145,8 +146,10 @@ export default function Pendientes() {
                 </TabsTrigger>
               ))}
             </TabsList>
+            <TabsContent value={elegida}>
+              <ListaDeUbicacion key={elegida} sesionId={sesion.data.id} ubicacionId={elegida} />
+            </TabsContent>
           </Tabs>
-          <ListaDeUbicacion key={elegida} sesionId={sesion.data.id} ubicacionId={elegida} />
         </>
       )}
     </CountShell>

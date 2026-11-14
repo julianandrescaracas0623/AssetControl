@@ -1,6 +1,6 @@
 # Spec 007 — Discrepancias y pendientes
 
-> **Estado:** Aprobada (G1–G3, 2026-11-14) con Q1–Q4 en la opción recomendada. Depende de la 006 (sesiones y verificación, hecha). Módulos M5 (CU-VER-02, CU-VER-04) y M6 (CU-DIS-01, CU-DIS-02) de `docs/07`; cierra P14 y P16. Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Implementada (T1–T8, 2026-11-14). Aprobada (G1–G3, 2026-11-14) con Q1–Q4 en la opción recomendada. Depende de la 006 (sesiones y verificación, hecha). Módulos M5 (CU-VER-02, CU-VER-04) y M6 (CU-DIS-01, CU-DIS-02) de `docs/07`; cierra P14 y P16. Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 

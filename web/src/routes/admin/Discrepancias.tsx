@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { type Discrepancia, type ResultadoDiscrepancia, TEXTO_RESULTADO, useDiscrepancias, useResolverDiscrepancias } from '@/lib/discrepancias'
@@ -126,20 +126,20 @@ function Lista({ sesionId }: { sesionId: string }) {
     ) : null
 
   return (
+    <Tabs
+      value={filtro}
+      onValueChange={(v) => {
+        setFiltro(v as typeof filtro)
+        setSeleccion(new Set())
+      }}
+      className="gap-0"
+    >
     <section className="min-w-0 rounded-xl border" aria-label="Lista de discrepancias">
       <div className="flex flex-col gap-3 border-b p-3 md:flex-row md:items-center md:justify-between">
-        <Tabs
-          value={filtro}
-          onValueChange={(v) => {
-            setFiltro(v as typeof filtro)
-            setSeleccion(new Set())
-          }}
-        >
-          <TabsList>
-            <TabsTrigger value="por_resolver">Por resolver</TabsTrigger>
-            <TabsTrigger value="resueltas">Resueltas</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <TabsList>
+          <TabsTrigger value="por_resolver">Por resolver</TabsTrigger>
+          <TabsTrigger value="resueltas">Resueltas</TabsTrigger>
+        </TabsList>
         {elegidas.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 [&_[data-slot=button]]:max-md:min-h-11" role="group" aria-label="Acciones sobre las seleccionadas">
             <span className="text-sm text-muted-foreground tabular-nums">{elegidas.length} seleccionadas</span>
@@ -154,6 +154,7 @@ function Lista({ sesionId }: { sesionId: string }) {
           </div>
         )}
       </div>
+      <TabsContent value={filtro} className="min-w-0">
       {consulta.isPending ? (
         <div role="status" aria-label="Cargando discrepancias" className="flex flex-col gap-2 p-4">
           <Skeleton className="h-10" />
@@ -259,6 +260,7 @@ function Lista({ sesionId }: { sesionId: string }) {
           </Table>
         </div>
       )}
+      </TabsContent>
       <AlertDialog open={desfasadas.length > 0} onOpenChange={(v) => !v && setDesfasadas([])}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -291,6 +293,7 @@ function Lista({ sesionId }: { sesionId: string }) {
         </AlertDialogContent>
       </AlertDialog>
     </section>
+    </Tabs>
   )
 }
 
