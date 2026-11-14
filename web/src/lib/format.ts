@@ -21,3 +21,6 @@ export function formatCOP(valor: string): string {
 export function formatEntero(n: number): string {
   return agruparMiles(String(Math.trunc(n)))
 }
+
+/** "1 unidad", "2 unidades", "1.250 unidades". */
+export const formatUnidades = (n: number) => `${formatEntero(n)} ${n === 1 ? 'unidad' : 'unidades'}`

@@ -3,7 +3,7 @@ import { useId } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import type { InformeCongelado, ValorActual } from '@/lib/cifras'
-import { formatCOP, formatEntero } from '@/lib/format'
+import { formatCOP, formatEntero, formatUnidades } from '@/lib/format'
 
 // R7/R10: el informe congelado y el valor actual viven en tarjetas distintas,
 // con rótulos distintos. Las cifras llegan del servidor; aquí no se suma nada.
@@ -48,7 +48,7 @@ export function ThreeFiguresCard({
               {c.rotulo}
             </span>
             <span className="truncate text-2xl font-semibold tracking-tight tabular-nums">{formatCOP(c.valor)}</span>
-            <span className="text-xs text-muted-foreground tabular-nums">{formatEntero(c.unidades)} unidades</span>
+            <span className="text-xs text-muted-foreground tabular-nums">{formatUnidades(c.unidades)}</span>
           </div>
         ))}
       </div>

@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { mensajeDeError } from '@/lib/api/cliente'
-import { formatCOP, formatEntero } from '@/lib/format'
+import { formatCOP, formatEntero, formatUnidades } from '@/lib/format'
 import { type FilaValor, type ValorEnVivo, useValorActual } from '@/lib/informe'
 
 // Valor actual del inventario (spec 008, T6; R8 de la spec, R7 de docs/03; CU-INF-02):
@@ -36,7 +36,7 @@ function Cifras({ valor }: { valor: ValorEnVivo }) {
         <div className="flex min-w-0 flex-col gap-1 px-5 py-4">
           <span className="text-xs font-medium text-muted-foreground">Total vigente</span>
           <span className="truncate text-2xl font-semibold tracking-tight tabular-nums">{formatCOP(valor.total)}</span>
-          <span className="text-xs text-muted-foreground tabular-nums">{formatEntero(valor.unidades)} unidades</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{formatUnidades(valor.unidades)}</span>
         </div>
         <div className="flex min-w-0 flex-col gap-1 border-t px-5 py-4 sm:border-t-0 sm:border-l">
           <span className="flex items-center gap-1.5 text-xs font-medium text-warning">
@@ -44,7 +44,7 @@ function Cifras({ valor }: { valor: ValorEnVivo }) {
             En reparación (incluido)
           </span>
           <span className="truncate text-2xl font-semibold tracking-tight tabular-nums">{formatCOP(valor.en_reparacion.valor)}</span>
-          <span className="text-xs text-muted-foreground tabular-nums">{formatEntero(valor.en_reparacion.unidades)} unidades</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{formatUnidades(valor.en_reparacion.unidades)}</span>
         </div>
       </div>
     </section>

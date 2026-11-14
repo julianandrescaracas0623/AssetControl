@@ -1,6 +1,6 @@
 # Spec 008 — Cierre de sesión, informe y valor actual
 
-> **Estado:** Aprobada (G1–G3, 2026-11-14) con Q1–Q3 en la opción recomendada. Depende de la 007 (discrepancias y pendientes, hecha). Módulos M4 (CU-SES-03) y M7 (CU-INF-01, CU-INF-02) de `docs/07`; tablas `sesion_desglose` (R9) y `sesion_no_encontrado` (R9a). La exportación (CU-INF-03) es de la 009. Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Implementada (T1–T7, 2026-11-14). Aprobada (G1–G3, 2026-11-14) con Q1–Q3 en la opción recomendada. Depende de la 007 (discrepancias y pendientes, hecha). Módulos M4 (CU-SES-03) y M7 (CU-INF-01, CU-INF-02) de `docs/07`; tablas `sesion_desglose` (R9) y `sesion_no_encontrado` (R9a). La exportación (CU-INF-03) es de la 009. Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 

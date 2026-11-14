@@ -31,7 +31,7 @@ describe('Valor actual (spec 008, T6)', () => {
     expect(within(cifras).getByText('No es un informe')).toBeTruthy()
     const texto = cop(cifras.textContent ?? '')
     expect(texto).toContain('Total vigente$ 1.779.900,002 unidades')
-    expect(texto).toContain('En reparación (incluido)$ 389.900,001 unidades')
+    expect(texto).toContain('En reparación (incluido)$ 389.900,001 unidad')
     expect(screen.queryByText(/Informe congelado/)).toBeNull()
   })
 
@@ -40,7 +40,7 @@ describe('Valor actual (spec 008, T6)', () => {
     catalogo.activos[0].estado = 'dado_de_baja'
     abrir(catalogo)
     const texto = cop((await screen.findByRole('region', { name: /Valor actual/ })).textContent ?? '')
-    expect(texto).toContain('Total vigente$ 389.900,001 unidades')
+    expect(texto).toContain('Total vigente$ 389.900,001 unidad')
   })
 
   it('desglosa por categoría y por ubicación con el total del servidor', async () => {

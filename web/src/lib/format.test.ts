@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatCOP, formatEntero } from './format'
+import { formatCOP, formatEntero, formatUnidades } from './format'
 
 // Spec 001b, T7: dinero es-CO sin pasar por float (docs/08 §2.3; AGENTS: nunca float).
 
@@ -29,4 +29,13 @@ describe('formatEntero', () => {
     expect(formatEntero(219)).toBe('219')
     expect(formatEntero(1234567)).toBe('1.234.567')
   })
+})
+
+describe('formatUnidades', () => {
+  it.each([
+    [0, '0 unidades'],
+    [1, '1 unidad'],
+    [2, '2 unidades'],
+    [1250, '1.250 unidades'],
+  ])('%s → %s', (n, esperado) => expect(formatUnidades(n)).toBe(esperado))
 })
