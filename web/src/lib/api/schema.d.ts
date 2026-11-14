@@ -526,6 +526,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sesiones/{id}/cerrar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cerrar la sesión y congelar el informe (solo admin; repetirlo devuelve el informe)
+         * @description Calcula una vez el universo del cierre y guarda, en la misma transacción, las tres cifras, el desglose por categoría y ubicación y la lista de no encontrados.
+         */
+        post: operations["cerrarSesion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sesiones/{id}/informe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Informe congelado de una sesión cerrada (solo admin; no recalcula nada) */
+        get: operations["informeSesion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -534,7 +571,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -933,6 +970,45 @@ export interface components {
             total: number;
             pagina: number;
             por_pagina: number;
+        };
+        Cifras: {
+            encontrado: components["schemas"]["Precio"];
+            no_encontrado: components["schemas"]["Precio"];
+            registrado: components["schemas"]["Precio"];
+            unidades_encontrado: number;
+            unidades_no_encontrado: number;
+            unidades_registrado: number;
+        };
+        /** @description etiqueta es el nombre de la categoría o la ruta de la ubicación al cierre. */
+        FilaDesglose: {
+            /** Format: uuid */
+            id: string;
+            etiqueta: string;
+            total_encontrado: components["schemas"]["Precio"];
+            total_no_encontrado: components["schemas"]["Precio"];
+            total_registrado: components["schemas"]["Precio"];
+            unidades_encontrado: number;
+            unidades_no_encontrado: number;
+            unidades_registrado: number;
+        };
+        NoEncontrado: {
+            /** Format: uuid */
+            activo_id: string;
+            codigo: string;
+            nombre: string;
+            categoria: components["schemas"]["Categoria"];
+            ubicacion: components["schemas"]["UbicacionRuta"];
+            precio: components["schemas"]["Precio"];
+            en_reparacion: boolean;
+        };
+        Informe: {
+            sesion: components["schemas"]["SesionConteo"];
+            totales: components["schemas"]["Cifras"];
+            desglose: {
+                categorias: components["schemas"]["FilaDesglose"][];
+                ubicaciones: components["schemas"]["FilaDesglose"][];
+            };
+            no_encontrados: components["schemas"]["NoEncontrado"][];
         };
         /** @enum {string} */
         TipoEvento: "creado" | "importado" | "verificado" | "ubicacion_cambiada" | "precio_cambiado" | "estado_cambiado" | "categoria_cambiada" | "datos_cambiados" | "dado_de_baja" | "discrepancia_descartada";
@@ -2295,6 +2371,68 @@ export interface operations {
             400: components["responses"]["SolicitudInvalida"];
             401: components["responses"]["NoAutenticado"];
             404: components["responses"]["NoEncontrado"];
+        };
+    };
+    cerrarSesion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description El informe congelado (también si ya estaba cerrada). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Informe"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    informeSesion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Las tres cifras, el desglose y los no encontrados del cierre. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Informe"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description La sesión sigue abierta. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
 }

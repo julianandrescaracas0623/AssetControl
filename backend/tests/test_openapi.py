@@ -49,6 +49,7 @@ from app.auth.decorators import NOT_AUTHENTICATED
 from app.auth.http import AUTH_MAX_BODY_BYTES, CSRF_HEADER, CSRF_HEADER_VALUE
 from app.catalogo import service as catalogo_service
 from app.config import RateLimits
+from app.conteo import cierre as conteo_cierre
 from app.conteo import service as conteo_service
 from app.conteo import verificaciones as conteo_verificaciones
 from app.invitaciones import routes as invitaciones_routes
@@ -888,16 +889,32 @@ def test_sesiones_responses(client, contrato_db):
         client.get(f"/sesiones/{uuid.uuid4()}/pendientes", headers=admin),
     )
 
-    # Una sesión cerrada (el cierre llega con la 008) también cumple el contrato.
-    with contrato_db.migrator.begin() as conn:
-        conn.execute(
-            text(
-                "update sesion_conteo set estado = 'cerrada', cerrada_en = now(), "
-                "total_encontrado = 0, total_no_encontrado = 0, total_registrado = 0, "
-                "cerrada_por = abierta_por where id = :s"
-            ),
-            {"s": sesion["sesion"]["id"]},
-        )
+    # Spec 008: informe de una abierta, cerrar (y repetir), informe.
+    informe = f"{ruta}/informe"
+    check("get", "/sesiones/{id}/informe", client.get(informe, headers=admin))
+    for headers in (contador, {}):
+        check("post", "/sesiones/{id}/cerrar", client.post(f"{ruta}/cerrar", headers=headers))
+        check("get", "/sesiones/{id}/informe", client.get(informe, headers=headers))
+    check(
+        "post",
+        "/sesiones/{id}/cerrar",
+        client.post(f"/sesiones/{uuid.uuid4()}/cerrar", headers=admin),
+    )
+    check(
+        "get",
+        "/sesiones/{id}/informe",
+        client.get(f"/sesiones/{uuid.uuid4()}/informe", headers=admin),
+    )
+    check(
+        "post",
+        "/sesiones/{id}/cerrar",
+        client.post(f"{ruta}/cerrar", data="x" * (AUTH_MAX_BODY_BYTES + 1), headers=admin),
+    )
+    cerrado = check("post", "/sesiones/{id}/cerrar", client.post(f"{ruta}/cerrar", headers=admin))
+    assert cerrado["sesion"]["estado"] == "cerrada"
+    assert cerrado["no_encontrados"]
+    check("post", "/sesiones/{id}/cerrar", client.post(f"{ruta}/cerrar", headers=admin))
+    check("get", "/sesiones/{id}/informe", client.get(informe, headers=admin))
     check("get", "/sesiones", client.get("/sesiones", headers=admin))
     cerrada = verificar({**cuerpo_v, "id": str(uuid.uuid4())})
     assert cerrada["error"]["code"] == "sesion_cerrada"
@@ -975,6 +992,7 @@ def backend_error_codes() -> set[str]:
     codes |= {error.code for error in activos_cambios.ERRORES}
     codes |= {error.code for error in conteo_service.ERRORES}
     codes |= {error.code for error in conteo_verificaciones.ERRORES}
+    codes |= {error.code for error in conteo_cierre.ERRORES}
     return codes | _policy_codes()
 
 

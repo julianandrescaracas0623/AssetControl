@@ -1027,6 +1027,61 @@ paths:
         "404":
           $ref: "#/components/responses/NoEncontrado"
 
+  /sesiones/{id}/cerrar:
+    post:
+      tags: [conteo]
+      operationId: cerrarSesion
+      summary: Cerrar la sesión y congelar el informe (solo admin; repetirlo devuelve el informe)
+      description: >-
+        Calcula una vez el universo del cierre y guarda, en la misma transacción, las tres
+        cifras, el desglose por categoría y ubicación y la lista de no encontrados.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: El informe congelado (también si ya estaba cerrada).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Informe" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /sesiones/{id}/informe:
+    get:
+      tags: [conteo]
+      operationId: informeSesion
+      summary: Informe congelado de una sesión cerrada (solo admin; no recalcula nada)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Las tres cifras, el desglose y los no encontrados del cierre.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Informe" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: La sesión sigue abierta.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [sesion_abierta]
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1198,6 +1253,7 @@ components:
         - motivo_invalido
         - sesion_abierta_existente
         - sesion_cerrada
+        - sesion_abierta
     Error:
       type: object
       required: [error]
@@ -1788,6 +1844,64 @@ components:
         total: { type: integer, minimum: 0 }
         pagina: { type: integer, minimum: 1 }
         por_pagina: { type: integer, minimum: 1 }
+    Cifras:
+      type: object
+      required: [encontrado, no_encontrado, registrado, unidades_encontrado, unidades_no_encontrado, unidades_registrado]
+      additionalProperties: false
+      properties:
+        encontrado: { $ref: "#/components/schemas/Precio" }
+        no_encontrado: { $ref: "#/components/schemas/Precio" }
+        registrado: { $ref: "#/components/schemas/Precio" }
+        unidades_encontrado: { type: integer, minimum: 0 }
+        unidades_no_encontrado: { type: integer, minimum: 0 }
+        unidades_registrado: { type: integer, minimum: 0 }
+    FilaDesglose:
+      type: object
+      required: [id, etiqueta, total_encontrado, total_no_encontrado, total_registrado, unidades_encontrado, unidades_no_encontrado, unidades_registrado]
+      additionalProperties: false
+      description: etiqueta es el nombre de la categoría o la ruta de la ubicación al cierre.
+      properties:
+        id: { type: string, format: uuid }
+        etiqueta: { type: string }
+        total_encontrado: { $ref: "#/components/schemas/Precio" }
+        total_no_encontrado: { $ref: "#/components/schemas/Precio" }
+        total_registrado: { $ref: "#/components/schemas/Precio" }
+        unidades_encontrado: { type: integer, minimum: 0 }
+        unidades_no_encontrado: { type: integer, minimum: 0 }
+        unidades_registrado: { type: integer, minimum: 0 }
+    NoEncontrado:
+      type: object
+      required: [activo_id, codigo, nombre, categoria, ubicacion, precio, en_reparacion]
+      additionalProperties: false
+      properties:
+        activo_id: { type: string, format: uuid }
+        codigo: { type: string }
+        nombre: { type: string }
+        categoria: { $ref: "#/components/schemas/Categoria" }
+        ubicacion: { $ref: "#/components/schemas/UbicacionRuta" }
+        precio: { $ref: "#/components/schemas/Precio" }
+        en_reparacion: { type: boolean }
+    Informe:
+      type: object
+      required: [sesion, totales, desglose, no_encontrados]
+      additionalProperties: false
+      properties:
+        sesion: { $ref: "#/components/schemas/SesionConteo" }
+        totales: { $ref: "#/components/schemas/Cifras" }
+        desglose:
+          type: object
+          required: [categorias, ubicaciones]
+          additionalProperties: false
+          properties:
+            categorias:
+              type: array
+              items: { $ref: "#/components/schemas/FilaDesglose" }
+            ubicaciones:
+              type: array
+              items: { $ref: "#/components/schemas/FilaDesglose" }
+        no_encontrados:
+          type: array
+          items: { $ref: "#/components/schemas/NoEncontrado" }
     TipoEvento:
       type: string
       enum:

@@ -11,7 +11,7 @@ from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 
 from app.auth.decorators import current_session, current_user, require_auth, require_role
-from app.conteo import discrepancias, service, verificaciones
+from app.conteo import cierre, discrepancias, service, verificaciones
 from app.errors import error_response
 
 bp = Blueprint("sesiones", __name__, url_prefix="/sesiones")
@@ -158,3 +158,27 @@ def listar_pendientes(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002
     except service.ErrorConteo as exc:
         return _error(exc)
     return jsonify(pagina)
+
+
+# --- Spec 008: cerrar e informe (solo admin) ----------------------------------------------
+
+
+@bp.post("/<uuid:id>/cerrar")
+@require_role("admin")
+def cerrar(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del contrato
+    session = current_session()
+    try:
+        sesion = cierre.cerrar(session, id, current_user().usuario_id)
+        return jsonify(cierre.informe(session, sesion))
+    except service.ErrorConteo as exc:
+        return _error(exc)
+
+
+@bp.get("/<uuid:id>/informe")
+@require_role("admin")
+def ver_informe(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del contrato
+    session = current_session()
+    try:
+        return jsonify(cierre.informe(session, service.obtener(session, id)))
+    except service.ErrorConteo as exc:
+        return _error(exc)

@@ -445,6 +445,9 @@ PROTECTED_ENDPOINTS = {
     "sesiones.aplicar_discrepancias": frozenset({"admin"}),
     "sesiones.descartar_discrepancias": frozenset({"admin"}),
     "sesiones.listar_pendientes": frozenset({"admin", "contador"}),
+    # Spec 008: cerrar e informe solo admin (P5, P13).
+    "sesiones.cerrar": frozenset({"admin"}),
+    "sesiones.ver_informe": frozenset({"admin"}),
 }
 
 
