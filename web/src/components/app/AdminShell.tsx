@@ -205,6 +205,7 @@ function MenuUsuario() {
 
 // Pantallas que ya muestran datos reales de la API: sin la banda de maqueta.
 const RUTAS_CON_DATOS_REALES = new Set(['/admin/usuarios', '/admin/ubicaciones', '/admin/categorias'])
+const conDatosReales = (ruta: string) => RUTAS_CON_DATOS_REALES.has(ruta) || ruta.startsWith('/admin/activos')
 
 export default function AdminShell() {
   const { pathname } = useLocation()
@@ -227,7 +228,7 @@ export default function AdminShell() {
     <SidebarProvider defaultOpen={abierta}>
       <BarraLateral />
       <SidebarInset className="min-w-0">
-        {!RUTAS_CON_DATOS_REALES.has(pathname) && <DatosFicticios />}
+        {!conDatosReales(pathname) && <DatosFicticios />}
         <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-2 md:px-6">
           <SidebarTrigger className="size-11 md:size-8" aria-label="Mostrar u ocultar el menú" />
           <div className="hidden h-5 w-px bg-border md:block" aria-hidden="true" />

@@ -32,6 +32,7 @@ describe('/admin/activos', () => {
     expect(silla.textContent).toContain('Silla ergonómica')
     expect(silla.textContent).toContain('Consultorio 1 › Box 2')
     expect(silla.textContent).toContain('$ 389.900,00')
+    expect(screen.queryByText(/Datos ficticios/)).toBeNull()
 
     fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar activos' }), { target: { value: 'impre' } })
     await waitFor(() => expect(filas()).toHaveLength(1))
