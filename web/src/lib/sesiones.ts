@@ -32,6 +32,9 @@ const FECHA = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' })
 /** "30 nov 2026" a partir de "2026-11-30" (sin correrse por la zona horaria). */
 export const fechaCorte = (iso: string) => FECHA.format(new Date(`${iso}T12:00:00`))
 
+/** "1 pendiente", "3 pendientes". */
+export const pendientes = (n: number) => `${n.toLocaleString('es-CO')} ${n === 1 ? 'pendiente' : 'pendientes'}`
+
 export function porcentaje(verificados: number, total: number): number {
   return total === 0 ? 0 : Math.round((verificados / total) * 1000) / 10
 }

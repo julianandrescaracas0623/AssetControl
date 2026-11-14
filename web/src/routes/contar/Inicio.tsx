@@ -15,7 +15,7 @@ import { mensajeDeError } from '@/lib/api/cliente'
 import { useSalaDeTrabajo } from '@/lib/conteo'
 import { formatEntero } from '@/lib/format'
 import { useSesion } from '@/lib/sesion'
-import { fechaCorte, porcentaje, type SesionConteo, useDetalleSesion, useSesionAbierta } from '@/lib/sesiones'
+import { fechaCorte, pendientes, porcentaje, type SesionConteo, useDetalleSesion, useSesionAbierta } from '@/lib/sesiones'
 
 // Inicio del conteo (spec 006, T6; docs/08 §4.2.1, CU-SES-02, Q4): la sesión abierta
 // real con su avance, la sala de trabajo y los pendientes por ubicación. Sin ningún
@@ -83,7 +83,7 @@ function SesionAbierta({ sesion, rol }: { sesion: SesionConteo; rol: string | un
             <span className="text-muted-foreground tabular-nums">
               <b className="font-semibold text-foreground">{formatEntero(avance.verificados)}</b> de {formatEntero(avance.total)} verificados
             </span>
-            <span className="font-medium tabular-nums">{formatEntero(avance.pendientes)} pendientes</span>
+            <span className="font-medium tabular-nums">{pendientes(avance.pendientes)}</span>
           </span>
         </div>
       ) : detalle.isError ? (

@@ -1,6 +1,6 @@
 # Spec 006 — Sesiones de conteo y verificación
 
-> **Estado:** Aprobada (G1–G3, 2026-11-14) con Q1–Q4 en la opción recomendada. Depende de la 005 (ciclo de vida e historial, hecha). Módulos M4 (CU-SES-01, 02, 04) y M5 (CU-VER-01, 03, 05, 06) de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Implementada (T1–T9, 2026-11-14). Aprobada (G1–G3, 2026-11-14) con Q1–Q4 en la opción recomendada. Depende de la 005 (ciclo de vida e historial, hecha). Módulos M4 (CU-SES-01, 02, 04) y M5 (CU-VER-01, 03, 05, 06) de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 

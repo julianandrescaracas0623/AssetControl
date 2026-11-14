@@ -83,5 +83,7 @@ export function migasDeRuta(pathname: string): string[] {
   if (!entrada) return ['Administración']
   if (entrada.exacta) return [entrada.grupo.titulo, entrada.item.titulo]
   const ultimo = decodeURIComponent(pathname.split('/').filter(Boolean).at(-1) ?? '')
-  return [entrada.grupo.titulo, entrada.item.titulo, ultimo === 'informe' ? 'Informe' : ultimo]
+  // Un id interno (uuid) no dice nada a la persona: la miga nombra la pantalla.
+  const esId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ultimo)
+  return [entrada.grupo.titulo, entrada.item.titulo, ultimo === 'informe' ? 'Informe' : esId ? 'Detalle' : ultimo]
 }

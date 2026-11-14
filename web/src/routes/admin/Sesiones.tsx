@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ErrorApi, mensajeDeError } from '@/lib/api/cliente'
 import { formatEntero } from '@/lib/format'
-import { fechaCorte, hoyISO, nombreSugerido, porcentaje, type SesionConteo, useAbrirSesion, useDetalleSesion, useSesiones } from '@/lib/sesiones'
+import { fechaCorte, hoyISO, nombreSugerido, pendientes, porcentaje, type SesionConteo, useAbrirSesion, useDetalleSesion, useSesiones } from '@/lib/sesiones'
 
 // Sesiones de conteo (spec 006, T5; CU-SES-01, 02; Q1): el admin abre una sesión (una
 // abierta por clínica) y ve su avance. Cerrar y el informe llegan con la spec 008.
@@ -120,7 +120,7 @@ function TarjetaAbierta({ sesion }: { sesion: SesionConteo }) {
             <span className="tabular-nums">
               <b className="font-semibold">{formatEntero(avance.verificados)}</b> de {formatEntero(avance.total)} verificados · {pct.toLocaleString('es-CO')} %
             </span>
-            <span className="font-medium">{formatEntero(avance.pendientes)} pendientes ›</span>
+            <span className="font-medium">{pendientes(avance.pendientes)} ›</span>
           </span>
         </>
       ) : (
@@ -272,7 +272,7 @@ export function DetalleSesion({ id }: { id: string }) {
         <Progress value={pct} aria-label="Avance del conteo" className="h-2" />
         <p className="text-sm tabular-nums">
           <b className="font-semibold">{formatEntero(avance.verificados)}</b> de {formatEntero(avance.total)} verificados · {pct.toLocaleString('es-CO')} % ·{' '}
-          {formatEntero(avance.pendientes)} pendientes
+          {pendientes(avance.pendientes)}
         </p>
         <p className="text-xs text-muted-foreground">Información de trabajo: no es el informe. Cerrar la sesión y el informe llegan con la spec 008.</p>
       </section>
