@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useUbicaciones } from '@/lib/catalogo'
 import { useSesion } from '@/lib/sesion'
 import { useSimulacion } from '@/lib/simulacion'
 import { ACTIVIDAD, CLINICA, RESUMEN } from '@/mocks/datos-ficticios'
@@ -24,7 +25,9 @@ export default function ContarInicio() {
   const { estado } = useSimulacion()
   const { sesion } = useSesion()
   const primerNombre = sesion?.usuario.nombre.trim().split(/\s+/)[0]
-  const [sala, setSala] = useState('administracion')
+  // Spec 003, T7: ubicaciones reales; la elegida vive en la memoria de la pestaña.
+  const ubicaciones = useUbicaciones()
+  const [sala, setSala] = useState<string>()
   const c = RESUMEN.conteoAbierto
   const actividad = ACTIVIDAD.filter((e) => !e.conPrecio).slice(0, 3)
   return (
@@ -90,7 +93,36 @@ export default function ContarInicio() {
         </Link>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="sala">Estás contando en</Label>
-          <LocationPicker id="sala" valor={sala} onChange={setSala} className="h-12 text-base md:h-12" />
+          <LocationPicker
+            id="sala"
+            ubicaciones={ubicaciones.data ?? []}
+            cargando={ubicaciones.isPending}
+            valor={sala}
+            onChange={setSala}
+            className="h-12 text-base md:h-12"
+          />
+          {ubicaciones.isError && (
+            <p className="flex flex-wrap items-center gap-x-2 text-sm text-destructive">
+              No se pudieron cargar las ubicaciones.
+              <Button variant="link" className="h-11 px-0 md:h-auto" onClick={() => void ubicaciones.refetch()}>
+                Reintentar
+              </Button>
+            </p>
+          )}
+          {ubicaciones.data && !ubicaciones.data.some((u) => u.activa && u.tipo !== 'sede') && (
+            <p className="text-sm text-muted-foreground">
+              {sesion?.rol === 'admin' ? (
+                <>
+                  Aún no hay salas activas.{' '}
+                  <Link to="/admin/ubicaciones" className="font-medium text-brand-strong underline underline-offset-4">
+                    Créalas en Ubicaciones
+                  </Link>
+                </>
+              ) : (
+                'Aún no hay salas activas. Pide al administrador que las cree.'
+              )}
+            </p>
+          )}
         </div>
         <section className="flex flex-col gap-2" aria-label="Pendientes por ubicación">
           <h2 className="text-sm font-medium text-muted-foreground">Pendientes por ubicación</h2>

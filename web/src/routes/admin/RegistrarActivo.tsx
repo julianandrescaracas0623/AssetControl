@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { useSimulacion } from '@/lib/simulacion'
 import { cn } from '@/lib/utils'
-import { ACTIVOS, CATEGORIAS, UBICACIONES, rutaUbicacion, type ActivoFicticio } from '@/mocks/datos-ficticios'
+import { ACTIVOS, CATEGORIAS, UBICACIONES, rutaUbicacion, type ActivoFicticio, UBICACIONES_API } from '@/mocks/datos-ficticios'
 
 // Registrar activo desde administración (decisión del humano 2026-11-13; D3).
 // R8: sin código de sticker no hay alta. Obligatorios: código, nombre, precio,
@@ -252,7 +252,7 @@ export default function RegistrarActivo() {
                 </Select>
               </Campo>
               <Campo id="ubicacion" etiqueta={<>Ubicación <Obligatorio /></>} error={errores.ubicacion} ayuda="Arriba aparece la última que usaste.">
-                <LocationPicker id="ubicacion" valor={ubicacion} ultimaUsada="c1b2" onChange={setUbicacion} className={cn(errores.ubicacion && 'border-destructive')} />
+                <LocationPicker id="ubicacion" ubicaciones={UBICACIONES_API} valor={ubicacion} ultimaUsada="c1b2" onChange={setUbicacion} className={cn(errores.ubicacion && 'border-destructive')} />
               </Campo>
             </div>
             <Collapsible className="rounded-lg border">

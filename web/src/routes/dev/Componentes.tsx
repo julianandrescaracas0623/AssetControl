@@ -43,7 +43,7 @@ import {
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { ACTIVOS, RESUMEN, ULTIMO_INFORME } from '@/mocks/datos-ficticios'
+import { ACTIVOS, RESUMEN, ULTIMO_INFORME, UBICACIONES_API } from '@/mocks/datos-ficticios'
 
 // Galería del sistema de diseño (spec 001b, T2). Ruta de desarrollo
 // /dev/componentes: equivale a la página "Sistema visual" del lienzo aprobado
@@ -226,7 +226,7 @@ export default function Componentes() {
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="g-ubicacion">Ubicación</Label>
-            <LocationPicker id="g-ubicacion" valor={ubicacion} ultimaUsada="c1b2" onChange={setUbicacion} />
+            <LocationPicker id="g-ubicacion" ubicaciones={UBICACIONES_API} valor={ubicacion} ultimaUsada="c1b2" onChange={setUbicacion} />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <NetworkStatus estado="en_linea" />

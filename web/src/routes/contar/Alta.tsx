@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useRol } from '@/lib/sesion'
-import { CATEGORIAS, UBICACIONES, rutaUbicacion, type ActivoFicticio } from '@/mocks/datos-ficticios'
+import { CATEGORIAS, UBICACIONES, rutaUbicacion, type ActivoFicticio, UBICACIONES_API } from '@/mocks/datos-ficticios'
 
 // Alta por escaneo (docs/08 §7.3, CU-CAT-02/03) a 375 px, en una columna.
 // El código llega del sticker y es fijo. Obligatorios: nombre, precio,
@@ -163,7 +163,7 @@ export default function Alta() {
           </Select>
         </Campo>
         <Campo id="ubicacion" etiqueta={<>Ubicación <Obligatorio /></>} error={errores.ubicacion} ayuda="Arriba aparece la sala donde estás contando.">
-          <LocationPicker id="ubicacion" valor={ubicacion} ultimaUsada="administracion" onChange={setUbicacion} className="h-12 text-base md:h-12" />
+          <LocationPicker id="ubicacion" ubicaciones={UBICACIONES_API} valor={ubicacion} ultimaUsada="administracion" onChange={setUbicacion} className="h-12 text-base md:h-12" />
         </Campo>
         <Collapsible className="rounded-lg border">
           <CollapsibleTrigger className="group flex min-h-12 w-full items-center gap-2 px-3 text-left text-[15px] font-medium">

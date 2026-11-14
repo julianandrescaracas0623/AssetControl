@@ -43,6 +43,15 @@ export const UBICACIONES: UbicacionFicticia[] = [
   { id: 'bodega', nombre: 'Bodega', tipo: 'sala', padre: 'sede' },
 ]
 
+/** Las mismas en la forma de la API (spec 003), para las maquetas que aún no la usan. */
+export const UBICACIONES_API = UBICACIONES.map((u) => ({
+  id: u.id,
+  nombre: u.nombre,
+  tipo: u.tipo,
+  padre_id: u.padre ?? null,
+  activa: true,
+}))
+
 /** Ruta legible "Consultorio 1 › Box 2" (sin la sede, que es una sola). */
 export function rutaUbicacion(id: string): string {
   const u = UBICACIONES.find((x) => x.id === id)

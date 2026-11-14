@@ -9,6 +9,7 @@ import { LocationPicker } from './LocationPicker'
 import { PendingList } from './PendingList'
 import { StatCard } from './StatCard'
 import type { InformeCongelado, ValorActual } from '@/lib/cifras'
+import { UBICACIONES_API } from '@/mocks/datos-ficticios'
 
 // Spec 001b, T7: componentes propios de datos (R10, R11, R12; A7).
 
@@ -135,7 +136,7 @@ describe('EmptyState', () => {
 describe('LocationPicker', () => {
   it('pone la última usada arriba y se elige con el teclado', async () => {
     const alCambiar = vi.fn()
-    render(<LocationPicker id="ubi" valor="administracion" ultimaUsada="c1b2" onChange={alCambiar} />)
+    render(<LocationPicker id="ubi" ubicaciones={UBICACIONES_API} valor="administracion" ultimaUsada="c1b2" onChange={alCambiar} />)
     const disparador = screen.getByRole('combobox')
     expect(disparador.textContent).toContain('Administración')
     fireEvent.click(disparador)
@@ -147,5 +148,21 @@ describe('LocationPicker', () => {
     fireEvent.change(campo, { target: { value: 'bodega' } })
     fireEvent.keyDown(campo, { key: 'Enter' })
     expect(alCambiar).toHaveBeenCalledWith('bodega')
+  })
+
+  it('agrupa por sede y no ofrece sedes ni inactivas (spec 003)', async () => {
+    const ubicaciones = [
+      { id: 'n', nombre: 'Norte', tipo: 'sede' as const, padre_id: null, activa: true },
+      { id: 's', nombre: 'Sur', tipo: 'sede' as const, padre_id: null, activa: true },
+      { id: 'r', nombre: 'Recepción', tipo: 'sala' as const, padre_id: 'n', activa: true },
+      { id: 'x', nombre: 'Cerrada', tipo: 'sala' as const, padre_id: 's', activa: false },
+      { id: 'l', nombre: 'Laboratorio', tipo: 'sala' as const, padre_id: 's', activa: true },
+    ]
+    render(<LocationPicker ubicaciones={ubicaciones} onChange={vi.fn()} />)
+    fireEvent.click(screen.getByRole('combobox'))
+    const lista = await screen.findByRole('listbox')
+    expect(within(lista).getByText('Norte')).toBeTruthy()
+    expect(within(lista).getByText('Sur')).toBeTruthy()
+    expect(within(lista).getAllByRole('option').map((o) => o.textContent)).toEqual(['Recepción', 'Laboratorio'])
   })
 })
