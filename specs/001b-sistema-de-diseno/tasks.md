@@ -64,6 +64,13 @@
 - **Verificación:** `cd web && npm test` + capturas a 375 px y 1440 px, barra expandida, colapsada y menú móvil abierto.
 - **Depende de:** T3.
 - **Riesgo:** `sidebar` de shadcn con muchas piezas; si pasa de un día, el menú móvil se separa con `/sdd-change`.
+- **Implementada (2026-11-13), revisada (APROBADO con menores):**
+  - `components/app/AdminShell.tsx` sobre `sidebar` de shadcn: grupos y entradas de `docs/08` §4.1 desde una sola fuente (`components/app/admin-nav.ts`, también usada por las migas y las pantallas pendientes), incluida **Registrar activo** (`/admin/activos/nuevo`, D3); colapsable a íconos con tooltip; estado recordado con la cookie `sidebar_state` de shadcn (se lee al montar); menú tipo `sheet` por debajo de `md` con enlaces de 44 px; migas de pan (en celular solo la última); botón del buscador (se conecta en T5); menú de usuario ficticio con "Ir a contar" y "Cerrar sesión" (→ `/login`); contenido con ancho máximo de 1320 px (D2). Marca provisional en `components/app/Logo.tsx`.
+  - Rutas de admin aún no construidas (`activos`, `activos/nuevo`, `ubicaciones`, `categorias`, `sesiones`, `discrepancias`, `valor`, `usuarios`) muestran "Pantalla en preparación" y qué spec o tarea las trae. `RequiereAdmin` pinta la banda y "Sin permiso" fuera del shell.
+  - `sidebar.tsx` traducido (título y descripción del `sheet`, botón y borde); el borde (`SidebarRail`, sin foco de teclado) tiene otro nombre para no duplicar el del botón.
+  - Pruebas primero: `components/app/AdminShell.test.tsx` (7: entradas y grupos, `aria-current`, migas, colapso persistido, menú de usuario, pantallas pendientes, `sheet` en celular). `src/test/setup.ts` + `src/test/matchMedia.ts` simulan `matchMedia` (jsdom no lo trae); sin `user-event` (no aprobada): `fireEvent`. Total 88/88; lint, typecheck y build en verde.
+  - Navegador real: a 1440 px expandida y colapsada, y tras recargar sigue colapsada; a 375 px encabezado con menú, buscador y usuario de 44 px, y `sheet` con enlaces de 44 px; sin scroll horizontal en ninguno.
+  - Menores: `Ctrl+B` (atajo de shadcn) alterna la barra; el texto del buscador se acortó a "Buscar por código o nombre" porque se cortaba a 1440 px.
 
 ### T5 — Buscador global
 

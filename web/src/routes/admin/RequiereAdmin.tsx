@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router'
 
+import { DatosFicticios } from '@/components/app/DatosFicticios'
 import { useSimulacion } from '@/lib/simulacion'
 import SinPermiso from '../SinPermiso'
 
@@ -7,5 +8,11 @@ import SinPermiso from '../SinPermiso'
 // 403 a un contador en cualquier endpoint de administración (spec 002).
 export default function RequiereAdmin() {
   const { rol } = useSimulacion()
-  return rol === 'admin' ? <Outlet /> : <SinPermiso />
+  if (rol === 'admin') return <Outlet />
+  return (
+    <div className="flex min-h-svh flex-col">
+      <DatosFicticios />
+      <SinPermiso />
+    </div>
+  )
 }
