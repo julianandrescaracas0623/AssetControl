@@ -157,6 +157,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ubicaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ubicaciones del tenant (el contador recibe solo las activas) */
+        get: operations["listarUbicaciones"];
+        put?: never;
+        /** Crear una sede, sala o box (solo admin) */
+        post: operations["crearUbicacion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ubicaciones/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Renombrar, desactivar o reactivar (solo admin) */
+        patch: operations["actualizarUbicacion"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -165,7 +200,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -242,6 +277,42 @@ export interface components {
         Vigencia: {
             vigente: boolean;
         };
+        /** @description Se guarda en NFC y sin espacios en los extremos; necesita una letra o un número y no admite caracteres invisibles o de control. */
+        NombreVisible: string;
+        /** @enum {string} */
+        TipoUbicacion: "sede" | "sala" | "box";
+        Ubicacion: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+            tipo: components["schemas"]["TipoUbicacion"];
+            /**
+             * Format: uuid
+             * @description Null solo en una sede.
+             */
+            padre_id: string | null;
+            activa: boolean;
+        };
+        UbicacionRespuesta: {
+            ubicacion: components["schemas"]["Ubicacion"];
+        };
+        ListaUbicaciones: {
+            ubicaciones: components["schemas"]["Ubicacion"][];
+        };
+        CrearUbicacionBody: {
+            nombre: components["schemas"]["NombreVisible"];
+            tipo: components["schemas"]["TipoUbicacion"];
+            /**
+             * Format: uuid
+             * @description Obligatorio para sala (una sede) y box (una sala); prohibido en sede.
+             */
+            padre_id?: string;
+        };
+        /** @description Al menos uno de los dos campos. */
+        ActualizarUbicacionBody: {
+            nombre?: components["schemas"]["NombreVisible"];
+            activa?: boolean;
+        };
         Health: {
             /** @enum {string} */
             status: "ok" | "error";
@@ -277,6 +348,15 @@ export interface components {
         };
         /** @description Sin sesión válida. */
         NoAutenticado: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description No existe en este tenant (o es de otro). */
+        NoEncontrado: {
             headers: {
                 [name: string]: unknown;
             };
@@ -326,6 +406,8 @@ export interface components {
         };
     };
     parameters: {
+        /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+        Id: string;
         /** @description Debe valer 1; además la petición debe venir del mismo sitio. */
         Csrf: "1";
         /** @description Cookie HttpOnly de refresh (__Secure-refresh fuera de desarrollo), Path=/auth. */
@@ -587,6 +669,114 @@ export interface operations {
                 };
             };
             503: components["responses"]["ServicioNoDisponible"];
+        };
+    };
+    listarUbicaciones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ordenadas por tipo (sede, sala, box) y nombre. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaUbicaciones"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+        };
+    };
+    crearUbicacion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrearUbicacionBody"];
+            };
+        };
+        responses: {
+            /** @description Creada y activa. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UbicacionRespuesta"];
+                };
+            };
+            /** @description Cuerpo o nombre no válidos, o tipo y padre que no encajan. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description Nombre repetido entre hermanas o padre inactivo. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    actualizarUbicacion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActualizarUbicacionBody"];
+            };
+        };
+        responses: {
+            /** @description Actualizada. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UbicacionRespuesta"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description Nombre repetido, hijas activas al desactivar o padre inactivo al reactivar. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["CuerpoDemasiadoGrande"];
         };
     };
 }

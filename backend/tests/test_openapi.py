@@ -45,6 +45,7 @@ from app.auth import routes as auth_routes
 from app.auth.credentials import COMMON_PASSWORDS, PasswordPolicyError, check_password_policy
 from app.auth.decorators import NOT_AUTHENTICATED
 from app.auth.http import AUTH_MAX_BODY_BYTES, CSRF_HEADER, CSRF_HEADER_VALUE
+from app.catalogo import service as catalogo_service
 from app.config import RateLimits
 from app.invitaciones import routes as invitaciones_routes
 
@@ -89,6 +90,7 @@ SCHEMA_KEYWORDS = {
     "examples",
     "title",
     "minimum",
+    "items",
 }
 FORMATS = {"uuid", "date-time", "email", "password"}
 
@@ -160,6 +162,9 @@ def validate(schema: dict, value: object, where: str = "$") -> None:
             assert len(value) <= schema["maxLength"], where
     if isinstance(value, int) and "minimum" in schema:
         assert value >= schema["minimum"], where
+    if isinstance(value, list) and "items" in schema:
+        for index, item in enumerate(value):
+            validate(schema["items"], item, f"{where}[{index}]")
     if isinstance(value, dict):
         properties = schema.get("properties", {})
         for name in schema.get("required", []):
@@ -206,6 +211,8 @@ def _walk_schema(schema: dict, where: str) -> None:
     assert not unknown, f"{where}: {unknown}"
     for name, sub in schema.get("properties", {}).items():
         _walk_schema(sub, f"{where}.{name}")
+    if "items" in schema:
+        _walk_schema(schema["items"], f"{where}[]")
     if schema.get("type") == "object" and "properties" in schema:
         assert schema.get("additionalProperties") is False, f"{where}: objeto abierto"
 
@@ -427,6 +434,41 @@ def test_validar_y_aceptar_responses(client):
     assert accepted["rol"] == "contador"
 
 
+def test_ubicaciones_responses(client):
+    admin, contador = bearer(ADMIN_A, TENANT_A), bearer(CONTADOR_A, TENANT_A)
+    grande = "x" * (AUTH_MAX_BODY_BYTES + 1)
+
+    def crear(body, headers=admin):
+        response = client.post("/ubicaciones", json=body, headers=headers)
+        return check("post", "/ubicaciones", response)
+
+    sede = crear({"nombre": f"Sede {uuid.uuid4().hex[:6]}", "tipo": "sede"})["ubicacion"]
+    sala = crear({"nombre": "Sala", "tipo": "sala", "padre_id": sede["id"]})["ubicacion"]
+    crear({"nombre": "", "tipo": "sede"})
+    crear({"nombre": "Box", "tipo": "box", "padre_id": sede["id"]})
+    crear({"nombre": "Sala", "tipo": "sala", "padre_id": sede["id"]})
+    crear({"nombre": "X", "tipo": "sala", "padre_id": str(uuid.uuid4())})
+    crear({"nombre": "X", "tipo": "sede"}, headers={})
+    crear({"nombre": "X", "tipo": "sede"}, headers=contador)
+    check("post", "/ubicaciones", client.post("/ubicaciones", data=grande, headers=admin))
+
+    check("get", "/ubicaciones", client.get("/ubicaciones", headers=contador))
+    check("get", "/ubicaciones", client.get("/ubicaciones"))
+
+    def patch(ubicacion_id, body, headers=admin):
+        response = client.patch(f"/ubicaciones/{ubicacion_id}", json=body, headers=headers)
+        return check("patch", "/ubicaciones/{id}", response)
+
+    patch(sala["id"], {"nombre": "Sala renombrada"})
+    patch(sala["id"], {})
+    patch(sede["id"], {"activa": False})
+    patch(sala["id"], {"nombre": "X"}, headers={})
+    patch(sala["id"], {"nombre": "X"}, headers=contador)
+    patch(uuid.uuid4(), {"nombre": "X"})
+    path = f"/ubicaciones/{sala['id']}"
+    check("patch", "/ubicaciones/{id}", client.patch(path, data=grande, headers=admin))
+
+
 LIMITED = [
     ("post", "/auth/login", {"email": ADMIN_A.email, "password": PASSWORD}, {}),
     ("post", "/auth/refresh", None, CSRF),
@@ -494,6 +536,7 @@ def backend_error_codes() -> set[str]:
         auth_routes.BAD_REQUEST[0],
         invitaciones_routes.INVALID_INVITATION[0],
     }
+    codes |= {error.code for error in catalogo_service.ERRORES}
     return codes | _policy_codes()
 
 

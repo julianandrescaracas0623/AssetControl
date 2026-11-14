@@ -22,6 +22,8 @@ from flask.wrappers import Response
 from app.config import Config
 
 AUTH_PATH_PREFIXES: tuple[str, ...] = ("/auth", "/invitaciones")
+# Spec 003: el catálogo también recibe solo JSON pequeño (sin cabeceras de /auth).
+SMALL_BODY_PATH_PREFIXES: tuple[str, ...] = (*AUTH_PATH_PREFIXES, "/ubicaciones", "/categorias")
 AUTH_MAX_BODY_BYTES = 4096
 REFRESH_COOKIE_SECURE_NAME = "__Secure-refresh"
 REFRESH_COOKIE_DEVELOPMENT_NAME = "refresh"
@@ -31,8 +33,16 @@ CSRF_HEADER = "X-AssetControl-CSRF"
 CSRF_HEADER_VALUE = "1"
 
 
+def _under(path: str, prefixes: tuple[str, ...]) -> bool:
+    return any(path == prefix or path.startswith(prefix + "/") for prefix in prefixes)
+
+
 def is_auth_path(path: str) -> bool:
-    return any(path == prefix or path.startswith(prefix + "/") for prefix in AUTH_PATH_PREFIXES)
+    return _under(path, AUTH_PATH_PREFIXES)
+
+
+def is_small_body_path(path: str) -> bool:
+    return _under(path, SMALL_BODY_PATH_PREFIXES)
 
 
 def refresh_cookie_options(config: Config) -> dict[str, object]:
@@ -77,7 +87,7 @@ def is_same_site_request() -> bool:
 def register_auth_http_policy(app: Flask) -> None:
     @app.before_request
     def _limit_auth_body() -> None:
-        if not is_auth_path(request.path):
+        if not is_small_body_path(request.path):
             return
         request.max_content_length = AUTH_MAX_BODY_BYTES
         if request.content_length is not None:

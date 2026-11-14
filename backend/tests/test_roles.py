@@ -22,6 +22,7 @@ dos tenants sintéticos (A y B):
   se valida).
 """
 
+import re
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -410,6 +411,10 @@ PUBLIC_ENDPOINTS = frozenset(
 PROTECTED_ENDPOINTS = {
     "auth.me": frozenset({"admin", "contador"}),  # test_auth_me_*, test_tenant_a_with_*
     "invitaciones.crear": frozenset({"admin"}),  # test_contador_*, test_invitaciones_crear
+    # Spec 003 (T2): roles y aislamiento en test_ubicaciones_api.py.
+    "ubicaciones.listar": frozenset({"admin", "contador"}),
+    "ubicaciones.crear": frozenset({"admin"}),
+    "ubicaciones.actualizar": frozenset({"admin"}),
 }
 
 
@@ -441,8 +446,10 @@ def _protected_routes(flask_app: Flask) -> list[tuple[str, str, str]]:
     routes = []
     for rule in flask_app.url_map.iter_rules():
         if rule.endpoint in PROTECTED_ENDPOINTS:
+            # Parámetros de ruta con un valor sintético válido (spec 003: /<uuid:...>).
+            path = re.sub(r"<uuid:[^>]+>", str(uuid.uuid4()), rule.rule)
             for method in sorted(rule.methods - {"HEAD", "OPTIONS"}):
-                routes.append((rule.endpoint, method, rule.rule))
+                routes.append((rule.endpoint, method, path))
     return routes
 
 
