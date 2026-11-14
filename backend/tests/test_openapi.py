@@ -620,12 +620,57 @@ def test_activos_responses(client, contrato_db):
             ruta, data="x" * (AUTH_MAX_BODY_BYTES + 1), headers={**admin, "If-Match": "2"}
         ),
     )
-    with contrato_db.migrator.begin() as conn:
-        conn.execute(
-            text("update activo set estado = 'dado_de_baja', row_version = 3 where id = :a"),
-            {"a": body["id"]},
+
+    # Spec 005, T3: mover, estado, baja y reactivar.
+    def accion(nombre, payload, headers=admin, version="2", activo=body["id"]):
+        extra = {"If-Match": f'"{version}"'} if version is not None else {}
+        response = client.post(
+            f"/activos/{activo}/{nombre}", json=payload, headers={**headers, **extra}
         )
-    assert editar({"nombre": "X"}, version="3")["error"]["code"] == "activo_dado_de_baja"
+        return check("post", f"/activos/{{id}}/{nombre}", response)
+
+    otra = post("/ubicaciones", {"nombre": "Otra", "tipo": "sala", "padre_id": sede})["ubicacion"]
+    assert accion("mover", {"ubicacion_id": otra["id"]})["activo"]["row_version"] == 3
+    assert accion("mover", {"ubicacion_id": sede}, version="3")["error"]["code"] == (
+        "ubicacion_invalida"
+    )
+    assert accion("estado", {"estado": "en_reparacion"}, version="3")["activo"]["estado"] == (
+        "en_reparacion"
+    )
+    assert accion("estado", {"estado": "otro"}, version="4")["error"]["code"] == (
+        "solicitud_invalida"
+    )
+    assert accion("baja", {"motivo": "otro"}, version="4")["error"]["code"] == "motivo_invalido"
+    for nombre, payload in (
+        ("mover", {"ubicacion_id": sala["id"]}),
+        ("estado", {"estado": "activo"}),
+        ("baja", {"motivo": "perdido"}),
+    ):
+        accion(nombre, payload, version="1")
+        accion(nombre, payload, version=None)
+        accion(nombre, payload, headers=contador)
+        accion(nombre, payload, headers={})
+        accion(nombre, payload, activo=uuid.uuid4())
+        check(
+            "post",
+            f"/activos/{{id}}/{nombre}",
+            client.post(
+                f"/activos/{body['id']}/{nombre}",
+                data="x" * (AUTH_MAX_BODY_BYTES + 1),
+                headers={**admin, "If-Match": "4"},
+            ),
+        )
+    assert accion("baja", {"motivo": "perdido"}, version="4")["activo"]["estado"] == "dado_de_baja"
+    for nombre, payload in (
+        ("mover", {"ubicacion_id": sala["id"]}),
+        ("estado", {"estado": "en_reparacion"}),
+        ("baja", {"motivo": "perdido"}),
+    ):
+        assert accion(nombre, payload, version="5")["error"]["code"] == "activo_dado_de_baja"
+    assert editar({"nombre": "X"}, version="5")["error"]["code"] == "activo_dado_de_baja"
+    reactivado = accion("estado", {"estado": "activo", "motivo": "encontrado"}, version="5")
+    assert reactivado["activo"]["estado"] == "activo"
+    accion("mover", {"ubicacion_id": sala["id"]}, version="6")
 
     # D2 en el contrato de ubicaciones.
     patch = client.patch(f"/ubicaciones/{sala['id']}", json={"activa": False}, headers=admin)

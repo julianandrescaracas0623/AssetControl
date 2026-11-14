@@ -14,6 +14,7 @@ Un activo ``dado_de_baja`` es de solo lectura (``409 activo_dado_de_baja``, Q1).
 """
 
 import uuid
+from collections.abc import Callable
 from datetime import date
 from decimal import Decimal
 
@@ -28,10 +29,12 @@ from app.activos.service import (
     PrecioInvalido,
     _categoria,
     _fecha,
+    _ruta,
     _texto_opcional,
+    _ubicacion,
     _uuid,
 )
-from app.catalogo.models import Categoria
+from app.catalogo.models import Categoria, Ubicacion
 from app.nombres import normalize_display_name
 
 # Campos que el admin edita (R1): los mismos del alta; nunca el código.
@@ -40,6 +43,9 @@ EDITABLES = ("nombre", "categoria_id", "precio_compra", *TEXTOS, "fecha_compra")
 # Orden de los campos dentro de ``datos_cambiados``.
 DATOS = ("nombre", *TEXTOS, "fecha_compra")
 MAX_VERSION_DIGITOS = 9
+
+# Firma de mover, cambiar_estado y dar_de_baja (la usa la ruta común).
+type Accion = Callable[[Session, uuid.UUID, int, dict[str, object], uuid.UUID], Activo]
 
 
 class FaltaVersion(ErrorActivo):
@@ -69,7 +75,17 @@ class ActivoDadoDeBaja(ErrorActivo):
     message = "El activo está dado de baja: solo se puede reactivar."
 
 
-ERRORES = (FaltaVersion, VersionDesactualizada, CodigoInmutable, ActivoDadoDeBaja)
+class MotivoInvalido(ErrorActivo):
+    code = "motivo_invalido"
+    message = "Elige un motivo; con «otro», escribe una nota de hasta 120 caracteres."
+
+
+ERRORES = (FaltaVersion, VersionDesactualizada, CodigoInmutable, ActivoDadoDeBaja, MotivoInvalido)
+
+# Q2 (baja) y Q1 (reactivar): listas cortas; con "otro" la nota es obligatoria.
+MOTIVOS_BAJA = ("danado_sin_reparacion", "perdido", "vendido_o_donado", "obsoleto", "otro")
+MOTIVOS_REACTIVAR = ("encontrado", "baja_por_error", "otro")
+ESTADOS_EDITABLES = ("activo", "en_reparacion")
 
 
 # --- Versión y bloqueo ------------------------------------------------------------------
@@ -200,4 +216,103 @@ def editar(
     for campo, valor in cambios.items():
         setattr(activo, campo, valor)
     _registrar(session, activo, eventos, usuario_id)
+    return activo
+
+
+# --- Mover, estado, baja y reactivar (T3; R4–R7, Q1, Q2, CU-CAT-06..08) -------------------
+
+
+def _solo(body: dict[str, object], permitidas: set[str]) -> None:
+    if not set(body) <= permitidas:
+        raise ErrorActivo()
+
+
+def _motivo(body: dict[str, object], permitidos: tuple[str, ...]) -> dict[str, object]:
+    motivo = body.get("motivo")
+    if not isinstance(motivo, str) or motivo not in permitidos:
+        raise MotivoInvalido()
+    valor = body.get("nota")
+    nota = None
+    if valor is not None and not (isinstance(valor, str) and not valor.strip()):
+        nota = normalize_display_name(valor) if isinstance(valor, str) else None
+        if nota is None:
+            raise MotivoInvalido()
+    if motivo == "otro" and nota is None:
+        raise MotivoInvalido()
+    return {"motivo": motivo, **({"nota": nota} if nota else {})}
+
+
+def _editable(session: Session, activo_id: uuid.UUID, version: int) -> Activo:
+    activo = bloquear(session, activo_id, version)
+    if activo.estado == "dado_de_baja":
+        raise ActivoDadoDeBaja()
+    return activo
+
+
+def mover(
+    session: Session,
+    activo_id: uuid.UUID,
+    version: int,
+    body: dict[str, object],
+    usuario_id: uuid.UUID,
+) -> Activo:
+    """Una sola ubicación vigente (CU-CAT-06); D1 como en el alta (sala o box activos)."""
+    _solo(body, {"ubicacion_id"})
+    destino_id = _uuid(body.get("ubicacion_id"))
+    activo = _editable(session, activo_id, version)
+    if destino_id == activo.ubicacion_id:
+        return activo
+    destino = _ubicacion(session, str(destino_id))
+    origen = session.get(Ubicacion, activo.ubicacion_id)
+    datos = {
+        "antes": {"id": str(activo.ubicacion_id), "ruta": _ruta(session, origen) if origen else ""},
+        "despues": {"id": str(destino.id), "ruta": _ruta(session, destino)},
+    }
+    activo.ubicacion_id = destino.id
+    _registrar(session, activo, [("ubicacion_cambiada", datos)], usuario_id)
+    return activo
+
+
+def cambiar_estado(
+    session: Session,
+    activo_id: uuid.UUID,
+    version: int,
+    body: dict[str, object],
+    usuario_id: uuid.UUID,
+) -> Activo:
+    """``activo`` ↔ ``en_reparacion`` (CU-CAT-07); desde la baja, solo reactivar (Q1)."""
+    _solo(body, {"estado", "motivo", "nota"})
+    estado = body.get("estado")
+    if not isinstance(estado, str) or estado not in ESTADOS_EDITABLES:
+        raise ErrorActivo()
+    con_motivo = "motivo" in body or "nota" in body
+    activo = bloquear(session, activo_id, version)
+    if activo.estado == "dado_de_baja":
+        if estado != "activo":
+            raise ActivoDadoDeBaja()
+        datos = {"antes": "dado_de_baja", "despues": "activo", **_motivo(body, MOTIVOS_REACTIVAR)}
+    else:
+        if con_motivo:
+            raise ErrorActivo()
+        if estado == activo.estado:
+            return activo
+        datos = {"antes": activo.estado, "despues": estado}
+    activo.estado = estado
+    _registrar(session, activo, [("estado_cambiado", datos)], usuario_id)
+    return activo
+
+
+def dar_de_baja(
+    session: Session,
+    activo_id: uuid.UUID,
+    version: int,
+    body: dict[str, object],
+    usuario_id: uuid.UUID,
+) -> Activo:
+    """Baja lógica con motivo (CU-CAT-08, Q2): sale del valor y de "Activos hoy" (R7)."""
+    _solo(body, {"motivo", "nota"})
+    datos = _motivo(body, MOTIVOS_BAJA)
+    activo = _editable(session, activo_id, version)
+    activo.estado = "dado_de_baja"
+    _registrar(session, activo, [("dado_de_baja", datos)], usuario_id)
     return activo

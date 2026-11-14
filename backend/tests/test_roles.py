@@ -428,6 +428,9 @@ PROTECTED_ENDPOINTS = {
     "activos.sugerencias": frozenset({"admin", "contador"}),
     # Spec 005: cambiar un activo existente es solo del admin (R9).
     "activos.editar": frozenset({"admin"}),
+    "activos.mover": frozenset({"admin"}),
+    "activos.cambiar_estado": frozenset({"admin"}),
+    "activos.dar_de_baja": frozenset({"admin"}),
 }
 
 

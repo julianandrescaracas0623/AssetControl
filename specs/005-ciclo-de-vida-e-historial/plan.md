@@ -24,7 +24,7 @@ Base primero (permiso de `UPDATE` por columna y el tipo de evento nuevo), luego 
   - `ubicacion_cambiada`: `{antes: {id, ruta}, despues: {id, ruta}}` (la ruta se copia para que el historial no cambie si después se renombra la sala).
   - `estado_cambiado`: `{antes, despues, motivo?, nota?}` (motivo solo al reactivar, Q1: `encontrado`, `baja_por_error`, `otro`; nota obligatoria con `otro`).
   - `dado_de_baja`: `{motivo, nota?}` (Q2).
-- Motivos de baja (Q2): `danado_sin_reparacion`, `perdido`, `vendido_o_donado`, `obsoleto`, `otro`; `nota` 1–200 caracteres (H-3), obligatoria con `otro`.
+- Motivos de baja (Q2): `danado_sin_reparacion`, `perdido`, `vendido_o_donado`, `obsoleto`, `otro`; `nota` 1–120 caracteres (regla H-3), obligatoria con `otro`.
 
 ## 4. API (T2–T4)
 

@@ -314,6 +314,57 @@ export interface paths {
         patch: operations["editarActivo"];
         trace?: never;
     };
+    "/activos/{id}/mover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mover a otra sala o box activos (solo admin; evento ubicacion_cambiada) */
+        post: operations["moverActivo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/activos/{id}/estado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activo ↔ en reparación, o reactivar un dado de baja con motivo (solo admin) */
+        post: operations["cambiarEstadoActivo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/activos/{id}/baja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dar de baja con motivo (solo admin; evento dado_de_baja) */
+        post: operations["darDeBajaActivo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -322,7 +373,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -538,6 +589,28 @@ export interface components {
              * @description No futura.
              */
             fecha_compra?: string | null;
+        };
+        MoverActivoBody: {
+            /**
+             * Format: uuid
+             * @description Una sala o un box activos (D1).
+             */
+            ubicacion_id: string;
+        };
+        /** @description Obligatoria si el motivo es "otro". */
+        NotaMotivo: string | null;
+        /** @description Entre activo y en_reparacion sin motivo. Un dado de baja solo pasa a activo y con motivo (reactivar). */
+        EstadoActivoBody: {
+            /** @enum {string} */
+            estado: "activo" | "en_reparacion";
+            /** @enum {string} */
+            motivo?: "encontrado" | "baja_por_error" | "otro";
+            nota?: components["schemas"]["NotaMotivo"];
+        };
+        BajaActivoBody: {
+            /** @enum {string} */
+            motivo: "danado_sin_reparacion" | "perdido" | "vendido_o_donado" | "obsoleto" | "otro";
+            nota?: components["schemas"]["NotaMotivo"];
         };
         CrearActivoBody: {
             /**
@@ -1386,6 +1459,120 @@ export interface operations {
         responses: {
             200: components["responses"]["ActivoCambiado"];
             /** @description Cuerpo o precio no válidos, o se intentó cambiar el código. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            409: components["responses"]["ActivoDadoDeBaja"];
+            412: components["responses"]["VersionDesactualizada"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            428: components["responses"]["FaltaVersion"];
+        };
+    };
+    moverActivo: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description row_version del activo leído, "3" o 3; si no coincide, 412. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoverActivoBody"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ActivoCambiado"];
+            /** @description Cuerpo no válido. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            409: components["responses"]["ActivoDadoDeBaja"];
+            412: components["responses"]["VersionDesactualizada"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            428: components["responses"]["FaltaVersion"];
+        };
+    };
+    cambiarEstadoActivo: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description row_version del activo leído, "3" o 3; si no coincide, 412. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EstadoActivoBody"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ActivoCambiado"];
+            /** @description Cuerpo no válido. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            409: components["responses"]["ActivoDadoDeBaja"];
+            412: components["responses"]["VersionDesactualizada"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            428: components["responses"]["FaltaVersion"];
+        };
+    };
+    darDeBajaActivo: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description row_version del activo leído, "3" o 3; si no coincide, 412. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BajaActivoBody"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ActivoCambiado"];
+            /** @description Cuerpo no válido. */
             400: {
                 headers: {
                     [name: string]: unknown;

@@ -136,3 +136,33 @@ def editar(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del con
     except service.ErrorActivo as exc:
         return _error(exc)
     return _con_version(activo)
+
+
+def _accion(id: uuid.UUID, accion: cambios.Accion) -> ResponseReturnValue:  # noqa: A002
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return error_response(400, "solicitud_invalida", "La solicitud no es válida.")
+    try:
+        version = cambios.leer_version(request.headers.get("If-Match"))
+        activo = accion(current_session(), id, version, body, current_user().usuario_id)
+    except service.ErrorActivo as exc:
+        return _error(exc)
+    return _con_version(activo)
+
+
+@bp.post("/<uuid:id>/mover")
+@require_role("admin")
+def mover(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del contrato
+    return _accion(id, cambios.mover)
+
+
+@bp.post("/<uuid:id>/estado")
+@require_role("admin")
+def cambiar_estado(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del contrato
+    return _accion(id, cambios.cambiar_estado)
+
+
+@bp.post("/<uuid:id>/baja")
+@require_role("admin")
+def dar_de_baja(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del contrato
+    return _accion(id, cambios.dar_de_baja)

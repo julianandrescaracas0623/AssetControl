@@ -328,3 +328,226 @@ def test_the_code_never_changes_in_the_database(client, cat, cam_db):
     with cam_db.migrator.connect() as conn:
         codigo = conn.scalar(text("select codigo from activo where id = :a"), {"a": activo["id"]})
     assert codigo == activo["codigo"]
+
+
+# --- T3: mover, estado, baja y reactivar -------------------------------------------------
+
+
+def accion(client, activo_id, nombre, body, *, v=1, headers=ADMIN):
+    return client.post(
+        f"/activos/{activo_id}/{nombre}", json=body, headers={**headers, **version(v)}
+    )
+
+
+def test_moving_leaves_the_old_and_new_route(client, cat, cam_db):
+    activo = nuevo(client, cat)
+    response = accion(client, activo["id"], "mover", {"ubicacion_id": cat["otra_sala"]})
+
+    assert response.status_code == 200, response.get_json()
+    assert response.headers["ETag"] == '"2"'
+    movido = response.get_json()["activo"]
+    assert movido["ubicacion"] == {"id": cat["otra_sala"], "nombre": "Bodega", "ruta": "Bodega"}
+    assert eventos(cam_db, activo["id"]) == [
+        (
+            "ubicacion_cambiada",
+            {
+                "antes": {"id": cat["box"], "ruta": "Consultorios › Box 2"},
+                "despues": {"id": cat["otra_sala"], "ruta": "Bodega"},
+            },
+            ADMIN_A.usuario_id,
+        )
+    ]
+
+
+def test_moving_to_the_same_place_changes_nothing(client, cat, cam_db):
+    activo = nuevo(client, cat)
+    response = accion(client, activo["id"], "mover", {"ubicacion_id": cat["box"]})
+    assert response.status_code == 200
+    assert response.get_json()["activo"]["row_version"] == 1
+    assert eventos(cam_db, activo["id"]) == []
+
+
+def test_moving_follows_d1(client, cat, cam_db):
+    activo = nuevo(client, cat)
+    archivo = client.post(
+        "/ubicaciones",
+        json={"nombre": f"Archivo {uuid.uuid4().hex[:4]}", "tipo": "sala", "padre_id": cat["sede"]},
+        headers=ADMIN,
+    ).get_json()["ubicacion"]["id"]
+    assert (
+        client.patch(f"/ubicaciones/{archivo}", json={"activa": False}, headers=ADMIN).status_code
+        == 200
+    )
+    for destino in (cat["sede"], archivo):
+        response = accion(client, activo["id"], "mover", {"ubicacion_id": destino})
+        assert response.status_code == 400
+        assert code(response) == "ubicacion_invalida"
+    assert accion(client, activo["id"], "mover", {"ubicacion_id": cat["sala_b"]}).status_code == 404
+    for body in ({}, {"ubicacion_id": None}, {"ubicacion_id": cat["sala"], "otro": 1}):
+        assert accion(client, activo["id"], "mover", body).status_code == 400
+    assert eventos(cam_db, activo["id"]) == []
+
+
+def test_moving_everything_out_lets_the_location_be_deactivated(client, cat):
+    sala = client.post(
+        "/ubicaciones",
+        json={"nombre": f"Rayos X {uuid.uuid4().hex[:4]}", "tipo": "sala", "padre_id": cat["sede"]},
+        headers=ADMIN,
+    ).get_json()["ubicacion"]["id"]
+    activo = nuevo(client, cat, ubicacion_id=sala)
+    desactivar = {"activa": False}
+    assert client.patch(f"/ubicaciones/{sala}", json=desactivar, headers=ADMIN).status_code == 409
+    assert accion(client, activo["id"], "mover", {"ubicacion_id": cat["box"]}).status_code == 200
+    assert client.patch(f"/ubicaciones/{sala}", json=desactivar, headers=ADMIN).status_code == 200
+
+
+def test_repair_round_trip_leaves_two_events(client, cat, cam_db):
+    activo = nuevo(client, cat)
+    ida = accion(client, activo["id"], "estado", {"estado": "en_reparacion"})
+    assert ida.status_code == 200
+    assert ida.get_json()["activo"]["estado"] == "en_reparacion"
+    vuelta = accion(client, activo["id"], "estado", {"estado": "activo"}, v=2)
+    assert vuelta.get_json()["activo"]["row_version"] == 3
+    assert [(t, d) for t, d, _ in eventos(cam_db, activo["id"])] == [
+        ("estado_cambiado", {"antes": "activo", "despues": "en_reparacion"}),
+        ("estado_cambiado", {"antes": "en_reparacion", "despues": "activo"}),
+    ]
+
+
+def test_same_state_changes_nothing(client, cat, cam_db):
+    activo = nuevo(client, cat)
+    response = accion(client, activo["id"], "estado", {"estado": "activo"})
+    assert response.status_code == 200
+    assert response.get_json()["activo"]["row_version"] == 1
+    assert eventos(cam_db, activo["id"]) == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"estado": "dado_de_baja"},
+        {"estado": "perdido"},
+        {"estado": "en_reparacion", "motivo": "encontrado"},
+        {"estado": "en_reparacion", "nota": "x"},
+    ],
+)
+def test_invalid_state_changes_are_400(client, cat, cam_db, body):
+    activo = nuevo(client, cat)
+    assert accion(client, activo["id"], "estado", body).status_code == 400
+    assert eventos(cam_db, activo["id"]) == []
+
+
+@pytest.mark.parametrize(
+    ("body", "datos"),
+    [
+        ({"motivo": "perdido"}, {"motivo": "perdido"}),
+        (
+            {"motivo": "danado_sin_reparacion", "nota": " Tarjeta quemada "},
+            {"motivo": "danado_sin_reparacion", "nota": "Tarjeta quemada"},
+        ),
+        (
+            {"motivo": "otro", "nota": "Robo reportado"},
+            {"motivo": "otro", "nota": "Robo reportado"},
+        ),
+        ({"motivo": "obsoleto", "nota": ""}, {"motivo": "obsoleto"}),
+    ],
+)
+def test_write_off_needs_a_reason_and_leaves_it(client, cat, cam_db, body, datos):
+    activo = nuevo(client, cat)
+    response = accion(client, activo["id"], "baja", body)
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()["activo"]["estado"] == "dado_de_baja"
+    assert eventos(cam_db, activo["id"]) == [("dado_de_baja", datos, ADMIN_A.usuario_id)]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"motivo": "robado"},
+        {"motivo": "otro"},
+        {"motivo": "otro", "nota": "   "},
+        {"motivo": "perdido", "nota": "x" * 121},
+        {"motivo": "perdido", "nota": 3},
+        {"motivo": "perdido", "extra": 1},
+    ],
+)
+def test_invalid_write_off_is_400(client, cat, cam_db, body):
+    activo = nuevo(client, cat)
+    response = accion(client, activo["id"], "baja", body)
+    assert response.status_code == 400
+    assert code(response) in {"motivo_invalido", "solicitud_invalida"}
+    assert eventos(cam_db, activo["id"]) == []
+
+
+def test_a_written_off_asset_is_read_only(client, cat, cam_db):
+    activo = nuevo(client, cat)
+    assert accion(client, activo["id"], "baja", {"motivo": "perdido"}).status_code == 200
+    for nombre, body in (
+        ("mover", {"ubicacion_id": cat["otra_sala"]}),
+        ("estado", {"estado": "en_reparacion"}),
+        ("baja", {"motivo": "obsoleto"}),
+    ):
+        response = accion(client, activo["id"], nombre, body, v=2)
+        assert response.status_code == 409, nombre
+        assert code(response) == "activo_dado_de_baja"
+    assert editar(client, activo["id"], {"nombre": "X"}, v=2).status_code == 409
+    assert [e[0] for e in eventos(cam_db, activo["id"])] == ["dado_de_baja"]
+
+
+def test_reactivating_needs_a_reason_and_returns_to_active(client, cat, cam_db):
+    activo = nuevo(client, cat)
+    accion(client, activo["id"], "baja", {"motivo": "perdido"})
+    for body in (
+        {"estado": "activo"},
+        {"estado": "activo", "motivo": "perdido"},
+        {"estado": "activo", "motivo": "otro"},
+    ):
+        response = accion(client, activo["id"], "estado", body, v=2)
+        assert response.status_code == 400, body
+        assert code(response) == "motivo_invalido"
+
+    response = accion(
+        client, activo["id"], "estado", {"estado": "activo", "motivo": "encontrado"}, v=2
+    )
+    assert response.status_code == 200
+    assert response.get_json()["activo"]["estado"] == "activo"
+    assert eventos(cam_db, activo["id"])[-1] == (
+        "estado_cambiado",
+        {"antes": "dado_de_baja", "despues": "activo", "motivo": "encontrado"},
+        ADMIN_A.usuario_id,
+    )
+    # De nuevo editable.
+    assert editar(client, activo["id"], {"nombre": "Reaparecido"}, v=3).status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("nombre", "body"),
+    [
+        ("mover", {"ubicacion_id": "x"}),
+        ("estado", {"estado": "en_reparacion"}),
+        ("baja", {"motivo": "perdido"}),
+    ],
+)
+def test_lifecycle_actions_are_admin_only_and_versioned(client, cat, cam_db, nombre, body):
+    activo = nuevo(client, cat)
+    assert accion(client, activo["id"], nombre, body, headers=CONTADOR).status_code == 403
+    sin_version = client.post(f"/activos/{activo['id']}/{nombre}", json=body, headers=ADMIN)
+    assert sin_version.status_code == 428
+    assert accion(client, activo["id"], nombre, body, v=5).status_code in {400, 412}
+    assert accion(client, str(uuid.uuid4()), nombre, body).status_code in {400, 404}
+    assert eventos(cam_db, activo["id"]) == []
+
+
+def test_stale_version_on_actions_is_412(client, cat):
+    activo = nuevo(client, cat)
+    editar(client, activo["id"], {"nombre": "Ya cambió"})
+    for nombre, body in (
+        ("mover", {"ubicacion_id": cat["otra_sala"]}),
+        ("estado", {"estado": "en_reparacion"}),
+        ("baja", {"motivo": "perdido"}),
+    ):
+        response = accion(client, activo["id"], nombre, body)
+        assert response.status_code == 412, nombre
+        assert response.get_json()["activo"]["row_version"] == 2

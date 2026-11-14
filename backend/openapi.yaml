@@ -602,6 +602,123 @@ paths:
         "428":
           $ref: "#/components/responses/FaltaVersion"
 
+  /activos/{id}/mover:
+    post:
+      tags: [activos]
+      operationId: moverActivo
+      summary: Mover a otra sala o box activos (solo admin; evento ubicacion_cambiada)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MoverActivoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/ActivoCambiado"
+        "400":
+          description: Cuerpo no válido.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [solicitud_invalida, ubicacion_invalida]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/ActivoDadoDeBaja"
+        "412":
+          $ref: "#/components/responses/VersionDesactualizada"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "428":
+          $ref: "#/components/responses/FaltaVersion"
+
+  /activos/{id}/estado:
+    post:
+      tags: [activos]
+      operationId: cambiarEstadoActivo
+      summary: Activo ↔ en reparación, o reactivar un dado de baja con motivo (solo admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EstadoActivoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/ActivoCambiado"
+        "400":
+          description: Cuerpo no válido.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [solicitud_invalida, motivo_invalido]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/ActivoDadoDeBaja"
+        "412":
+          $ref: "#/components/responses/VersionDesactualizada"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "428":
+          $ref: "#/components/responses/FaltaVersion"
+
+  /activos/{id}/baja:
+    post:
+      tags: [activos]
+      operationId: darDeBajaActivo
+      summary: Dar de baja con motivo (solo admin; evento dado_de_baja)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BajaActivoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/ActivoCambiado"
+        "400":
+          description: Cuerpo no válido.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [solicitud_invalida, motivo_invalido]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/ActivoDadoDeBaja"
+        "412":
+          $ref: "#/components/responses/VersionDesactualizada"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "428":
+          $ref: "#/components/responses/FaltaVersion"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -770,6 +887,7 @@ components:
         - version_desactualizada
         - codigo_inmutable
         - activo_dado_de_baja
+        - motivo_invalido
     Error:
       type: object
       required: [error]
@@ -1097,6 +1215,36 @@ components:
         modelo: { $ref: "#/components/schemas/TextoOpcional" }
         subtipo: { $ref: "#/components/schemas/TextoOpcional" }
         fecha_compra: { type: [string, "null"], format: date, description: No futura. }
+    MoverActivoBody:
+      type: object
+      required: [ubicacion_id]
+      additionalProperties: false
+      properties:
+        ubicacion_id: { type: string, format: uuid, description: Una sala o un box activos (D1). }
+    NotaMotivo:
+      type: [string, "null"]
+      maxLength: 120
+      description: Obligatoria si el motivo es "otro".
+    EstadoActivoBody:
+      type: object
+      required: [estado]
+      additionalProperties: false
+      description: >-
+        Entre activo y en_reparacion sin motivo. Un dado de baja solo pasa a activo y con
+        motivo (reactivar).
+      properties:
+        estado: { type: string, enum: [activo, en_reparacion] }
+        motivo: { type: string, enum: [encontrado, baja_por_error, otro] }
+        nota: { $ref: "#/components/schemas/NotaMotivo" }
+    BajaActivoBody:
+      type: object
+      required: [motivo]
+      additionalProperties: false
+      properties:
+        motivo:
+          type: string
+          enum: [danado_sin_reparacion, perdido, vendido_o_donado, obsoleto, otro]
+        nota: { $ref: "#/components/schemas/NotaMotivo" }
     CrearActivoBody:
       type: object
       required: [id, codigo, nombre, precio_compra, categoria_id, ubicacion_id]
