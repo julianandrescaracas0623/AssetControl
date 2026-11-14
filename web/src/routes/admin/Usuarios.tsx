@@ -79,11 +79,11 @@ function Resultado({ creada, onOtra }: { creada: InvitacionCreada; onOtra: () =>
       <Alert variant="success">
         <MailPlus />
         <AlertTitle>Invitación creada</AlertTitle>
-        <AlertDescription>
-          <span className="break-all">
-            Para <strong className="font-medium">{email}</strong> como {etiquetaRol(rol)}. Vence el{' '}
-            {fechaHora.format(new Date(expira_en))}.
+        <AlertDescription className="flex flex-col gap-0.5">
+          <span>
+            Para <strong className="font-medium break-all">{email}</strong> como {etiquetaRol(rol)}.
           </span>
+          <span>Vence: {fechaHora.format(new Date(expira_en))}</span>
         </AlertDescription>
       </Alert>
       <div className="flex flex-col gap-2">

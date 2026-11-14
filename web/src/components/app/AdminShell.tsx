@@ -54,6 +54,7 @@ function barraAbierta(): boolean {
 function BarraLateral() {
   const { pathname } = useLocation()
   const activa = entradaDeRuta(pathname)?.item.ruta
+  const clinica = useSesion().sesion?.tenant.nombre ?? ''
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -109,10 +110,10 @@ function BarraLateral() {
           <SidebarMenuItem>
             <div className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-xs group-data-[collapsible=icon]:hidden">
               <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-soft text-[10px] font-semibold text-brand-strong">
-                CD
+                {iniciales(clinica)}
               </span>
               <span className="min-w-0">
-                <span className="block truncate font-medium text-sidebar-foreground">Clínica Demo</span>
+                <span className="block truncate font-medium text-sidebar-foreground">{clinica}</span>
                 <span className="block truncate text-muted-foreground">Clínica activa</span>
               </span>
             </div>

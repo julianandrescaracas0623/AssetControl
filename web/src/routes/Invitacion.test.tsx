@@ -52,6 +52,14 @@ describe('/invitacion', () => {
     expect(screen.getByLabelText('Nombre').getAttribute('autocomplete')).toBe('name')
   })
 
+  it('un enlace nuevo en la misma pestaña (solo cambia el fragmento) se lee', async () => {
+    const { router } = abrir('/invitacion')
+    await h1('Este enlace no es válido')
+    await router.navigate(`/invitacion#${TOKEN}`)
+    await h1('Crea tu cuenta')
+    expect(router.state.location.hash).toBe('')
+  })
+
   it('acepta con {token, nombre, password} y entra al inicio de su rol', async () => {
     const { router, f } = abrir(`/invitacion#${TOKEN}`)
     await h1('Crea tu cuenta')

@@ -1,6 +1,6 @@
 # Plan 002b — Acceso: contrato OpenAPI y web mínima
 
-> **Estado:** Aprobado (G1–G3, 2026-11-14) con Q8 = YAML a mano + pruebas y TanStack Query, Q19 = *proxy* de Vite. Tareas en `tasks.md`.
+> **Estado:** Implementado (T1–T6, 2026-11-14), aprobado (G1–G3, 2026-11-14) con Q8 = YAML a mano + pruebas y TanStack Query, Q19 = *proxy* de Vite. Tareas en `tasks.md`.
 
 ## 1. Enfoque
 

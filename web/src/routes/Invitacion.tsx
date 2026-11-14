@@ -139,8 +139,11 @@ function Formulario({ token }: { token: string }) {
 export default function Invitacion() {
   const location = useLocation()
   const navigate = useNavigate()
-  // Una sola lectura del fragmento; después vive solo en el estado del componente.
-  const [token] = useState(() => location.hash.slice(1))
+  // El fragmento se lee al llegar (también si cambia sin recargar, p. ej. al pegar
+  // otro enlace en la misma pestaña); después vive solo en el estado del componente.
+  const fragmento = location.hash.slice(1)
+  const [token, setToken] = useState(fragmento)
+  if (fragmento && fragmento !== token) setToken(fragmento)
 
   useEffect(() => {
     if (location.hash) navigate({ pathname: location.pathname, search: '', hash: '' }, { replace: true })

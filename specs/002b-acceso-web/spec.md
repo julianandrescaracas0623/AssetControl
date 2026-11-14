@@ -1,6 +1,6 @@
 # Spec 002b — Acceso: contrato OpenAPI y web mínima
 
-> **Estado:** Aprobada (G1–G3, 2026-11-14) con las respuestas humanas Q8 y Q19 (tabla de decisiones). Fecha: 2026-11-12, detallada el 2026-11-14. Hermana de `specs/002-acceso-y-usuarios/` (partición Q18). Depende de la spec 002 (T1–T10, hecha) y de la 001b (sistema de diseño, hecha). Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Implementada (T1–T6, 2026-11-14), aprobada (G1–G3, 2026-11-14) con las respuestas humanas Q8 y Q19 (tabla de decisiones). Fecha: 2026-11-12, detallada el 2026-11-14. Hermana de `specs/002-acceso-y-usuarios/` (partición Q18). Depende de la spec 002 (T1–T10, hecha) y de la 001b (sistema de diseño, hecha). Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 
