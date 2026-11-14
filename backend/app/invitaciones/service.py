@@ -35,7 +35,6 @@ aceptado para el piloto.
 Nada de este módulo registra el token, su clave, la contraseña ni su hash.
 """
 
-import unicodedata
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -47,6 +46,7 @@ from app.auth.credentials import get_passwords, new_token, token_key, token_stor
 from app.auth.models import Invitacion
 from app.auth.service import LoginResult, issue_session, normalize_email
 from app.db import aceptar_invitacion, validar_invitacion
+from app.nombres import normalize_display_name
 
 INVITATION_TTL = timedelta(hours=72)
 INVITATION_LINK_PREFIX = "/invitacion#"
@@ -129,12 +129,8 @@ def invitation_key(token: str) -> str:
 
 
 def normalize_nombre(nombre: str) -> str | None:
-    """Nombre sin espacios en los extremos; ``None`` si queda vacío, lleva caracteres de
-    control (NUL, saltos de línea...) o un sustituto suelto (no codificable en UTF-8)."""
-    value = nombre.strip()
-    if not value or any(unicodedata.category(char) in ("Cc", "Cs") for char in value):
-        return None
-    return value
+    """Nombre visible del invitado (cambio H-3): ver ``app.nombres``."""
+    return normalize_display_name(nombre)
 
 
 def is_valid_invitation(token: str) -> bool:

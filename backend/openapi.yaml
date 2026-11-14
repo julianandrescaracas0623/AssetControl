@@ -420,7 +420,12 @@ components:
       additionalProperties: false
       properties:
         token: { type: string }
-        nombre: { type: string }
+        nombre:
+          type: string
+          maxLength: 120
+          description: >-
+            Nombre visible: se guarda en NFC y sin espacios en los extremos; necesita una
+            letra o un número y no admite caracteres invisibles o de control.
         password:
           type: string
           format: password

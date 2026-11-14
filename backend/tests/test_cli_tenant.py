@@ -329,6 +329,18 @@ def test_the_link_goes_only_to_stdout_once_and_never_to_logs(operador, caplog):
     assert token not in caplog.text and key not in caplog.text
 
 
+def test_create_tenant_stores_the_name_in_nfc(operador):
+    """Cambio H-3: mismo normalizador que el nombre de usuario (NFC y recorte)."""
+    result = run_cli(
+        operador, "create-tenant", "  Clínica Jose\u0301 sintética  ", "nfc@ejemplo.test"
+    )
+
+    assert result.exit_code == 0, result.stderr
+    with operador.superuser.connect() as conn:
+        nombres = conn.execute(text("select nombre from tenant")).scalars().all()
+    assert "Clínica José sintética" in nombres
+
+
 def test_create_tenant_normalizes_the_email(operador):
     local = f"Admin.Mayus.{uuid.uuid4().hex[:6]}"
 
@@ -494,6 +506,12 @@ def test_command_rejects_the_app_role_as_migrator(operador):
         # N1/H3 (T9): mismo normalizador que la API; antes, error de CHECK.
         ("Clínica sintética", "admin\u1c89@ejemplo.test"),
         ("Clínica sintética", "admin\x00@ejemplo.test"),
+        # Cambio H-3 (2026-11-14): el nombre del tenant sigue la regla de nombres visibles.
+        ("Clínica \u202eacitétnis", "admin@ejemplo.test"),
+        ("\u200b", "admin@ejemplo.test"),
+        ("Clínica\ue000", "admin@ejemplo.test"),
+        ("x" * 121, "admin@ejemplo.test"),
+        ("...", "admin@ejemplo.test"),
     ],
 )
 def test_invalid_input_creates_nothing(operador, nombre, email):

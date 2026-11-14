@@ -238,6 +238,20 @@ def hash_spy(acc_app, monkeypatch) -> HashSpy:
 # --- Aceptar: camino correcto (R11, A8, A9) ------------------------------------------
 
 
+def test_accept_stores_the_name_in_nfc_up_to_120_characters(client, acc_db):
+    """Cambio H-3: el nombre se guarda en NFC y el tope de 120 se mide ya en NFC."""
+    token, email = invitar(client)
+    en_nfd = "Jose\u0301 " + "x" * 115  # 121 puntos de código; 120 en NFC
+    esperado = "José " + "x" * 115
+
+    response = aceptar(client, token, nombre=en_nfd)
+
+    assert len(en_nfd) == 121 and len(esperado) == 120
+    assert response.status_code == 201, response.get_json()
+    assert response.get_json()["usuario"]["nombre"] == esperado
+    assert usuario_row(acc_db, email)["nombre"] == esperado
+
+
 @pytest.mark.parametrize("rol", ["contador", "admin"])
 def test_accept_creates_user_and_membership_from_the_invitation(client, acc_db, rol):
     token, email = invitar(client, rol=rol)
@@ -476,6 +490,13 @@ INVALID_BODIES = {
     "nombre_con_nul": {"token": "t", "nombre": "Ana\x00", "password": NUEVA},
     "nombre_con_salto": {"token": "t", "nombre": "Ana\nBeto", "password": NUEVA},
     "nombre_sustituto": {"token": "t", "nombre": "Ana\ud800", "password": NUEVA},
+    # Cambio H-3 (2026-11-14): nombres visibles.
+    "nombre_invierte_texto": {"token": "t", "nombre": "Ana \u202eserroT", "password": NUEVA},
+    "nombre_invisible": {"token": "t", "nombre": "\u200b", "password": NUEVA},
+    "nombre_separador_linea": {"token": "t", "nombre": "Ana\u2028Beto", "password": NUEVA},
+    "nombre_uso_privado": {"token": "t", "nombre": "Ana\ue000", "password": NUEVA},
+    "nombre_sin_letras": {"token": "t", "nombre": "...", "password": NUEVA},
+    "nombre_121": {"token": "t", "nombre": "x" * 121, "password": NUEVA},
 }
 
 

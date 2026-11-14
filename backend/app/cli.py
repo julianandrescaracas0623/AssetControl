@@ -36,6 +36,7 @@ from app.config import (
     load_migration_url,
 )
 from app.invitaciones.service import normalize_invitation_email
+from app.nombres import NOMBRE_MAX_LENGTH, normalize_display_name
 
 INVITATION_LINK_PREFIX = "/invitacion#"
 CONNECT_TIMEOUT_SECONDS = 5
@@ -58,9 +59,14 @@ def create_tenant_command(nombre: str, email: str) -> None:
     Usa el rol migrador de MIGRATION_DATABASE_URL (solo por entorno) y muestra el
     enlace de la invitación una sola vez.
     """
-    nombre = nombre.strip()
-    if not nombre:
-        raise click.ClickException("El nombre del tenant no puede estar vacío.")
+    # Cambio H-3: mismo normalizador que el nombre de usuario (la web muestra ambos).
+    normalized_nombre = normalize_display_name(nombre)
+    if normalized_nombre is None:
+        raise click.ClickException(
+            f"El nombre del tenant no es válido: de 1 a {NOMBRE_MAX_LENGTH} caracteres, con "
+            "letras o números y sin caracteres invisibles o de control."
+        )
+    nombre = normalized_nombre
     # Mismo normalizador que la API (N1/H3 de T9): su salida cumple el CHECK de la base.
     normalized_email = normalize_invitation_email(email)
     if normalized_email is None:

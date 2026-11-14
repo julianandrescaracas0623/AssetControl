@@ -16,8 +16,8 @@ el mismo ``{"vigente": false}``; no consume.
 sin email; cualquier otro campo (``email``, ``rol``, ``tenant_id``...) y las
 credenciales de la petición (JWT, cookie) se ignoran. ``201`` con el mismo cuerpo
 que el login y la cookie de refresh (sesión emitida tras el ``COMMIT``, R11).
-Errores: ``400 solicitud_invalida`` (cuerpo, ``nombre`` vacío o con caracteres de
-control), ``400 contrasena_*`` (Q9, antes de mirar el token), ``400
+Errores: ``400 solicitud_invalida`` (cuerpo, o ``nombre`` fuera de la regla de
+nombres visibles de ``app.nombres``, cambio H-3), ``400 contrasena_*`` (Q9, antes de mirar el token), ``400
 invitacion_invalida`` idéntico para vencida, usada, inexistente, mal formada o
 email ya registrado (Q16), ``500`` genérico si la cuenta se creó pero la sesión no
 (A22: entra con el login).

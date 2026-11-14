@@ -220,6 +220,7 @@ export interface components {
         };
         AceptarBody: {
             token: string;
+            /** @description Nombre visible: se guarda en NFC y sin espacios en los extremos; necesita una letra o un número y no admite caracteres invisibles o de control. */
             nombre: string;
             /** Format: password */
             password: string;

@@ -19,6 +19,9 @@ import { PantallaCarga } from './PantallaCarga'
 // nombre y contraseña: el correo lo fijó quien invitó.
 
 const POLITICA = 'Entre 10 y 128 caracteres. Evita contraseñas comunes.'
+// Cambio H-3 de la spec 002: el servidor exige letras o números visibles y 120 como máximo.
+const NOMBRE_MAX = 120
+const ERROR_NOMBRE = `Revisa el nombre: usa letras o números, hasta ${NOMBRE_MAX} caracteres y sin símbolos invisibles.`
 
 function Encabezado({ titulo, descripcion }: { titulo: string; descripcion: string }) {
   return (
@@ -63,7 +66,9 @@ function Formulario({ token }: { token: string }) {
   const error = aceptar.error instanceof ErrorApi ? aceptar.error : null
   if (error?.code === 'invitacion_invalida') return <EnlaceNoValido />
   const errorClave = error?.code.startsWith('contrasena_') ? error.message : null
-  const errorGeneral = aceptar.isError && !errorClave ? mensajeDeError(aceptar.error) : null
+  // Token y contraseña siempre son texto desde esta pantalla: el 400 genérico es el nombre.
+  const errorNombre = error?.code === 'solicitud_invalida' ? ERROR_NOMBRE : null
+  const errorGeneral = aceptar.isError && !errorClave && !errorNombre ? mensajeDeError(aceptar.error) : null
 
   function alEnviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault()
@@ -88,7 +93,22 @@ function Formulario({ token }: { token: string }) {
           )}
           <div className="flex flex-col gap-2">
             <Label htmlFor="invitacion-nombre">Nombre</Label>
-            <Input id="invitacion-nombre" name="nombre" autoComplete="name" required autoFocus className="h-11 md:h-9" />
+            <Input
+              id="invitacion-nombre"
+              name="nombre"
+              autoComplete="name"
+              required
+              maxLength={NOMBRE_MAX}
+              autoFocus
+              aria-invalid={errorNombre ? true : undefined}
+              aria-describedby={errorNombre ? 'invitacion-nombre-error' : undefined}
+              className="h-11 md:h-9"
+            />
+            {errorNombre && (
+              <p id="invitacion-nombre-error" className="text-sm text-destructive">
+                {errorNombre}
+              </p>
+            )}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="invitacion-password">Contraseña</Label>

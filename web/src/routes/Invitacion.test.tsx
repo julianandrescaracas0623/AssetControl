@@ -114,6 +114,18 @@ describe('/invitacion', () => {
     expect(clave.getAttribute('aria-describedby')).toContain('invitacion-password-error')
   })
 
+  it('un nombre rechazado (H-3) se marca en el campo, que admite hasta 120 caracteres', async () => {
+    abrir(`/invitacion#${TOKEN}`, { aceptar: () => errorApi(400, 'solicitud_invalida', 'La solicitud no es válida.') })
+    await h1('Crea tu cuenta')
+    expect(screen.getByLabelText('Nombre').getAttribute('maxlength')).toBe('120')
+    crear('...')
+    expect(await screen.findByText(/Revisa el nombre/)).toBeTruthy()
+    const nombre = screen.getByLabelText('Nombre')
+    expect(nombre.getAttribute('aria-invalid')).toBe('true')
+    expect(nombre.getAttribute('aria-describedby')).toBe('invitacion-nombre-error')
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('si al aceptar la invitación ya no es válida, lo dice', async () => {
     abrir(`/invitacion#${TOKEN}`, {
       aceptar: () => errorApi(400, 'invitacion_invalida', 'El enlace de invitación no es válido o ya no está vigente.'),
