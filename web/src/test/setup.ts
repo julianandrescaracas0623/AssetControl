@@ -7,6 +7,8 @@ beforeEach(() => simularAncho({ movil: false }))
 
 // jsdom no implementa scrollIntoView ni ResizeObserver (los usan cmdk y Radix).
 Element.prototype.scrollIntoView ??= function scrollIntoView() {}
+Element.prototype.hasPointerCapture ??= () => false
+Element.prototype.releasePointerCapture ??= () => {}
 globalThis.ResizeObserver ??= class {
   observe() {}
   unobserve() {}

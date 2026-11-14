@@ -57,3 +57,31 @@ export function buscarEnNav(pathname: string): { grupo: AdminNavGrupo; item: Adm
   }
   return undefined
 }
+
+/**
+ * Entrada de la navegación a la que pertenece una ruta: la exacta o, para
+ * pantallas de detalle (/admin/activos/000123, /admin/sesiones/x/informe), la
+ * de prefijo más largo. Inicio (/admin) no cuenta como prefijo.
+ */
+export function entradaDeRuta(pathname: string): { grupo: AdminNavGrupo; item: AdminNavItem; exacta: boolean } | undefined {
+  const exacta = buscarEnNav(pathname)
+  if (exacta) return { ...exacta, exacta: true }
+  let mejor: { grupo: AdminNavGrupo; item: AdminNavItem } | undefined
+  for (const grupo of ADMIN_NAV) {
+    for (const item of grupo.items) {
+      if (item.ruta !== '/admin' && pathname.startsWith(`${item.ruta}/`) && (!mejor || item.ruta.length > mejor.item.ruta.length)) {
+        mejor = { grupo, item }
+      }
+    }
+  }
+  return mejor && { ...mejor, exacta: false }
+}
+
+/** Migas de pan de una ruta de administración. */
+export function migasDeRuta(pathname: string): string[] {
+  const entrada = entradaDeRuta(pathname)
+  if (!entrada) return ['Administración']
+  if (entrada.exacta) return [entrada.grupo.titulo, entrada.item.titulo]
+  const ultimo = decodeURIComponent(pathname.split('/').filter(Boolean).at(-1) ?? '')
+  return [entrada.grupo.titulo, entrada.item.titulo, ultimo === 'informe' ? 'Informe' : ultimo]
+}

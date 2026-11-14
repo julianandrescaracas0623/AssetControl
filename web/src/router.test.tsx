@@ -20,7 +20,7 @@ function renderAt(path: string) {
 
 describe('rutas', () => {
   it.each([
-    ['/admin', 'Inicio'],
+    ['/admin', 'Resumen'],
     ['/contar', 'Conteo'],
     ['/login', 'Iniciar sesión'],
     ['/dev/componentes', 'Sistema de diseño · Grafito y Cobalto'],
@@ -36,7 +36,7 @@ describe('rutas', () => {
 
   it('/ lleva a /admin', async () => {
     const router = renderAt('/')
-    await screen.findByRole('heading', { level: 1, name: 'Inicio' })
+    await screen.findByRole('heading', { level: 1, name: 'Resumen' })
     expect(router.state.location.pathname).toBe('/admin')
   })
 
@@ -50,7 +50,7 @@ describe('rutas', () => {
     renderAt('/admin?rol=contador')
     expect(await screen.findByRole('heading', { name: 'No tienes permiso para ver esto' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Volver' })).toBeTruthy()
-    expect(screen.queryByRole('heading', { level: 1, name: 'Inicio' })).toBeNull()
+    expect(screen.queryByRole('heading', { level: 1, name: 'Resumen' })).toBeNull()
   })
 
   it('las maquetas muestran la banda «Datos ficticios»', async () => {

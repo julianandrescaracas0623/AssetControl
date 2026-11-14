@@ -5,7 +5,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { DatosFicticios } from '@/components/app/DatosFicticios'
 import { GlobalSearch } from '@/components/app/GlobalSearch'
 import { Logo } from '@/components/app/Logo'
-import { ADMIN_NAV, buscarEnNav } from '@/components/app/admin-nav'
+import { ADMIN_NAV, entradaDeRuta, migasDeRuta } from '@/components/app/admin-nav'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   Breadcrumb,
@@ -39,6 +39,7 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
+import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
 // App shell de administración (docs/08 §4.1, spec 001b T4): barra lateral
@@ -54,6 +55,7 @@ function barraAbierta(): boolean {
 
 function BarraLateral() {
   const { pathname } = useLocation()
+  const activa = entradaDeRuta(pathname)?.item.ruta
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -79,7 +81,7 @@ function BarraLateral() {
                     <SidebarMenuItem key={item.ruta}>
                       <SidebarMenuButton
                         asChild
-                        isActive={pathname === item.ruta}
+                        isActive={activa === item.ruta}
                         tooltip={item.titulo}
                         className="max-md:h-11 data-[active=true]:bg-background data-[active=true]:font-semibold data-[active=true]:shadow-[0_0_0_1px_var(--sidebar-border)]"
                       >
@@ -126,8 +128,7 @@ function BarraLateral() {
 
 function Migas() {
   const { pathname } = useLocation()
-  const encontrado = buscarEnNav(pathname)
-  const migas = encontrado ? [encontrado.grupo.titulo, encontrado.item.titulo] : ['Administración']
+  const migas = migasDeRuta(pathname)
   return (
     <Breadcrumb aria-label="Migas de pan" className="min-w-0">
       <BreadcrumbList className="flex-nowrap">
@@ -236,6 +237,7 @@ export default function AdminShell() {
           <Outlet />
         </main>
         <GlobalSearch open={buscando} onOpenChange={setBuscando} />
+        <Toaster position="bottom-right" />
       </SidebarInset>
     </SidebarProvider>
     </TooltipProvider>

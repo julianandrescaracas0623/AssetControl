@@ -8,7 +8,15 @@ import { formatCOP, formatEntero } from '@/lib/format'
 // R7/R10: el informe congelado y el valor actual viven en tarjetas distintas,
 // con rótulos distintos. Las cifras llegan del servidor; aquí no se suma nada.
 
-export function ThreeFiguresCard({ informe, accion }: { informe: InformeCongelado; accion?: React.ReactNode }) {
+export function ThreeFiguresCard({
+  informe,
+  accion,
+  titulo = 'Último informe cerrado',
+}: {
+  informe: InformeCongelado
+  accion?: React.ReactNode
+  titulo?: string
+}) {
   const tituloId = useId()
   const cifras = [
     { rotulo: 'Encontrado', icono: <Check className="size-3.5" aria-hidden="true" />, color: 'text-success', ...informe.encontrado },
@@ -20,7 +28,7 @@ export function ThreeFiguresCard({ informe, accion }: { informe: InformeCongelad
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h2 id={tituloId} className="font-semibold">
-            Último informe cerrado <span className="sr-only">· Informe congelado</span>
+            {titulo} <span className="sr-only">· Informe congelado</span>
           </h2>
           <Badge variant="dark">
             <Lock aria-hidden="true" />

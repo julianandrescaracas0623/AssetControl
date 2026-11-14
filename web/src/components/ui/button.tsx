@@ -18,6 +18,9 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive dark:bg-destructive/20 dark:hover:bg-destructive/30",
         link: "text-primary underline-offset-4 hover:underline",
+        // Acción destructiva CONFIRMADA (docs/08 §2.1): rojo sólido, solo en alert-dialog.
+        destructiveSolid:
+          "bg-destructive text-primary-foreground hover:bg-destructive/90 focus-visible:ring-destructive",
       },
       size: {
         default:

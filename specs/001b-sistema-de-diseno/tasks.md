@@ -125,6 +125,15 @@
 - **Verificación:** `cd web && npm test` + capturas a 375 px y 1440 px, con modales y `sheet` abiertos, y `scrollWidth` (A8).
 - **Depende de:** T4, T5, T7.
 - **Riesgo:** pasar de un día; Informe se separa con `/sdd-change` si hace falta.
+- **Implementada (2026-11-14), revisada (APROBADO):**
+  - `routes/admin/Inicio.tsx` ("Resumen"): cinco indicadores (Activos hoy, Valor actual en `LiveValueCard`, avance del conteo, Discrepancias, Dañados o en reparación) en rejilla de 1/2/3 columnas (con 5 en fila la cifra del valor actual se cortaba a 1440 px); último informe en `ThreeFiguresCard` (separados, R7); aviso de que las gráficas llegan con la 010; actividad reciente en tabla (computador) o lista (celular). El avance usa el porcentaje y los pendientes del servidor, no los calcula.
+  - `routes/admin/Activos.tsx`: pestañas por estado, búsqueda (`type="search"`), filtro de categoría (`Select`), tabla en computador y tarjetas en celular, menú por fila (Ver ficha, Editar, Mover, Duplicar, Historial, Dar de baja), `alert-dialog` de baja con su efecto y botón rojo sólido (variante nueva `destructiveSolid` de `Button`: con `asChild` el `className` no reemplaza al de la variante), "Nada coincide" + Limpiar filtros, paginación de maqueta. Exportar avisa que llega con la 009.
+  - `routes/admin/RegistrarActivo.tsx` (`/admin/activos/nuevo`, D3): código del sticker (libre / ya existe con "Abrir activo"), confirmación del código, copiar de un parecido, nombre, precio, categoría y ubicación obligatorios, más datos plegados, varias unidades, Guardar y Guardar y registrar otro; errores junto a cada campo con `aria-invalid` y `aria-describedby`.
+  - `routes/admin/Informe.tsx` (`/admin/sesiones/:id/informe`): tres cifras congeladas y pestañas por categoría, por ubicación y no encontrados (marca "En reparación"); totales leídos del servidor, no sumados; tablas con scroll propio y primera columna fija en celular.
+  - `components/app/ConEstado.tsx`: estados cargando (`role="status"`), vacío con acción, error con Reintentar y éxito, por `?estado=`; `EncabezadoPagina`. `Toaster` (sonner) en el shell para acciones que llegan en otras specs.
+  - Migas y entrada activa también en pantallas de detalle (`entradaDeRuta`, `migasDeRuta`): "Conteo › Sesiones › Informe".
+  - Pruebas primero: `routes/admin/maquetas.test.tsx` (17, en rojo antes) + 1 de migas en `AdminShell.test.tsx`; se ajustaron las pruebas de T3/T4 al título "Resumen". Total 139/139; lint, typecheck y build en verde.
+  - Navegador real a 375 y 1440 px de las cuatro maquetas, con el menú de fila, el `alert-dialog` y el selector de parecidos abiertos y el estado de error: sin scroll horizontal ni desbordes.
 
 ### T9 — Maquetas de conteo
 

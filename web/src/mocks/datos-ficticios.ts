@@ -80,6 +80,7 @@ export const RESUMEN = {
     verificados: 132,
     total: 219,
     porcentaje: '60,3',
+    pendientes: 87,
     pendientesPorUbicacion: [
       { ubicacion: 'Bodega', pendientes: 58, verificados: 0, total: 58 },
       { ubicacion: 'Administración', pendientes: 16, verificados: 13, total: 29 },
@@ -89,7 +90,7 @@ export const RESUMEN = {
     ],
   },
   discrepancias: 3,
-  danados: { enReparacion: 2, danadosEnSesion: 2 },
+  danados: { total: 4, enReparacion: 2, danadosEnSesion: 2 },
 }
 
 export interface FilaDesglose {

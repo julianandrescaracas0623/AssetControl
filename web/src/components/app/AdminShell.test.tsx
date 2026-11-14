@@ -49,13 +49,21 @@ describe('AdminShell en computador', () => {
     expect(within(migas).getByText('Activos').getAttribute('aria-current')).toBe('page')
   })
 
+  it('en una pantalla de detalle marca la sección y arma las migas', async () => {
+    renderAt('/admin/sesiones/conteo-may-2026/informe')
+    const migas = await screen.findByRole('navigation', { name: 'Migas de pan' })
+    expect(migas.textContent).toBe('ConteoSesionesInforme')
+    const nav = screen.getByRole('navigation', { name: 'Navegación principal' })
+    expect(within(nav).getByRole('link', { name: 'Sesiones' }).getAttribute('data-active')).toBe('true')
+  })
+
   it('colapsa la barra a íconos y lo recuerda al recargar', async () => {
     renderAt('/admin')
     fireEvent.click(await screen.findByRole('button', { name: 'Mostrar u ocultar el menú' }))
     expect(document.querySelector('[data-slot="sidebar"]')?.getAttribute('data-state')).toBe('collapsed')
     cleanup()
     renderAt('/admin')
-    await screen.findByRole('heading', { level: 1, name: 'Inicio' })
+    await screen.findByRole('heading', { level: 1, name: 'Resumen' })
     expect(document.querySelector('[data-slot="sidebar"]')?.getAttribute('data-state')).toBe('collapsed')
   })
 
@@ -77,8 +85,8 @@ describe('AdminShell en celular', () => {
 
   it('reemplaza la barra lateral por un menú que se abre desde el encabezado', async () => {
     renderAt('/admin')
-    await screen.findByRole('heading', { level: 1, name: 'Inicio' })
-    expect(screen.queryByRole('link', { name: 'Registrar activo' })).toBeNull()
+    await screen.findByRole('heading', { level: 1, name: 'Resumen' })
+    expect(screen.queryByRole('navigation', { name: 'Navegación principal' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar u ocultar el menú' }))
     const menu = await screen.findByRole('dialog', { name: 'Menú de navegación' })
     expect(within(menu).getByRole('link', { name: 'Registrar activo' })).toBeTruthy()
