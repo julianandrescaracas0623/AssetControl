@@ -162,9 +162,23 @@ describe('alta por escaneo', () => {
     expect(container.textContent).not.toContain('389')
   })
 
-  it('pendientes por ubicación', async () => {
-    await abrir('/contar/pendientes')
+  it('pendientes por ubicación con datos reales (spec 007, T7)', async () => {
+    await abrir('/contar/pendientes?ubicacion=00000000-0000-4000-8000-0000000000a4')
     expect(screen.getByRole('heading', { level: 1, name: 'Pendientes' })).toBeTruthy()
-    expect(screen.getAllByRole('tab').length).toBeGreaterThan(2)
+    const pestañas = await screen.findAllByRole('tab')
+    expect(pestañas.map((t) => t.textContent)).toEqual(expect.arrayContaining(['Administración · 1', 'Consultorio 1 › Box 2 · 1']))
+    expect(screen.getByRole('tab', { name: 'Consultorio 1 › Box 2 · 1' }).getAttribute('aria-selected')).toBe('true')
+    const enlace = await screen.findByRole('link', { name: /Silla ergonómica/ })
+    expect(enlace.getAttribute('href')).toBe('/contar/activo/000123')
+    expect(document.body.textContent).not.toContain('$')
+  })
+
+  it('desde el inicio, cada ubicación abre sus pendientes', async () => {
+    await abrir('/contar')
+    const region = await screen.findByRole('region', { name: 'Pendientes por ubicación' })
+    const enlaces = await within(region).findAllByRole('link')
+    expect(enlaces.map((a) => a.getAttribute('href'))).toEqual(
+      expect.arrayContaining(['/contar/pendientes?ubicacion=00000000-0000-4000-8000-0000000000a2']),
+    )
   })
 })

@@ -19,7 +19,8 @@ import { fechaCorte, pendientes, porcentaje, type SesionConteo, useDetalleSesion
 
 // Inicio del conteo (spec 006, T6; docs/08 §4.2.1, CU-SES-02, Q4): la sesión abierta
 // real con su avance, la sala de trabajo y los pendientes por ubicación. Sin ningún
-// precio (P13). La actividad reciente llega con la spec 010.
+// precio (P13). La actividad reciente llega con la spec 010. Spec 007: cada fila de
+// pendientes abre la lista de esa ubicación.
 
 function SalaDeTrabajo({ rol }: { rol: string | undefined }) {
   const { sala, elegir, ubicaciones } = useSalaDeTrabajo()
@@ -100,7 +101,15 @@ function SesionAbierta({ sesion, rol }: { sesion: SesionConteo; rol: string | un
       {conPendientes.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Pendientes por ubicación">
           <h2 className="text-sm font-medium text-muted-foreground">Pendientes por ubicación</h2>
-          <PendingList items={conPendientes.map((f) => ({ ubicacion: f.ubicacion.ruta, pendientes: f.pendientes, verificados: f.verificados, total: f.total }))} />
+          <PendingList
+            items={conPendientes.map((f) => ({
+              ubicacion: f.ubicacion.ruta,
+              pendientes: f.pendientes,
+              verificados: f.verificados,
+              total: f.total,
+              href: `/contar/pendientes?ubicacion=${f.ubicacion.id}`,
+            }))}
+          />
         </section>
       )}
     </>

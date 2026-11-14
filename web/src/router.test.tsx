@@ -42,12 +42,12 @@ describe('rutas', () => {
     expect(screen.getByRole('link', { name: 'Ir al inicio' }).getAttribute('href')).toBe('/')
   })
 
-  it('las maquetas muestran la banda «Datos ficticios»; el conteo real no (spec 006)', async () => {
-    renderAt('/contar/pendientes', 'contador')
+  it('las maquetas muestran la banda «Datos ficticios»; el conteo real no (specs 006 y 007)', async () => {
+    renderAt('/admin', 'admin')
     expect(await screen.findByText(/Datos ficticios/)).toBeTruthy()
     cleanup()
-    renderAt('/contar', 'contador')
-    await screen.findByRole('heading', { level: 1, name: 'Conteo' })
+    renderAt('/contar/pendientes', 'contador')
+    await screen.findByRole('heading', { level: 1, name: 'Pendientes' })
     expect(screen.queryByText(/Datos ficticios/)).toBeNull()
   })
 })
