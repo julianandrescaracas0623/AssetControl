@@ -204,8 +204,9 @@ function MenuUsuario() {
 }
 
 // Pantallas que ya muestran datos reales de la API: sin la banda de maqueta.
-const RUTAS_CON_DATOS_REALES = new Set(['/admin/usuarios', '/admin/ubicaciones', '/admin/categorias'])
-const conDatosReales = (ruta: string) => RUTAS_CON_DATOS_REALES.has(ruta) || ruta.startsWith('/admin/activos')
+const RUTAS_CON_DATOS_REALES = new Set(['/admin/usuarios', '/admin/ubicaciones', '/admin/categorias', '/admin/sesiones'])
+const conDatosReales = (ruta: string) =>
+  RUTAS_CON_DATOS_REALES.has(ruta) || ruta.startsWith('/admin/activos') || /^\/admin\/sesiones\/[^/]+$/.test(ruta)
 
 export default function AdminShell() {
   const { pathname } = useLocation()

@@ -188,4 +188,13 @@ export const api = {
     pedir('post', '/activos/{id}/baja', { token, cuerpo, version, parametros: { id } }),
   historialActivo: (token: string, id: string, antesDe?: number) =>
     pedir('get', '/activos/{id}/historial', { token, parametros: { id }, consulta: { antes_de: antesDe } }),
+  // Spec 006: sesiones de conteo y verificaciones.
+  listarSesiones: (token: string) => pedir('get', '/sesiones', { token }),
+  sesionAbierta: (token: string) => pedir('get', '/sesiones/abierta', { token }),
+  detalleSesion: (token: string, id: string) => pedir('get', '/sesiones/{id}', { token, parametros: { id } }),
+  abrirSesion: (token: string, cuerpo: Esquemas['AbrirSesionBody']) => pedir('post', '/sesiones', { token, cuerpo }),
+  verificar: (token: string, sesionId: string, cuerpo: Esquemas['VerificarBody']) =>
+    pedir('post', '/sesiones/{id}/verificaciones', { token, cuerpo, parametros: { id: sesionId } }),
+  ultimaVerificacion: (token: string, sesionId: string, activoId: string) =>
+    pedir('get', '/sesiones/{id}/verificaciones', { token, parametros: { id: sesionId }, consulta: { activo_id: activoId } }),
 }

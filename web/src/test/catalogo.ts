@@ -1,5 +1,6 @@
 import type { Categoria, Rol, Ubicacion } from '@/lib/api/cliente'
 import type { Activo } from '@/lib/activos'
+import type { SesionConteo, Verificacion } from '@/lib/sesiones'
 import { errorApi, json, type Manejador } from './sesion'
 
 // API del catálogo simulada en memoria (spec 003): responde como el backend lo
@@ -8,11 +9,19 @@ import { errorApi, json, type Manejador } from './sesion'
 // `catalogo.fallar(ruta, respuesta)`.
 
 export function crearCatalogo(
-  inicial: { ubicaciones?: Ubicacion[]; categorias?: Categoria[]; activos?: Activo[]; rol?: Rol } = {},
+  inicial: {
+    ubicaciones?: Ubicacion[]
+    categorias?: Categoria[]
+    activos?: Activo[]
+    rol?: Rol
+    sesiones?: SesionConteo[]
+  } = {},
 ) {
   const ubicaciones = [...(inicial.ubicaciones ?? [])]
   const categorias = [...(inicial.categorias ?? [])]
   const activos = [...(inicial.activos ?? [])]
+  const sesiones = [...(inicial.sesiones ?? [])]
+  const verificaciones: Verificacion[] = []
   const rol = inicial.rol ?? 'admin'
   const sinPrecio = (a: Activo) => {
     if (rol === 'admin') return { ...a }
@@ -94,6 +103,90 @@ export function crearCatalogo(
     if (act && metodo === 'GET') {
       const a = activos.find((x) => x.id === act[1])
       return a ? json(200, { activo: sinPrecio(a) }) : errorApi(404, 'no_encontrado', 'El recurso no existe.')
+    }
+    // Spec 006: sesiones y verificaciones.
+    if (ruta0 === '/api/sesiones' && metodo === 'GET') return json(200, { sesiones })
+    if (ruta0 === '/api/sesiones/abierta' && metodo === 'GET') {
+      return json(200, { sesion: sesiones.find((x) => x.estado === 'abierta') ?? null })
+    }
+    if (ruta0 === '/api/sesiones' && metodo === 'POST') {
+      if (rol !== 'admin') return errorApi(403, 'prohibido', 'No tienes permiso.')
+      if (sesiones.some((x) => x.estado === 'abierta')) {
+        return errorApi(409, 'sesion_abierta_existente', 'Ya hay una sesión de conteo abierta. Ciérrala antes de abrir otra.')
+      }
+      const b = cuerpo(init)
+      const nueva: SesionConteo = {
+        id: nuevoId(),
+        nombre: String(b.nombre).trim(),
+        tipo: 'conteo',
+        estado: 'abierta',
+        fecha_corte: String(b.fecha_corte),
+        abierta_por: { id: '00000000-0000-4000-8000-00000000000a', nombre: 'Ana Torres' },
+        abierta_en: '2026-11-14T13:00:00+00:00',
+        cerrada_por: null,
+        cerrada_en: null,
+      }
+      sesiones.unshift(nueva)
+      return json(201, { sesion: nueva })
+    }
+    const ses = ruta0.match(/^\/api\/sesiones\/([0-9a-f-]{36})(\/verificaciones)?$/)
+    if (ses) {
+      const sesion = sesiones.find((x) => x.id === ses[1])
+      if (!sesion) return errorApi(404, 'no_encontrado', 'El recurso no existe.')
+      const conPrecio = (v: Verificacion) => {
+        if (rol === 'admin') return v
+        const resto: Partial<Verificacion> = { ...v }
+        delete resto.precio_al_contar
+        return resto
+      }
+      if (!ses[2] && metodo === 'GET') {
+        const grupos = new Map<string, { ruta: string; total: number; verificados: number }>()
+        for (const a of activos.filter((x) => x.estado !== 'dado_de_baja')) {
+          const g = grupos.get(a.ubicacion.id) ?? { ruta: a.ubicacion.ruta, total: 0, verificados: 0 }
+          g.total += 1
+          if (verificaciones.some((v) => v.sesion_id === sesion.id && v.activo.id === a.id)) g.verificados += 1
+          grupos.set(a.ubicacion.id, g)
+        }
+        const por_ubicacion = [...grupos.entries()].map(([id, g]) => ({
+          ubicacion: { id, ruta: g.ruta },
+          total: g.total,
+          verificados: g.verificados,
+          pendientes: g.total - g.verificados,
+        }))
+        const total = por_ubicacion.reduce((n, f) => n + f.total, 0)
+        const verificados = por_ubicacion.reduce((n, f) => n + f.verificados, 0)
+        return json(200, { sesion, avance: { total, verificados, pendientes: total - verificados, por_ubicacion } })
+      }
+      if (ses[2] && metodo === 'GET') {
+        const ultima = verificaciones.filter((v) => v.sesion_id === sesion.id && v.activo.id === q.get('activo_id')).at(-1)
+        return json(200, { verificacion: ultima ? conPrecio(ultima) : null })
+      }
+      if (ses[2] && metodo === 'POST') {
+        const b = cuerpo(init)
+        const previa = verificaciones.find((v) => v.id === b.id)
+        if (previa) return json(200, { verificacion: conPrecio(previa) })
+        if (sesion.estado !== 'abierta') return errorApi(409, 'sesion_cerrada', 'La sesión se cerró: esta verificación no se guardó.')
+        const a = activos.find((x) => x.id === b.activo_id)
+        if (!a) return errorApi(404, 'no_encontrado', 'El recurso no existe.')
+        if (a.estado === 'dado_de_baja') return errorApi(409, 'activo_dado_de_baja', 'El activo está dado de baja: no se puede verificar.')
+        const encontrada = String(b.ubicacion_encontrada_id)
+        const v: Verificacion = {
+          id: String(b.id),
+          sesion_id: sesion.id,
+          activo: { id: a.id, codigo: a.codigo, nombre: a.nombre },
+          ubicacion_esperada: { id: a.ubicacion.id, ruta: a.ubicacion.ruta },
+          ubicacion_encontrada: { id: encontrada, ruta: ruta(encontrada) },
+          estado_fisico: b.estado_fisico as Verificacion['estado_fisico'],
+          nota: (b.nota as string | null | undefined) ?? null,
+          verificado_por: { id: '00000000-0000-4000-8000-00000000000b', nombre: rol === 'admin' ? 'Ana Torres' : 'Luis Pérez' },
+          ocurrido_en: (b.ocurrido_en as string | null | undefined) ?? null,
+          recibido_en: '2026-11-14T15:44:00+00:00',
+          seq: verificaciones.length + 1,
+          precio_al_contar: a.precio_compra,
+        }
+        verificaciones.push(v)
+        return json(201, { verificacion: conPrecio(v) })
+      }
     }
     // Spec 005: cambios con If-Match (412 con el vigente) e historial.
     const cambio = ruta0.match(/^\/api\/activos\/([0-9a-f-]{36})(?:\/(mover|estado|baja))?$/)
@@ -231,6 +324,15 @@ export function crearCatalogo(
     fallar(clave: string, respuesta: () => Response) {
       fallos.set(clave, respuesta)
     },
+    sesiones,
+    verificaciones,
+    /** El cierre llega con la 008: aquí se simula. */
+    cerrarSesion(id: string) {
+      const x = sesiones.find((y) => y.id === id)!
+      x.estado = 'cerrada'
+      x.cerrada_en = '2026-11-14T16:00:00+00:00'
+      x.cerrada_por = x.abierta_por
+    },
     /** Otra persona cambia el activo: sube su versión sin que la pantalla lo sepa. */
     cambiarPorOtro(id: string, cambios: Partial<Activo>) {
       const a = activos.find((x) => x.id === id)!
@@ -269,7 +371,7 @@ export function activoDe(
 }
 
 /** Catálogo pequeño para las pruebas de pantallas de activos (spec 004). */
-export function catalogoDemo(rol: Rol = 'admin') {
+export function catalogoDemo(rol: Rol = 'admin', opciones: { sesiones?: SesionConteo[] } = {}) {
   const ubicaciones = [
     ub('00000000-0000-4000-8000-0000000000a1', 'Sede Principal', 'sede', null),
     ub('00000000-0000-4000-8000-0000000000a2', 'Administración', 'sala', '00000000-0000-4000-8000-0000000000a1'),
@@ -290,5 +392,20 @@ export function catalogoDemo(rol: Rol = 'admin') {
       { categoria: categorias[1], ubicacion: ubicaciones[3], ruta: 'Consultorio 1 › Box 2' },
     ),
   ]
-  return crearCatalogo({ ubicaciones, categorias, activos, rol })
+  return crearCatalogo({ ubicaciones, categorias, activos, rol, sesiones: opciones.sesiones })
+}
+
+export function sesionDe(datos: Partial<SesionConteo> = {}): SesionConteo {
+  return {
+    id: '00000000-0000-4000-8000-0000000000e1',
+    nombre: 'Conteo nov 2026',
+    tipo: 'conteo',
+    estado: 'abierta',
+    fecha_corte: '2026-11-30',
+    abierta_por: { id: '00000000-0000-4000-8000-00000000000a', nombre: 'Ana Torres' },
+    abierta_en: '2026-11-14T13:00:00+00:00',
+    cerrada_por: null,
+    cerrada_en: null,
+    ...datos,
+  }
 }

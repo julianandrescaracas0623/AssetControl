@@ -4,6 +4,8 @@ import App from './App'
 import AdminShell from './components/app/AdminShell'
 import Activos from './routes/admin/Activos'
 import FichaActivo from './routes/admin/FichaActivo'
+import RutaDetalleSesion from './routes/admin/DetalleSesion'
+import Sesiones from './routes/admin/Sesiones'
 import Informe from './routes/admin/Informe'
 import AdminInicio from './routes/admin/Inicio'
 import Pendiente from './routes/admin/Pendiente'
@@ -55,11 +57,13 @@ export const routes: RouteObject[] = [
                   { index: true, element: <AdminInicio /> },
                   { path: 'activos', element: <Activos /> },
                   { path: 'activos/nuevo', element: <RegistrarActivo /> },
+                  { path: 'sesiones', element: <Sesiones /> },
+                  { path: 'sesiones/:id', element: <RutaDetalleSesion /> },
                   { path: 'sesiones/:id/informe', element: <Informe /> },
                   { path: 'usuarios', element: <Usuarios /> },
                   { path: 'ubicaciones', element: <Ubicaciones /> },
                   { path: 'categorias', element: <Categorias /> },
-                  ...['sesiones', 'discrepancias', 'valor'].map(
+                  ...['discrepancias', 'valor'].map(
                     (path) => ({ path, element: <Pendiente /> }),
                   ),
                   { path: 'activos/:codigo', element: <FichaActivo /> },
