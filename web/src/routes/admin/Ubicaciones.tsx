@@ -1,5 +1,6 @@
 import { Building2, CircleAlert, DoorOpen, EllipsisVertical, MapPin, Plus, RefreshCw, SquareDashed } from 'lucide-react'
 import { type FormEvent, useId, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
 import { EncabezadoPagina } from '@/components/app/ConEstado'
@@ -218,13 +219,20 @@ export default function Ubicaciones() {
   const [edicion, setEdicion] = useState<Edicion | null>(null)
   const [aDesactivar, setADesactivar] = useState<Ubicacion | null>(null)
   const idSwitch = useId()
+  const navegar = useNavigate()
 
   function cambiarActiva(ubicacion: Ubicacion, activa: boolean) {
     actualizar.mutate(
       { id: ubicacion.id, activa },
       {
         onSuccess: () => toast.success(activa ? `«${ubicacion.nombre}» está activa` : `«${ubicacion.nombre}» quedó inactiva`),
-        onError: (error) => toast.error(mensajeDeError(error)),
+        onError: (error) =>
+          // D2 (spec 004) y R10 (spec 005): llevar a los activos que hay que mover.
+          error instanceof ErrorApi && error.code === 'tiene_activos'
+            ? toast.error(error.message, {
+                action: { label: 'Ver activos', onClick: () => navegar(`/admin/activos?ubicacion=${encodeURIComponent(ubicacion.id)}`) },
+              })
+            : toast.error(mensajeDeError(error)),
       },
     )
   }

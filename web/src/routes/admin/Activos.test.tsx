@@ -77,13 +77,40 @@ describe('/admin/activos', () => {
     await waitFor(() => expect(filas()).toHaveLength(2))
   })
 
-  it('las acciones de edición esperan la spec 005', async () => {
-    abrir('/admin/activos')
+  it('el menú de cada fila abre la ficha con la acción (spec 005, T8)', async () => {
+    const { router } = abrir('/admin/activos')
     await waitFor(() => expect(filas()).toHaveLength(2))
     fireEvent.keyDown(screen.getByRole('button', { name: 'Acciones de Silla ergonómica (000123)' }), { key: 'Enter' })
     const menu = await screen.findByRole('menu')
-    expect(within(menu).getByRole('menuitem', { name: 'Ver ficha' })).toBeTruthy()
-    expect(menu.textContent).toContain('llegan con la spec 005')
+    expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Ver ficha', 'Editar', 'Mover', 'Dar de baja'])
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Mover' }))
+    expect(await screen.findByRole('dialog', { name: 'Mover activo' })).toBeTruthy()
+    expect(router.state.location.pathname).toBe('/admin/activos/000123')
+  })
+
+  it('un dado de baja solo ofrece ver y reactivar', async () => {
+    const base = catalogoDemo('admin')
+    base.activos[1].estado = 'dado_de_baja'
+    abrir('/admin/activos', base)
+    await waitFor(() => expect(filas()).toHaveLength(2))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Acciones de Silla ergonómica (000123)' }), { key: 'Enter' })
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Ver ficha', 'Reactivar'])
+  })
+
+  it('filtra por ubicación en el servidor y se quita con un toque', async () => {
+    const { f, router } = abrir('/admin/activos?ubicacion=00000000-0000-4000-8000-0000000000a4')
+    await waitFor(() => expect(filas()).toHaveLength(1))
+    expect(filas()[0].textContent).toContain('Silla ergonómica')
+    expect(pedidas(f, 'ubicacion_id=00000000-0000-4000-8000-0000000000a4').length).toBeGreaterThan(0)
+    fireEvent.click(await screen.findByRole('button', { name: /Quitar el filtro de ubicación Consultorio 1 › Box 2/ }))
+    await waitFor(() => expect(filas()).toHaveLength(2))
+    expect(router.state.location.search).toBe('')
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Filtrar por ubicación' }))
+    fireEvent.click(await screen.findByRole('option', { name: /Administración/ }))
+    await waitFor(() => expect(filas()).toHaveLength(1))
+    expect(filas()[0].textContent).toContain('Impresora multifuncional')
   })
 })
 

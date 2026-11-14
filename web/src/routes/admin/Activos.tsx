@@ -1,11 +1,12 @@
-import { CircleAlert, Download, Eye, MoreHorizontal, Plus, RefreshCw, Search } from 'lucide-react'
+import { Archive, ArchiveRestore, CircleAlert, Download, Eye, MapPin, MoreHorizontal, Pencil, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
 import { EncabezadoPagina } from '@/components/app/ConEstado'
 import { EmptyState } from '@/components/app/EmptyState'
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
+import { LocationPicker } from '@/components/app/LocationPicker'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -23,11 +24,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { type Activo, useBuscarActivos } from '@/lib/activos'
 import { mensajeDeError } from '@/lib/api/cliente'
+import { rutaDe, useUbicaciones } from '@/lib/catalogo'
 import { formatCOP, formatEntero } from '@/lib/format'
 
-// Activos (docs/08 §4.3, §7.7; spec 004, T9): datos reales en solo lectura. Búsqueda por
-// código, nombre o serial, filtro por estado y paginación en el servidor (25 por
-// página). Editar, mover y dar de baja llegan con la spec 005.
+// Activos (docs/08 §4.3, §7.7; spec 004, T9): búsqueda por código, nombre o serial,
+// filtro por estado y paginación en el servidor (25 por página). Spec 005, T8: el menú
+// de cada fila abre la ficha con la acción (editar, mover, dar de baja o reactivar) y
+// la lista filtra por ubicación (`?ubicacion=`; llega desde el aviso "tiene activos").
 
 type Pestaña = 'todos' | Activo['estado']
 
@@ -42,13 +45,28 @@ function AccionesFila({ activo }: { activo: Activo }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="truncate text-xs font-normal text-muted-foreground">{activo.codigo}</DropdownMenuLabel>
         <DropdownMenuItem asChild>
           <Link to={ficha(activo)}><Eye />Ver ficha</Link>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          Editar, mover y dar de baja llegan con la spec 005
-        </DropdownMenuLabel>
+        {activo.estado === 'dado_de_baja' ? (
+          <DropdownMenuItem asChild>
+            <Link to={`${ficha(activo)}?accion=reactivar`}><ArchiveRestore />Reactivar</Link>
+          </DropdownMenuItem>
+        ) : (
+          <>
+            <DropdownMenuItem asChild>
+              <Link to={`${ficha(activo)}?accion=editar`}><Pencil />Editar</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to={`${ficha(activo)}?accion=mover`}><MapPin />Mover</Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild variant="destructive">
+              <Link to={`${ficha(activo)}?accion=baja`}><Archive />Dar de baja</Link>
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -68,14 +86,29 @@ export default function Activos() {
   const [pestaña, setPestaña] = useState<Pestaña>('todos')
   const [texto, setTexto] = useState('')
   const [pagina, setPagina] = useState(1)
+  const [params, setParams] = useSearchParams()
+  const ubicacion = params.get('ubicacion') ?? ''
+  const ubicaciones = useUbicaciones()
   const q = useRetrasado(texto.trim())
-  const busqueda = useBuscarActivos({ q: q || undefined, estado: pestaña === 'todos' ? undefined : pestaña, pagina })
+  const busqueda = useBuscarActivos({
+    q: q || undefined,
+    estado: pestaña === 'todos' ? undefined : pestaña,
+    ubicacion_id: ubicacion || undefined,
+    pagina,
+  })
+
+  function filtrarUbicacion(id: string) {
+    if (id) params.set('ubicacion', id)
+    else params.delete('ubicacion')
+    setParams(params, { replace: true })
+    setPagina(1)
+  }
   const datos = busqueda.data
   const activos = datos?.activos ?? []
   const desde = datos && datos.total > 0 ? (datos.pagina - 1) * datos.por_pagina + 1 : 0
   const hasta = datos ? desde + activos.length - (activos.length > 0 ? 1 : 0) : 0
   const hayMas = datos ? datos.pagina * datos.por_pagina < datos.total : false
-  const filtrando = q !== '' || pestaña !== 'todos'
+  const filtrando = q !== '' || pestaña !== 'todos' || ubicacion !== ''
 
   return (
     <div className="flex flex-col gap-6">
@@ -113,6 +146,25 @@ export default function Activos() {
               <TabsTrigger value="en_reparacion">En reparación</TabsTrigger>
               <TabsTrigger value="dado_de_baja">Dados de baja</TabsTrigger>
             </TabsList>
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+            {ubicacion ? (
+              <Button variant="outline" className="max-w-full justify-between max-md:h-11" onClick={() => filtrarUbicacion('')} aria-label={`Quitar el filtro de ubicación ${rutaDe(ubicaciones.data ?? [], ubicacion)}`}>
+                <MapPin />
+                <span className="truncate">{rutaDe(ubicaciones.data ?? [], ubicacion) || 'Ubicación'}</span>
+                <X />
+              </Button>
+            ) : (
+              <div className="sm:w-56">
+                <LocationPicker
+                  id="filtro-ubicacion"
+                  ubicaciones={ubicaciones.data ?? []}
+                  cargando={ubicaciones.isPending}
+                  onChange={filtrarUbicacion}
+                  etiqueta="Todas las ubicaciones"
+                  nombre="Filtrar por ubicación"
+                />
+              </div>
+            )}
             <div className="relative min-w-0 sm:w-72">
               <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
@@ -127,6 +179,7 @@ export default function Activos() {
                 }}
                 className="pl-8 max-md:h-11"
               />
+            </div>
             </div>
           </div>
 
@@ -156,8 +209,8 @@ export default function Activos() {
                 {filtrando ? (
                   <EmptyState
                     titulo="Nada coincide"
-                    descripcion="Prueba con otro código, nombre, serial o estado."
-                    accion={<Button variant="outline" onClick={() => { setTexto(''); setPestaña('todos') }}>Limpiar filtros</Button>}
+                    descripcion="Prueba con otro código, nombre, serial, estado o ubicación."
+                    accion={<Button variant="outline" onClick={() => { setTexto(''); setPestaña('todos'); filtrarUbicacion('') }}>Limpiar filtros</Button>}
                   />
                 ) : (
                   <EmptyState

@@ -20,6 +20,8 @@ export function LocationPicker({
   onChange,
   className,
   cargando = false,
+  etiqueta: vacio = 'Elige una ubicación',
+  nombre,
 }: {
   id?: string
   ubicaciones: Ubicacion[]
@@ -28,6 +30,10 @@ export function LocationPicker({
   onChange: (id: string) => void
   className?: string
   cargando?: boolean
+  /** Texto del botón sin nada elegido. */
+  etiqueta?: string
+  /** Nombre accesible cuando no hay un <Label> asociado. */
+  nombre?: string
 }) {
   const [abierto, setAbierto] = useState(false)
   const grupos = opcionesDeSelector(ubicaciones)
@@ -48,7 +54,7 @@ export function LocationPicker({
     )
   }
 
-  const etiqueta = cargando ? 'Cargando ubicaciones…' : valor ? rutaDe(ubicaciones, valor) || 'Elige una ubicación' : 'Elige una ubicación'
+  const etiqueta = cargando ? 'Cargando ubicaciones…' : valor ? rutaDe(ubicaciones, valor) || vacio : vacio
 
   return (
     <Popover open={abierto} onOpenChange={setAbierto}>
@@ -58,6 +64,7 @@ export function LocationPicker({
           variant="outline"
           role="combobox"
           aria-expanded={abierto}
+          aria-label={nombre}
           disabled={cargando}
           className={cn('h-11 w-full justify-between border-input font-normal md:h-9', className)}
         >

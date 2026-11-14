@@ -130,6 +130,21 @@ describe('/admin/ubicaciones', () => {
     expect(catalogo.ubicaciones.find((u) => u.id === 'c')!.activa).toBe(true)
   })
 
+  it('con activos dentro, el aviso lleva a la lista filtrada por esa ubicación (spec 005, R10)', async () => {
+    const { catalogo } = abrir()
+    catalogo.fallar('PATCH /api/ubicaciones/b', () =>
+      errorApi(409, 'tiene_activos', 'Tiene 2 activos: muévelos antes de desactivarla.'),
+    )
+    await titulo()
+    await screen.findByRole('listitem', { name: 'Box 2' })
+    await accion('Box 2', 'Desactivar')
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Desactivar' }))
+    expect(await screen.findByText('Tiene 2 activos: muévelos antes de desactivarla.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver activos' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Activos' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /Quitar el filtro de ubicación Consultorios › Box 2/ })).toBeTruthy()
+  })
+
   it('desactiva un box y lo puede reactivar', async () => {
     const { catalogo } = abrir()
     await titulo()
