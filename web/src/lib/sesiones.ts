@@ -94,6 +94,7 @@ export function useVerificar(sesionId: string | undefined) {
     onSuccess: ({ verificacion }) => {
       cliente.setQueryData([...CLAVE_SESIONES, 'verificacion', sesionId, verificacion.activo.id], verificacion)
       void cliente.invalidateQueries({ queryKey: [...CLAVE_SESIONES, 'detalle', sesionId] })
+      void cliente.invalidateQueries({ queryKey: [...CLAVE_SESIONES, 'pendientes', sesionId] })
       void cliente.invalidateQueries({ queryKey: [...CLAVE_ACTIVOS, 'historial', verificacion.activo.id] })
     },
   })

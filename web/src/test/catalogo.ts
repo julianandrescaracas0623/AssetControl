@@ -22,6 +22,7 @@ export function crearCatalogo(
   const activos = [...(inicial.activos ?? [])]
   const sesiones = [...(inicial.sesiones ?? [])]
   const verificaciones: Verificacion[] = []
+  const resoluciones = new Map<string, { tipo: 'aplicada' | 'descartada'; en: string }>()
   const rol = inicial.rol ?? 'admin'
   const sinPrecio = (a: Activo) => {
     if (rol === 'admin') return { ...a }
@@ -128,6 +129,80 @@ export function crearCatalogo(
       }
       sesiones.unshift(nueva)
       return json(201, { sesion: nueva })
+    }
+    const dis = ruta0.match(/^\/api\/sesiones\/([0-9a-f-]{36})\/(discrepancias(?:\/aplicar|\/descartar)?|pendientes)$/)
+    if (dis) {
+      const sesion = sesiones.find((x) => x.id === dis[1])
+      if (!sesion) return errorApi(404, 'no_encontrado', 'El recurso no existe.')
+      const vigentes = new Map<string, Verificacion>()
+      for (const v of verificaciones.filter((x) => x.sesion_id === sesion.id)) vigentes.set(v.activo.id, v)
+      const estadoDe = (v: Verificacion) => {
+        const r = resoluciones.get(v.id)
+        if (r) return r.tipo
+        const a = activos.find((x) => x.id === v.activo.id)!
+        return a.ubicacion.id === v.ubicacion_esperada.id ? 'pendiente' : 'desfasada'
+      }
+      if (dis[2] === 'pendientes' && metodo === 'GET') {
+        const ubicacionId = q.get('ubicacion_id')
+        const lista = activos.filter(
+          (a) => a.estado !== 'dado_de_baja' && !vigentes.has(a.id) && (!ubicacionId || a.ubicacion.id === ubicacionId),
+        )
+        return json(200, {
+          activos: lista.map((a) => ({ id: a.id, codigo: a.codigo, nombre: a.nombre, categoria: a.categoria, ubicacion: { id: a.ubicacion.id, ruta: a.ubicacion.ruta }, estado: a.estado })),
+          total: lista.length,
+          pagina: 1,
+          por_pagina: 50,
+        })
+      }
+      if (rol !== 'admin') return errorApi(403, 'prohibido', 'No tienes permiso.')
+      if (dis[2] === 'discrepancias' && metodo === 'GET') {
+        const filtro = q.get('estado') ?? 'por_resolver'
+        const items = [...vigentes.values()]
+          .filter((v) => v.ubicacion_encontrada.id !== v.ubicacion_esperada.id)
+          .map((v) => {
+            const a = activos.find((x) => x.id === v.activo.id)!
+            const estado = estadoDe(v)
+            const r = resoluciones.get(v.id)
+            return {
+              verificacion_id: v.id,
+              activo: { ...v.activo, estado: a.estado },
+              ubicacion_esperada: v.ubicacion_esperada,
+              ubicacion_encontrada: v.ubicacion_encontrada,
+              ubicacion_actual: { id: a.ubicacion.id, ruta: a.ubicacion.ruta },
+              verificado_por: v.verificado_por,
+              recibido_en: v.recibido_en,
+              estado,
+              resolucion: r ? { tipo: r.tipo, por: { id: '00000000-0000-4000-8000-00000000000a', nombre: 'Ana Torres' }, en: r.en } : null,
+            }
+          })
+          .filter((d) => filtro === 'todas' || (filtro === 'resueltas') === (d.estado === 'aplicada' || d.estado === 'descartada'))
+        return json(200, { discrepancias: items })
+      }
+      if (metodo === 'POST') {
+        const b = cuerpo(init)
+        const aplicar = dis[2].endsWith('aplicar')
+        const resultados = (b.verificaciones as string[]).map((id) => {
+          const v = verificaciones.find((x) => x.id === id && x.sesion_id === sesion.id)
+          if (!v) return { verificacion_id: id, resultado: 'no_encontrada' }
+          const a = activos.find((x) => x.id === v.activo.id)!
+          const activo = () => ({ id: a.id, codigo: a.codigo, nombre: a.nombre, ubicacion: { id: a.ubicacion.id, ruta: a.ubicacion.ruta } })
+          if (resoluciones.has(id)) return { verificacion_id: id, resultado: 'ya_resuelta', activo: activo() }
+          if (vigentes.get(a.id)?.id !== id) return { verificacion_id: id, resultado: 'ya_no_es_discrepancia', activo: activo() }
+          if (!aplicar) {
+            resoluciones.set(id, { tipo: 'descartada', en: '2026-11-14T17:00:00+00:00' })
+            return { verificacion_id: id, resultado: 'descartada', activo: activo() }
+          }
+          if (a.ubicacion.id !== v.ubicacion_esperada.id) {
+            if (a.ubicacion.id === v.ubicacion_encontrada.id) return { verificacion_id: id, resultado: 'ya_en_la_encontrada', activo: activo() }
+            if (!b.confirmar_desfase) return { verificacion_id: id, resultado: 'desfasada', activo: activo() }
+          }
+          a.ubicacion = { id: v.ubicacion_encontrada.id, nombre: ubicaciones.find((u) => u.id === v.ubicacion_encontrada.id)?.nombre ?? '', ruta: v.ubicacion_encontrada.ruta }
+          a.row_version += 1
+          resoluciones.set(id, { tipo: 'aplicada', en: '2026-11-14T17:00:00+00:00' })
+          return { verificacion_id: id, resultado: 'aplicada', activo: activo() }
+        })
+        return json(200, { resultados })
+      }
     }
     const ses = ruta0.match(/^\/api\/sesiones\/([0-9a-f-]{36})(\/verificaciones)?$/)
     if (ses) {

@@ -195,6 +195,15 @@ export const api = {
   abrirSesion: (token: string, cuerpo: Esquemas['AbrirSesionBody']) => pedir('post', '/sesiones', { token, cuerpo }),
   verificar: (token: string, sesionId: string, cuerpo: Esquemas['VerificarBody']) =>
     pedir('post', '/sesiones/{id}/verificaciones', { token, cuerpo, parametros: { id: sesionId } }),
+  // Spec 007: discrepancias (solo admin) y pendientes.
+  listarDiscrepancias: (token: string, sesionId: string, estado: 'por_resolver' | 'resueltas' | 'todas') =>
+    pedir('get', '/sesiones/{id}/discrepancias', { token, parametros: { id: sesionId }, consulta: { estado } }),
+  aplicarDiscrepancias: (token: string, sesionId: string, cuerpo: Esquemas['AplicarDiscrepanciasBody']) =>
+    pedir('post', '/sesiones/{id}/discrepancias/aplicar', { token, cuerpo, parametros: { id: sesionId } }),
+  descartarDiscrepancias: (token: string, sesionId: string, cuerpo: Esquemas['DescartarDiscrepanciasBody']) =>
+    pedir('post', '/sesiones/{id}/discrepancias/descartar', { token, cuerpo, parametros: { id: sesionId } }),
+  listarPendientes: (token: string, sesionId: string, consulta: { ubicacion_id?: string; pagina?: number }) =>
+    pedir('get', '/sesiones/{id}/pendientes', { token, parametros: { id: sesionId }, consulta }),
   ultimaVerificacion: (token: string, sesionId: string, activoId: string) =>
     pedir('get', '/sesiones/{id}/verificaciones', { token, parametros: { id: sesionId }, consulta: { activo_id: activoId } }),
 }
