@@ -55,6 +55,7 @@ from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
 from app.auth import models
+from app.catalogo import models as catalogo_models  # noqa: F401 - registra ubicacion y categoria
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
@@ -63,7 +64,7 @@ SUPABASE_ROLES = ("anon", "authenticated", "service_role")
 
 # Lista cerrada de tablas de public sin tenant_id; cada una tiene su prueba propia.
 EXCEPTIONS = frozenset({"alembic_version", "tenant", "usuario", "limite_tasa"})
-TENANT_TABLES = frozenset({"membresia", "invitacion", "refresh_token"})
+TENANT_TABLES = frozenset({"membresia", "invitacion", "refresh_token", "ubicacion", "categoria"})
 
 TENANT_EXPR = "(NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid"
 ISOLATION_EXPR = f"(tenant_id = {TENANT_EXPR})"
@@ -108,6 +109,21 @@ EXPECTED_POLICIES = {
         "(creada_por IS NOT NULL)",
     ),
     ("refresh_token", "tenant_isolation"): (
+        "PERMISSIVE",
+        "ALL",
+        "{app}",
+        ISOLATION_EXPR,
+        ISOLATION_EXPR,
+    ),
+    # Spec 003, T1 (0006): mismo patrón de aislamiento que 0002.
+    ("ubicacion", "tenant_isolation"): (
+        "PERMISSIVE",
+        "ALL",
+        "{app}",
+        ISOLATION_EXPR,
+        ISOLATION_EXPR,
+    ),
+    ("categoria", "tenant_isolation"): (
         "PERMISSIVE",
         "ALL",
         "{app}",
@@ -185,6 +201,27 @@ EXPECTED_APP_COLUMNS = {
         "INSERT": {"ambito", "clave_hash", "ventana_inicio", "intentos"},
         "UPDATE": {"intentos"},
     },
+    # Spec 003, T1 (0006): id, activa y creado_en por DEFAULT; tenant_id, tipo y padre_id
+    # no se actualizan; sin DELETE.
+    "ubicacion": {
+        "SELECT": {
+            "id",
+            "tenant_id",
+            "nombre",
+            "nombre_clave",
+            "tipo",
+            "padre_id",
+            "activa",
+            "creado_en",
+        },
+        "INSERT": {"tenant_id", "nombre", "nombre_clave", "tipo", "padre_id"},
+        "UPDATE": {"nombre", "nombre_clave", "activa"},
+    },
+    "categoria": {
+        "SELECT": {"id", "tenant_id", "nombre", "nombre_clave", "creado_en"},
+        "INSERT": {"tenant_id", "nombre", "nombre_clave"},
+        "UPDATE": {"nombre", "nombre_clave"},
+    },
 }
 # Privilegios a nivel de tabla del rol de la aplicación (sin columnas).
 EXPECTED_APP_TABLE_PRIVILEGES = {
@@ -195,6 +232,8 @@ EXPECTED_APP_TABLE_PRIVILEGES = {
     "invitacion": set(),
     "refresh_token": {"SELECT", "INSERT"},
     "limite_tasa": {"SELECT", "INSERT"},
+    "ubicacion": {"SELECT"},
+    "categoria": {"SELECT"},
 }
 
 
@@ -353,6 +392,8 @@ EXPECTED_OWNER_COLUMNS = {
     },
     "refresh_token": {},
     "limite_tasa": {},
+    "ubicacion": {},
+    "categoria": {},
 }
 TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
 COLUMN_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "REFERENCES")

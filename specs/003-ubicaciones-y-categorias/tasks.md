@@ -15,4 +15,4 @@
 
 ## Notas por tarea
 
-_(se completan al cerrar cada tarea)_
+- **T1 (hecha, 2026-11-14):** migración `0006_ubicaciones_y_categorias` (tablas, `CHECK` de sede sin padre y de largo, FK compuesta del padre, únicos parciales por `nombre_clave`, `UNIQUE (tenant_id, id)`, RLS forzada con `tenant_isolation`, `GRANT` por columna sin `DELETE`). Modelos `app/catalogo/models.py` (`id`, `activa` y `creado_en` por `DEFAULT`, leídos con `RETURNING`). `test_catalog_rls.py` amplía tablas, políticas, `GRANT` de la aplicación y de `auth_owner` (nada) y modelos; `test_migrations.py` con la nueva cabeza y `0006` sube, baja y vuelve a subir tocando solo sus tablas; `test_catalogo_db.py` (20 pruebas con el rol de la aplicación: RLS, padre de otro tenant, `CHECK`, únicos, sin `DELETE` ni cambio de `tenant_id`/`tipo`/`padre_id`). `docs/03` actualizado. De paso, corregido un E501 del docstring de `invitaciones/routes.py` que entró con el commit de H-3. Backend 1274 pruebas, ruff limpio.

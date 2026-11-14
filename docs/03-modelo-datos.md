@@ -64,9 +64,16 @@ erDiagram
 
 | Tabla | Campos principales | Notas |
 |---|---|---|
-| `ubicacion` | `id`, `tenant_id`, `nombre`, `tipo` (`sede`\|`sala`\|`box`), `padre_id`, `activa` | Jerarquía simple por `padre_id`. |
-| `categoria` | `id`, `tenant_id`, `nombre` | Lista cerrada. Resuelve "Mobiliaria/Mobiliario/Inmobiliaria" del Excel. |
+| `ubicacion` | `id`, `tenant_id`, `nombre`, `nombre_clave`, `tipo` (`sede`\|`sala`\|`box`), `padre_id`, `activa`, `creado_en` | Jerarquía estricta por `padre_id`: sede > sala > box (spec 003, Q1). |
+| `categoria` | `id`, `tenant_id`, `nombre`, `nombre_clave`, `creado_en` | Lista cerrada. Resuelve "Mobiliaria/Mobiliario/Inmobiliaria" del Excel. |
 | `activo` | ver abajo | Entidad central. |
+
+Detalle de `ubicacion` y `categoria` (spec 003, migración `0006`):
+
+- `nombre`: de 1 a 120 caracteres con la regla de nombres visibles (H-3 de la spec 002). `nombre_clave`: el nombre sin tildes, en minúsculas y con espacios colapsados; la calcula la aplicación y la base solo hace cumplir su unicidad.
+- `ubicacion`: `CHECK ((tipo = 'sede') = (padre_id IS NULL))`; FK compuesta `(tenant_id, padre_id) → ubicacion (tenant_id, id)`, así el padre es siempre del mismo tenant; el tipo del padre (sala bajo sede, box bajo sala) lo exige la aplicación. Únicos parciales: `(tenant_id, nombre_clave) WHERE padre_id IS NULL` y `(tenant_id, padre_id, nombre_clave) WHERE padre_id IS NOT NULL`. No se borra ni cambia de padre; `activa = false` la saca de los selectores y no se permite con hijas activas (Q2).
+- `categoria`: `UNIQUE (tenant_id, nombre_clave)` y `UNIQUE (tenant_id, id)` para las FK compuestas de `activo`.
+- Ambas: RLS forzada con `tenant_isolation`; la aplicación no tiene `DELETE` ni actualiza `tenant_id`, `tipo` ni `padre_id`.
 
 `activo`:
 
