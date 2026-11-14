@@ -46,7 +46,7 @@ export const ADMIN_NAV: AdminNavGrupo[] = [
     ],
   },
   { titulo: 'Finanzas', items: [{ titulo: 'Valor actual', ruta: '/admin/valor', icono: TrendingUp, llega: 'la spec 008' }] },
-  { titulo: 'Ajustes', items: [{ titulo: 'Usuarios', ruta: '/admin/usuarios', icono: Users, llega: 'la spec 002b' }] },
+  { titulo: 'Ajustes', items: [{ titulo: 'Usuarios', ruta: '/admin/usuarios', icono: Users, llega: 'invitar en la spec 002b; lista de usuarios en una spec posterior' }] },
 ]
 
 export function buscarEnNav(pathname: string): { grupo: AdminNavGrupo; item: AdminNavItem } | undefined {
