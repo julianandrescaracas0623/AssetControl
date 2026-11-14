@@ -4,6 +4,8 @@
 
 **Dirección (decidida por el humano, 2026-11-11)**: AssetControl es un sistema de gestión de activos y debe verse **profesional**. Estilo **SaaS moderno y sobrio**, inspirado (no copiado) en paneles como los de Stripe, Linear o Vercel: barra lateral, encabezado con buscador, tarjetas de indicadores, tablas limpias con filtros, mucho espacio en blanco y tipografía cuidada. Base neutra (grises tipo zinc/slate de shadcn), **un acento contenido** y estados semánticos discretos. La marca es la del producto, no la de la clínica. Los colores viven como variables de tema (Tailwind/shadcn) para cambiarlos sin tocar pantallas.
 
+**Diseño aprobado (decisión del humano, 2026-11-13)**: el humano aprobó la propuesta visual **"Grafito y Cobalto"** como el diseño que se usará. Vive en el lienzo de diseño [AssetControl — Diseño de la aplicación](https://claude.ai/artifact/JL51wegLrd1sJ2W7heqvMe) (sistema visual, 14 pantallas de administración y 10 de conteo a 375 px) y es la referencia para la spec de sistema de diseño y app shell (sección 11). Decide: base zinc, acento cobalto `#2B50E0`, botón principal neutro oscuro (opción A), fuente Geist / Geist Mono (dependencia pendiente de aprobar en esa spec) y la entrada **Registrar activo** en administración (4.1, 4.3, 7.7). El lienzo es una maqueta: no reemplaza la verificación en navegador real a 375 y 1440 px con componentes reales (sección 11, paso 3). Si choca con este documento, manda este documento hasta que se actualice.
+
 ## 1. Principios visuales
 
 1. **Profesional y sobrio**: la interfaz transmite control y precisión. Jerarquía por tipografía, espacio y peso, no por color ni decoración. Bordes finos antes que sombras; nada de degradados, ilustraciones ni íconos decorativos.
@@ -18,7 +20,7 @@
 
 ### 2.1 Color (claro)
 
-Variables CSS de shadcn (`--background`, `--primary`, etc.) en un único archivo de tema; base neutra **zinc** `[PENDIENTE: zinc o slate]`. Valores propuestos; **no se afirma que cumplan contraste hasta medirlos**.
+Variables CSS de shadcn (`--background`, `--primary`, etc.) en un único archivo de tema; base neutra **zinc** (decidido 2026-11-13, diseño aprobado). Contrastes calculados con la fórmula WCAG sobre blanco al aprobar el diseño; falta medirlos en la web real con herramienta (meta abajo).
 
 | Rol | Variable shadcn | Hex | Uso |
 |---|---|---|---|
@@ -30,17 +32,17 @@ Variables CSS de shadcn (`--background`, `--primary`, etc.) en un único archivo
 | Superficie suave | `--muted` / `--accent` | `#F4F4F5` | Hover de fila, ítem activo del menú, chips neutros |
 | Botón principal | `--primary` | `#18181B` | Acción principal (una por pantalla) |
 | Texto sobre principal | `--primary-foreground` | `#FAFAFA` | Etiqueta del botón principal |
-| Acento de marca | `--brand` (propio) | `#2563EB` | Foco, enlaces, selección, barra de avance |
+| Acento de marca (cobalto) | `--brand` (propio) | `#2B50E0` (6,3 : 1); suave `#EEF1FD`, borde `#C9D3FA`, fuerte `#2443C4` | Foco, enlaces, selección, barra de avance |
 | Éxito | `--success` (propio) | `#15803D` | Encontrado, guardado |
 | Error | `--destructive` | `#B91C1C` | Fallo, no encontrado, baja |
 | Aviso | `--warning` (propio) | `#B45309` | Discrepancia, "No se pudo confirmar", dañado |
 | Borde | `--border` | `#E4E4E7` | Separadores, contorno de tarjetas y tablas |
-| Borde de control | `--input` | `#A1A1AA` | Contorno de campos y casillas |
-| Anillo de foco | `--ring` | `#2563EB` | Foco visible (2 px + 2 px de separación) |
+| Borde de control | `--input` | `#8A8A93` (3,4 : 1) | Contorno de campos y casillas |
+| Anillo de foco | `--ring` | `#2B50E0` | Foco visible (2 px + 2 px de separación) |
 
-- **Botón principal** `[PENDIENTE]`: opción A (recomendada) neutro oscuro `#18181B`, como en el tema por defecto de shadcn, y el acento solo en foco, enlaces, selección y avance; opción B, el botón principal en el acento. A es más sobria y resiste mejor el sol directo.
+- **Botón principal** (decidido 2026-11-13: **opción A**): opción A neutro oscuro `#18181B`, como en el tema por defecto de shadcn, y el acento solo en foco, enlaces, selección y avance; opción B, el botón principal en el acento. A es más sobria y resiste mejor el sol directo.
 - **Estados discretos**: en badges y avisos se usa fondo muy suave (≈ 5–10 % del color) con texto e ícono del color sólido; el color sólido de fondo se reserva para la banda "Verificado" y la acción destructiva confirmada. Nunca van solos: siempre ícono + texto.
-- El borde de control `#A1A1AA` probablemente no alcanza 3:1 sobre blanco; si al medirlo no llega, se oscurece (p. ej. hacia `#71717A`). El borde decorativo `--border` no tiene que cumplir 3:1 porque no delimita controles.
+- El borde de control pasó de `#A1A1AA` (2,6 : 1, no cumplía) a `#8A8A93` (3,4 : 1). El borde decorativo `--border` no tiene que cumplir 3:1 porque no delimita controles.
 - **Modo oscuro** `[PENDIENTE]`: el estilo SaaS suele incluirlo y las variables ya permiten añadir `.dark` sin tocar pantallas; no entra al MVP salvo decisión humana.
 - **Meta de contraste**: WCAG AA, 4.5:1 en texto normal y 3:1 en texto grande y bordes de controles. Se mide con herramienta (inspector de contraste de Chrome DevTools o Lighthouse) cada par de la tabla y el resultado se anota en el PR. Hoy es una meta, no un hecho.
 
@@ -58,7 +60,7 @@ Variables CSS de shadcn (`--background`, `--primary`, etc.) en un único archivo
 ### 2.3 Tipografía
 
 - **Base**: pila del sistema, sin descargar nada: `ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`. Cifras con `tabular-nums`; códigos con `font-mono` del sistema.
-- **Fuente de producto** `[PENDIENTE]`: el estilo SaaS gana mucho con una sola familia cuidada. Recomendación: **Inter** o **Geist**, variable y **autoalojada** (servida desde la propia web, no desde un CDN de terceros, para no filtrar visitas ni depender de red externa). Es una **dependencia nueva** (paquete npm de la fuente o archivos en el repo, con su licencia) que el humano debe aprobar; hasta entonces se usa la pila del sistema y nada se rompe al cambiarla, porque la familia vive en una variable de tema.
+- **Fuente de producto** (elegida 2026-11-13 en el diseño aprobado: **Geist** y **Geist Mono** para códigos; la dependencia sigue pendiente de aprobar en la spec de sistema de diseño): el estilo SaaS gana mucho con una sola familia cuidada. Opciones evaluadas: **Inter** o **Geist**, variable y **autoalojada** (servida desde la propia web, no desde un CDN de terceros, para no filtrar visitas ni depender de red externa). Es una **dependencia nueva** (paquete npm de la fuente o archivos en el repo, con su licencia) que el humano debe aprobar; hasta entonces se usa la pila del sistema y nada se rompe al cambiarla, porque la familia vive en una variable de tema.
 
 | Uso | Móvil (`/contar`, y `/admin` por debajo de `md`) | Computador (`/admin` desde `md`) |
 |---|---|---|
@@ -138,7 +140,7 @@ Copiar un componente de shadcn/ui no es "cero dependencias": muchos instalan paq
 
 ### 4.1 App shell
 
-- **Barra lateral** (componente `sidebar`), colapsable a solo íconos (con tooltip) y recordando el estado. Arriba: "AssetControl" en texto (sin logotipo hasta T9). Grupos: **General** (Inicio), **Inventario** (Activos, Ubicaciones, Categorías), **Conteo** (Sesiones, Discrepancias `[PENDIENTE: entrada propia o solo dentro de la sesión]`), **Finanzas** (Valor actual), **Ajustes** (Usuarios). Abajo: "Ir a contar" (abre `/contar`) y la clínica activa (tenant) como texto.
+- **Barra lateral** (componente `sidebar`), colapsable a solo íconos (con tooltip) y recordando el estado. Arriba: "AssetControl" en texto (sin logotipo hasta T9). Grupos: **General** (Inicio), **Inventario** (Activos, Registrar activo, Ubicaciones, Categorías), **Conteo** (Sesiones, Discrepancias `[PENDIENTE: entrada propia o solo dentro de la sesión]`), **Finanzas** (Valor actual), **Ajustes** (Usuarios). Abajo: "Ir a contar" (abre `/contar`) y la clínica activa (tenant) como texto.
 - **Encabezado** (altura ~56 px, borde inferior): botón para colapsar la barra, **migas de pan** (`Sesiones / Conteo nov 2026 / Informe`), **buscador global** al centro o a la derecha, y **menú de usuario** (avatar con iniciales, nombre, rol, "Cerrar sesión").
 - **Buscador global**: abre un `command` (también con `Ctrl/⌘ K`) que busca activos por código o nombre y salta a su ficha; alcance más allá de activos `[PENDIENTE]` (recomendación MVP: solo activos y navegación a pantallas). La búsqueda la resuelve el servidor, filtrada por tenant.
 - **Área de contenido**: título de página + descripción corta a la izquierda, acciones de página a la derecha (una principal); debajo, tarjetas y tablas.
@@ -182,7 +184,7 @@ El contador no entra a `/admin/**` (403); su Inicio vive en el modo conteo (`/co
 
 Patrón para Activos, Ubicaciones (vista lista), Sesiones, Discrepancias, Usuarios:
 
-- **Barra de herramientas**: búsqueda por texto, filtros como botones `outline` con conteo de seleccionados (p. ej. Categoría, Ubicación, Estado), "Limpiar filtros"; a la derecha la acción principal ("Nuevo activo" no aplica: el alta es por escaneo; en Activos la principal es "Exportar" `[PENDIENTE]`).
+- **Barra de herramientas**: búsqueda por texto, filtros como botones `outline` con conteo de seleccionados (p. ej. Categoría, Ubicación, Estado), "Limpiar filtros"; a la derecha la acción principal. En Activos la principal es **"Registrar activo"** y "Exportar" queda como secundaria (decisión del humano, 2026-11-13).
 - **Tabla**: encabezados en 12–13 px `--muted-foreground`, filas de ~44 px, hover suave, cifras alineadas a la derecha con `tabular-nums`, códigos en `font-mono`, estados como `badge`. Orden al hacer clic en el encabezado.
 - **Acciones por fila**: menú `⋯` (`dropdown-menu`) con Ver, Editar, Mover, Historial, Dar de baja (destructiva, al final y con `alert-dialog`).
 - **Paginación** al pie: "1–25 de 200", tamaño de página y anterior/siguiente. Paginación, orden y filtro en cliente o en servidor `[PENDIENTE]`; con el volumen del primer cliente cabe en cliente, pero el contrato de la API se fija en la spec de cada módulo.
@@ -245,6 +247,7 @@ Rutas **propuestas** (`[PENDIENTE]` de fijar en las specs 002–010). "Precios" 
 |---|---|---|---|
 | `/admin` | Inicio / Resumen (4.2): indicadores, último informe, gráficas, evolución, actividad | DSH-01..04 (reúne SES-02, INF-01, INF-02, DIS-01, HIS-01) | Solo admin |
 | `/admin/activos` | Tabla de datos; ficha con editar, mover, estado, baja | CAT-04..08 | Admin ve todo |
+| `/admin/activos/nuevo` (ruta propuesta) | Registrar activo desde el computador: código del sticker (escanear con la cámara o escribir y confirmar), copiar de un parecido, nombre, precio, categoría y ubicación obligatorios, opcionales colapsados, varias unidades iguales seguidas | CAT-01..03 | Admin escribe y ve el precio |
 | `/admin/ubicaciones` | Árbol sede > sala > box; crear, editar, desactivar | UBI-01..03 | — |
 | `/admin/categorias` | Lista cerrada de categorías | CAT-09 | — |
 | `/admin/sesiones` | Lista; abrir; detalle con avance y cierre | SES-01..03 | — |
@@ -441,7 +444,7 @@ Contador (sin precio)             Admin (con precio de referencia)
 ```
 
 - `⋯` abre Ver, Editar (sheet lateral), Mover, Historial y Dar de baja (con `alert-dialog`). Precio alineado a la derecha, `tabular-nums`, en COP.
-- No hay "Nuevo activo": el alta es por escaneo (CU-CAT-02); el vacío ofrece [Ir a escanear]. Edición concurrente: `412` con aviso (sección 8).
+- **Registrar activo** (decisión del humano, 2026-11-13): entrada propia en la barra lateral y acción principal de la tabla. Sigue R8: no hay alta sin código de sticker (se escanea o se escribe y se confirma, porque es inmutable). Obligatorios: nombre, precio, categoría y ubicación; solo se teclean nombre y precio. El vacío ofrece [Registrar activo] y [Ir a escanear]. Edición concurrente: `412` con aviso (sección 8).
 
 ## 8. Estados y mensajes
 
@@ -494,19 +497,19 @@ Tono: breve, directo, sin tecnicismos ni culpa al usuario. Tuteo.
 
 ### Decisiones `[PENDIENTE]` de diseño
 
-1. Base neutra (zinc o slate) y hex definitivos de neutros, acento y estados, tras medir contraste (sección 2.1).
-2. Botón principal: neutro oscuro (recomendado) o en el acento.
-3. Fuente de producto: Inter o Geist autoalojada, o quedarse con la pila del sistema (dependencia nueva).
+1. ~~Base neutra y hex definitivos~~: decidido 2026-11-13 (zinc + cobalto, sección 2.1). Falta medir contraste en la web real.
+2. ~~Botón principal~~: decidido 2026-11-13, neutro oscuro (opción A).
+3. Fuente de producto: Geist / Geist Mono elegida en el diseño aprobado (2026-11-13); falta aprobar la dependencia (autoalojada) en la spec de sistema de diseño.
 4. Modo oscuro: dentro o fuera del MVP.
 5. Dependencias: `lucide-react` (íconos), `@tanstack/react-table` (tablas) y `recharts` (gráficos del Inicio, vía el componente `chart` de shadcn/ui; spec 010), además de las que arrastre cada componente de shadcn/ui.
 6. Alcance del buscador global (recomendación: activos y navegación).
 7. Paginación, orden y filtro en cliente o en servidor.
 8. "Actividad reciente": ¿pantalla de actividad global o solo historial por activo? Discrepancias: ¿entrada propia en la barra lateral?
-9. Acción principal de la tabla de Activos ("Exportar" u otra) y ancho máximo del contenido.
+9. ~~Acción principal de la tabla de Activos~~: "Registrar activo" (2026-11-13). Pendiente: ancho máximo del contenido (el lienzo usa ~1320 px).
 10. Admin por debajo de `md` (resuelto el 2026-11-11: responsive, sección 4.4): falta el criterio por pantalla (tarjetas o scroll horizontal con columnas prioritarias) y el patrón de crear o editar.
 11. Vibración y sonido al verificar, y si el usuario puede apagarlos.
 12. Rutas definitivas (sección 6) y `inputmode` del campo de código (P9).
-13. Nombre y logo del producto (T9); hasta entonces, texto "AssetControl".
+13. Nombre y logo del producto (T9); hasta entonces, texto "AssetControl". El lienzo trae un logo provisional de barras, no aprobado como marca.
 14. Contador: ¿ve discrepancias de su conteo? (CU-DIS-01), ¿sesiones pasadas? (CU-HIS-02), ¿puede editar el precio al duplicar sin verlo? (CU-CAT-03), ¿qué ve en su Inicio? (P25).
 15. Vista previa "no definitiva" del informe con sesión abierta; "buscado y no hallado" frente a "sin verificar" (P16); umbral de "Poca luz".
 16. Nombre y número de la spec de sistema de diseño y app shell (sección 11).
@@ -515,7 +518,7 @@ Tono: breve, directo, sin tecnicismos ni culpa al usuario. Tuteo.
 
 ## 11. Siguientes pasos
 
-1. **No más prototipos hechos a mano.** El diseño se valida sobre la web real, con los componentes reales.
+1. **No más prototipos hechos a mano.** El diseño se valida sobre la web real, con los componentes reales. Excepción ya hecha: el lienzo de diseño aprobado el 2026-11-13 (ver el encabezado) es la referencia visual; no se hacen más maquetas, se construye.
 2. **Spec corta de "sistema de diseño y app shell"** `[PENDIENTE: nombre y número, decisión humana]`, **después de T8** de [specs/001-fundacion-tecnica](../specs/001-fundacion-tecnica/tasks.md). Monta el shell real (`AdminShell` y `CountShell`) con componentes de shadcn/ui, el tema de la sección 2 y **datos ficticios**, sin backend de negocio: Inicio, tabla de Activos, informe y las pantallas (a)–(d) de conteo como maquetas navegables. Declara para aprobación todas sus dependencias (las que arrastre `npx shadcn@latest add`, `lucide-react`, `@tanstack/react-table`, la fuente si se aprueba y `recharts` solo si la maqueta del Inicio incluye gráficas; si no, las gráficas llegan con la spec 010). T8 sigue limitada a su criterio (esqueleto, tema base y un componente); cualquier ajuste a T8 pasa por el planner y el humano.
 3. **Revisión antes de mostrar**: cada pantalla, de admin y de conteo, se revisa con capturas en navegador real a **375 px** y a **1440 px** (skill `browser-qa`), con contraste medido y estados (cargando, vacío, error, éxito) recorridos, **antes** de presentarla al humano.
 4. **Aprobación humana con las capturas**: el humano aprueba o pide cambios sobre las capturas; con eso se fijan los hex, la fuente y los `[PENDIENTE]` que afecten a las specs 004 y 006 (escáner y verificación). Las pantallas reales con datos llegan en las specs 002–010.
