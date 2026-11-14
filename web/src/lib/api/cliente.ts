@@ -15,6 +15,9 @@ export type Sesion = Esquemas['Sesion']
 export type UsuarioActual = Esquemas['UsuarioActual']
 export type Rol = Esquemas['Rol']
 export type InvitacionCreada = Esquemas['InvitacionCreada']
+export type Ubicacion = Esquemas['Ubicacion']
+export type TipoUbicacion = Esquemas['TipoUbicacion']
+export type Categoria = Esquemas['Categoria']
 /** Códigos del backend más `sin_conexion` (no hubo respuesta de la API). */
 export type CodigoError = Esquemas['ErrorCode'] | 'sin_conexion'
 
@@ -41,7 +44,7 @@ export function mensajeDeError(error: unknown): string {
   return MENSAJE_INESPERADO
 }
 
-type Metodo = 'get' | 'post'
+type Metodo = 'get' | 'post' | 'patch'
 type Ruta = keyof paths
 /** Métodos que el contrato declara para `R` (los ausentes son `never`). */
 type MetodoDe<R extends Ruta> = {
@@ -60,6 +63,8 @@ type ExitoDe<O> = O extends { responses: infer Rs }
 
 export interface Opciones<B> {
   cuerpo?: B
+  /** Valores de la ruta (`/ubicaciones/{id}` → `{ id }`). */
+  parametros?: Record<string, string>
   /** Token de acceso (solo en memoria). */
   token?: string | null
   /** Cabecera `X-AssetControl-CSRF: 1` (refresh y logout, Q14). */
@@ -98,12 +103,17 @@ export async function pedir<R extends Ruta, M extends MetodoDe<R>>(
   if (opciones.token) headers.set('Authorization', `Bearer ${opciones.token}`)
   if (opciones.csrf) headers.set(CSRF_HEADER, '1')
 
+  const url = String(ruta).replace(/\{(\w+)\}/g, (_, nombre: string) => {
+    const valor = opciones.parametros?.[nombre]
+    if (valor === undefined) throw new Error(`Falta el parámetro de ruta ${nombre}`)
+    return encodeURIComponent(valor)
+  })
   const plazo = new AbortController()
   const reloj = setTimeout(() => plazo.abort(), TIEMPO_MAXIMO_MS)
   try {
     let respuesta: Response
     try {
-      respuesta = await fetch(`${API_BASE}${ruta}`, {
+      respuesta = await fetch(`${API_BASE}${url}`, {
         method: metodo.toUpperCase(),
         headers,
         body: opciones.cuerpo === undefined ? undefined : JSON.stringify(opciones.cuerpo),
@@ -133,4 +143,15 @@ export const api = {
     pedir('post', '/invitaciones', { token, cuerpo }),
   validarInvitacion: (token: string) => pedir('post', '/invitaciones/validar', { cuerpo: { token } }),
   aceptarInvitacion: (cuerpo: Esquemas['AceptarBody']) => pedir('post', '/invitaciones/aceptar', { cuerpo }),
+  // Spec 003: catálogo (todas con el token de la sesión).
+  listarUbicaciones: (token: string) => pedir('get', '/ubicaciones', { token }),
+  crearUbicacion: (token: string, cuerpo: Esquemas['CrearUbicacionBody']) =>
+    pedir('post', '/ubicaciones', { token, cuerpo }),
+  actualizarUbicacion: (token: string, id: string, cuerpo: Esquemas['ActualizarUbicacionBody']) =>
+    pedir('patch', '/ubicaciones/{id}', { token, cuerpo, parametros: { id } }),
+  listarCategorias: (token: string) => pedir('get', '/categorias', { token }),
+  crearCategoria: (token: string, cuerpo: Esquemas['NombreBody']) => pedir('post', '/categorias', { token, cuerpo }),
+  renombrarCategoria: (token: string, id: string, cuerpo: Esquemas['NombreBody']) =>
+    pedir('patch', '/categorias/{id}', { token, cuerpo, parametros: { id } }),
+  cargarCategoriasSugeridas: (token: string) => pedir('post', '/categorias/sugeridas', { token }),
 }

@@ -87,6 +87,31 @@ describe('pedir', () => {
   })
 })
 
+describe('catálogo (spec 003)', () => {
+  it('rellena el id de la ruta y usa PATCH', async () => {
+    const f = responder(200, { ubicacion: {} })
+    await api.actualizarUbicacion('jwt.sintetico', 'a b/c', { activa: false })
+    const { url, init, headers } = peticion(f)
+    expect(url).toBe('/api/ubicaciones/a%20b%2Fc')
+    expect(init.method).toBe('PATCH')
+    expect(headers.get('Authorization')).toBe('Bearer jwt.sintetico')
+    expect(JSON.parse(String(init.body))).toEqual({ activa: false })
+  })
+
+  it('cargar sugeridas es un POST sin cuerpo', async () => {
+    const f = responder(200, { categorias: [], creadas: 0 })
+    await api.cargarCategoriasSugeridas('jwt.sintetico')
+    expect(peticion(f).url).toBe('/api/categorias/sugeridas')
+    expect(peticion(f).init.body).toBeUndefined()
+  })
+
+  it('sin el parámetro de ruta falla antes de llamar', async () => {
+    const f = responder(200, {})
+    await expect(pedir('patch', '/categorias/{id}', { cuerpo: { nombre: 'x' } })).rejects.toThrow(/id/)
+    expect(f).not.toHaveBeenCalled()
+  })
+})
+
 describe('errores', () => {
   it('un error de la API se vuelve ErrorApi con su código, mensaje y request_id', async () => {
     responder(401, {
