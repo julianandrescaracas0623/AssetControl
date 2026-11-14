@@ -1,6 +1,6 @@
 # Plan 004 — Activos: alta por escaneo
 
-> **Estado:** Aprobado (G1–G3, 2026-11-14) con Q1–Q6 en la opción recomendada (`spec.md`).
+> **Estado:** Implementado (T1–T11, 2026-11-14). Aprobado (G1–G3, 2026-11-14) con Q1–Q6 en la opción recomendada (`spec.md`).
 
 ## 1. Enfoque
 

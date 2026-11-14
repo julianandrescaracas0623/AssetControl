@@ -1,6 +1,6 @@
 # Spec 004 — Activos: alta por escaneo
 
-> **Estado:** Aprobada (G1–G3, 2026-11-14) con Q1–Q6 en la opción recomendada. Fecha: 2026-11-14. Depende de la 003 (ubicaciones y categorías, hecha). Módulo M3 parcial: CU-CAT-01 a CU-CAT-04 de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Implementada (T1–T11, 2026-11-14); queda A6 (prueba humana con teléfonos, guía en `tasks.md`). Aprobada (G1–G3, 2026-11-14) con Q1–Q6 en la opción recomendada. Fecha: 2026-11-14. Depende de la 003 (ubicaciones y categorías, hecha). Módulo M3 parcial: CU-CAT-01 a CU-CAT-04 de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 
