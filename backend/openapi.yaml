@@ -21,6 +21,7 @@ tags:
   - name: auth
   - name: invitaciones
   - name: catalogo
+  - name: activos
 
 paths:
   /health:
@@ -323,11 +324,12 @@ paths:
           $ref: "#/components/responses/NoEncontrado"
         "409":
           description: >-
-            Nombre repetido, hijas activas al desactivar o padre inactivo al reactivar.
+            Nombre repetido, hijas activas o activos al desactivar (D2 de la spec 004) o
+            padre inactivo al reactivar.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
-          x-codigos: [nombre_duplicado, tiene_hijas_activas, padre_inactivo]
+          x-codigos: [nombre_duplicado, tiene_hijas_activas, padre_inactivo, tiene_activos]
         "413":
           $ref: "#/components/responses/CuerpoDemasiadoGrande"
 
@@ -424,6 +426,97 @@ paths:
           $ref: "#/components/responses/NoAutenticado"
         "403":
           $ref: "#/components/responses/Prohibido"
+
+  /activos:
+    post:
+      tags: [activos]
+      operationId: crearActivo
+      summary: Dar de alta un activo (admin y contador; idempotente por id)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CrearActivoBody" }
+      responses:
+        "200":
+          description: Reintento con el mismo id y código; devuelve el ya guardado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActivoRespuesta" }
+        "201":
+          description: Creado con su evento "creado".
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActivoRespuesta" }
+        "400":
+          description: Cuerpo, código, precio o ubicación no válidos.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [solicitud_invalida, codigo_invalido, precio_invalido, ubicacion_invalida]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: El código ya es de otro activo; se devuelve ese activo para abrirlo.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CodigoExistente" }
+          x-codigos: [codigo_existente]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /activos/por-codigo:
+    get:
+      tags: [activos]
+      operationId: resolverCodigo
+      summary: El activo de un código de sticker (se normaliza a mayúsculas)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: codigo
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Existe en este tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActivoRespuesta" }
+        "400":
+          description: El texto no tiene el formato de un código.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [codigo_invalido]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /activos/{id}:
+    get:
+      tags: [activos]
+      operationId: fichaActivo
+      summary: Ficha de solo lectura de un activo
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: El activo (con precio solo para el admin).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActivoRespuesta" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
 
 components:
   securitySchemes:
@@ -550,6 +643,11 @@ components:
         - nombre_duplicado
         - tiene_hijas_activas
         - padre_inactivo
+        - tiene_activos
+        - codigo_invalido
+        - precio_invalido
+        - ubicacion_invalida
+        - codigo_existente
     Error:
       type: object
       required: [error]
@@ -756,6 +854,90 @@ components:
       additionalProperties: false
       properties:
         nombre: { $ref: "#/components/schemas/NombreVisible" }
+
+    Precio:
+      type: string
+      description: >-
+        Decimal en texto canónico ("1390000.50"), mayor o igual a 0 y con hasta dos
+        decimales. Nunca un número JSON.
+    EstadoActivo:
+      type: string
+      enum: [activo, en_reparacion, dado_de_baja]
+    TextoOpcional:
+      type: [string, "null"]
+      maxLength: 120
+    Activo:
+      type: object
+      required:
+        [id, codigo, nombre, categoria, ubicacion, serial, marca, modelo, subtipo, fecha_compra, estado, creado_en]
+      additionalProperties: false
+      description: precio_compra solo existe en las respuestas al admin (P13).
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string }
+        nombre: { type: string }
+        categoria: { $ref: "#/components/schemas/Categoria" }
+        ubicacion: { $ref: "#/components/schemas/UbicacionDeActivo" }
+        serial: { $ref: "#/components/schemas/TextoOpcional" }
+        marca: { $ref: "#/components/schemas/TextoOpcional" }
+        modelo: { $ref: "#/components/schemas/TextoOpcional" }
+        subtipo: { $ref: "#/components/schemas/TextoOpcional" }
+        fecha_compra: { type: [string, "null"], format: date }
+        estado: { $ref: "#/components/schemas/EstadoActivo" }
+        creado_en: { type: string, format: date-time }
+        precio_compra: { $ref: "#/components/schemas/Precio" }
+    UbicacionDeActivo:
+      type: object
+      required: [id, nombre, ruta]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        ruta: { type: string, description: '"Sala › Box" o el nombre de la sala.' }
+    ActivoRespuesta:
+      type: object
+      required: [activo]
+      additionalProperties: false
+      properties:
+        activo: { $ref: "#/components/schemas/Activo" }
+    ActivoResumen:
+      type: object
+      required: [id, codigo, nombre]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string }
+        nombre: { type: string }
+    CodigoExistente:
+      type: object
+      required: [error, activo]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          additionalProperties: false
+          properties:
+            code: { $ref: "#/components/schemas/ErrorCode" }
+            message: { type: string }
+            request_id: { type: string, format: uuid }
+        activo: { $ref: "#/components/schemas/ActivoResumen" }
+    CrearActivoBody:
+      type: object
+      required: [id, codigo, nombre, precio_compra, categoria_id, ubicacion_id]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid, description: Lo genera el cliente; reintentar con el mismo id no duplica. }
+        codigo: { type: string, description: "1 a 40: letras sin tilde, números y - . / _; se guarda en mayúsculas." }
+        nombre: { $ref: "#/components/schemas/NombreVisible" }
+        precio_compra: { $ref: "#/components/schemas/Precio" }
+        categoria_id: { type: string, format: uuid }
+        ubicacion_id: { type: string, format: uuid, description: Una sala o un box activos (D1). }
+        serial: { $ref: "#/components/schemas/TextoOpcional" }
+        marca: { $ref: "#/components/schemas/TextoOpcional" }
+        modelo: { $ref: "#/components/schemas/TextoOpcional" }
+        subtipo: { $ref: "#/components/schemas/TextoOpcional" }
+        fecha_compra: { type: [string, "null"], format: date, description: No futura. }
 
     Health:
       type: object

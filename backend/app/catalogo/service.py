@@ -17,11 +17,12 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from sqlalchemy import case, exists, select
+from sqlalchemy import case, exists, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.activos.models import Activo
 from app.catalogo.models import Categoria, Ubicacion
 from app.nombres import normalize_display_name
 
@@ -69,6 +70,19 @@ class TieneHijasActivas(ErrorCatalogo):
     message = "Primero desactiva las salas o boxes que tiene dentro."
 
 
+class TieneActivos(ErrorCatalogo):
+    status = 409
+    code = "tiene_activos"
+    message = "Tiene activos: muévelos antes de desactivarla."
+
+    def __init__(self, cantidad: int) -> None:
+        self.message = (
+            f"Tiene {cantidad} {'activo' if cantidad == 1 else 'activos'}: "
+            "muévelos antes de desactivarla."
+        )
+        super().__init__()
+
+
 class PadreInactivo(ErrorCatalogo):
     status = 409
     code = "padre_inactivo"
@@ -82,6 +96,7 @@ ERRORES = (
     NombreDuplicado,
     TieneHijasActivas,
     PadreInactivo,
+    TieneActivos,
 )
 
 
@@ -200,6 +215,14 @@ def actualizar_ubicacion(
         )
         if hijas_activas:
             raise TieneHijasActivas()
+        # D2 (spec 004): los dados de baja no bloquean; los en reparación sí.
+        con_activos = session.scalar(
+            select(func.count())
+            .select_from(Activo)
+            .where(Activo.ubicacion_id == ubicacion.id, Activo.estado != "dado_de_baja")
+        )
+        if con_activos:
+            raise TieneActivos(con_activos)
     if activa is True and not ubicacion.activa and ubicacion.padre_id is not None:
         if not _bloquear(session, ubicacion.padre_id).activa:
             raise PadreInactivo()

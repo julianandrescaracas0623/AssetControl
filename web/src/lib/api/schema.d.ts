@@ -244,6 +244,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/activos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dar de alta un activo (admin y contador; idempotente por id) */
+        post: operations["crearActivo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/activos/por-codigo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** El activo de un código de sticker (se normaliza a mayúsculas) */
+        get: operations["resolverCodigo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/activos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ficha de solo lectura de un activo */
+        get: operations["fichaActivo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -252,7 +303,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -382,6 +433,82 @@ export interface components {
         };
         NombreBody: {
             nombre: components["schemas"]["NombreVisible"];
+        };
+        /** @description Decimal en texto canónico ("1390000.50"), mayor o igual a 0 y con hasta dos decimales. Nunca un número JSON. */
+        Precio: string;
+        /** @enum {string} */
+        EstadoActivo: "activo" | "en_reparacion" | "dado_de_baja";
+        TextoOpcional: string | null;
+        /** @description precio_compra solo existe en las respuestas al admin (P13). */
+        Activo: {
+            /** Format: uuid */
+            id: string;
+            codigo: string;
+            nombre: string;
+            categoria: components["schemas"]["Categoria"];
+            ubicacion: components["schemas"]["UbicacionDeActivo"];
+            serial: components["schemas"]["TextoOpcional"];
+            marca: components["schemas"]["TextoOpcional"];
+            modelo: components["schemas"]["TextoOpcional"];
+            subtipo: components["schemas"]["TextoOpcional"];
+            /** Format: date */
+            fecha_compra: string | null;
+            estado: components["schemas"]["EstadoActivo"];
+            /** Format: date-time */
+            creado_en: string;
+            precio_compra?: components["schemas"]["Precio"];
+        };
+        UbicacionDeActivo: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+            /** @description "Sala › Box" o el nombre de la sala. */
+            ruta: string;
+        };
+        ActivoRespuesta: {
+            activo: components["schemas"]["Activo"];
+        };
+        ActivoResumen: {
+            /** Format: uuid */
+            id: string;
+            codigo: string;
+            nombre: string;
+        };
+        CodigoExistente: {
+            error: {
+                code: components["schemas"]["ErrorCode"];
+                message: string;
+                /** Format: uuid */
+                request_id: string;
+            };
+            activo: components["schemas"]["ActivoResumen"];
+        };
+        CrearActivoBody: {
+            /**
+             * Format: uuid
+             * @description Lo genera el cliente; reintentar con el mismo id no duplica.
+             */
+            id: string;
+            /** @description 1 a 40: letras sin tilde, números y - . / _; se guarda en mayúsculas. */
+            codigo: string;
+            nombre: components["schemas"]["NombreVisible"];
+            precio_compra: components["schemas"]["Precio"];
+            /** Format: uuid */
+            categoria_id: string;
+            /**
+             * Format: uuid
+             * @description Una sala o un box activos (D1).
+             */
+            ubicacion_id: string;
+            serial?: components["schemas"]["TextoOpcional"];
+            marca?: components["schemas"]["TextoOpcional"];
+            modelo?: components["schemas"]["TextoOpcional"];
+            subtipo?: components["schemas"]["TextoOpcional"];
+            /**
+             * Format: date
+             * @description No futura.
+             */
+            fecha_compra?: string | null;
         };
         Health: {
             /** @enum {string} */
@@ -846,7 +973,7 @@ export interface operations {
             401: components["responses"]["NoAutenticado"];
             403: components["responses"]["Prohibido"];
             404: components["responses"]["NoEncontrado"];
-            /** @description Nombre repetido, hijas activas al desactivar o padre inactivo al reactivar. */
+            /** @description Nombre repetido, hijas activas o activos al desactivar (D2 de la spec 004) o padre inactivo al reactivar. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -961,6 +1088,118 @@ export interface operations {
             };
             401: components["responses"]["NoAutenticado"];
             403: components["responses"]["Prohibido"];
+        };
+    };
+    crearActivo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrearActivoBody"];
+            };
+        };
+        responses: {
+            /** @description Reintento con el mismo id y código; devuelve el ya guardado. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivoRespuesta"];
+                };
+            };
+            /** @description Creado con su evento "creado". */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivoRespuesta"];
+                };
+            };
+            /** @description Cuerpo, código, precio o ubicación no válidos. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description El código ya es de otro activo; se devuelve ese activo para abrirlo. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodigoExistente"];
+                };
+            };
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    resolverCodigo: {
+        parameters: {
+            query: {
+                codigo: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Existe en este tenant. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivoRespuesta"];
+                };
+            };
+            /** @description El texto no tiene el formato de un código. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
+        };
+    };
+    fichaActivo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description El activo (con precio solo para el admin). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivoRespuesta"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
         };
     };
 }

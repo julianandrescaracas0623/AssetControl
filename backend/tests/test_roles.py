@@ -420,6 +420,10 @@ PROTECTED_ENDPOINTS = {
     "categorias.crear_categoria": frozenset({"admin"}),
     "categorias.renombrar_categoria": frozenset({"admin"}),
     "categorias.cargar_sugeridas": frozenset({"admin"}),
+    # Spec 004 (T3): ambos roles (P11); precio por rol en test_activos_api.py.
+    "activos.por_codigo": frozenset({"admin", "contador"}),
+    "activos.ficha": frozenset({"admin", "contador"}),
+    "activos.crear": frozenset({"admin", "contador"}),
 }
 
 

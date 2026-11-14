@@ -23,7 +23,12 @@ from app.config import Config
 
 AUTH_PATH_PREFIXES: tuple[str, ...] = ("/auth", "/invitaciones")
 # Spec 003: el catálogo también recibe solo JSON pequeño (sin cabeceras de /auth).
-SMALL_BODY_PATH_PREFIXES: tuple[str, ...] = (*AUTH_PATH_PREFIXES, "/ubicaciones", "/categorias")
+SMALL_BODY_PATH_PREFIXES: tuple[str, ...] = (
+    *AUTH_PATH_PREFIXES,
+    "/ubicaciones",
+    "/categorias",
+    "/activos",
+)
 AUTH_MAX_BODY_BYTES = 4096
 REFRESH_COOKIE_SECURE_NAME = "__Secure-refresh"
 REFRESH_COOKIE_DEVELOPMENT_NAME = "refresh"

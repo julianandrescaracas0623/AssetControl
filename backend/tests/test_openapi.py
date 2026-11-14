@@ -19,7 +19,7 @@ desconocida falla, para que nadie amplíe el contrato sin ampliar la prueba.
 import re
 import uuid
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -40,6 +40,7 @@ from sqlalchemy import text
 
 import app.meta.routes as meta_routes
 from app import errors
+from app.activos import service as activos_service
 from app.auth import limits
 from app.auth import routes as auth_routes
 from app.auth.credentials import COMMON_PASSWORDS, PasswordPolicyError, check_password_policy
@@ -92,7 +93,7 @@ SCHEMA_KEYWORDS = {
     "minimum",
     "items",
 }
-FORMATS = {"uuid", "date-time", "email", "password"}
+FORMATS = {"uuid", "date-time", "date", "email", "password"}
 
 
 def resolve(ref: str) -> dict:
@@ -130,6 +131,11 @@ def _format_ok(fmt: str, value: str) -> bool:
     if fmt == "date-time":
         try:
             return datetime.fromisoformat(value).tzinfo is not None
+        except ValueError:
+            return False
+    if fmt == "date":
+        try:
+            return date.fromisoformat(value).isoformat() == value
         except ValueError:
             return False
     if fmt == "email":
@@ -506,6 +512,70 @@ def test_categorias_responses(client):
     check("post", sugeridas, client.post(sugeridas, headers=contador))
 
 
+def test_activos_responses(client):
+    admin, contador = bearer(ADMIN_A, TENANT_A), bearer(CONTADOR_A, TENANT_A)
+    sufijo = uuid.uuid4().hex[:6]
+
+    def post(path, body):
+        response = client.post(path, json=body, headers=admin)
+        assert response.status_code == 201, response.get_json()
+        return response.get_json()
+
+    sede = post("/ubicaciones", {"nombre": f"Sede {sufijo}", "tipo": "sede"})["ubicacion"]["id"]
+    sala = post("/ubicaciones", {"nombre": "Sala", "tipo": "sala", "padre_id": sede})["ubicacion"]
+    categoria = post("/categorias", {"nombre": f"Cat {sufijo}"})["categoria"]["id"]
+    body = {
+        "id": str(uuid.uuid4()),
+        "codigo": f"OA-{sufijo}",
+        "nombre": "Activo del contrato",
+        "precio_compra": "100.00",
+        "categoria_id": categoria,
+        "ubicacion_id": sala["id"],
+        "fecha_compra": "2024-01-31",
+    }
+
+    def alta(payload, headers=admin):
+        return check("post", "/activos", client.post("/activos", json=payload, headers=headers))
+
+    alta(body)
+    alta(body)
+    alta({**body, "id": str(uuid.uuid4()), "codigo": f"oa-{sufijo}"})
+    alta({**body, "id": str(uuid.uuid4()), "codigo": "con espacio"})
+    alta(
+        {
+            **body,
+            "id": str(uuid.uuid4()),
+            "codigo": f"OB-{sufijo}",
+            "categoria_id": str(uuid.uuid4()),
+        }
+    )
+    alta(body, headers={})
+    check(
+        "post",
+        "/activos",
+        client.post("/activos", data="x" * (AUTH_MAX_BODY_BYTES + 1), headers=admin),
+    )
+
+    def por_codigo(codigo, headers=admin):
+        response = client.get(
+            "/activos/por-codigo", query_string={"codigo": codigo}, headers=headers
+        )
+        return check("get", "/activos/por-codigo", response)
+
+    por_codigo(body["codigo"], headers=contador)
+    por_codigo("NO-EXISTE")
+    por_codigo("con espacio")
+    por_codigo("X", headers={})
+
+    for headers in (admin, contador, {}):
+        check("get", "/activos/{id}", client.get(f"/activos/{body['id']}", headers=headers))
+    check("get", "/activos/{id}", client.get(f"/activos/{uuid.uuid4()}", headers=admin))
+
+    # D2 en el contrato de ubicaciones.
+    patch = client.patch(f"/ubicaciones/{sala['id']}", json={"activa": False}, headers=admin)
+    assert check("patch", "/ubicaciones/{id}", patch)["error"]["code"] == "tiene_activos"
+
+
 LIMITED = [
     ("post", "/auth/login", {"email": ADMIN_A.email, "password": PASSWORD}, {}),
     ("post", "/auth/refresh", None, CSRF),
@@ -574,6 +644,7 @@ def backend_error_codes() -> set[str]:
         invitaciones_routes.INVALID_INVITATION[0],
     }
     codes |= {error.code for error in catalogo_service.ERRORES}
+    codes |= {error.code for error in (*activos_service.ERRORES, activos_service.CodigoExistente)}
     return codes | _policy_codes()
 
 
