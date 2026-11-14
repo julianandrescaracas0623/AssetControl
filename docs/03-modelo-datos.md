@@ -169,6 +169,8 @@ Detalle de `sesion_conteo` y `verificacion` (spec 006, migración `0009`):
 - `activo_evento.sesion_id` y `verificacion_id` tienen FK compuesta desde la `0009`.
 - Un reintento con el `id` de una verificación ya guardada la devuelve aunque la sesión se haya cerrado después (Q3 de la 006: R2 precede a R5 solo en ese caso).
 
+Cierre (spec 008, migración `0011`): `sesion_conteo` gana `total_encontrado`, `total_no_encontrado` y `total_registrado` (`numeric(14,2)`), obligatorios si y solo si está `cerrada`, `>= 0` y registrado = encontrado + no encontrado. La aplicación tiene `UPDATE` solo de las columnas del cierre y el disparador `sesion_conteo_inmutable` permite únicamente la transición `abierta → cerrada`: una sesión cerrada no se modifica ni se reabre (R5, también para el dueño de la tabla). `sesion_desglose` y `sesion_no_encontrado` son solo `INSERT`/`SELECT`, el disparador `conteo_cerrado_requerido` exige la sesión ya cerrada al insertar, y congelan la etiqueta (nombre de la categoría o ruta de la ubicación) al cierre (Q3 de la 008: el informe se lee igual aunque luego se renombre). El cierre toma el candado consultivo **exclusivo** de la sesión (la verificación toma el compartido, 006) y la fila con `FOR UPDATE`; U se lee en una sola consulta. Cerrar una sesión ya cerrada devuelve su informe sin reinsertar (Q1 de la 008).
+
 `verificacion` (inmutable, unidad de sincronización):
 
 | Campo | Notas |

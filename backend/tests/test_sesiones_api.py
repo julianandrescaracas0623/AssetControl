@@ -132,8 +132,9 @@ def test_list_puts_the_open_one_first(client, ses_db):
             conn.execute(
                 text(
                     "insert into sesion_conteo (tenant_id, nombre, fecha_corte, abierta_por, "
-                    "estado, cerrada_por, cerrada_en, abierta_en) values (:t, :n, current_date, "
-                    ":p, 'cerrada', :p, now(), now() - interval '1 day')"
+                    "estado, cerrada_por, cerrada_en, abierta_en, total_encontrado, "
+                    "total_no_encontrado, total_registrado) values (:t, :n, current_date, "
+                    ":p, 'cerrada', :p, now(), now() - interval '1 day', 0, 0, 0)"
                 ),
                 {"t": TENANT_A, "n": nombre, "p": ADMIN_A.usuario_id},
             )

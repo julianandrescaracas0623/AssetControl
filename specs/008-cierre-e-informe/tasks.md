@@ -14,4 +14,4 @@
 
 ## Notas por tarea
 
-(Se completan al cerrar cada tarea.)
+- **T1 (hecha, 2026-11-14):** migración `0011_cierre_e_informe` y modelos (`SesionDesglose`, `SesionNoEncontrado`, totales en `SesionConteo`). Totales con `CHECK` (cerrada ⇔ totales, `>= 0`, registrado = encontrado + no encontrado); disparador `sesion_conteo_inmutable` (solo `abierta → cerrada`, `P0003`); `UPDATE` de la aplicación solo de las columnas del cierre. `sesion_desglose` (dimensión coherente, sumas en COP y unidades, únicos parciales por categoría y por ubicación, etiqueta congelada) y `sesion_no_encontrado` (único por activo, nombres y precio congelados, marca `en_reparacion`), ambas solo `INSERT`/`SELECT`, con el disparador `conteo_cerrado_requerido` (`P0004`) y FK compuestas. Las pruebas que cerraban sesiones a mano ahora ponen totales (el `CHECK` los exige). `test_cierre_db.py` (24), catálogo de RLS y permisos (tablas, políticas, columnas, funciones), cadena con cabeza `0011` y su subir/bajar. `docs/03` actualizado. Backend 1673 en verde.

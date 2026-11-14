@@ -100,6 +100,7 @@ def cerrar(db: AccesoDb, sesion_id: str) -> None:
         conn.execute(
             text(
                 "update sesion_conteo set estado = 'cerrada', cerrada_en = now(), "
+                "total_encontrado = 0, total_no_encontrado = 0, total_registrado = 0, "
                 "cerrada_por = abierta_por where id = :s and estado = 'abierta'"
             ),
             {"s": sesion_id},
@@ -462,6 +463,7 @@ def test_a_verification_waits_for_a_close_in_progress(client, cat, ver_db, sesio
         conn.execute(
             text(
                 "update sesion_conteo set estado = 'cerrada', cerrada_en = now(), "
+                "total_encontrado = 0, total_no_encontrado = 0, total_registrado = 0, "
                 "cerrada_por = abierta_por where id = :s"
             ),
             {"s": sesion},

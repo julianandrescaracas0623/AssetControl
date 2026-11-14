@@ -92,6 +92,7 @@ def cerrar(db: AccesoDb, sesion_id: str) -> None:
         conn.execute(
             text(
                 "update sesion_conteo set estado = 'cerrada', cerrada_en = now(), "
+                "total_encontrado = 0, total_no_encontrado = 0, total_registrado = 0, "
                 "cerrada_por = abierta_por where id = :s and estado = 'abierta'"
             ),
             {"s": sesion_id},

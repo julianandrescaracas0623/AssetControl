@@ -9,7 +9,17 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Date, DateTime, FetchedValue, Numeric, Text, Uuid
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    FetchedValue,
+    Integer,
+    Numeric,
+    Text,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.auth.models import Base
@@ -34,6 +44,15 @@ class SesionConteo(TenantScoped, Base):
     cerrada_en: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=FetchedValue()
     )
+    total_encontrado: Mapped[Decimal | None] = mapped_column(
+        Numeric(14, 2, asdecimal=True), server_default=FetchedValue()
+    )
+    total_no_encontrado: Mapped[Decimal | None] = mapped_column(
+        Numeric(14, 2, asdecimal=True), server_default=FetchedValue()
+    )
+    total_registrado: Mapped[Decimal | None] = mapped_column(
+        Numeric(14, 2, asdecimal=True), server_default=FetchedValue()
+    )
 
 
 class Verificacion(TenantScoped, Base):
@@ -55,3 +74,48 @@ class Verificacion(TenantScoped, Base):
         DateTime(timezone=True), server_default=FetchedValue()
     )
     seq: Mapped[int] = mapped_column(BigInteger, server_default=FetchedValue())
+
+
+class SesionDesglose(TenantScoped, Base):
+    """Fila congelada del desglose de una sesión cerrada (spec 008, R9); solo INSERT."""
+
+    __tablename__ = "sesion_desglose"
+    __mapper_args__ = {"eager_defaults": True}
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, server_default=FetchedValue())
+    sesion_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    dimension: Mapped[str] = mapped_column(Text)
+    categoria_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    ubicacion_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    etiqueta: Mapped[str] = mapped_column(Text)
+    total_encontrado: Mapped[Decimal] = mapped_column(Numeric(14, 2, asdecimal=True))
+    total_no_encontrado: Mapped[Decimal] = mapped_column(Numeric(14, 2, asdecimal=True))
+    total_registrado: Mapped[Decimal] = mapped_column(Numeric(14, 2, asdecimal=True))
+    unidades_encontrado: Mapped[int] = mapped_column(Integer)
+    unidades_no_encontrado: Mapped[int] = mapped_column(Integer)
+    unidades_registrado: Mapped[int] = mapped_column(Integer)
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=FetchedValue()
+    )
+
+
+class SesionNoEncontrado(TenantScoped, Base):
+    """Activo no encontrado congelado al cierre (spec 008, R9a); solo INSERT."""
+
+    __tablename__ = "sesion_no_encontrado"
+    __mapper_args__ = {"eager_defaults": True}
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, server_default=FetchedValue())
+    sesion_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    activo_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    codigo: Mapped[str] = mapped_column(Text)
+    nombre: Mapped[str] = mapped_column(Text)
+    categoria_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    categoria_nombre: Mapped[str] = mapped_column(Text)
+    ubicacion_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    ubicacion_ruta: Mapped[str] = mapped_column(Text)
+    precio: Mapped[Decimal] = mapped_column(Numeric(14, 2, asdecimal=True))
+    en_reparacion: Mapped[bool] = mapped_column(Boolean)
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=FetchedValue()
+    )

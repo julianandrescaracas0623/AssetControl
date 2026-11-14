@@ -46,6 +46,7 @@ ACTIVOS = "0007_activos"
 CAMBIOS = "0008_activo_cambios"
 CONTEO = "0009_sesiones_y_verificacion"
 DISCREPANCIAS = "0010_discrepancias"
+CIERRE = "0011_cierre_e_informe"
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
 MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
@@ -54,6 +55,7 @@ AUTH_TABLES = ["invitacion", "membresia", "refresh_token", "tenant", "usuario"]
 CATALOG_TABLES = ["categoria", "ubicacion"]
 ASSET_TABLES = ["activo", "activo_evento"]
 COUNT_TABLES = ["sesion_conteo", "verificacion"]
+CLOSE_TABLES = ["sesion_desglose", "sesion_no_encontrado"]
 
 APP_URL = "postgresql+psycopg://assetcontrol_app:valor-secreto-app@db.invalid:5432/assetcontrol"
 MIGRATOR_URL = "postgresql+psycopg://postgres:valor-secreto-migr@db.invalid:5432/assetcontrol"
@@ -191,8 +193,9 @@ def test_revision_chain():
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == [DISCREPANCIAS]
+    assert script.get_heads() == [CIERRE]
     assert [r.revision for r in revisions] == [
+        CIERRE,
         DISCREPANCIAS,
         CONTEO,
         CAMBIOS,
@@ -204,16 +207,17 @@ def test_revision_chain():
         ACCESO,
         BASELINE,
     ]
-    assert revisions[0].down_revision == CONTEO
-    assert revisions[1].down_revision == CAMBIOS
-    assert revisions[2].down_revision == ACTIVOS
-    assert revisions[3].down_revision == CATALOGO
-    assert revisions[4].down_revision == LIMITE_TASA
-    assert revisions[5].down_revision == FUNCIONES
-    assert revisions[6].down_revision == POLITICAS
-    assert revisions[7].down_revision == ACCESO
-    assert revisions[8].down_revision == BASELINE
-    assert revisions[9].down_revision is None
+    assert revisions[0].down_revision == DISCREPANCIAS
+    assert revisions[1].down_revision == CONTEO
+    assert revisions[2].down_revision == CAMBIOS
+    assert revisions[3].down_revision == ACTIVOS
+    assert revisions[4].down_revision == CATALOGO
+    assert revisions[5].down_revision == LIMITE_TASA
+    assert revisions[6].down_revision == FUNCIONES
+    assert revisions[7].down_revision == POLITICAS
+    assert revisions[8].down_revision == ACCESO
+    assert revisions[9].down_revision == BASELINE
+    assert revisions[10].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -333,6 +337,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
             *CATALOG_TABLES,
             *ASSET_TABLES,
             *COUNT_TABLES,
+            *CLOSE_TABLES,
         ]
     )
 
@@ -340,7 +345,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [DISCREPANCIAS])
+    assert _public_state(migrate_env) == (with_auth, [CIERRE])
     assert _schema_exists(migrate_env, "acceso")
 
     command.downgrade(config, "base")
@@ -349,7 +354,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [DISCREPANCIAS])
+    assert _public_state(migrate_env) == (with_auth, [CIERRE])
     assert _schema_exists(migrate_env, "acceso")
 
 
@@ -535,6 +540,42 @@ def test_0010_up_down_up_changes_only_the_event_type_and_index(migrate_env):
 
     command.upgrade(config, DISCREPANCIAS)
     assert _public_state(migrate_env) == (tables, [DISCREPANCIAS])
+
+
+def test_0011_up_down_up_touches_only_the_close_tables_and_functions(migrate_env):
+    # Spec 008, T1: 0011 crea sesion_desglose, sesion_no_encontrado, los totales de la
+    # sesión y las funciones de sus disparadores; el downgrade deja todo como en 0010.
+    config = alembic_config()
+    before = sorted(
+        [
+            "alembic_version",
+            "limite_tasa",
+            *AUTH_TABLES,
+            *CATALOG_TABLES,
+            *ASSET_TABLES,
+            *COUNT_TABLES,
+        ]
+    )
+    command.upgrade(config, DISCREPANCIAS)
+    owner_before = _owner_state(migrate_env)
+
+    command.upgrade(config, CIERRE)
+    assert _public_state(migrate_env) == (sorted([*before, *CLOSE_TABLES]), [CIERRE])
+    for table in CLOSE_TABLES:
+        assert _policy_names(migrate_env, table) == ["tenant_isolation"]
+    assert _public_functions(migrate_env) == [
+        "activo_ubicacion_valida",
+        "conteo_cerrado_requerido",
+        "sesion_conteo_inmutable",
+    ]
+    assert _owner_state(migrate_env) == owner_before
+
+    command.downgrade(config, DISCREPANCIAS)
+    assert _public_state(migrate_env) == (before, [DISCREPANCIAS])
+    assert _public_functions(migrate_env) == ["activo_ubicacion_valida"]
+
+    command.upgrade(config, CIERRE)
+    assert _public_state(migrate_env) == (sorted([*before, *CLOSE_TABLES]), [CIERRE])
 
 
 def _activo_update_columns(url: URL) -> list[str]:

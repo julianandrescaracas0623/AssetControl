@@ -3,7 +3,7 @@
 Con el **rol de la aplicación** sobre una base temporal con dos tenants (A y B):
 
 - ``sesion_conteo``: una sola sesión ``conteo`` abierta por tenant (Q1); cerrada exige
-  ``cerrada_en``; sin ``UPDATE`` todavía (el cierre llega con la 008).
+  ``cerrada_en``; ``UPDATE`` solo de las columnas del cierre (spec 008, 0011).
 - ``verificacion``: inmutable (solo ``INSERT`` y ``SELECT``); ``estado_fisico`` de Q2;
   precio ``>= 0``; nota de 1 a 120; ``seq`` y ``recibido_en`` los pone la base.
 - FK compuestas: sesión, activo, ubicaciones, categoría y autor del mismo tenant.
@@ -148,7 +148,8 @@ def test_closed_requires_closed_at(con_db, base):
             conn.execute(
                 text(
                     "insert into sesion_conteo (tenant_id, nombre, fecha_corte, abierta_por, "
-                    "estado) values (:t, 'x', date '2026-11-30', :p, 'cerrada')"
+                    "estado, total_encontrado, total_no_encontrado, total_registrado) "
+                    "values (:t, 'x', date '2026-11-30', :p, 'cerrada', 0, 0, 0)"
                 ),
                 {"t": TENANT_A, "p": ADMIN_A.usuario_id},
             )
@@ -211,8 +212,8 @@ def test_references_of_another_tenant_fail(con_db, base, campo):
         "update verificacion set precio_al_contar = 0",
         "delete from verificacion",
         "truncate verificacion",
-        "update sesion_conteo set estado = 'cerrada', cerrada_en = now()",
         "update sesion_conteo set nombre = 'x'",
+        "update sesion_conteo set fecha_corte = current_date",
         "delete from sesion_conteo",
         "insert into sesion_conteo (tenant_id, nombre, fecha_corte, abierta_por, estado) "
         "values (:t, 'x', date '2026-11-30', gen_random_uuid(), 'cerrada')",

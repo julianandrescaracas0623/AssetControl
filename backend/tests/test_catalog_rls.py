@@ -57,7 +57,7 @@ from sqlalchemy.pool import NullPool
 from app.activos import models as activos_models  # noqa: F401 - registra activo y activo_evento
 from app.auth import models
 from app.catalogo import models as catalogo_models  # noqa: F401 - registra ubicacion y categoria
-from app.conteo import models as conteo_models  # noqa: F401 - registra sesion_conteo y verificacion
+from app.conteo import models as conteo_models  # noqa: F401 - registra las tablas del conteo
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
@@ -77,6 +77,8 @@ TENANT_TABLES = frozenset(
         "activo_evento",
         "sesion_conteo",
         "verificacion",
+        "sesion_desglose",
+        "sesion_no_encontrado",
     }
 )
 
@@ -168,6 +170,21 @@ EXPECTED_POLICIES = {
         ISOLATION_EXPR,
         ISOLATION_EXPR,
     ),
+    # Spec 008, T1 (0011).
+    ("sesion_desglose", "tenant_isolation"): (
+        "PERMISSIVE",
+        "ALL",
+        "{app}",
+        ISOLATION_EXPR,
+        ISOLATION_EXPR,
+    ),
+    ("sesion_no_encontrado", "tenant_isolation"): (
+        "PERMISSIVE",
+        "ALL",
+        "{app}",
+        ISOLATION_EXPR,
+        ISOLATION_EXPR,
+    ),
     # limite_tasa (T10, docs/03 cambio 6): una política por comando TO la aplicación, sin
     # filtro de tenant (no lo hay antes del login); su defensa es el privilegio mínimo y
     # el HMAC de la clave.
@@ -238,6 +255,41 @@ EVENTO_INSERT = {
     "verificacion_id",
 }
 SESION_INSERT = {"tenant_id", "nombre", "fecha_corte", "abierta_por"}
+SESION_CIERRE = {
+    "estado",
+    "cerrada_por",
+    "cerrada_en",
+    "total_encontrado",
+    "total_no_encontrado",
+    "total_registrado",
+}
+DESGLOSE_INSERT = {
+    "tenant_id",
+    "sesion_id",
+    "dimension",
+    "categoria_id",
+    "ubicacion_id",
+    "etiqueta",
+    "total_encontrado",
+    "total_no_encontrado",
+    "total_registrado",
+    "unidades_encontrado",
+    "unidades_no_encontrado",
+    "unidades_registrado",
+}
+NO_ENCONTRADO_INSERT = {
+    "tenant_id",
+    "sesion_id",
+    "activo_id",
+    "codigo",
+    "nombre",
+    "categoria_id",
+    "categoria_nombre",
+    "ubicacion_id",
+    "ubicacion_ruta",
+    "precio",
+    "en_reparacion",
+}
 VERIFICACION_INSERT = {
     "id",
     "tenant_id",
@@ -333,14 +385,23 @@ EXPECTED_APP_COLUMNS = {
     "sesion_conteo": {
         "SELECT": {
             *SESION_INSERT,
+            *SESION_CIERRE,
             "id",
             "tipo",
-            "estado",
             "abierta_en",
-            "cerrada_por",
-            "cerrada_en",
         },
         "INSERT": SESION_INSERT,
+        # Spec 008 (0011): solo las columnas del cierre; un disparador impide tocar una
+        # sesión cerrada.
+        "UPDATE": SESION_CIERRE,
+    },
+    "sesion_desglose": {
+        "SELECT": {*DESGLOSE_INSERT, "id", "creado_en"},
+        "INSERT": DESGLOSE_INSERT,
+    },
+    "sesion_no_encontrado": {
+        "SELECT": {*NO_ENCONTRADO_INSERT, "id", "creado_en"},
+        "INSERT": NO_ENCONTRADO_INSERT,
     },
     "verificacion": {
         "SELECT": {*VERIFICACION_INSERT, "recibido_en", "seq"},
@@ -363,6 +424,8 @@ EXPECTED_APP_TABLE_PRIVILEGES = {
     "activo_evento": {"SELECT"},
     "sesion_conteo": {"SELECT"},
     "verificacion": {"SELECT"},
+    "sesion_desglose": {"SELECT"},
+    "sesion_no_encontrado": {"SELECT"},
 }
 
 
@@ -527,6 +590,8 @@ EXPECTED_OWNER_COLUMNS = {
     "activo_evento": {},
     "sesion_conteo": {},
     "verificacion": {},
+    "sesion_desglose": {},
+    "sesion_no_encontrado": {},
 }
 TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
 COLUMN_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "REFERENCES")
@@ -1188,15 +1253,20 @@ def test_supabase_roles_cannot_execute_acceso_functions(catalog, role, name):
 
 
 def test_public_functions_are_a_closed_list(conn):
-    # Spec 004 (0007): solo la función del disparador D1, SECURITY INVOKER y sin EXECUTE
-    # para PUBLIC (su prueba de comportamiento está en test_activos_db.py).
+    # Spec 004 (0007): la función del disparador D1. Spec 008 (0011): las del cierre.
+    # Todas SECURITY INVOKER, search_path fijo y sin EXECUTE para PUBLIC (sus pruebas de
+    # comportamiento están en test_activos_db.py y test_cierre_db.py).
     functions = conn.scalars(
         text(
             "select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
-            "where n.nspname = 'public'"
+            "where n.nspname = 'public' order by 1"
         )
     ).all()
-    assert functions == ["activo_ubicacion_valida"]
+    assert functions == [
+        "activo_ubicacion_valida",
+        "conteo_cerrado_requerido",
+        "sesion_conteo_inmutable",
+    ]
 
 
 # --- Claves, CHECK e índices ----------------------------------------------------
