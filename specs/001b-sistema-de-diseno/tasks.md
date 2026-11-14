@@ -30,6 +30,15 @@
 - **Verificación:** `cd web && npm test && npm run lint && npm run typecheck` + capturas de la galería.
 - **Depende de:** T1.
 - **Riesgo:** paquetes no previstos; se para y se pregunta.
+- **Implementada (2026-11-13), revisada (APROBADO con menores):**
+  - Pruebas primero (en rojo antes de la CLI): `components/ui/ui.node.test.ts` (24 componentes presentes, solo dependencias aprobadas y exactas, foco sólido), `components/ui/variants.test.tsx` y `routes/dev/Componentes.test.tsx`. Sin `@testing-library/jest-dom` (no aprobada). Total: 69/69 en verde; lint, typecheck y build en verde.
+  - CLI ejecutada por el humano en su equipo (`ui.shadcn.com` está bloqueado en la sesión): `npx shadcn@4.23.0 add …`. Creó además `input-group` (lo pide `command`) y `hooks/use-mobile.ts` (lo pide `sidebar`).
+  - La CLI añadió `next-themes` (no aprobado, lo pide `sonner` para modo oscuro): se quitó y `sonner.tsx` usa `theme="light"` (sin modo oscuro en el MVP). `cmdk` y `sonner` quedaron con versión exacta (1.1.1 y 2.0.8). El lock conserva el formato de npm 11.
+  - Foco: en todos los componentes, `ring-3`/`ring-[3px]` + `ring-ring/50` pasan a `ring-2 ring-offset-2 ring-offset-background ring-ring` (cierra el hallazgo I-1 de T1); se quitan los `dark:` de foco. Comprobado en Chromium: anillo blanco de 2 px + cobalto de 2 px, también sobre el botón principal oscuro.
+  - Tema: fondos de diálogo, `alert-dialog` y `sheet` de `bg-black/10` a `bg-foreground/40`; barra de `progress` en cobalto (`bg-brand`, docs/08: el acento marca el avance); variantes `success`, `warning`, `destructive`, `brand`, `neutral`, `dark` en `Badge` e `info`, `success`, `warning`, `destructive` en `Alert` (el color del ícono va en cada variante, no en la base).
+  - `hooks/use-mobile.ts` reescrito con `useSyncExternalStore` (la versión de la CLI fallaba la regla `react-hooks/set-state-in-effect`).
+  - Galería en `/dev/componentes` (secciones Botones, Campos, Insignias, Avisos, Superficies); `main.tsx` la elige por `pathname` de forma provisional hasta el enrutado de T3. Sin scroll horizontal a 375 y 1440 px.
+  - Menores para tareas siguientes: jsdom no implementa `matchMedia` (las pruebas de la barra lateral en T4 deben simularlo); el botón `destructive` de shadcn es de fondo suave y la acción destructiva **confirmada** de `alert-dialog` debe ir en sólido (T8).
 
 ### T3 — Enrutado y pantallas de sistema
 
