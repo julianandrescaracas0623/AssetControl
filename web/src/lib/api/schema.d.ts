@@ -797,7 +797,7 @@ export interface components {
             ocurrido_en?: string | null;
         };
         /** @enum {string} */
-        TipoEvento: "creado" | "importado" | "verificado" | "ubicacion_cambiada" | "precio_cambiado" | "estado_cambiado" | "categoria_cambiada" | "datos_cambiados" | "dado_de_baja";
+        TipoEvento: "creado" | "importado" | "verificado" | "ubicacion_cambiada" | "precio_cambiado" | "estado_cambiado" | "categoria_cambiada" | "datos_cambiados" | "dado_de_baja" | "discrepancia_descartada";
         EventoActivo: {
             seq: number;
             tipo: components["schemas"]["TipoEvento"];

@@ -45,6 +45,7 @@ CATALOGO = "0006_ubicaciones_y_categorias"
 ACTIVOS = "0007_activos"
 CAMBIOS = "0008_activo_cambios"
 CONTEO = "0009_sesiones_y_verificacion"
+DISCREPANCIAS = "0010_discrepancias"
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
 MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
@@ -190,8 +191,9 @@ def test_revision_chain():
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == [CONTEO]
+    assert script.get_heads() == [DISCREPANCIAS]
     assert [r.revision for r in revisions] == [
+        DISCREPANCIAS,
         CONTEO,
         CAMBIOS,
         ACTIVOS,
@@ -202,15 +204,16 @@ def test_revision_chain():
         ACCESO,
         BASELINE,
     ]
-    assert revisions[0].down_revision == CAMBIOS
-    assert revisions[1].down_revision == ACTIVOS
-    assert revisions[2].down_revision == CATALOGO
-    assert revisions[3].down_revision == LIMITE_TASA
-    assert revisions[4].down_revision == FUNCIONES
-    assert revisions[5].down_revision == POLITICAS
-    assert revisions[6].down_revision == ACCESO
-    assert revisions[7].down_revision == BASELINE
-    assert revisions[8].down_revision is None
+    assert revisions[0].down_revision == CONTEO
+    assert revisions[1].down_revision == CAMBIOS
+    assert revisions[2].down_revision == ACTIVOS
+    assert revisions[3].down_revision == CATALOGO
+    assert revisions[4].down_revision == LIMITE_TASA
+    assert revisions[5].down_revision == FUNCIONES
+    assert revisions[6].down_revision == POLITICAS
+    assert revisions[7].down_revision == ACCESO
+    assert revisions[8].down_revision == BASELINE
+    assert revisions[9].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -337,7 +340,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [CONTEO])
+    assert _public_state(migrate_env) == (with_auth, [DISCREPANCIAS])
     assert _schema_exists(migrate_env, "acceso")
 
     command.downgrade(config, "base")
@@ -346,7 +349,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [CONTEO])
+    assert _public_state(migrate_env) == (with_auth, [DISCREPANCIAS])
     assert _schema_exists(migrate_env, "acceso")
 
 
@@ -502,6 +505,36 @@ def test_0009_up_down_up_touches_only_the_count_tables(migrate_env):
 
     command.upgrade(config, CONTEO)
     assert _public_state(migrate_env) == (sorted([*before, *COUNT_TABLES]), [CONTEO])
+
+
+def test_0010_up_down_up_changes_only_the_event_type_and_index(migrate_env):
+    # Spec 007, T1: 0010 suma discrepancia_descartada y el índice de una resolución.
+    config = alembic_config()
+    tables = sorted(
+        [
+            "alembic_version",
+            "limite_tasa",
+            *AUTH_TABLES,
+            *CATALOG_TABLES,
+            *ASSET_TABLES,
+            *COUNT_TABLES,
+        ]
+    )
+    command.upgrade(config, CONTEO)
+    owner_before = _owner_state(migrate_env)
+    assert "discrepancia_descartada" not in _event_type_check(migrate_env)
+
+    command.upgrade(config, DISCREPANCIAS)
+    assert _public_state(migrate_env) == (tables, [DISCREPANCIAS])
+    assert "discrepancia_descartada" in _event_type_check(migrate_env)
+    assert _owner_state(migrate_env) == owner_before
+
+    command.downgrade(config, CONTEO)
+    assert _public_state(migrate_env) == (tables, [CONTEO])
+    assert "discrepancia_descartada" not in _event_type_check(migrate_env)
+
+    command.upgrade(config, DISCREPANCIAS)
+    assert _public_state(migrate_env) == (tables, [DISCREPANCIAS])
 
 
 def _activo_update_columns(url: URL) -> list[str]:

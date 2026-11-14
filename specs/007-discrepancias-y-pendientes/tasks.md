@@ -15,4 +15,4 @@
 
 ## Notas por tarea
 
-(Se completan al cerrar cada tarea.)
+- **T1 (hecha, 2026-11-14):** migración `0010_discrepancias`: `discrepancia_descartada` en el `CHECK` de `activo_evento.tipo` e índice único parcial `activo_evento_una_resolucion (tenant_id, verificacion_id)` sobre `ubicacion_cambiada` y `discrepancia_descartada` con verificación; sin cambios de permisos. Pruebas: una sola resolución por verificación en las cuatro combinaciones, movimientos sin verificación sin límite, cadena con cabeza `0010` y su subir/bajar. `TipoEvento` del contrato y `docs/03` actualizados.

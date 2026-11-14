@@ -1564,6 +1564,7 @@ components:
         - categoria_cambiada
         - datos_cambiados
         - dado_de_baja
+        - discrepancia_descartada
     EventoActivo:
       type: object
       required: [seq, tipo, ocurrido_en, autor, datos]

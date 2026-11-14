@@ -8,6 +8,8 @@ Con el **rol de la aplicación** sobre una base temporal con dos tenants (A y B)
   precio ``>= 0``; nota de 1 a 120; ``seq`` y ``recibido_en`` los pone la base.
 - FK compuestas: sesión, activo, ubicaciones, categoría y autor del mismo tenant.
 - ``activo_evento.sesion_id`` y ``verificacion_id`` ya tienen FK.
+- Spec 007, T1 (0010): ``discrepancia_descartada`` y una sola resolución
+  (``ubicacion_cambiada`` o ``discrepancia_descartada``) por verificación.
 """
 
 import uuid
@@ -279,3 +281,44 @@ def test_rls_hides_other_tenant_rows(con_db, base):
     finally:
         with con_db.migrator.begin() as conn:
             conn.execute(text("delete from sesion_conteo where id = :s"), {"s": sesion_b})
+
+
+# --- Spec 007, T1 (0010): una sola resolución por verificación ----------------------------
+
+EVENTO = (
+    "insert into activo_evento (tenant_id, activo_id, tipo, datos, usuario_id, sesion_id, "
+    "verificacion_id) values (:t, :a, :tipo, '{}', :u, :s, :v)"
+)
+
+
+@pytest.mark.parametrize(
+    ("primera", "segunda"),
+    [
+        ("ubicacion_cambiada", "ubicacion_cambiada"),
+        ("ubicacion_cambiada", "discrepancia_descartada"),
+        ("discrepancia_descartada", "discrepancia_descartada"),
+        ("discrepancia_descartada", "ubicacion_cambiada"),
+    ],
+)
+def test_a_verification_is_resolved_at_most_once(con_db, base, primera, segunda):
+    with como_app(con_db, TENANT_A) as conn:
+        sesion = abrir(conn)
+        p = verificacion(base, sesion)
+        conn.execute(text(VERIFICAR), p)
+        datos = {
+            "t": TENANT_A,
+            "a": base["act"],
+            "u": ADMIN_A.usuario_id,
+            "s": sesion,
+            "v": p["id"],
+        }
+        conn.execute(text(EVENTO), {**datos, "tipo": "verificado"})
+        conn.execute(text(EVENTO), {**datos, "tipo": primera})
+        falla(conn, EVENTO, {**datos, "tipo": segunda}, UNIQUE_VIOLATION)
+
+
+def test_moves_without_verification_are_not_limited(con_db, base):
+    with como_app(con_db, TENANT_A) as conn:
+        datos = {"t": TENANT_A, "a": base["act"], "u": ADMIN_A.usuario_id, "s": None, "v": None}
+        for _ in range(2):
+            conn.execute(text(EVENTO), {**datos, "tipo": "ubicacion_cambiada"})
