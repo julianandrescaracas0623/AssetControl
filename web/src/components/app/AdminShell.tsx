@@ -1,8 +1,9 @@
 import { ChevronsUpDown, LogOut, ScanBarcode, Search } from 'lucide-react'
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 
 import { DatosFicticios } from '@/components/app/DatosFicticios'
+import { GlobalSearch } from '@/components/app/GlobalSearch'
 import { Logo } from '@/components/app/Logo'
 import { ADMIN_NAV, buscarEnNav } from '@/components/app/admin-nav'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -146,16 +147,15 @@ function Migas() {
   )
 }
 
-function BotonBuscar() {
-  // El buscador global (Ctrl/⌘ K) se conecta en T5.
+function BotonBuscar({ onAbrir }: { onAbrir: () => void }) {
   return (
     <>
-      <Button variant="outline" className="hidden w-80 justify-start gap-2 text-muted-foreground md:inline-flex">
+      <Button variant="outline" className="hidden w-80 justify-start gap-2 text-muted-foreground md:inline-flex" onClick={onAbrir}>
         <Search />
         <span className="flex-1 truncate text-left">Buscar por código o nombre</span>
         <kbd className="rounded border bg-muted px-1.5 font-mono text-[11px] text-muted-foreground">Ctrl K</kbd>
       </Button>
-      <Button variant="ghost" size="icon" className="size-11 md:hidden" aria-label="Buscar activo">
+      <Button variant="ghost" size="icon" className="size-11 md:hidden" aria-label="Buscar activo" onClick={onAbrir}>
         <Search />
       </Button>
     </>
@@ -205,6 +205,19 @@ function MenuUsuario() {
 
 export default function AdminShell() {
   const [abierta] = useState(barraAbierta)
+  const [buscando, setBuscando] = useState(false)
+
+  // Ctrl+K / ⌘K abre el buscador desde cualquier pantalla de administración.
+  useEffect(() => {
+    function alPulsar(evento: KeyboardEvent) {
+      if (evento.key.toLowerCase() === 'k' && (evento.ctrlKey || evento.metaKey)) {
+        evento.preventDefault()
+        setBuscando((valor) => !valor)
+      }
+    }
+    document.addEventListener('keydown', alPulsar)
+    return () => document.removeEventListener('keydown', alPulsar)
+  }, [])
   return (
     <TooltipProvider delayDuration={0}>
     <SidebarProvider defaultOpen={abierta}>
@@ -216,12 +229,13 @@ export default function AdminShell() {
           <div className="hidden h-5 w-px bg-border md:block" aria-hidden="true" />
           <Migas />
           <div className="flex-1" />
-          <BotonBuscar />
+          <BotonBuscar onAbrir={() => setBuscando(true)} />
           <MenuUsuario />
         </header>
         <main className="mx-auto flex w-full max-w-[1320px] min-w-0 flex-1 flex-col p-4 md:p-8">
           <Outlet />
         </main>
+        <GlobalSearch open={buscando} onOpenChange={setBuscando} />
       </SidebarInset>
     </SidebarProvider>
     </TooltipProvider>

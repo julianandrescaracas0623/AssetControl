@@ -80,6 +80,13 @@
 - **Verificación:** `cd web && npm test` + capturas del buscador abierto a 375 px y 1440 px.
 - **Depende de:** T4.
 - **Riesgo:** atajo que choca con el del navegador; se usa `preventDefault` solo dentro de la app.
+- **Implementada (2026-11-13), revisada (APROBADO):**
+  - `components/app/GlobalSearch.tsx` (`CommandDialog` + `cmdk`): grupo "Activos" (código o nombre sobre `mocks/datos-ficticios.ts`) y grupo "Ir a" (pantallas de `admin-nav.ts`); "Sin resultados para «…»"; elementos de 44 px en celular. Se abre con `Ctrl+K`/`⌘K` (con `preventDefault`), con el botón del encabezado y con el ícono en celular.
+  - `mocks/datos-ficticios.ts`: "Clínica Demo" con activos, ubicaciones, resumen del Inicio, último informe (desglose por categoría y ubicación que suma las tres cifras) y actividad; dinero como texto decimal. Lo usan T5–T9.
+  - Ruta `/admin/activos/:codigo` con ficha mínima (la completa llega con la spec 005) y "No encontramos ese código".
+  - `command.tsx`: campo de búsqueda con `bg-muted` (el `bg-input/30` quedaba gris oscuro con el borde de control más fuerte del tema) y 16 px en celular (evita el zoom de iOS).
+  - `test/setup.ts`: simula `scrollIntoView` y `ResizeObserver` (cmdk y Radix; jsdom no los trae).
+  - Pruebas primero: `components/app/GlobalSearch.test.tsx` (6, en rojo antes); total 94/94; lint, typecheck y build en verde. Navegador real a 375 y 1440 px: diálogo dentro de la pantalla, sin scroll horizontal ni errores de consola.
 
 ### T6 — `CountShell` y `NetworkStatus`
 

@@ -2,6 +2,7 @@ import { Navigate, type RouteObject } from 'react-router'
 
 import App from './App'
 import AdminShell from './components/app/AdminShell'
+import FichaActivo from './routes/admin/FichaActivo'
 import AdminInicio from './routes/admin/Inicio'
 import Pendiente from './routes/admin/Pendiente'
 import RequiereAdmin from './routes/admin/RequiereAdmin'
@@ -29,6 +30,7 @@ export const routes: RouteObject[] = [
           ...['activos', 'activos/nuevo', 'ubicaciones', 'categorias', 'sesiones', 'discrepancias', 'valor', 'usuarios'].map(
             (path) => ({ path, element: <Pendiente /> }),
           ),
+          { path: 'activos/:codigo', element: <FichaActivo /> },
         ],
       },
     ],
