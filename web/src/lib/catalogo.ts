@@ -14,6 +14,7 @@ export function useUbicaciones() {
   return useQuery({
     queryKey: CLAVE_UBICACIONES,
     queryFn: async () => (await conToken((t) => api.listarUbicaciones(t))).ubicaciones,
+    retry: false, // la pantalla ofrece "Reintentar"
   })
 }
 
@@ -22,6 +23,7 @@ export function useCategorias() {
   return useQuery({
     queryKey: CLAVE_CATEGORIAS,
     queryFn: async () => (await conToken((t) => api.listarCategorias(t))).categorias,
+    retry: false,
   })
 }
 

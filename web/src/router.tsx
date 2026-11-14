@@ -9,6 +9,7 @@ import AdminInicio from './routes/admin/Inicio'
 import Pendiente from './routes/admin/Pendiente'
 import RegistrarActivo from './routes/admin/RegistrarActivo'
 import RequiereAdmin from './routes/admin/RequiereAdmin'
+import Ubicaciones from './routes/admin/Ubicaciones'
 import Usuarios from './routes/admin/Usuarios'
 import Alta from './routes/contar/Alta'
 import Escanear from './routes/contar/Escanear'
@@ -55,7 +56,8 @@ export const routes: RouteObject[] = [
                   { path: 'activos/nuevo', element: <RegistrarActivo /> },
                   { path: 'sesiones/:id/informe', element: <Informe /> },
                   { path: 'usuarios', element: <Usuarios /> },
-                  ...['ubicaciones', 'categorias', 'sesiones', 'discrepancias', 'valor'].map(
+                  { path: 'ubicaciones', element: <Ubicaciones /> },
+                  ...['categorias', 'sesiones', 'discrepancias', 'valor'].map(
                     (path) => ({ path, element: <Pendiente /> }),
                   ),
                   { path: 'activos/:codigo', element: <FichaActivo /> },

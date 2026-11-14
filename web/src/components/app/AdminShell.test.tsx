@@ -76,9 +76,9 @@ describe('AdminShell en computador', () => {
   })
 
   it('las pantallas aún no construidas dicen qué spec las trae', async () => {
-    renderAt('/admin/ubicaciones')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Ubicaciones' })).toBeTruthy()
-    expect(screen.getByText(/spec 003/)).toBeTruthy()
+    renderAt('/admin/sesiones')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Sesiones' })).toBeTruthy()
+    expect(screen.getByText(/spec 006/)).toBeTruthy()
   })
 })
 
