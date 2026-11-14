@@ -132,7 +132,10 @@ describe('Cerrar una sesión (spec 008, T4)', () => {
     expect(within(dialogo).getByText(/No se puede reabrir/)).toBeTruthy()
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Cerrar y ver informe' }))
     await waitFor(() => expect(router.state.location.pathname).toBe(`/admin/sesiones/${SESION}/informe`))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Informe · Conteo nov 2026' })).toBeTruthy()
     expect(llamadasCerrar(f)).toBe(1)
+    // El informe llega con la respuesta del cierre: no se vuelve a pedir.
+    expect(f.mock.calls.some(([url]) => url === `/api/sesiones/${SESION}/informe`)).toBe(false)
   })
 
   it('«Seguir contando» no cierra', async () => {

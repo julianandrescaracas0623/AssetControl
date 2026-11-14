@@ -1,29 +1,33 @@
-import { Download, Lock, Wrench } from 'lucide-react'
-import { Link } from 'react-router'
-import { toast } from 'sonner'
+import { CircleAlert, ClipboardList, Lock, RefreshCw, Wrench } from 'lucide-react'
+import { Link, useParams } from 'react-router'
 
-import { ConEstado, EncabezadoPagina } from '@/components/app/ConEstado'
+import { EncabezadoPagina } from '@/components/app/ConEstado'
 import { EmptyState } from '@/components/app/EmptyState'
 import { ThreeFiguresCard } from '@/components/app/FigureCards'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ErrorApi, mensajeDeError } from '@/lib/api/cliente'
 import { formatCOP, formatEntero } from '@/lib/format'
-import { useSimulacion } from '@/lib/simulacion'
-import { ULTIMO_INFORME, type FilaDesglose } from '@/mocks/datos-ficticios'
+import { type FilaDesglose, type Informe as InformeSesion, type NoEncontrado, useInforme } from '@/lib/informe'
+import { fechaCorte, porcentaje } from '@/lib/sesiones'
 
-// Informe de sesión (docs/08 §7.5, CU-INF-01): tres cifras, desglose y lista
-// de no encontrados congelados al cierre (R4, R9, R9a). La pantalla lee; no
-// recalcula: también los totales de cada tabla vienen del servidor.
+// Informe de una sesión cerrada (spec 008, T5; docs/08 §7.5, CU-INF-01; R7 de la spec):
+// tres cifras, desglose y no encontrados congelados al cierre, con los nombres de ese
+// momento (Q3). La pantalla solo lee: cada total, también el de cada tabla, viene del
+// servidor. El % encontrado es una proporción de unidades, no una suma.
 
-const I = ULTIMO_INFORME
+const fechaHora = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
 
-function Desglose({ filas, rotulo }: { filas: FilaDesglose[]; rotulo: string }) {
+const pct = (encontradas: number, registradas: number) => `${porcentaje(encontradas, registradas).toLocaleString('es-CO')} %`
+
+function Desglose({ filas, rotulo, totales }: { filas: FilaDesglose[]; rotulo: string; totales: InformeSesion['totales'] }) {
   return (
     <div className="overflow-x-auto rounded-xl border">
-      <Table className="min-w-[680px]">
+      <Table className="min-w-[760px]">
         <TableHeader>
           <TableRow>
             <TableHead className="sticky left-0 bg-background pl-4">{rotulo}</TableHead>
@@ -32,31 +36,34 @@ function Desglose({ filas, rotulo }: { filas: FilaDesglose[]; rotulo: string }) 
             <TableHead className="text-right">No encontrado</TableHead>
             <TableHead className="text-right">u.</TableHead>
             <TableHead className="text-right">Total registrado</TableHead>
-            <TableHead className="pr-4 text-right">u.</TableHead>
+            <TableHead className="text-right">u.</TableHead>
+            <TableHead className="pr-4 text-right">% encontrado</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {filas.map((f) => (
-            <TableRow key={f.nombre}>
-              <TableCell className="sticky left-0 bg-background pl-4 font-medium">{f.nombre}</TableCell>
-              <TableCell className="text-right tabular-nums">{formatCOP(f.encontrado)}</TableCell>
-              <TableCell className="text-right text-muted-foreground tabular-nums">{f.encontradoU}</TableCell>
-              <TableCell className="text-right tabular-nums">{formatCOP(f.noEncontrado)}</TableCell>
-              <TableCell className="text-right text-muted-foreground tabular-nums">{f.noEncontradoU}</TableCell>
-              <TableCell className="text-right font-semibold tabular-nums">{formatCOP(f.total)}</TableCell>
-              <TableCell className="pr-4 text-right text-muted-foreground tabular-nums">{f.totalU}</TableCell>
+            <TableRow key={f.id}>
+              <TableCell className="sticky left-0 max-w-56 bg-background pl-4 font-medium whitespace-normal">{f.etiqueta}</TableCell>
+              <TableCell className="text-right tabular-nums">{formatCOP(f.total_encontrado)}</TableCell>
+              <TableCell className="text-right text-muted-foreground tabular-nums">{formatEntero(f.unidades_encontrado)}</TableCell>
+              <TableCell className="text-right tabular-nums">{formatCOP(f.total_no_encontrado)}</TableCell>
+              <TableCell className="text-right text-muted-foreground tabular-nums">{formatEntero(f.unidades_no_encontrado)}</TableCell>
+              <TableCell className="text-right font-semibold tabular-nums">{formatCOP(f.total_registrado)}</TableCell>
+              <TableCell className="text-right text-muted-foreground tabular-nums">{formatEntero(f.unidades_registrado)}</TableCell>
+              <TableCell className="pr-4 text-right tabular-nums">{pct(f.unidades_encontrado, f.unidades_registrado)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
         <TableFooter>
           <TableRow>
             <TableCell className="sticky left-0 bg-muted pl-4">Total</TableCell>
-            <TableCell className="text-right tabular-nums">{formatCOP(I.encontrado.valor)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatEntero(I.encontrado.unidades)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatCOP(I.noEncontrado.valor)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatEntero(I.noEncontrado.unidades)}</TableCell>
-            <TableCell className="text-right tabular-nums">{formatCOP(I.total.valor)}</TableCell>
-            <TableCell className="pr-4 text-right tabular-nums">{formatEntero(I.total.unidades)}</TableCell>
+            <TableCell className="text-right tabular-nums">{formatCOP(totales.encontrado)}</TableCell>
+            <TableCell className="text-right tabular-nums">{formatEntero(totales.unidades_encontrado)}</TableCell>
+            <TableCell className="text-right tabular-nums">{formatCOP(totales.no_encontrado)}</TableCell>
+            <TableCell className="text-right tabular-nums">{formatEntero(totales.unidades_no_encontrado)}</TableCell>
+            <TableCell className="text-right tabular-nums">{formatCOP(totales.registrado)}</TableCell>
+            <TableCell className="text-right tabular-nums">{formatEntero(totales.unidades_registrado)}</TableCell>
+            <TableCell className="pr-4 text-right tabular-nums">{pct(totales.unidades_encontrado, totales.unidades_registrado)}</TableCell>
           </TableRow>
         </TableFooter>
       </Table>
@@ -64,10 +71,13 @@ function Desglose({ filas, rotulo }: { filas: FilaDesglose[]; rotulo: string }) 
   )
 }
 
-function NoEncontrados() {
+function NoEncontrados({ filas, total }: { filas: NoEncontrado[]; total: string }) {
+  if (filas.length === 0) {
+    return <EmptyState titulo="Se encontraron todos los activos" descripcion="Ningún activo quedó como no encontrado en esta sesión." />
+  }
   return (
     <div className="overflow-x-auto rounded-xl border">
-      <Table className="min-w-[680px]">
+      <Table className="min-w-[720px]">
         <TableHeader>
           <TableRow>
             <TableHead className="pl-4">Código</TableHead>
@@ -79,14 +89,18 @@ function NoEncontrados() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {I.noEncontrados.map((a) => (
-            <TableRow key={a.codigo}>
-              <TableCell className="pl-4 font-mono">{a.codigo}</TableCell>
+          {filas.map((a) => (
+            <TableRow key={a.activo_id}>
+              <TableCell className="pl-4 font-mono">
+                <Link to={`/admin/activos/${encodeURIComponent(a.codigo)}`} className="hover:underline">
+                  {a.codigo}
+                </Link>
+              </TableCell>
               <TableCell className="min-w-44 font-medium whitespace-normal">{a.nombre}</TableCell>
-              <TableCell>{a.categoria}</TableCell>
-              <TableCell className="text-muted-foreground">{a.ubicacion}</TableCell>
+              <TableCell className="whitespace-normal">{a.categoria.nombre}</TableCell>
+              <TableCell className="whitespace-normal text-muted-foreground">{a.ubicacion.ruta}</TableCell>
               <TableCell>
-                {a.enReparacion && (
+                {a.en_reparacion && (
                   <Badge variant="warning">
                     <Wrench aria-hidden="true" />
                     En reparación
@@ -99,10 +113,10 @@ function NoEncontrados() {
         </TableBody>
         <TableFooter>
           <TableRow>
-            <TableCell colSpan={5} className="pl-4">
-              {I.noEncontrados.length} activos no encontrados · lista congelada al cierre
+            <TableCell colSpan={5} className="pl-4 whitespace-normal">
+              {formatEntero(filas.length)} {filas.length === 1 ? 'activo no encontrado' : 'activos no encontrados'} · lista congelada al cierre
             </TableCell>
-            <TableCell className="pr-4 text-right tabular-nums">{formatCOP(I.noEncontrado.valor)}</TableCell>
+            <TableCell className="pr-4 text-right tabular-nums">{formatCOP(total)}</TableCell>
           </TableRow>
         </TableFooter>
       </Table>
@@ -110,13 +124,113 @@ function NoEncontrados() {
   )
 }
 
+function Contenido({ informe }: { informe: InformeSesion }) {
+  const { sesion, totales, desglose, no_encontrados } = informe
+  return (
+    <>
+      <ThreeFiguresCard
+        titulo="Cifras del informe"
+        informe={{
+          fuente: 'informe_congelado',
+          sesion: sesion.nombre,
+          corte: fechaCorte(sesion.fecha_corte),
+          encontrado: { valor: totales.encontrado, unidades: totales.unidades_encontrado },
+          noEncontrado: { valor: totales.no_encontrado, unidades: totales.unidades_no_encontrado },
+          total: { valor: totales.registrado, unidades: totales.unidades_registrado },
+        }}
+      />
+      <p className="-mt-2 text-xs text-muted-foreground">{pct(totales.unidades_encontrado, totales.unidades_registrado)} de las unidades encontradas.</p>
+      {totales.unidades_registrado === 0 ? (
+        <EmptyState icono={<ClipboardList className="size-5" />} titulo="No había activos que contar" descripcion="La sesión se cerró sin activos vigentes: las tres cifras son cero." />
+      ) : (
+        <Tabs defaultValue="categoria" className="gap-4">
+          <TabsList className="max-w-full overflow-x-auto">
+            <TabsTrigger value="categoria">Por categoría</TabsTrigger>
+            <TabsTrigger value="ubicacion">Por ubicación</TabsTrigger>
+            <TabsTrigger value="no-encontrados">
+              No encontrados <span className="text-xs text-muted-foreground tabular-nums">{formatEntero(no_encontrados.length)}</span>
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="categoria">
+            <Desglose filas={desglose.categorias} rotulo="Categoría (al cierre)" totales={totales} />
+          </TabsContent>
+          <TabsContent value="ubicacion">
+            <Desglose filas={desglose.ubicaciones} rotulo="Ubicación (al cierre)" totales={totales} />
+          </TabsContent>
+          <TabsContent value="no-encontrados">
+            <NoEncontrados filas={no_encontrados} total={totales.no_encontrado} />
+          </TabsContent>
+        </Tabs>
+      )}
+      <p className="max-w-3xl text-xs text-muted-foreground">
+        Cifras calculadas por el servidor una sola vez, al cerrar la sesión. Lo encontrado usa el precio, la categoría y la ubicación del momento de
+        contar; lo no encontrado, los del cierre. Los cambios posteriores de precio, categoría o ubicación no alteran este informe.
+      </p>
+    </>
+  )
+}
+
 export default function Informe() {
-  const { estado } = useSimulacion()
-  const exportar = (formato: string) => () => toast(`Exportar a ${formato} llega con la spec 009, con las mismas cifras de esta pantalla`)
+  const { id = '' } = useParams()
+  const consulta = useInforme(id)
+
+  if (consulta.isPending) {
+    return (
+      <div role="status" aria-label="Cargando el informe" className="flex flex-col gap-4">
+        <Skeleton className="h-8 w-2/3" />
+        <Skeleton className="h-36 rounded-xl" />
+        <Skeleton className="h-72 rounded-xl" />
+      </div>
+    )
+  }
+  if (consulta.isError) {
+    const error = consulta.error
+    if (error instanceof ErrorApi && error.code === 'sesion_abierta') {
+      return (
+        <div className="flex flex-col gap-6">
+          <h1 className="text-2xl font-semibold tracking-tight">Informe</h1>
+          <EmptyState
+            titulo="Esta sesión sigue abierta"
+            descripcion="El informe se calcula una sola vez, al cerrar la sesión."
+            accion={
+              <Button asChild>
+                <Link to={`/admin/sesiones/${id}`}>Ir a la sesión</Link>
+              </Button>
+            }
+          />
+        </div>
+      )
+    }
+    const noExiste = error instanceof ErrorApi && error.status === 404
+    return (
+      <div className="flex flex-col gap-6">
+        <h1 className="text-2xl font-semibold tracking-tight">Informe</h1>
+        <Alert variant="destructive" className="items-start">
+          <CircleAlert />
+          <AlertTitle>{noExiste ? 'Esa sesión no existe' : 'No se pudo cargar el informe'}</AlertTitle>
+          <AlertDescription className="flex flex-col items-start gap-3">
+            {noExiste ? 'Puede que el enlace esté incompleto.' : mensajeDeError(error)}
+            {noExiste ? (
+              <Button asChild variant="outline" size="sm" className="max-md:min-h-11">
+                <Link to="/admin/sesiones">Ver sesiones</Link>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" className="max-md:min-h-11" onClick={() => void consulta.refetch()}>
+                <RefreshCw />
+                Reintentar
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
+  const { sesion } = consulta.data
   return (
     <div className="flex flex-col gap-6">
       <EncabezadoPagina
-        titulo={`Informe · ${I.sesion}`}
+        titulo={`Informe · ${sesion.nombre}`}
         insignia={
           <Badge variant="dark">
             <Lock aria-hidden="true" />
@@ -125,77 +239,29 @@ export default function Informe() {
         }
         descripcion={
           <span className="flex flex-wrap gap-x-4 gap-y-1">
-            <span>Fecha de corte <b className="font-medium text-foreground tabular-nums">{I.corte}</b></span>
-            <span>Cerrada <b className="font-medium text-foreground tabular-nums">{I.cerradaEn}</b></span>
-            <span>Por <b className="font-medium text-foreground">{I.cerradaPor}</b></span>
-            <span>Valores en COP · precio de compra al contar</span>
+            <span>
+              Fecha de corte <b className="font-medium text-foreground tabular-nums">{fechaCorte(sesion.fecha_corte)}</b>
+            </span>
+            {sesion.cerrada_en && (
+              <span>
+                Cerrada <b className="font-medium text-foreground tabular-nums">{fechaHora.format(new Date(sesion.cerrada_en))}</b>
+              </span>
+            )}
+            {sesion.cerrada_por && (
+              <span>
+                Por <b className="font-medium text-foreground">{sesion.cerrada_por.nombre}</b>
+              </span>
+            )}
+            <span>Valores en COP</span>
           </span>
         }
         acciones={
-          <>
-            <Button asChild variant="ghost">
-              <Link to="/admin/valor">Ver valor actual</Link>
-            </Button>
-            <Button variant="outline" onClick={exportar('Excel')}>
-              <Download />
-              Exportar Excel
-            </Button>
-            <Button onClick={exportar('PDF')}>
-              <Download />
-              Exportar PDF
-            </Button>
-          </>
+          <Button asChild variant="outline">
+            <Link to="/admin/valor">Ver valor actual</Link>
+          </Button>
         }
       />
-      <ConEstado
-        estado={estado}
-        etiquetaCargando="Cargando el informe"
-        cargando={
-          <>
-            <Skeleton className="h-36 rounded-xl" />
-            <Skeleton className="h-72 rounded-xl" />
-          </>
-        }
-        vacio={
-          <EmptyState
-            titulo="Esta sesión sigue abierta"
-            descripcion="El informe se genera al cerrar la sesión."
-            accion={
-              <Button asChild>
-                <Link to="/admin/sesiones">Ir a la sesión</Link>
-              </Button>
-            }
-          />
-        }
-      >
-        <ThreeFiguresCard
-          titulo="Cifras del informe"
-          informe={{ fuente: 'informe_congelado', sesion: I.sesion, corte: I.corte, encontrado: I.encontrado, noEncontrado: I.noEncontrado, total: I.total }}
-        />
-        <p className="-mt-2 text-xs text-muted-foreground">{I.porcentajeEncontrado} % de las unidades encontradas.</p>
-        <Tabs defaultValue="categoria" className="gap-4">
-          <TabsList className="max-w-full overflow-x-auto">
-            <TabsTrigger value="categoria">Por categoría</TabsTrigger>
-            <TabsTrigger value="ubicacion">Por ubicación</TabsTrigger>
-            <TabsTrigger value="no-encontrados">
-              No encontrados <span className="text-xs text-muted-foreground tabular-nums">{I.noEncontrados.length}</span>
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="categoria">
-            <Desglose filas={I.porCategoria} rotulo="Categoría" />
-          </TabsContent>
-          <TabsContent value="ubicacion">
-            <Desglose filas={I.porUbicacion} rotulo="Ubicación (al cierre)" />
-          </TabsContent>
-          <TabsContent value="no-encontrados">
-            <NoEncontrados />
-          </TabsContent>
-        </Tabs>
-        <p className="max-w-3xl text-xs text-muted-foreground">
-          Cifras calculadas por el servidor una sola vez al cerrar la sesión. Los cambios posteriores de precio, categoría o ubicación no
-          alteran este informe. El PDF y el Excel muestran exactamente las mismas cifras.
-        </p>
-      </ConEstado>
+      <Contenido informe={consulta.data} />
     </div>
   )
 }
