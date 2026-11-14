@@ -1,12 +1,16 @@
-# Tasks 002b — Acceso: contrato y web mínima (esquemático)
+# Tasks 002b — Acceso: contrato y web mínima
 
-> **Estado:** Propuesta. Esquema para dimensionar; se detalla tras aprobar la spec. Una tarea ≤ 1 día, tests primero en cada una (T6 verifica en navegador). Depende de la T10 de la spec 002.
+> **Estado:** Aprobadas (G1–G3, 2026-11-14). Una tarea ≤ 1 día, pruebas primero, revisión y commit por tarea. Plan en `plan.md`.
 
 | Tarea | Resultado | Verificación | Depende de |
 |---|---|---|---|
-| T1 | Esquema OpenAPI publicado por el backend para `/auth`, `/invitaciones`, `/ready` (ejecutable: `GET` del esquema) | `cd backend && uv run pytest` | 002 T10; Q8 |
-| T2 | Tipos TS generados + verificación en CI de que están al día | `cd web && npm run typecheck` | T1; Q8 |
-| T3 | Cliente de API, enrutado y `/login` con redirección por rol; *proxy* de Vite | `cd web && npm test && npm run lint` | T2; Q8, Q19 |
-| T4 | `/invitacion` (token del fragmento; solo nombre y contraseña, sin email; cuerpo `{token, nombre, password}`) | `cd web && npm test` | T3 |
-| T5 | Pantalla de invitar (email y rol) y copiar enlace | `cd web && npm test` | T3 |
-| T6 | Verificación en navegador a 375 px y 1440 px con capturas | skill `browser-qa` | T4, T5 |
+| T1 | `backend/openapi.yaml` a mano y `tests/test_openapi.py` (rutas, respuestas reales, códigos de error); `pyyaml` en `dev` | `cd backend && uv run pytest && uv run ruff check . && uv run ruff format --check .` | — |
+| T2 | `openapi-typescript` + `api:types` + `schema.d.ts` versionado + prueba de frescura + cliente tipado con `ErrorApi` | `cd web && npm test && npm run lint && npm run typecheck` | T1 |
+| T3 | `@tanstack/react-query`, raíz con sesión, guardas, `/login`, cerrar sesión en los shells, fin de `?rol=`, cookie en el *proxy* | `cd web && npm test && npm run lint && npm run typecheck && npm run build` | T2 |
+| T4 | `/invitacion`: token del fragmento, validar, nombre y contraseña, aceptar y redirigir | igual que T3 | T3 |
+| T5 | `/admin/usuarios`: invitar (email y rol), enlace para copiar | igual que T3 | T3 |
+| T6 | Navegador real contra el backend a 375 px y 1440 px: capturas, consola, axe, almacenamiento | skill `browser-qa` | T4, T5 |
+
+## Notas por tarea
+
+_(se completan al cerrar cada tarea)_
