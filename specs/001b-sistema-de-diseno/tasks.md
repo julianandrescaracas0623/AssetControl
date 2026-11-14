@@ -48,6 +48,13 @@
 - **Verificación:** `cd web && npm test && npm run build`.
 - **Depende de:** T2.
 - **Riesgo:** confundir el rol simulado con autorización; se documenta en el código que la autorización es del servidor (002b).
+- **Implementada (2026-11-13), revisada (APROBADO con menores):**
+  - `react-router` 8.5.1 exacto (D1); trae como transitivas `cookie-es` 3.1.1 y `@remix-run/route-pattern` 0.22.x (en el lock, sin entrada en `package.json`). Lock con formato de npm 11 conservado (+43 líneas).
+  - `src/router.tsx` (`routes`, usadas por `main.tsx` con `createBrowserRouter` y por las pruebas con `createMemoryRouter`): `/` → `/admin`, `/health` (pantalla de la fundación), `/login` (marcador de 002b), `/dev/componentes`, `/admin` (requiere rol simulado admin, si no "Sin permiso"), `/contar`, `*` → "No encontrado". Se retira el `pathname` provisional de T2.
+  - `lib/simulacion.ts`: `?rol=admin|contador` y `?estado=exito|cargando|vacio|error`, con valores desconocidos ignorados; comentado como solo presentación.
+  - Banda "Datos ficticios" (con el rol simulado) en todas las maquetas; pantallas de sistema con objetivos de 44 px por debajo de `md`.
+  - Pruebas primero: `router.test.tsx` (9) y `lib/simulacion.test.ts` (3), en rojo antes de implementar; total 81/81, lint, typecheck y build en verde. En Chromium, las cinco rutas muestran su título a 375 y 1440 px sin scroll horizontal.
+  - Menores: `/` → `/admin` es provisional hasta que 002b redirija por rol tras el login; el hosting de producción necesitará *fallback* de SPA a `index.html` (spec de despliegue); los botones de shadcn miden 32 px y los shells (T4, T6) deben asegurar 44 px en celular.
 
 ### T4 — `AdminShell`
 
