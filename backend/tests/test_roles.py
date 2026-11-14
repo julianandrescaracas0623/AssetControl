@@ -424,6 +424,8 @@ PROTECTED_ENDPOINTS = {
     "activos.por_codigo": frozenset({"admin", "contador"}),
     "activos.ficha": frozenset({"admin", "contador"}),
     "activos.crear": frozenset({"admin", "contador"}),
+    "activos.buscar": frozenset({"admin", "contador"}),
+    "activos.sugerencias": frozenset({"admin", "contador"}),
 }
 
 

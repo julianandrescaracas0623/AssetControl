@@ -72,3 +72,37 @@ def crear() -> ResponseReturnValue:
     except service.ErrorActivo as exc:
         return _error(exc)
     return jsonify(activo=resultado.activo), 201 if resultado.creado else 200
+
+
+@bp.get("")
+@require_auth
+def buscar() -> ResponseReturnValue:
+    session = current_session()
+    try:
+        pagina = service.buscar(
+            session,
+            q=request.args.get("q"),
+            estado=request.args.get("estado"),
+            pagina=request.args.get("pagina"),
+            con_precio=_es_admin(),
+        )
+    except service.ErrorActivo as exc:
+        return _error(exc)
+    return jsonify(
+        activos=pagina.activos,
+        total=pagina.total,
+        pagina=pagina.pagina,
+        por_pagina=pagina.por_pagina,
+    )
+
+
+@bp.get("/sugerencias")
+@require_auth
+def sugerencias() -> ResponseReturnValue:
+    try:
+        valores = service.sugerencias(
+            current_session(), campo=request.args.get("campo"), q=request.args.get("q")
+        )
+    except service.ErrorActivo as exc:
+        return _error(exc)
+    return jsonify(valores=valores)

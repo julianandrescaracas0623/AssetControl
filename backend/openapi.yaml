@@ -428,6 +428,26 @@ paths:
           $ref: "#/components/responses/Prohibido"
 
   /activos:
+    get:
+      tags: [activos]
+      operationId: buscarActivos
+      summary: Buscar por código, nombre o serial; 25 por página, lo más reciente primero
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 120 } }
+        - { name: estado, in: query, required: false, schema: { $ref: "#/components/schemas/EstadoActivo" } }
+        - { name: pagina, in: query, required: false, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Página de resultados (precio solo para el admin).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaActivos" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
     post:
       tags: [activos]
       operationId: crearActivo
@@ -471,6 +491,30 @@ paths:
           x-codigos: [codigo_existente]
         "413":
           $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /activos/sugerencias:
+    get:
+      tags: [activos]
+      operationId: sugerenciasActivos
+      summary: Valores ya registrados de un campo, los más usados primero (hasta 8)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: campo
+          in: query
+          required: true
+          schema: { type: string, enum: [nombre, marca, modelo, subtipo] }
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 120 } }
+      responses:
+        "200":
+          description: Valores distintos.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Sugerencias" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
 
   /activos/por-codigo:
     get:
@@ -897,6 +941,25 @@ components:
         id: { type: string, format: uuid }
         nombre: { type: string }
         ruta: { type: string, description: '"Sala › Box" o el nombre de la sala.' }
+    ListaActivos:
+      type: object
+      required: [activos, total, pagina, por_pagina]
+      additionalProperties: false
+      properties:
+        activos:
+          type: array
+          items: { $ref: "#/components/schemas/Activo" }
+        total: { type: integer, minimum: 0 }
+        pagina: { type: integer, minimum: 1 }
+        por_pagina: { type: integer, minimum: 1 }
+    Sugerencias:
+      type: object
+      required: [valores]
+      additionalProperties: false
+      properties:
+        valores:
+          type: array
+          items: { type: string }
     ActivoRespuesta:
       type: object
       required: [activo]

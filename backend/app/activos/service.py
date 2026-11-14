@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -348,3 +348,88 @@ def datos_de_duplicado(session: Session, body: dict[str, object], *, es_admin: b
         fecha_compra=None,
         copiado_de=origen.id,
     )
+
+
+# --- Búsqueda y sugerencias (T5; R10, CU-CAT-04) -------------------------------------------
+
+POR_PAGINA = 25
+ESTADOS = ("activo", "en_reparacion", "dado_de_baja")
+CAMPOS_SUGERIDOS = ("nombre", "marca", "modelo", "subtipo")
+MAX_SUGERENCIAS = 8
+
+
+def _patron(texto: str) -> str:
+    """``%texto%`` para ``ILIKE`` con ``%``, ``_`` y ``\\`` escapados."""
+    escapado = texto.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escapado}%"
+
+
+def _consulta_texto(valor: object) -> str | None:
+    if valor is None:
+        return None
+    if not isinstance(valor, str) or len(valor) > 120:
+        raise ErrorActivo()
+    texto = " ".join(valor.split())
+    return texto or None
+
+
+@dataclass(frozen=True)
+class Pagina:
+    activos: list[dict[str, object]]
+    total: int
+    pagina: int
+    por_pagina: int
+
+
+def buscar(
+    session: Session, *, q: object, estado: object, pagina: object, con_precio: bool
+) -> Pagina:
+    texto = _consulta_texto(q)
+    if estado is not None and estado not in ESTADOS:
+        raise ErrorActivo()
+    try:
+        numero = int(pagina) if pagina is not None else 1
+    except (TypeError, ValueError):
+        raise ErrorActivo() from None
+    if numero < 1 or numero > 10_000:
+        raise ErrorActivo()
+
+    filtro = select(Activo)
+    if texto:
+        patron = _patron(texto)
+        filtro = filtro.where(
+            or_(
+                Activo.codigo.ilike(_patron(texto.upper()), escape="\\"),
+                Activo.nombre.ilike(patron, escape="\\"),
+                Activo.serial.ilike(patron, escape="\\"),
+            )
+        )
+    if estado is not None:
+        filtro = filtro.where(Activo.estado == estado)
+    total = session.scalar(select(func.count()).select_from(filtro.subquery()))
+    filas = session.scalars(
+        filtro.order_by(Activo.creado_en.desc(), Activo.id)
+        .limit(POR_PAGINA)
+        .offset((numero - 1) * POR_PAGINA)
+    )
+    return Pagina(
+        activos=[vista(session, a, con_precio=con_precio) for a in filas],
+        total=int(total or 0),
+        pagina=numero,
+        por_pagina=POR_PAGINA,
+    )
+
+
+def sugerencias(session: Session, *, campo: object, q: object) -> list[str]:
+    """Valores ya registrados de ``campo`` que contienen ``q``, los más usados primero."""
+    if campo not in CAMPOS_SUGERIDOS:
+        raise ErrorActivo()
+    texto = _consulta_texto(q)
+    columna = getattr(Activo, campo)  # type: ignore[arg-type]
+    consulta = select(columna, func.count().label("usos")).where(columna.is_not(None))
+    if texto:
+        consulta = consulta.where(columna.ilike(_patron(texto), escape="\\"))
+    consulta = (
+        consulta.group_by(columna).order_by(func.count().desc(), columna).limit(MAX_SUGERENCIAS)
+    )
+    return [fila[0] for fila in session.execute(consulta)]

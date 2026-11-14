@@ -573,6 +573,21 @@ def test_activos_responses(client):
         check("get", "/activos/{id}", client.get(f"/activos/{body['id']}", headers=headers))
     check("get", "/activos/{id}", client.get(f"/activos/{uuid.uuid4()}", headers=admin))
 
+    for params, headers in (
+        ({"q": "contrato"}, admin),
+        ({"pagina": "2"}, contador),
+        ({"estado": "otro"}, admin),
+        ({}, {}),
+    ):
+        check("get", "/activos", client.get("/activos", query_string=params, headers=headers))
+    sugerencias = "/activos/sugerencias"
+    for params, headers in (
+        ({"campo": "nombre", "q": "act"}, contador),
+        ({"campo": "precio_compra"}, admin),
+        ({"campo": "nombre"}, {}),
+    ):
+        check("get", sugerencias, client.get(sugerencias, query_string=params, headers=headers))
+
     # D2 en el contrato de ubicaciones.
     patch = client.patch(f"/ubicaciones/{sala['id']}", json={"activa": False}, headers=admin)
     assert check("patch", "/ubicaciones/{id}", patch)["error"]["code"] == "tiene_activos"

@@ -251,10 +251,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Buscar por código, nombre o serial; 25 por página, lo más reciente primero */
+        get: operations["buscarActivos"];
         put?: never;
         /** Dar de alta o duplicar un activo (admin y contador; idempotente por id) */
         post: operations["crearActivo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/activos/sugerencias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Valores ya registrados de un campo, los más usados primero (hasta 8) */
+        get: operations["sugerenciasActivos"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -464,6 +482,15 @@ export interface components {
             nombre: string;
             /** @description "Sala › Box" o el nombre de la sala. */
             ruta: string;
+        };
+        ListaActivos: {
+            activos: components["schemas"]["Activo"][];
+            total: number;
+            pagina: number;
+            por_pagina: number;
+        };
+        Sugerencias: {
+            valores: string[];
         };
         ActivoRespuesta: {
             activo: components["schemas"]["Activo"];
@@ -1106,6 +1133,32 @@ export interface operations {
             403: components["responses"]["Prohibido"];
         };
     };
+    buscarActivos: {
+        parameters: {
+            query?: {
+                q?: string;
+                estado?: components["schemas"]["EstadoActivo"];
+                pagina?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Página de resultados (precio solo para el admin). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaActivos"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+        };
+    };
     crearActivo: {
         parameters: {
             query?: never;
@@ -1158,6 +1211,31 @@ export interface operations {
                 };
             };
             413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    sugerenciasActivos: {
+        parameters: {
+            query: {
+                campo: "nombre" | "marca" | "modelo" | "subtipo";
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Valores distintos. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sugerencias"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
         };
     };
     resolverCodigo: {
