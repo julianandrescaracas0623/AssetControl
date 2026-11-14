@@ -909,6 +909,124 @@ paths:
         "413":
           $ref: "#/components/responses/CuerpoDemasiadoGrande"
 
+  /sesiones/{id}/discrepancias:
+    get:
+      tags: [conteo]
+      operationId: listarDiscrepancias
+      summary: Activos vistos en otra ubicación según su verificación vigente (solo admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: estado
+          in: query
+          required: false
+          description: por_resolver (pendientes y desfasadas; por defecto), resueltas o todas.
+          schema: { type: string, enum: [por_resolver, resueltas, todas] }
+      responses:
+        "200":
+          description: Las discrepancias, la más reciente primero.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaDiscrepancias" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /sesiones/{id}/discrepancias/aplicar:
+    post:
+      tags: [conteo]
+      operationId: aplicarDiscrepancias
+      summary: Mover cada activo a donde se vio (solo admin; también en sesiones cerradas)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AplicarDiscrepanciasBody" }
+      responses:
+        "200":
+          description: Un resultado por verificación, en el mismo orden.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResultadosDiscrepancias" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /sesiones/{id}/discrepancias/descartar:
+    post:
+      tags: [conteo]
+      operationId: descartarDiscrepancias
+      summary: Descartar diferencias sin mover los activos (solo admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DescartarDiscrepanciasBody" }
+      responses:
+        "200":
+          description: Un resultado por verificación, en el mismo orden.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResultadosDiscrepancias" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /sesiones/{id}/pendientes:
+    get:
+      tags: [conteo]
+      operationId: listarPendientes
+      summary: Activos activo o en_reparacion sin verificación en la sesión (sin precios)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: ubicacion_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - { name: pagina, in: query, required: false, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Una página de 50.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaPendientes" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1552,6 +1670,124 @@ components:
         estado_fisico: { $ref: "#/components/schemas/EstadoFisico" }
         nota: { $ref: "#/components/schemas/NotaMotivo" }
         ocurrido_en: { type: [string, "null"], format: date-time, description: "Reloj del cliente, informativo." }
+    ActivoConEstado:
+      type: object
+      required: [id, codigo, nombre, estado]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string }
+        nombre: { type: string }
+        estado: { $ref: "#/components/schemas/EstadoActivo" }
+    Discrepancia:
+      type: object
+      required:
+        [verificacion_id, activo, ubicacion_esperada, ubicacion_encontrada, ubicacion_actual, verificado_por, recibido_en, estado, resolucion]
+      additionalProperties: false
+      properties:
+        verificacion_id: { type: string, format: uuid }
+        activo: { $ref: "#/components/schemas/ActivoConEstado" }
+        ubicacion_esperada: { $ref: "#/components/schemas/UbicacionRuta" }
+        ubicacion_encontrada: { $ref: "#/components/schemas/UbicacionRuta" }
+        ubicacion_actual: { $ref: "#/components/schemas/UbicacionRuta" }
+        verificado_por: { $ref: "#/components/schemas/Autor" }
+        recibido_en: { type: string, format: date-time }
+        estado: { type: string, enum: [pendiente, desfasada, aplicada, descartada] }
+        resolucion:
+          oneOf:
+            - type: object
+              required: [tipo, por, en]
+              additionalProperties: false
+              properties:
+                tipo: { type: string, enum: [aplicada, descartada] }
+                por: { $ref: "#/components/schemas/Autor" }
+                en: { type: string, format: date-time }
+            - { type: "null" }
+    ListaDiscrepancias:
+      type: object
+      required: [discrepancias]
+      additionalProperties: false
+      properties:
+        discrepancias:
+          type: array
+          items: { $ref: "#/components/schemas/Discrepancia" }
+    AplicarDiscrepanciasBody:
+      type: object
+      required: [verificaciones]
+      additionalProperties: false
+      properties:
+        verificaciones:
+          type: array
+          description: De 1 a 100 ids de verificación, sin repetir.
+          items: { type: string, format: uuid }
+        confirmar_desfase:
+          type: boolean
+          description: Aplicar aunque el activo ya no esté en la ubicación esperada.
+    DescartarDiscrepanciasBody:
+      type: object
+      required: [verificaciones]
+      additionalProperties: false
+      properties:
+        verificaciones:
+          type: array
+          description: De 1 a 100 ids de verificación, sin repetir.
+          items: { type: string, format: uuid }
+    ResultadosDiscrepancias:
+      type: object
+      required: [resultados]
+      additionalProperties: false
+      properties:
+        resultados:
+          type: array
+          items:
+            type: object
+            required: [verificacion_id, resultado]
+            additionalProperties: false
+            properties:
+              verificacion_id: { type: string, format: uuid }
+              resultado:
+                type: string
+                enum:
+                  - aplicada
+                  - descartada
+                  - desfasada
+                  - ya_en_la_encontrada
+                  - ya_resuelta
+                  - ya_no_es_discrepancia
+                  - dado_de_baja
+                  - ubicacion_invalida
+                  - no_encontrada
+              activo:
+                type: object
+                required: [id, codigo, nombre, ubicacion]
+                additionalProperties: false
+                properties:
+                  id: { type: string, format: uuid }
+                  codigo: { type: string }
+                  nombre: { type: string }
+                  ubicacion: { $ref: "#/components/schemas/UbicacionRuta" }
+    Pendiente:
+      type: object
+      required: [id, codigo, nombre, categoria, ubicacion, estado]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string }
+        nombre: { type: string }
+        categoria: { $ref: "#/components/schemas/Categoria" }
+        ubicacion: { $ref: "#/components/schemas/UbicacionRuta" }
+        estado: { $ref: "#/components/schemas/EstadoActivo" }
+    ListaPendientes:
+      type: object
+      required: [activos, total, pagina, por_pagina]
+      additionalProperties: false
+      properties:
+        activos:
+          type: array
+          items: { $ref: "#/components/schemas/Pendiente" }
+        total: { type: integer, minimum: 0 }
+        pagina: { type: integer, minimum: 1 }
+        por_pagina: { type: integer, minimum: 1 }
     TipoEvento:
       type: string
       enum:

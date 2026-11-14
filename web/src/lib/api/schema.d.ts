@@ -458,6 +458,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sesiones/{id}/discrepancias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Activos vistos en otra ubicación según su verificación vigente (solo admin) */
+        get: operations["listarDiscrepancias"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sesiones/{id}/discrepancias/aplicar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mover cada activo a donde se vio (solo admin; también en sesiones cerradas) */
+        post: operations["aplicarDiscrepancias"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sesiones/{id}/discrepancias/descartar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Descartar diferencias sin mover los activos (solo admin) */
+        post: operations["descartarDiscrepancias"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sesiones/{id}/pendientes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Activos activo o en_reparacion sin verificación en la sesión (sin precios) */
+        get: operations["listarPendientes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -795,6 +863,76 @@ export interface components {
              * @description Reloj del cliente, informativo.
              */
             ocurrido_en?: string | null;
+        };
+        ActivoConEstado: {
+            /** Format: uuid */
+            id: string;
+            codigo: string;
+            nombre: string;
+            estado: components["schemas"]["EstadoActivo"];
+        };
+        Discrepancia: {
+            /** Format: uuid */
+            verificacion_id: string;
+            activo: components["schemas"]["ActivoConEstado"];
+            ubicacion_esperada: components["schemas"]["UbicacionRuta"];
+            ubicacion_encontrada: components["schemas"]["UbicacionRuta"];
+            ubicacion_actual: components["schemas"]["UbicacionRuta"];
+            verificado_por: components["schemas"]["Autor"];
+            /** Format: date-time */
+            recibido_en: string;
+            /** @enum {string} */
+            estado: "pendiente" | "desfasada" | "aplicada" | "descartada";
+            resolucion: {
+                /** @enum {string} */
+                tipo: "aplicada" | "descartada";
+                por: components["schemas"]["Autor"];
+                /** Format: date-time */
+                en: string;
+            } | null;
+        };
+        ListaDiscrepancias: {
+            discrepancias: components["schemas"]["Discrepancia"][];
+        };
+        AplicarDiscrepanciasBody: {
+            /** @description De 1 a 100 ids de verificación, sin repetir. */
+            verificaciones: string[];
+            /** @description Aplicar aunque el activo ya no esté en la ubicación esperada. */
+            confirmar_desfase?: boolean;
+        };
+        DescartarDiscrepanciasBody: {
+            /** @description De 1 a 100 ids de verificación, sin repetir. */
+            verificaciones: string[];
+        };
+        ResultadosDiscrepancias: {
+            resultados: {
+                /** Format: uuid */
+                verificacion_id: string;
+                /** @enum {string} */
+                resultado: "aplicada" | "descartada" | "desfasada" | "ya_en_la_encontrada" | "ya_resuelta" | "ya_no_es_discrepancia" | "dado_de_baja" | "ubicacion_invalida" | "no_encontrada";
+                activo?: {
+                    /** Format: uuid */
+                    id: string;
+                    codigo: string;
+                    nombre: string;
+                    ubicacion: components["schemas"]["UbicacionRuta"];
+                };
+            }[];
+        };
+        Pendiente: {
+            /** Format: uuid */
+            id: string;
+            codigo: string;
+            nombre: string;
+            categoria: components["schemas"]["Categoria"];
+            ubicacion: components["schemas"]["UbicacionRuta"];
+            estado: components["schemas"]["EstadoActivo"];
+        };
+        ListaPendientes: {
+            activos: components["schemas"]["Pendiente"][];
+            total: number;
+            pagina: number;
+            por_pagina: number;
         };
         /** @enum {string} */
         TipoEvento: "creado" | "importado" | "verificado" | "ubicacion_cambiada" | "precio_cambiado" | "estado_cambiado" | "categoria_cambiada" | "datos_cambiados" | "dado_de_baja" | "discrepancia_descartada";
@@ -2034,6 +2172,129 @@ export interface operations {
                 };
             };
             413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    listarDiscrepancias: {
+        parameters: {
+            query?: {
+                /** @description por_resolver (pendientes y desfasadas; por defecto), resueltas o todas. */
+                estado?: "por_resolver" | "resueltas" | "todas";
+            };
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Las discrepancias, la más reciente primero. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaDiscrepancias"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+        };
+    };
+    aplicarDiscrepancias: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AplicarDiscrepanciasBody"];
+            };
+        };
+        responses: {
+            /** @description Un resultado por verificación, en el mismo orden. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadosDiscrepancias"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    descartarDiscrepancias: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DescartarDiscrepanciasBody"];
+            };
+        };
+        responses: {
+            /** @description Un resultado por verificación, en el mismo orden. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadosDiscrepancias"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    listarPendientes: {
+        parameters: {
+            query?: {
+                ubicacion_id?: string;
+                pagina?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Una página de 50. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaPendientes"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
         };
     };
 }

@@ -11,7 +11,7 @@ from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 
 from app.auth.decorators import current_session, current_user, require_auth, require_role
-from app.conteo import service, verificaciones
+from app.conteo import discrepancias, service, verificaciones
 from app.errors import error_response
 
 bp = Blueprint("sesiones", __name__, url_prefix="/sesiones")
@@ -98,3 +98,63 @@ def ultima_verificacion(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002
         else None
     )
     return jsonify(verificacion=vista)
+
+
+# --- Spec 007: discrepancias (solo admin) y pendientes (ambos) ----------------------------
+
+
+@bp.get("/<uuid:id>/discrepancias")
+@require_role("admin")
+def listar_discrepancias(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002
+    try:
+        items = discrepancias.listar(current_session(), id, request.args.get("estado"))
+    except service.ErrorConteo as exc:
+        return _error(exc)
+    return jsonify(discrepancias=items)
+
+
+def _resolver(id: uuid.UUID, *, aplicar: bool) -> ResponseReturnValue:  # noqa: A002
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return error_response(400, "solicitud_invalida", "La solicitud no es válida.")
+    session = current_session()
+    try:
+        ids, confirmar = discrepancias.datos_de_lote(body, con_desfase=aplicar)
+        salida = discrepancias.resolver(
+            session,
+            id,
+            ids,
+            aplicar=aplicar,
+            confirmar_desfase=confirmar,
+            usuario_id=current_user().usuario_id,
+        )
+    except service.ErrorConteo as exc:
+        return _error(exc)
+    return jsonify(resultados=[discrepancias.vista_resultado(session, r) for r in salida])
+
+
+@bp.post("/<uuid:id>/discrepancias/aplicar")
+@require_role("admin")
+def aplicar_discrepancias(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002
+    return _resolver(id, aplicar=True)
+
+
+@bp.post("/<uuid:id>/discrepancias/descartar")
+@require_role("admin")
+def descartar_discrepancias(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002
+    return _resolver(id, aplicar=False)
+
+
+@bp.get("/<uuid:id>/pendientes")
+@require_auth
+def listar_pendientes(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002
+    try:
+        pagina = discrepancias.pendientes(
+            current_session(),
+            id,
+            ubicacion_id=request.args.get("ubicacion_id"),
+            pagina=request.args.get("pagina"),
+        )
+    except service.ErrorConteo as exc:
+        return _error(exc)
+    return jsonify(pagina)

@@ -813,6 +813,81 @@ def test_sesiones_responses(client, contrato_db):
         client.post(ver, data="x" * (AUTH_MAX_BODY_BYTES + 1), headers=admin),
     )
 
+    # Spec 007: discrepancias y pendientes.
+    a2 = activo(f"VC-{sufijo}")
+    otra_sala = post("/ubicaciones", {"nombre": "Otra", "tipo": "sala", "padre_id": sede})
+    otra_id = otra_sala["ubicacion"]["id"]
+    v_otra = verificar(
+        {
+            "id": str(uuid.uuid4()),
+            "activo_id": a2,
+            "ubicacion_encontrada_id": otra_id,
+            "estado_fisico": "ok",
+        }
+    )["verificacion"]["id"]
+    dis = f"{ruta}/discrepancias"
+    for params, headers in (
+        ({}, admin),
+        ({"estado": "todas"}, admin),
+        ({"estado": "x"}, admin),
+        ({}, contador),
+        ({}, {}),
+    ):
+        check(
+            "get",
+            "/sesiones/{id}/discrepancias",
+            client.get(dis, query_string=params, headers=headers),
+        )
+    check(
+        "get",
+        "/sesiones/{id}/discrepancias",
+        client.get(f"/sesiones/{uuid.uuid4()}/discrepancias", headers=admin),
+    )
+    for nombre, cuerpo_lote in (
+        ("aplicar", {"verificaciones": [v_otra], "confirmar_desfase": False}),
+        ("descartar", {"verificaciones": [v_otra]}),
+    ):
+        plantilla = f"/sesiones/{{id}}/discrepancias/{nombre}"
+        url = f"{dis}/{nombre}"
+        check("post", plantilla, client.post(url, json=cuerpo_lote, headers=admin))
+        check("post", plantilla, client.post(url, json={"verificaciones": []}, headers=admin))
+        check("post", plantilla, client.post(url, json=cuerpo_lote, headers=contador))
+        check("post", plantilla, client.post(url, json=cuerpo_lote, headers={}))
+        check(
+            "post",
+            plantilla,
+            client.post(
+                f"/sesiones/{uuid.uuid4()}/discrepancias/{nombre}", json=cuerpo_lote, headers=admin
+            ),
+        )
+        check(
+            "post",
+            plantilla,
+            client.post(url, data="x" * (AUTH_MAX_BODY_BYTES + 1), headers=admin),
+        )
+    check(
+        "get",
+        "/sesiones/{id}/discrepancias",
+        client.get(dis, query_string={"estado": "todas"}, headers=admin),
+    )
+    pend = f"{ruta}/pendientes"
+    for params, headers in (
+        ({}, contador),
+        ({"ubicacion_id": sala_id}, admin),
+        ({"pagina": "0"}, admin),
+        ({}, {}),
+    ):
+        check(
+            "get",
+            "/sesiones/{id}/pendientes",
+            client.get(pend, query_string=params, headers=headers),
+        )
+    check(
+        "get",
+        "/sesiones/{id}/pendientes",
+        client.get(f"/sesiones/{uuid.uuid4()}/pendientes", headers=admin),
+    )
+
     # Una sesión cerrada (el cierre llega con la 008) también cumple el contrato.
     with contrato_db.migrator.begin() as conn:
         conn.execute(
