@@ -1,5 +1,6 @@
 import type { Categoria, Rol, Ubicacion } from '@/lib/api/cliente'
 import type { Activo } from '@/lib/activos'
+import type { FilaDesglose, Informe, ValorEnVivo } from '@/lib/informe'
 import type { SesionConteo, Verificacion } from '@/lib/sesiones'
 import { errorApi, json, type Manejador } from './sesion'
 
@@ -41,6 +42,113 @@ export function crearCatalogo(
   let siguiente = 1
   const nuevoId = () => `00000000-0000-4000-8000-${String(siguiente++).padStart(12, '0')}`
   const cuerpo = (init: RequestInit) => JSON.parse(String(init.body ?? '{}')) as Record<string, unknown>
+  // Dinero en centavos enteros, como el Decimal del servidor (sin float).
+  const centavos = (texto: string) => Math.round(Number(texto) * 100)
+  const dinero = (c: number) => `${Math.trunc(c / 100)}.${String(c % 100).padStart(2, '0')}`
+  const informes = new Map<string, Informe>()
+
+  /** Universo U del cierre (R4 de docs/03): la misma regla que el servidor, en pequeño. */
+  function calcularInforme(sesion: SesionConteo): Informe {
+    const vigentes = new Map<string, Verificacion>()
+    for (const v of verificaciones.filter((x) => x.sesion_id === sesion.id)) vigentes.set(v.activo.id, v)
+    const filas = activos.flatMap((a) => {
+      const v = vigentes.get(a.id)
+      if (v) return [{ a, encontrado: true, precio: centavos(v.precio_al_contar ?? a.precio_compra ?? '0'), ubicacion: v.ubicacion_esperada }]
+      if (a.estado === 'dado_de_baja') return []
+      return [{ a, encontrado: false, precio: centavos(a.precio_compra ?? '0'), ubicacion: { id: a.ubicacion.id, ruta: a.ubicacion.ruta } }]
+    })
+    const agrupar = (clave: (f: (typeof filas)[number]) => { id: string; etiqueta: string }): FilaDesglose[] => {
+      const grupos = new Map<string, { etiqueta: string; e: number; n: number; ue: number; un: number }>()
+      for (const f of filas) {
+        const { id, etiqueta } = clave(f)
+        const g = grupos.get(id) ?? { etiqueta, e: 0, n: 0, ue: 0, un: 0 }
+        if (f.encontrado) {
+          g.e += f.precio
+          g.ue += 1
+        } else {
+          g.n += f.precio
+          g.un += 1
+        }
+        grupos.set(id, g)
+      }
+      return [...grupos.entries()]
+        .sort(([, x], [, y]) => x.etiqueta.localeCompare(y.etiqueta))
+        .map(([id, g]) => ({
+          id,
+          etiqueta: g.etiqueta,
+          total_encontrado: dinero(g.e),
+          total_no_encontrado: dinero(g.n),
+          total_registrado: dinero(g.e + g.n),
+          unidades_encontrado: g.ue,
+          unidades_no_encontrado: g.un,
+          unidades_registrado: g.ue + g.un,
+        }))
+    }
+    const suma = (encontrado: boolean) => filas.filter((f) => f.encontrado === encontrado).reduce((n, f) => n + f.precio, 0)
+    const ue = filas.filter((f) => f.encontrado).length
+    return {
+      sesion: { ...sesion },
+      totales: {
+        encontrado: dinero(suma(true)),
+        no_encontrado: dinero(suma(false)),
+        registrado: dinero(suma(true) + suma(false)),
+        unidades_encontrado: ue,
+        unidades_no_encontrado: filas.length - ue,
+        unidades_registrado: filas.length,
+      },
+      desglose: {
+        categorias: agrupar((f) => ({ id: f.a.categoria.id, etiqueta: f.a.categoria.nombre })),
+        ubicaciones: agrupar((f) => ({ id: f.ubicacion.id, etiqueta: f.ubicacion.ruta })),
+      },
+      no_encontrados: filas
+        .filter((f) => !f.encontrado)
+        .map((f) => ({
+          activo_id: f.a.id,
+          codigo: f.a.codigo,
+          nombre: f.a.nombre,
+          categoria: { ...f.a.categoria },
+          ubicacion: { ...f.ubicacion },
+          precio: dinero(f.precio),
+          en_reparacion: f.a.estado === 'en_reparacion',
+        })),
+    }
+  }
+
+  function cerrar(sesion: SesionConteo): Informe {
+    if (sesion.estado === 'abierta') {
+      sesion.estado = 'cerrada'
+      sesion.cerrada_en = '2026-11-14T16:00:00+00:00'
+      sesion.cerrada_por = { id: '00000000-0000-4000-8000-00000000000a', nombre: 'Ana Torres' }
+    }
+    if (!informes.has(sesion.id)) informes.set(sesion.id, calcularInforme(sesion))
+    return informes.get(sesion.id)!
+  }
+
+  function valorActual(): ValorEnVivo {
+    const vigentes = activos.filter((a) => a.estado !== 'dado_de_baja')
+    const agrupar = (clave: (a: Activo) => { id: string; etiqueta: string }) => {
+      const grupos = new Map<string, { etiqueta: string; c: number; u: number }>()
+      for (const a of vigentes) {
+        const { id, etiqueta } = clave(a)
+        const g = grupos.get(id) ?? { etiqueta, c: 0, u: 0 }
+        g.c += centavos(a.precio_compra ?? '0')
+        g.u += 1
+        grupos.set(id, g)
+      }
+      return [...grupos.entries()]
+        .sort(([, x], [, y]) => x.etiqueta.localeCompare(y.etiqueta))
+        .map(([id, g]) => ({ id, etiqueta: g.etiqueta, valor: dinero(g.c), unidades: g.u }))
+    }
+    const reparacion = vigentes.filter((a) => a.estado === 'en_reparacion')
+    return {
+      total: dinero(vigentes.reduce((n, a) => n + centavos(a.precio_compra ?? '0'), 0)),
+      unidades: vigentes.length,
+      en_reparacion: { valor: dinero(reparacion.reduce((n, a) => n + centavos(a.precio_compra ?? '0'), 0)), unidades: reparacion.length },
+      por_categoria: agrupar((a) => ({ id: a.categoria.id, etiqueta: a.categoria.nombre })),
+      por_ubicacion: agrupar((a) => ({ id: a.ubicacion.id, etiqueta: a.ubicacion.ruta })),
+      calculado_en: '2026-11-14T17:30:00+00:00',
+    }
+  }
 
   const manejador: Manejador = (url, init) => {
     const metodo = (init.method ?? 'GET').toUpperCase()
@@ -129,6 +237,22 @@ export function crearCatalogo(
       }
       sesiones.unshift(nueva)
       return json(201, { sesion: nueva })
+    }
+    // Spec 008: cierre, informe congelado y valor actual (solo admin).
+    if (ruta0 === '/api/valor-actual' && metodo === 'GET') {
+      if (rol !== 'admin') return errorApi(403, 'prohibido', 'No tienes permiso.')
+      return json(200, valorActual())
+    }
+    const cie = ruta0.match(/^\/api\/sesiones\/([0-9a-f-]{36})\/(cerrar|informe)$/)
+    if (cie) {
+      if (rol !== 'admin') return errorApi(403, 'prohibido', 'No tienes permiso.')
+      const sesion = sesiones.find((x) => x.id === cie[1])
+      if (!sesion) return errorApi(404, 'no_encontrado', 'El recurso no existe.')
+      if (cie[2] === 'cerrar' && metodo === 'POST') return json(200, cerrar(sesion))
+      if (cie[2] === 'informe' && metodo === 'GET') {
+        if (sesion.estado === 'abierta') return errorApi(409, 'sesion_abierta', 'La sesión sigue abierta: el informe se genera al cerrarla.')
+        return json(200, cerrar(sesion))
+      }
     }
     const dis = ruta0.match(/^\/api\/sesiones\/([0-9a-f-]{36})\/(discrepancias(?:\/aplicar|\/descartar)?|pendientes)$/)
     if (dis) {
@@ -401,12 +525,9 @@ export function crearCatalogo(
     },
     sesiones,
     verificaciones,
-    /** El cierre llega con la 008: aquí se simula. */
+    /** Cierra como lo haría otra persona (el informe queda congelado igual que en el servidor). */
     cerrarSesion(id: string) {
-      const x = sesiones.find((y) => y.id === id)!
-      x.estado = 'cerrada'
-      x.cerrada_en = '2026-11-14T16:00:00+00:00'
-      x.cerrada_por = x.abierta_por
+      cerrar(sesiones.find((y) => y.id === id)!)
     },
     /** Otra persona cambia el activo: sube su versión sin que la pantalla lo sepa. */
     cambiarPorOtro(id: string, cambios: Partial<Activo>) {

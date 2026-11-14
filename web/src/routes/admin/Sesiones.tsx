@@ -1,6 +1,6 @@
-import { ArrowLeftRight, ChevronRight, CircleAlert, ClipboardList, Loader2, Plus, RefreshCw } from 'lucide-react'
+import { ArrowLeftRight, ChevronRight, CircleAlert, ClipboardList, FileText, Loader2, Lock, Plus, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
 import { Campo, Obligatorio } from '@/components/app/CampoFormulario'
@@ -17,10 +17,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ErrorApi, mensajeDeError } from '@/lib/api/cliente'
 import { useDiscrepancias, usePendientes } from '@/lib/discrepancias'
 import { formatEntero } from '@/lib/format'
-import { fechaCorte, hoyISO, nombreSugerido, pendientes, porcentaje, type SesionConteo, useAbrirSesion, useDetalleSesion, useSesiones } from '@/lib/sesiones'
+import { useCerrarSesion } from '@/lib/informe'
+import { fechaCorte, hoyISO, nombreSugerido, pendientes, porcentaje, type Avance, type SesionConteo, useAbrirSesion, useDetalleSesion, useSesiones } from '@/lib/sesiones'
 
 // Sesiones de conteo (spec 006, T5; CU-SES-01, 02; Q1): el admin abre una sesión (una
-// abierta por clínica) y ve su avance. Cerrar y el informe llegan con la spec 008.
+// abierta por clínica) y ve su avance. Spec 008 (T4; R10, Q2): la cierra con un aviso de
+// lo que falta y las cerradas llevan a su informe congelado.
 
 const fecha = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' })
 
@@ -198,19 +200,30 @@ export default function Sesiones() {
                     <TableRow>
                       <TableHead className="pl-4">Nombre</TableHead>
                       <TableHead>Corte</TableHead>
-                      <TableHead className="pr-4">Cerrada</TableHead>
+                      <TableHead>Cerrada</TableHead>
+                      <TableHead className="pr-4">
+                        <span className="sr-only">Informe</span>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {cerradas.map((s) => (
                       <TableRow key={s.id}>
                         <TableCell className="pl-4 font-medium whitespace-normal">
-                          <Link to={`/admin/sesiones/${s.id}`} className="hover:underline">
+                          <Link to={`/admin/sesiones/${s.id}/informe`} className="hover:underline">
                             {s.nombre}
                           </Link>
                         </TableCell>
                         <TableCell>{fechaCorte(s.fecha_corte)}</TableCell>
-                        <TableCell className="pr-4">{s.cerrada_en ? fecha.format(new Date(s.cerrada_en)) : '—'}</TableCell>
+                        <TableCell>{s.cerrada_en ? fecha.format(new Date(s.cerrada_en)) : '—'}</TableCell>
+                        <TableCell className="pr-4 text-right">
+                          <Button asChild variant="ghost" size="sm" className="max-md:min-h-11">
+                            <Link to={`/admin/sesiones/${s.id}/informe`} aria-label={`Ver informe de ${s.nombre}`}>
+                              <FileText />
+                              Informe
+                            </Link>
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -289,6 +302,112 @@ function ListaPendientes({ sesionId }: { sesionId: string }) {
   )
 }
 
+function CerrarSesion({ sesion, pendientesN }: { sesion: SesionConteo; pendientesN: number }) {
+  const [abierto, setAbierto] = useState(false)
+  const cerrar = useCerrarSesion(sesion.id)
+  const discrepancias = useDiscrepancias(abierto ? sesion.id : undefined, 'por_resolver')
+  const navegar = useNavigate()
+  const porResolver = discrepancias.data?.length ?? 0
+
+  function confirmar() {
+    cerrar.mutate(undefined, {
+      onSuccess: () => {
+        toast.success(`«${sesion.nombre}» quedó cerrada: este es su informe`)
+        void navegar(`/admin/sesiones/${sesion.id}/informe`)
+      },
+    })
+  }
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        onClick={() => {
+          cerrar.reset()
+          setAbierto(true)
+        }}
+      >
+        <Lock />
+        Cerrar sesión
+      </Button>
+      <Dialog open={abierto} onOpenChange={(v) => !cerrar.isPending && setAbierto(v)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>¿Cerrar «{sesion.nombre}»?</DialogTitle>
+            <DialogDescription>
+              Al cerrar se calcula el informe una sola vez y queda congelado. No se puede reabrir ni seguir contando en esta sesión.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="flex flex-col gap-2 text-sm" aria-label="Lo que queda al cerrar">
+            <li className="rounded-lg border px-3 py-2">
+              {pendientesN === 0 ? (
+                'Todos los activos están verificados.'
+              ) : (
+                <>
+                  <b className="font-semibold tabular-nums">{formatEntero(pendientesN)}</b>{' '}
+                  {pendientesN === 1 ? 'activo sin verificar quedará como no encontrado.' : 'activos sin verificar quedarán como no encontrados.'}
+                </>
+              )}
+            </li>
+            <li className="rounded-lg border px-3 py-2">
+              {discrepancias.isPending ? (
+                <Skeleton className="h-5 w-48" />
+              ) : discrepancias.isError ? (
+                'No se pudieron revisar las discrepancias.'
+              ) : porResolver === 0 ? (
+                'No hay discrepancias por resolver.'
+              ) : (
+                <>
+                  <b className="font-semibold tabular-nums">{formatEntero(porResolver)}</b>{' '}
+                  {porResolver === 1 ? 'discrepancia sigue' : 'discrepancias siguen'} por resolver; se pueden resolver después del cierre.
+                </>
+              )}
+            </li>
+          </ul>
+          {cerrar.isError && (
+            <Alert variant="destructive">
+              <CircleAlert />
+              <AlertDescription>{mensajeDeError(cerrar.error)}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter className="[&_[data-slot=button]]:max-md:min-h-11">
+            <Button type="button" variant="ghost" disabled={cerrar.isPending} onClick={() => setAbierto(false)}>
+              Seguir contando
+            </Button>
+            <Button type="button" variant="destructive" disabled={cerrar.isPending} onClick={confirmar}>
+              {cerrar.isPending && <Loader2 className="animate-spin" aria-hidden="true" />}
+              Cerrar y ver informe
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+function SesionCerrada({ sesion }: { sesion: SesionConteo }) {
+  return (
+    <section aria-labelledby="titulo-cerrada" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-sidebar p-4">
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <h2 id="titulo-cerrada" className="flex items-center gap-2 font-semibold">
+          <Lock className="size-4" aria-hidden="true" />
+          Sesión cerrada
+        </h2>
+        <span className="text-sm text-muted-foreground">
+          {sesion.cerrada_en ? `El ${fecha.format(new Date(sesion.cerrada_en))}` : 'Cerrada'}
+          {sesion.cerrada_por ? ` por ${sesion.cerrada_por.nombre}` : ''}. Sus cifras quedaron congeladas en el informe.
+        </span>
+      </span>
+      <Button asChild className="max-md:min-h-11">
+        <Link to={`/admin/sesiones/${sesion.id}/informe`}>
+          <FileText />
+          Ver informe
+        </Link>
+      </Button>
+    </section>
+  )
+}
+
 export function DetalleSesion({ id }: { id: string }) {
   const consulta = useDetalleSesion(id)
   if (consulta.isPending) {
@@ -322,14 +441,32 @@ export function DetalleSesion({ id }: { id: string }) {
     )
   }
   const { sesion, avance } = consulta.data
-  const pct = porcentaje(avance.verificados, avance.total)
+  const abierta = sesion.estado === 'abierta'
   return (
     <div className="flex max-w-4xl flex-col gap-6">
       <EncabezadoPagina
         titulo={sesion.nombre}
-        insignia={sesion.estado === 'abierta' ? <Badge variant="brand">Abierta</Badge> : <Badge variant="outline">Cerrada</Badge>}
+        insignia={abierta ? <Badge variant="brand">Abierta</Badge> : <Badge variant="outline">Cerrada</Badge>}
         descripcion={`Corte ${fechaCorte(sesion.fecha_corte)} · abrió ${sesion.abierta_por.nombre} el ${fecha.format(new Date(sesion.abierta_en))}`}
+        acciones={abierta && <CerrarSesion sesion={sesion} pendientesN={avance.pendientes} />}
       />
+      {abierta ? (
+        <AvanceEnVivo sesion={sesion} avance={avance} />
+      ) : (
+        <>
+          <SesionCerrada sesion={sesion} />
+          <AvisoDiscrepancias sesionId={sesion.id} />
+        </>
+      )}
+    </div>
+  )
+}
+
+// Avance en vivo de una sesión abierta (información de trabajo, no el informe).
+function AvanceEnVivo({ sesion, avance }: { sesion: SesionConteo; avance: Avance }) {
+  const pct = porcentaje(avance.verificados, avance.total)
+  return (
+    <>
       <section aria-labelledby="titulo-avance" className="flex flex-col gap-3 rounded-xl border p-4">
         <h2 id="titulo-avance" className="font-semibold">
           Avance
@@ -339,7 +476,7 @@ export function DetalleSesion({ id }: { id: string }) {
           <b className="font-semibold">{formatEntero(avance.verificados)}</b> de {formatEntero(avance.total)} verificados · {pct.toLocaleString('es-CO')} % ·{' '}
           {pendientes(avance.pendientes)}
         </p>
-        <p className="text-xs text-muted-foreground">Información de trabajo: no es el informe. Cerrar la sesión y el informe llegan con la spec 008.</p>
+        <p className="text-xs text-muted-foreground">Información de trabajo: no es el informe. El informe se calcula una sola vez, al cerrar.</p>
       </section>
       <AvisoDiscrepancias sesionId={sesion.id} />
       {avance.por_ubicacion.length > 0 ? (
@@ -375,6 +512,6 @@ export function DetalleSesion({ id }: { id: string }) {
         <EmptyState titulo="No hay activos que contar" descripcion="Registra activos para verlos aquí por ubicación." />
       )}
       <ListaPendientes sesionId={sesion.id} />
-    </div>
+    </>
   )
 }

@@ -206,4 +206,8 @@ export const api = {
     pedir('get', '/sesiones/{id}/pendientes', { token, parametros: { id: sesionId }, consulta }),
   ultimaVerificacion: (token: string, sesionId: string, activoId: string) =>
     pedir('get', '/sesiones/{id}/verificaciones', { token, parametros: { id: sesionId }, consulta: { activo_id: activoId } }),
+  // Spec 008: cierre, informe congelado y valor actual (solo admin).
+  cerrarSesion: (token: string, sesionId: string) => pedir('post', '/sesiones/{id}/cerrar', { token, parametros: { id: sesionId } }),
+  informeSesion: (token: string, sesionId: string) => pedir('get', '/sesiones/{id}/informe', { token, parametros: { id: sesionId } }),
+  valorActual: (token: string) => pedir('get', '/valor-actual', { token }),
 }
