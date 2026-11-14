@@ -253,7 +253,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Dar de alta un activo (admin y contador; idempotente por id) */
+        /** Dar de alta o duplicar un activo (admin y contador; idempotente por id) */
         post: operations["crearActivo"];
         delete?: never;
         options?: never;
@@ -509,6 +509,22 @@ export interface components {
              * @description No futura.
              */
             fecha_compra?: string | null;
+        };
+        /** @description El servidor copia nombre, categoría, marca, modelo, subtipo, precio y ubicación del original; nunca código, serial ni historial. */
+        DuplicarActivoBody: {
+            /** Format: uuid */
+            id: string;
+            codigo: string;
+            /** Format: uuid */
+            copiar_de: string;
+            serial?: components["schemas"]["TextoOpcional"];
+            /**
+             * Format: uuid
+             * @description Si la unidad nueva está en otro cuarto.
+             */
+            ubicacion_id?: string;
+            /** @description Solo el admin; el contador hereda el precio sin verlo (400 si lo manda). */
+            precio_compra?: components["schemas"]["Precio"];
         };
         Health: {
             /** @enum {string} */
@@ -1099,7 +1115,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CrearActivoBody"];
+                "application/json": components["schemas"]["CrearActivoBody"] | components["schemas"]["DuplicarActivoBody"];
             };
         };
         responses: {

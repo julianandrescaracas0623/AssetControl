@@ -341,3 +341,109 @@ def test_d2_deactivating_a_location_with_assets_is_409(client, cat, act_db):
         client.patch(f"/ubicaciones/{sala}", json={"activa": False}, headers=ADMIN).status_code
         == 200
     )
+
+
+# --- Duplicar (R6, Q3; T4) ---------------------------------------------------------------
+
+
+def original(client, cat) -> dict:
+    payload = body(cat, marca="Tuttnauer", modelo="2540", subtipo="Autoclave", serial="SN-ORIG")
+    response = alta(client, payload)
+    assert response.status_code == 201
+    return response.get_json()["activo"]
+
+
+def duplicar(client, origen_id, headers=ADMIN, **extra):
+    payload = {
+        "id": str(uuid.uuid4()),
+        "codigo": f"dup-{uuid.uuid4().hex[:8]}",
+        "copiar_de": origen_id,
+        **extra,
+    }
+    return client.post("/activos", json=payload, headers=headers), payload
+
+
+def test_duplicate_copies_everything_but_code_serial_and_history(client, cat, act_db):
+    origen = original(client, cat)
+    response, payload = duplicar(client, origen["id"], serial="SN-NUEVO")
+
+    assert response.status_code == 201, response.get_json()
+    copia = response.get_json()["activo"]
+    assert copia["id"] == payload["id"] and copia["id"] != origen["id"]
+    assert copia["codigo"] == payload["codigo"].upper()
+    for campo in (
+        "nombre",
+        "categoria",
+        "ubicacion",
+        "marca",
+        "modelo",
+        "subtipo",
+        "precio_compra",
+    ):
+        assert copia[campo] == origen[campo], campo
+    assert copia["serial"] == "SN-NUEVO"
+    with act_db.migrator.connect() as conn:
+        datos = conn.scalar(
+            text("select datos from activo_evento where activo_id = :id"), {"id": payload["id"]}
+        )
+    assert datos["copiado_de"] == origen["id"]
+
+
+def test_contador_duplicates_without_seeing_nor_changing_the_price(client, cat, act_db):
+    origen = original(client, cat)
+    response, payload = duplicar(client, origen["id"], headers=CONTADOR)
+    assert response.status_code == 201
+    assert not tiene_precio(response.get_json())
+    with act_db.migrator.connect() as conn:
+        precio = conn.scalar(
+            text("select precio_compra::text from activo where id = :id"), {"id": payload["id"]}
+        )
+    assert precio == origen["precio_compra"]
+
+    intento, _ = duplicar(client, origen["id"], headers=CONTADOR, precio_compra="1.00")
+    assert intento.status_code == 400
+    assert code(intento) == "solicitud_invalida"
+
+
+def test_admin_can_change_the_price_and_the_location_when_duplicating(client, cat):
+    origen = original(client, cat)
+    response, _ = duplicar(
+        client, origen["id"], precio_compra="99.50", ubicacion_id=cat["otra_sala"]
+    )
+    copia = response.get_json()["activo"]
+    assert copia["precio_compra"] == "99.50"
+    assert copia["ubicacion"]["id"] == cat["otra_sala"]
+
+
+@pytest.mark.parametrize(
+    ("extra", "status", "codigo_error"),
+    [
+        ({"copiar_de": "no-uuid"}, 400, "solicitud_invalida"),
+        ({"precio_compra": "-5"}, 400, "precio_invalido"),
+        ({"ubicacion_id": "sede"}, 400, "ubicacion_invalida"),
+        ({"codigo": "con espacio"}, 400, "codigo_invalido"),
+    ],
+)
+def test_invalid_duplicates(client, cat, extra, status, codigo_error):
+    origen = original(client, cat)
+    if extra.get("ubicacion_id") == "sede":
+        extra = {**extra, "ubicacion_id": cat["sede"]}
+    response, _ = duplicar(client, origen["id"], **extra)
+    assert response.status_code == status
+    assert code(response) == codigo_error
+
+
+def test_duplicate_from_another_tenant_or_unknown_is_404(client, cat):
+    de_b = alta(
+        client, body(cat, categoria_id=cat["cat_b"], ubicacion_id=cat["sala_b"]), ADMIN_OTRO
+    ).get_json()["activo"]
+    for origen_id in (de_b["id"], str(uuid.uuid4())):
+        response, _ = duplicar(client, origen_id)
+        assert response.status_code == 404
+
+
+def test_duplicate_with_an_existing_code_is_409(client, cat):
+    origen = original(client, cat)
+    response, _ = duplicar(client, origen["id"], codigo=origen["codigo"])
+    assert response.status_code == 409
+    assert response.get_json()["activo"]["id"] == origen["id"]

@@ -539,6 +539,8 @@ def test_activos_responses(client):
 
     alta(body)
     alta(body)
+    duplicado = {"id": str(uuid.uuid4()), "codigo": f"OD-{sufijo}", "copiar_de": body["id"]}
+    alta(duplicado, headers=contador)
     alta({**body, "id": str(uuid.uuid4()), "codigo": f"oa-{sufijo}"})
     alta({**body, "id": str(uuid.uuid4()), "codigo": "con espacio"})
     alta(

@@ -220,6 +220,7 @@ class DatosAlta:
     ubicacion_id: uuid.UUID
     opcionales: dict[str, str | None]
     fecha_compra: date | None
+    copiado_de: uuid.UUID | None = None
 
 
 def guardar(
@@ -259,6 +260,7 @@ def guardar(
             "precio_compra": str(datos.precio),
             "fecha_compra": datos.fecha_compra.isoformat() if datos.fecha_compra else None,
             **datos.opcionales,
+            **({"copiado_de": str(datos.copiado_de)} if datos.copiado_de else {}),
         },
     )
     try:
@@ -304,4 +306,45 @@ def datos_de_alta(body: dict[str, object]) -> DatosAlta:
         ubicacion_id=_uuid(body.get("ubicacion_id")),
         opcionales={campo: _texto_opcional(body.get(campo)) for campo in OPCIONALES},
         fecha_compra=_fecha(body.get("fecha_compra")),
+    )
+
+
+# Lo que se copia al duplicar (R6, CU-CAT-03); nunca código, serial ni historial.
+COPIADOS = ("marca", "modelo", "subtipo")
+
+
+def datos_de_duplicado(session: Session, body: dict[str, object], *, es_admin: bool) -> DatosAlta:
+    """Valida un duplicado (``copiar_de``): el servidor copia del original (R6, Q3).
+
+    El contador no puede mandar precio (lo hereda sin verlo); el admin puede cambiarlo.
+    La ubicación puede cambiar (la unidad nueva puede estar en otro cuarto).
+    """
+    activo_id = _uuid(body.get("id"))
+    codigo = normalizar_codigo(body.get("codigo"))
+    if codigo is None:
+        raise CodigoInvalido()
+    origen = session.get(Activo, _uuid(body.get("copiar_de")))
+    if origen is None:
+        raise NoEncontrado()
+    precio = origen.precio_compra
+    if body.get("precio_compra") is not None:
+        if not es_admin:
+            raise ErrorActivo("Al duplicar, el precio se copia del original.")
+        precio = parsear_precio(body.get("precio_compra"))
+        if precio is None:
+            raise PrecioInvalido()
+    ubicacion = body.get("ubicacion_id")
+    return DatosAlta(
+        id=activo_id,
+        codigo=codigo,
+        nombre=origen.nombre,
+        precio=precio,
+        categoria_id=origen.categoria_id,
+        ubicacion_id=_uuid(ubicacion) if ubicacion is not None else origen.ubicacion_id,
+        opcionales={
+            **{campo: getattr(origen, campo) for campo in COPIADOS},
+            "serial": _texto_opcional(body.get("serial")),
+        },
+        fecha_compra=None,
+        copiado_de=origen.id,
     )

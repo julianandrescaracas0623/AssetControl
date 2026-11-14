@@ -62,7 +62,10 @@ def crear() -> ResponseReturnValue:
     session = current_session()
     usuario = current_user()
     try:
-        datos = service.datos_de_alta(body)
+        if "copiar_de" in body:
+            datos = service.datos_de_duplicado(session, body, es_admin=usuario.rol == "admin")
+        else:
+            datos = service.datos_de_alta(body)
         resultado = service.guardar(
             session, datos, usuario_id=usuario.usuario_id, con_precio=usuario.rol == "admin"
         )

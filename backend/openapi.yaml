@@ -431,14 +431,17 @@ paths:
     post:
       tags: [activos]
       operationId: crearActivo
-      summary: Dar de alta un activo (admin y contador; idempotente por id)
+      summary: Dar de alta o duplicar un activo (admin y contador; idempotente por id)
       security:
         - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/CrearActivoBody" }
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/CrearActivoBody"
+                - $ref: "#/components/schemas/DuplicarActivoBody"
       responses:
         "200":
           description: Reintento con el mismo id y código; devuelve el ya guardado.
@@ -938,6 +941,22 @@ components:
         modelo: { $ref: "#/components/schemas/TextoOpcional" }
         subtipo: { $ref: "#/components/schemas/TextoOpcional" }
         fecha_compra: { type: [string, "null"], format: date, description: No futura. }
+    DuplicarActivoBody:
+      type: object
+      required: [id, codigo, copiar_de]
+      additionalProperties: false
+      description: >-
+        El servidor copia nombre, categoría, marca, modelo, subtipo, precio y ubicación
+        del original; nunca código, serial ni historial.
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string }
+        copiar_de: { type: string, format: uuid }
+        serial: { $ref: "#/components/schemas/TextoOpcional" }
+        ubicacion_id: { type: string, format: uuid, description: Si la unidad nueva está en otro cuarto. }
+        precio_compra:
+          $ref: "#/components/schemas/Precio"
+          description: Solo el admin; el contador hereda el precio sin verlo (400 si lo manda).
 
     Health:
       type: object
