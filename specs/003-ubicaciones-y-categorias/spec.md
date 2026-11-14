@@ -1,6 +1,6 @@
 # Spec 003 — Ubicaciones y categorías
 
-> **Estado:** Aprobada (G1–G3, 2026-11-14) con Q1–Q4 en la opción recomendada. Fecha: 2026-11-14. Depende de la spec 002 (acceso, hecha) y de la 002b (web con sesión, hecha). Módulo M2 completo y CU-CAT-09 de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Implementada (T1–T8, 2026-11-14), aprobada (G1–G3, 2026-11-14) con Q1–Q4 en la opción recomendada. Fecha: 2026-11-14. Depende de la spec 002 (acceso, hecha) y de la 002b (web con sesión, hecha). Módulo M2 completo y CU-CAT-09 de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 

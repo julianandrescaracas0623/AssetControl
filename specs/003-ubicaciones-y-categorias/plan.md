@@ -1,6 +1,6 @@
 # Plan 003 — Ubicaciones y categorías
 
-> **Estado:** Aprobado (G1–G3, 2026-11-14) con Q1–Q4 en la opción recomendada (`spec.md`, Decisiones).
+> **Estado:** Implementado (T1–T8, 2026-11-14), aprobado (G1–G3, 2026-11-14) con Q1–Q4 en la opción recomendada (`spec.md`, Decisiones).
 
 ## 1. Enfoque
 

@@ -161,6 +161,12 @@ describe('/admin/ubicaciones', () => {
     expect(await screen.findByText('Aún no hay ubicaciones')).toBeTruthy()
   })
 
+  it('muestra datos reales: sin la banda de maqueta', async () => {
+    abrir()
+    await titulo()
+    expect(screen.queryByText(/Datos ficticios/)).toBeNull()
+  })
+
   it('el contador no entra', async () => {
     abrir(undefined, 'contador')
     expect(await screen.findByRole('heading', { level: 1, name: 'No tienes permiso para ver esto' })).toBeTruthy()
