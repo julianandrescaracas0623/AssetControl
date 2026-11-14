@@ -437,6 +437,11 @@ paths:
       parameters:
         - { name: q, in: query, required: false, schema: { type: string, maxLength: 120 } }
         - { name: estado, in: query, required: false, schema: { $ref: "#/components/schemas/EstadoActivo" } }
+        - name: ubicacion_id
+          in: query
+          required: false
+          description: Solo los activos de esa ubicación exacta (spec 005, R10).
+          schema: { type: string, format: uuid }
         - { name: pagina, in: query, required: false, schema: { type: integer, minimum: 1 } }
       responses:
         "200":
@@ -601,6 +606,36 @@ paths:
           $ref: "#/components/responses/CuerpoDemasiadoGrande"
         "428":
           $ref: "#/components/responses/FaltaVersion"
+
+  /activos/{id}/historial:
+    get:
+      tags: [activos]
+      operationId: historialActivo
+      summary: Línea de tiempo del activo, lo más reciente primero (50 por página)
+      description: >-
+        Al contador se le omiten los eventos precio_cambiado y toda clave de precio de los
+        demás (P13).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: antes_de
+          in: query
+          required: false
+          description: El valor de "siguiente" de la página anterior.
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Una página de eventos.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Historial" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
 
   /activos/{id}/mover:
     post:
@@ -1215,6 +1250,47 @@ components:
         modelo: { $ref: "#/components/schemas/TextoOpcional" }
         subtipo: { $ref: "#/components/schemas/TextoOpcional" }
         fecha_compra: { type: [string, "null"], format: date, description: No futura. }
+    TipoEvento:
+      type: string
+      enum:
+        - creado
+        - importado
+        - verificado
+        - ubicacion_cambiada
+        - precio_cambiado
+        - estado_cambiado
+        - categoria_cambiada
+        - datos_cambiados
+        - dado_de_baja
+    EventoActivo:
+      type: object
+      required: [seq, tipo, ocurrido_en, autor, datos]
+      additionalProperties: false
+      properties:
+        seq: { type: integer, minimum: 1 }
+        tipo: { $ref: "#/components/schemas/TipoEvento" }
+        ocurrido_en: { type: string, format: date-time }
+        autor:
+          type: object
+          required: [id, nombre]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            nombre: { type: string }
+        datos:
+          type: object
+          description: Contenido por tipo (docs/03, spec 005); sin precios para el contador.
+    Historial:
+      type: object
+      required: [eventos, siguiente]
+      additionalProperties: false
+      properties:
+        eventos:
+          type: array
+          items: { $ref: "#/components/schemas/EventoActivo" }
+        siguiente:
+          type: [integer, "null"]
+          description: Cursor para la página siguiente (antes_de); null si no hay más.
     MoverActivoBody:
       type: object
       required: [ubicacion_id]

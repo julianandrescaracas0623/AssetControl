@@ -314,6 +314,26 @@ export interface paths {
         patch: operations["editarActivo"];
         trace?: never;
     };
+    "/activos/{id}/historial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Línea de tiempo del activo, lo más reciente primero (50 por página)
+         * @description Al contador se le omiten los eventos precio_cambiado y toda clave de precio de los demás (P13).
+         */
+        get: operations["historialActivo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/activos/{id}/mover": {
         parameters: {
             query?: never;
@@ -589,6 +609,26 @@ export interface components {
              * @description No futura.
              */
             fecha_compra?: string | null;
+        };
+        /** @enum {string} */
+        TipoEvento: "creado" | "importado" | "verificado" | "ubicacion_cambiada" | "precio_cambiado" | "estado_cambiado" | "categoria_cambiada" | "datos_cambiados" | "dado_de_baja";
+        EventoActivo: {
+            seq: number;
+            tipo: components["schemas"]["TipoEvento"];
+            /** Format: date-time */
+            ocurrido_en: string;
+            autor: {
+                /** Format: uuid */
+                id: string;
+                nombre: string;
+            };
+            /** @description Contenido por tipo (docs/03, spec 005); sin precios para el contador. */
+            datos: Record<string, never>;
+        };
+        Historial: {
+            eventos: components["schemas"]["EventoActivo"][];
+            /** @description Cursor para la página siguiente (antes_de); null si no hay más. */
+            siguiente: number | null;
         };
         MoverActivoBody: {
             /**
@@ -1280,6 +1320,8 @@ export interface operations {
             query?: {
                 q?: string;
                 estado?: components["schemas"]["EstadoActivo"];
+                /** @description Solo los activos de esa ubicación exacta (spec 005, R10). */
+                ubicacion_id?: string;
                 pagina?: number;
             };
             header?: never;
@@ -1474,6 +1516,35 @@ export interface operations {
             412: components["responses"]["VersionDesactualizada"];
             413: components["responses"]["CuerpoDemasiadoGrande"];
             428: components["responses"]["FaltaVersion"];
+        };
+    };
+    historialActivo: {
+        parameters: {
+            query?: {
+                /** @description El valor de "siguiente" de la página anterior. */
+                antes_de?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Una página de eventos. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Historial"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
         };
     };
     moverActivo: {

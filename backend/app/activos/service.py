@@ -383,11 +383,18 @@ class Pagina:
 
 
 def buscar(
-    session: Session, *, q: object, estado: object, pagina: object, con_precio: bool
+    session: Session,
+    *,
+    q: object,
+    estado: object,
+    pagina: object,
+    con_precio: bool,
+    ubicacion_id: object = None,
 ) -> Pagina:
     texto = _consulta_texto(q)
     if estado is not None and estado not in ESTADOS:
         raise ErrorActivo()
+    ubicacion = _uuid(ubicacion_id) if ubicacion_id is not None else None
     try:
         numero = int(pagina) if pagina is not None else 1
     except (TypeError, ValueError):
@@ -407,6 +414,8 @@ def buscar(
         )
     if estado is not None:
         filtro = filtro.where(Activo.estado == estado)
+    if ubicacion is not None:
+        filtro = filtro.where(Activo.ubicacion_id == ubicacion)
     total = session.scalar(select(func.count()).select_from(filtro.subquery()))
     filas = session.scalars(
         filtro.order_by(Activo.creado_en.desc(), Activo.id)

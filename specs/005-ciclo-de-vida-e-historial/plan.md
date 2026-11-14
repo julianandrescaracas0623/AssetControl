@@ -37,7 +37,7 @@ Base primero (permiso de `UPDATE` por columna y el tipo de evento nuevo), luego 
 | `GET /activos/{id}/historial?antes_de=<seq>` | ambos | 50 eventos por página, `seq` descendente, con autor (nombre) y `siguiente` para la próxima página |
 | `GET /activos?ubicacion_id=` | ambos | Filtro nuevo de la búsqueda (R10) |
 
-- **Errores nuevos:** `falta_version` (428), `version_desactualizada` (412, con `{error, activo}` vigente), `codigo_inmutable` (400), `activo_dado_de_baja` (409), `motivo_invalido` (400). El `409 tiene_activos` suma `ubicacion_id` para el enlace (R10).
+- **Errores nuevos:** `falta_version` (428), `version_desactualizada` (412, con `{error, activo}` vigente), `codigo_inmutable` (400), `activo_dado_de_baja` (409), `motivo_invalido` (400). El enlace desde `409 tiene_activos` lo arma la web con la ubicación que intentó desactivar (ajuste de T4).
 - **Respuesta del activo:** suma `row_version` (el `ETag` y la web lo usan); el precio sigue solo para el admin.
 - **Historial por rol (P13):** una sola función arma cada evento según el rol; al contador se le omiten los `precio_cambiado` y se le quita `precio_compra` de `creado` e `importado`. Prueba que recorre el historial y todas las respuestas del contador buscando cualquier clave o valor de precio.
 - **`If-Match`:** acepta `"3"` y `3`; cualquier otra forma → `428`. Se compara contra la fila bloqueada, no contra una lectura previa.

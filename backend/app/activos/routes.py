@@ -11,7 +11,7 @@ import uuid
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 
-from app.activos import cambios, service
+from app.activos import cambios, historial, service
 from app.activos.models import Activo
 from app.auth.decorators import current_session, current_user, require_auth, require_role
 from app.errors import current_request_id, error_response
@@ -95,6 +95,7 @@ def buscar() -> ResponseReturnValue:
             session,
             q=request.args.get("q"),
             estado=request.args.get("estado"),
+            ubicacion_id=request.args.get("ubicacion_id"),
             pagina=request.args.get("pagina"),
             con_precio=_es_admin(),
         )
@@ -106,6 +107,18 @@ def buscar() -> ResponseReturnValue:
         pagina=pagina.pagina,
         por_pagina=pagina.por_pagina,
     )
+
+
+@bp.get("/<uuid:id>/historial")
+@require_auth
+def ver_historial(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del contrato
+    try:
+        pagina = historial.leer(
+            current_session(), id, antes_de=request.args.get("antes_de"), con_precio=_es_admin()
+        )
+    except service.ErrorActivo as exc:
+        return _error(exc)
+    return jsonify(eventos=pagina.eventos, siguiente=pagina.siguiente)
 
 
 @bp.get("/sugerencias")

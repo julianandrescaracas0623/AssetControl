@@ -672,6 +672,22 @@ def test_activos_responses(client, contrato_db):
     assert reactivado["activo"]["estado"] == "activo"
     accion("mover", {"ubicacion_id": sala["id"]}, version="6")
 
+    # Spec 005, T4: historial y filtro por ubicación.
+    historial = f"/activos/{body['id']}/historial"
+    for params, headers in (({}, admin), ({}, contador), ({"antes_de": "x"}, admin), ({}, {})):
+        check(
+            "get",
+            "/activos/{id}/historial",
+            client.get(historial, query_string=params, headers=headers),
+        )
+    check(
+        "get",
+        "/activos/{id}/historial",
+        client.get(f"/activos/{uuid.uuid4()}/historial", headers=admin),
+    )
+    filtrada = client.get("/activos", query_string={"ubicacion_id": sala["id"]}, headers=admin)
+    assert check("get", "/activos", filtrada)["total"] >= 1
+
     # D2 en el contrato de ubicaciones.
     patch = client.patch(f"/ubicaciones/{sala['id']}", json={"activa": False}, headers=admin)
     assert check("patch", "/ubicaciones/{id}", patch)["error"]["code"] == "tiene_activos"
