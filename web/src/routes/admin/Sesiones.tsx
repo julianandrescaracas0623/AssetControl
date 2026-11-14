@@ -1,4 +1,4 @@
-import { CircleAlert, ClipboardList, Loader2, Plus, RefreshCw } from 'lucide-react'
+import { ArrowLeftRight, ChevronRight, CircleAlert, ClipboardList, Loader2, Plus, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
@@ -15,6 +15,7 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ErrorApi, mensajeDeError } from '@/lib/api/cliente'
+import { useDiscrepancias, usePendientes } from '@/lib/discrepancias'
 import { formatEntero } from '@/lib/format'
 import { fechaCorte, hoyISO, nombreSugerido, pendientes, porcentaje, type SesionConteo, useAbrirSesion, useDetalleSesion, useSesiones } from '@/lib/sesiones'
 
@@ -224,6 +225,70 @@ export default function Sesiones() {
   )
 }
 
+function AvisoDiscrepancias({ sesionId }: { sesionId: string }) {
+  const consulta = useDiscrepancias(sesionId, 'por_resolver')
+  const n = consulta.data?.length ?? 0
+  if (n === 0) return null
+  return (
+    <Link to={`/admin/discrepancias?sesion=${sesionId}`} className="flex min-h-12 items-center gap-3 rounded-xl border border-warning-border bg-warning-soft px-4 py-2 text-sm">
+      <ArrowLeftRight className="size-4 shrink-0 text-warning" aria-hidden="true" />
+      <span className="min-w-0 flex-1">
+        <b className="font-semibold">{formatEntero(n)}</b> {n === 1 ? 'activo se vio' : 'activos se vieron'} en otra ubicación
+      </span>
+      <span className="font-medium">Revisar</span>
+      <ChevronRight className="size-4" aria-hidden="true" />
+    </Link>
+  )
+}
+
+function ListaPendientes({ sesionId }: { sesionId: string }) {
+  const consulta = usePendientes(sesionId, undefined)
+  const activos = consulta.data?.pages.flatMap((p) => p.activos) ?? []
+  if (consulta.isPending || activos.length === 0) return null
+  return (
+    <section aria-labelledby="titulo-pendientes" className="flex flex-col gap-2">
+      <h2 id="titulo-pendientes" className="font-semibold">
+        Pendientes por verificar
+      </h2>
+      <div className="overflow-x-auto rounded-xl border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="pl-4">Código</TableHead>
+              <TableHead>Nombre</TableHead>
+              <TableHead className="pr-4">Ubicación</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {activos.map((a) => (
+              <TableRow key={a.id}>
+                <TableCell className="pl-4 font-mono">{a.codigo}</TableCell>
+                <TableCell className="whitespace-normal">
+                  <Link to={`/admin/activos/${encodeURIComponent(a.codigo)}`} className="font-medium hover:underline">
+                    {a.nombre}
+                  </Link>
+                  {a.estado === 'en_reparacion' && (
+                    <Badge variant="warning" className="ml-2">
+                      En reparación
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell className="pr-4 whitespace-normal text-muted-foreground">{a.ubicacion.ruta}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      {consulta.hasNextPage && (
+        <Button variant="outline" className="self-start max-md:min-h-11" disabled={consulta.isFetchingNextPage} onClick={() => void consulta.fetchNextPage()}>
+          {consulta.isFetchingNextPage && <Loader2 className="animate-spin" aria-hidden="true" />}
+          Ver más
+        </Button>
+      )}
+    </section>
+  )
+}
+
 export function DetalleSesion({ id }: { id: string }) {
   const consulta = useDetalleSesion(id)
   if (consulta.isPending) {
@@ -276,6 +341,7 @@ export function DetalleSesion({ id }: { id: string }) {
         </p>
         <p className="text-xs text-muted-foreground">Información de trabajo: no es el informe. Cerrar la sesión y el informe llegan con la spec 008.</p>
       </section>
+      <AvisoDiscrepancias sesionId={sesion.id} />
       {avance.por_ubicacion.length > 0 ? (
         <div className="overflow-x-auto rounded-xl border">
           <Table>
@@ -308,6 +374,7 @@ export function DetalleSesion({ id }: { id: string }) {
       ) : (
         <EmptyState titulo="No hay activos que contar" descripcion="Registra activos para verlos aquí por ubicación." />
       )}
+      <ListaPendientes sesionId={sesion.id} />
     </div>
   )
 }

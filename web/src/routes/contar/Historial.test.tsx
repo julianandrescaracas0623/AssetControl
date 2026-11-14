@@ -29,6 +29,17 @@ describe('historial (T7)', () => {
     catalogo.fallar(`GET /api/activos/${SILLA}/historial`, () =>
       json(200, {
         eventos: [
+          evento(9, 'discrepancia_descartada', {
+            sesion: 'Conteo nov 2026',
+            esperada: { id: 'b', ruta: 'Bodega' },
+            encontrada: { id: 'c', ruta: 'Administración' },
+          }),
+          evento(8, 'ubicacion_cambiada', {
+            antes: { id: 'a', ruta: 'Consultorio 1 › Box 2' },
+            despues: { id: 'b', ruta: 'Bodega' },
+            origen: 'discrepancia',
+            sesion: 'Conteo nov 2026',
+          }),
           evento(7, 'verificado', {
             sesion: 'Conteo nov 2026',
             estado_fisico: 'danado',
@@ -58,6 +69,8 @@ describe('historial (T7)', () => {
     const lista = await screen.findByRole('list')
     const items = within(lista).getAllByRole('listitem')
     expect(items.map((li) => li.querySelector('.font-semibold')?.textContent)).toEqual([
+      'Diferencia descartada',
+      'Movido por el conteo',
       'Verificado en otra ubicación',
       'Verificado',
       'Dado de baja',
@@ -66,12 +79,14 @@ describe('historial (T7)', () => {
       'Datos editados',
       'Activo creado',
     ])
-    expect(items[0].textContent).toContain('Conteo nov 2026 · en Bodega (esperada Consultorio 1 › Box 2) · dañado · «Bandeja rota»')
-    expect(items[1].textContent).toContain('Conteo nov 2026 · en Consultorio 1 › Box 2 · ok')
-    expect(items[2].textContent).toContain('Perdido · «No apareció»')
-    expect(items[4].textContent).toContain('Consultorio 1 › Box 2 → Bodega')
-    expect(items[5].textContent).toContain('Marca: Rimax → vacío')
-    expect(items[6].textContent).toContain('Ana Torres')
+    expect(items[0].textContent).toContain('Se vio en Administración; sigue en Bodega · Conteo nov 2026')
+    expect(items[1].textContent).toContain('Consultorio 1 › Box 2 → Bodega · Conteo nov 2026')
+    expect(items[2].textContent).toContain('Conteo nov 2026 · en Bodega (esperada Consultorio 1 › Box 2) · dañado · «Bandeja rota»')
+    expect(items[3].textContent).toContain('Conteo nov 2026 · en Consultorio 1 › Box 2 · ok')
+    expect(items[4].textContent).toContain('Perdido · «No apareció»')
+    expect(items[6].textContent).toContain('Consultorio 1 › Box 2 → Bodega')
+    expect(items[7].textContent).toContain('Marca: Rimax → vacío')
+    expect(items[8].textContent).toContain('Ana Torres')
     expect(screen.queryByText(/\$/)).toBeNull()
     expect(screen.queryByText(/Datos ficticios/)).toBeNull() // spec 006: el conteo ya es real
   })

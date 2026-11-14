@@ -63,6 +63,30 @@ describe('/admin/sesiones', () => {
     expect(screen.getByText(/no es el informe/)).toBeTruthy()
   })
 
+  it('el detalle avisa de las diferencias y lista los pendientes (spec 007, T6)', async () => {
+    const catalogo = catalogoDemo('admin', { sesiones: [sesionDe()] })
+    const [impresora] = catalogo.activos
+    catalogo.verificaciones.push({
+      id: '00000000-0000-4000-8000-0000000000f1',
+      sesion_id: '00000000-0000-4000-8000-0000000000e1',
+      activo: { id: impresora.id, codigo: impresora.codigo, nombre: impresora.nombre },
+      ubicacion_esperada: { id: impresora.ubicacion.id, ruta: impresora.ubicacion.ruta },
+      ubicacion_encontrada: { id: '00000000-0000-4000-8000-0000000000a4', ruta: 'Consultorio 1 › Box 2' },
+      estado_fisico: 'ok',
+      nota: null,
+      verificado_por: { id: '00000000-0000-4000-8000-00000000000b', nombre: 'Luis Pérez' },
+      ocurrido_en: null,
+      recibido_en: '2026-11-14T15:44:00+00:00',
+      seq: 1,
+    })
+    abrir('/admin/sesiones/00000000-0000-4000-8000-0000000000e1', catalogo)
+    const aviso = await screen.findByRole('link', { name: /1 activo se vio en otra ubicación/ })
+    expect(aviso.getAttribute('href')).toBe('/admin/discrepancias?sesion=00000000-0000-4000-8000-0000000000e1')
+    const pendientes = (await screen.findByRole('heading', { level: 2, name: 'Pendientes por verificar' })).parentElement!
+    expect(within(pendientes).getByText('Silla ergonómica')).toBeTruthy()
+    expect(within(pendientes).queryByText('Impresora multifuncional')).toBeNull()
+  })
+
   it('una sesión inexistente lo dice', async () => {
     abrir('/admin/sesiones/00000000-0000-4000-8000-0000000000ff')
     expect(await screen.findByText('Esa sesión no existe')).toBeTruthy()

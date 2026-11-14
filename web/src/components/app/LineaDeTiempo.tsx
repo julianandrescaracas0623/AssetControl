@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, ArrowLeftRight, Check, CircleAlert, CircleDollarSign, FileInput, Loader2, MapPin, Pencil, Plus, RefreshCw, Tag, Wrench } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowLeftRight, Check, CircleAlert, CircleDollarSign, FileInput, Loader2, MapPin, Pencil, Plus, RefreshCw, Tag, Wrench, X } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -80,7 +80,16 @@ function vista(evento: EventoActivo): Vista {
       return { icono: Pencil, tono: 'neutro', titulo: 'Datos editados', detalle }
     }
     case 'ubicacion_cambiada':
-      return { icono: MapPin, tono: 'neutro', titulo: 'Ubicación cambiada', detalle: `${ruta(d.antes)} → ${ruta(d.despues)}` }
+      return d.origen === 'discrepancia'
+        ? { icono: MapPin, tono: 'neutro', titulo: 'Movido por el conteo', detalle: `${ruta(d.antes)} → ${ruta(d.despues)}${d.sesion ? ` · ${String(d.sesion)}` : ''}` }
+        : { icono: MapPin, tono: 'neutro', titulo: 'Ubicación cambiada', detalle: `${ruta(d.antes)} → ${ruta(d.despues)}` }
+    case 'discrepancia_descartada':
+      return {
+        icono: X,
+        tono: 'neutro',
+        titulo: 'Diferencia descartada',
+        detalle: `Se vio en ${ruta(d.encontrada)}; sigue en ${ruta(d.esperada)}${d.sesion ? ` · ${String(d.sesion)}` : ''}`,
+      }
     case 'estado_cambiado': {
       if (d.antes === 'dado_de_baja') {
         const nota = d.nota ? ` · «${String(d.nota)}»` : ''
