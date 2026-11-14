@@ -57,6 +57,7 @@ from sqlalchemy.pool import NullPool
 from app.activos import models as activos_models  # noqa: F401 - registra activo y activo_evento
 from app.auth import models
 from app.catalogo import models as catalogo_models  # noqa: F401 - registra ubicacion y categoria
+from app.conteo import models as conteo_models  # noqa: F401 - registra sesion_conteo y verificacion
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
@@ -74,6 +75,8 @@ TENANT_TABLES = frozenset(
         "categoria",
         "activo",
         "activo_evento",
+        "sesion_conteo",
+        "verificacion",
     }
 )
 
@@ -150,6 +153,21 @@ EXPECTED_POLICIES = {
         ISOLATION_EXPR,
         ISOLATION_EXPR,
     ),
+    # Spec 006, T1 (0009).
+    ("sesion_conteo", "tenant_isolation"): (
+        "PERMISSIVE",
+        "ALL",
+        "{app}",
+        ISOLATION_EXPR,
+        ISOLATION_EXPR,
+    ),
+    ("verificacion", "tenant_isolation"): (
+        "PERMISSIVE",
+        "ALL",
+        "{app}",
+        ISOLATION_EXPR,
+        ISOLATION_EXPR,
+    ),
     # limite_tasa (T10, docs/03 cambio 6): una política por comando TO la aplicación, sin
     # filtro de tenant (no lo hay antes del login); su defensa es el privilegio mínimo y
     # el HMAC de la clave.
@@ -218,6 +236,21 @@ EVENTO_INSERT = {
     "usuario_id",
     "sesion_id",
     "verificacion_id",
+}
+SESION_INSERT = {"tenant_id", "nombre", "fecha_corte", "abierta_por"}
+VERIFICACION_INSERT = {
+    "id",
+    "tenant_id",
+    "sesion_id",
+    "activo_id",
+    "ubicacion_esperada_id",
+    "ubicacion_encontrada_id",
+    "estado_fisico",
+    "precio_al_contar",
+    "categoria_al_contar",
+    "nota",
+    "verificado_por",
+    "ocurrido_en",
 }
 EXPECTED_APP_COLUMNS = {
     "tenant": {"SELECT": {"id", "nombre", "creado_en"}},
@@ -295,6 +328,24 @@ EXPECTED_APP_COLUMNS = {
         "SELECT": {*EVENTO_INSERT, "id", "ocurrido_en", "seq"},
         "INSERT": EVENTO_INSERT,
     },
+    # Spec 006, T1 (0009): la sesión sin UPDATE hasta el cierre (008); la verificación es
+    # inmutable (sin UPDATE nunca); seq y recibido_en los pone la base.
+    "sesion_conteo": {
+        "SELECT": {
+            *SESION_INSERT,
+            "id",
+            "tipo",
+            "estado",
+            "abierta_en",
+            "cerrada_por",
+            "cerrada_en",
+        },
+        "INSERT": SESION_INSERT,
+    },
+    "verificacion": {
+        "SELECT": {*VERIFICACION_INSERT, "recibido_en", "seq"},
+        "INSERT": VERIFICACION_INSERT,
+    },
 }
 # Privilegios a nivel de tabla del rol de la aplicación (sin columnas).
 
@@ -310,6 +361,8 @@ EXPECTED_APP_TABLE_PRIVILEGES = {
     "categoria": {"SELECT"},
     "activo": {"SELECT"},
     "activo_evento": {"SELECT"},
+    "sesion_conteo": {"SELECT"},
+    "verificacion": {"SELECT"},
 }
 
 
@@ -472,6 +525,8 @@ EXPECTED_OWNER_COLUMNS = {
     "categoria": {},
     "activo": {},
     "activo_evento": {},
+    "sesion_conteo": {},
+    "verificacion": {},
 }
 TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
 COLUMN_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "REFERENCES")

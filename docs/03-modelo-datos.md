@@ -162,6 +162,13 @@ Restricciones propuestas:
 - Índice único `(sesion_id, activo_id)`: un activo aparece como mucho una vez por sesión.
 - Solo hay filas de sesiones `cerrada` de tipo `conteo`.
 
+Detalle de `sesion_conteo` y `verificacion` (spec 006, migración `0009`):
+
+- Una sola sesión `conteo` `abierta` por tenant (índice único parcial; Q1 de la 006, cierra P12). `CHECK ((estado = 'cerrada') = (cerrada_en IS NOT NULL))`. La aplicación inserta solo `tenant_id`, `nombre`, `fecha_corte` y `abierta_por` (siempre `conteo` y `abierta`) y aún no tiene `UPDATE`: el cierre, con los totales, llega con la 008.
+- `verificacion` es inmutable (solo `INSERT` y `SELECT`); `seq` es una identidad y `recibido_en` lo pone la base. FK compuestas a sesión, activo, las dos ubicaciones, categoría y membresía del autor. `nota` de 1 a 120. `estado_fisico` `ok` o `danado` (Q2 de la 006).
+- `activo_evento.sesion_id` y `verificacion_id` tienen FK compuesta desde la `0009`.
+- Un reintento con el `id` de una verificación ya guardada la devuelve aunque la sesión se haya cerrado después (Q3 de la 006: R2 precede a R5 solo en ese caso).
+
 `verificacion` (inmutable, unidad de sincronización):
 
 | Campo | Notas |

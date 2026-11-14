@@ -16,4 +16,4 @@
 
 ## Notas por tarea
 
-(Se completan al cerrar cada tarea.)
+- **T1 (hecha, 2026-11-14; backend 1576 en verde):** migración `0009_sesiones_y_verificacion` y modelos `app/conteo/models.py`. `sesion_conteo` con una sola `conteo` abierta por tenant (índice único parcial), `CHECK` de cierre, autor de apertura y cierre por membresía; `INSERT` de 4 columnas y sin `UPDATE`. `verificacion` inmutable con FK compuestas a sesión, activo, ubicaciones, categoría y autor; `estado_fisico` `ok`/`danado`; nota 1–120. FK de `activo_evento.sesion_id` y `verificacion_id`. Pruebas: `test_conteo_db.py` (valores por defecto, una abierta por tenant, `CHECK`, referencias de otro tenant, prohibidos `42501`, FK del evento, RLS), catálogo de RLS y permisos, cadena de migraciones con cabeza `0009` y su subir/bajar. `docs/03` actualizado.
