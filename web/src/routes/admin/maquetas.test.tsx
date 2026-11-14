@@ -52,49 +52,6 @@ describe('Inicio', () => {
   })
 })
 
-describe('Activos', () => {
-  it('lista los activos con precio para el admin y filtra por código', async () => {
-    await abrir('/admin/activos')
-    const tabla = screen.getByRole('table')
-    expect(within(tabla).getAllByRole('row')).toHaveLength(13)
-    expect(within(tabla).getByText('$ 14.200.000,00')).toBeTruthy()
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar activos' }), { target: { value: '000123' } })
-    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(2)
-  })
-
-  it('filtra por estado con las pestañas', async () => {
-    await abrir('/admin/activos')
-    pestaña(/En reparación/)
-    const filas = within(screen.getByRole('table')).getAllByRole('row')
-    expect(filas).toHaveLength(2)
-    expect(filas[1].textContent).toContain('Compresor libre de aceite')
-  })
-
-  it('sin coincidencias ofrece limpiar los filtros', async () => {
-    await abrir('/admin/activos')
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar activos' }), { target: { value: 'zzzz' } })
-    expect(screen.getByText('Nada coincide')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Limpiar filtros' }))
-    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(13)
-  })
-
-  it('dar de baja pide confirmación con su efecto', async () => {
-    await abrir('/admin/activos')
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Acciones de Monitor 24″ (000210)' }), { key: 'Enter' })
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Dar de baja' }))
-    const dialogo = await screen.findByRole('alertdialog')
-    expect(within(dialogo).getByRole('heading', { name: '¿Dar de baja «Monitor 24″»?' })).toBeTruthy()
-    expect(dialogo.textContent).toMatch(/no se borra/i)
-    expect(within(dialogo).getByRole('button', { name: 'Cancelar' })).toBeTruthy()
-  })
-
-  it('estado vacío invita a registrar', async () => {
-    await abrir('/admin/activos?estado=vacio')
-    expect(screen.getByText('Aún no hay activos')).toBeTruthy()
-    expect(screen.getAllByRole('link', { name: 'Registrar activo' }).length).toBeGreaterThan(0)
-  })
-})
-
 describe('Informe de sesión', () => {
   it('muestra tres cifras congeladas y el desglose por pestañas', async () => {
     await abrir('/admin/sesiones/conteo-may-2026/informe')

@@ -62,7 +62,7 @@ describe('alta en administración', () => {
     abrir('/admin/activos/nuevo')
     fireEvent.change(await screen.findByRole('textbox', { name: /Código del sticker/ }), { target: { value: '000123' } })
     expect(await screen.findByText(/Ese código ya existe: Silla ergonómica/)).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Abrir activo' }).getAttribute('href')).toBe('/admin/activos/00000000-0000-4000-8000-0000000000d2')
+    expect(screen.getByRole('link', { name: 'Abrir activo' }).getAttribute('href')).toBe('/admin/activos/000123')
   })
 
   it('copia de un parecido (con precio para el admin) y guarda con el precio canónico', async () => {

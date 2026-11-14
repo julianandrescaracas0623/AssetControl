@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { routes } from '@/router'
+import { catalogoDemo } from '@/test/catalogo'
 import { simularSesion } from '@/test/sesion'
 
 // Spec 001b, T5: buscador global (R7, A5) sobre datos ficticios.
@@ -10,7 +11,7 @@ import { simularSesion } from '@/test/sesion'
 afterEach(cleanup)
 
 async function abrirEn(path: string) {
-  simularSesion('admin')
+  simularSesion('admin', catalogoDemo('admin').manejador)
   const router = createMemoryRouter(routes, { initialEntries: [path] })
   render(<RouterProvider router={router} />)
   await screen.findByRole('heading', { level: 1 })
@@ -41,10 +42,10 @@ describe('buscador global', () => {
     const dialogo = await screen.findByRole('dialog', { name: 'Buscar' })
     const campo = within(dialogo).getByRole('combobox')
     fireEvent.change(campo, { target: { value: '000123' } })
-    expect(within(dialogo).getByRole('option', { name: /Autoclave clase B 18 L/ })).toBeTruthy()
-    expect(within(dialogo).queryByRole('option', { name: /Silla ergonómica/ })).toBeNull()
+    expect(await within(dialogo).findByRole('option', { name: /Silla ergonómica/ })).toBeTruthy()
+    expect(within(dialogo).queryByRole('option', { name: /Impresora multifuncional/ })).toBeNull()
     fireEvent.keyDown(campo, { key: 'Enter' })
-    expect(await screen.findByRole('heading', { level: 1, name: 'Autoclave clase B 18 L' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Silla ergonómica' })).toBeTruthy()
     expect(router.state.location.pathname).toBe('/admin/activos/000123')
   })
 
@@ -53,7 +54,7 @@ describe('buscador global', () => {
     fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
     const dialogo = await screen.findByRole('dialog', { name: 'Buscar' })
     fireEvent.change(within(dialogo).getByRole('combobox'), { target: { value: 'ubicac' } })
-    expect(within(dialogo).getByRole('option', { name: /Ubicaciones/ })).toBeTruthy()
+    expect(await within(dialogo).findByRole('option', { name: /Ubicaciones/ })).toBeTruthy()
   })
 
   it('sin coincidencias dice «Sin resultados para «…»»', async () => {
@@ -61,11 +62,11 @@ describe('buscador global', () => {
     fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
     const dialogo = await screen.findByRole('dialog', { name: 'Buscar' })
     fireEvent.change(within(dialogo).getByRole('combobox'), { target: { value: 'zzzz' } })
-    expect(within(dialogo).getByText('Sin resultados para «zzzz»')).toBeTruthy()
+    expect(await within(dialogo).findByText('Sin resultados para «zzzz»')).toBeTruthy()
   })
 
   it('un código inexistente en la ficha muestra «No encontramos ese código»', async () => {
     await abrirEn('/admin/activos/999999')
-    expect(screen.getByRole('heading', { level: 1, name: 'No encontramos ese código' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'No encontramos ese código' })).toBeTruthy()
   })
 })

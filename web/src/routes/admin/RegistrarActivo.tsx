@@ -118,7 +118,7 @@ export default function RegistrarActivo() {
             <span className="flex flex-wrap gap-2 [&_[data-slot=button]]:max-md:min-h-11">
               <Button size="sm" onClick={() => alta.otro()}>Registrar otro</Button>
               <Button asChild size="sm" variant="outline">
-                <Link to={`/admin/activos/${alta.creado.id}`}>Ver el activo</Link>
+                <Link to={`/admin/activos/${encodeURIComponent(alta.creado.codigo)}`}>Ver el activo</Link>
               </Button>
             </span>
           </AlertDescription>
@@ -179,7 +179,7 @@ export default function RegistrarActivo() {
                     <TriangleAlert className="size-4" aria-hidden="true" />
                     Ese código ya existe: {existente.nombre}
                     <Button asChild size="sm" variant="outline" className="max-md:min-h-11">
-                      <Link to={`/admin/activos/${existente.id}`}>Abrir activo</Link>
+                      <Link to={`/admin/activos/${encodeURIComponent(existente.codigo)}`}>Abrir activo</Link>
                     </Button>
                   </span>
                 ) : revision.data === null ? (
