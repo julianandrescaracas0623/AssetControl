@@ -94,6 +94,14 @@ Detalle de `ubicacion` y `categoria` (spec 003, migración `0006`):
 | `row_version` | int | Concurrencia optimista en ediciones **online** (`If-Match`). |
 | `creado_por`, `creado_en`, `actualizado_en` | | |
 
+Detalle de `activo` y `activo_evento` (spec 004, migración `0007`):
+
+- `codigo`: `CHECK (codigo ~ '^[A-Z0-9._/-]{1,40}$')` (Q1 de la 004: la aplicación lo pasa a mayúsculas) y `UNIQUE (tenant_id, codigo)`. `precio_compra >= 0` (Q2 de la 004). `nombre` y los opcionales de texto de 1 a 120 caracteres.
+- FK compuestas `(tenant_id, categoria_id)`, `(tenant_id, ubicacion_id)` y `(tenant_id, creado_por) → membresia (tenant_id, usuario_id)`: todo del mismo tenant.
+- **Solo sala o box (D1 de la 004):** el disparador `activo_ubicacion_valida` (`SECURITY INVOKER`, `search_path` fijo) rechaza al insertar o cambiar `ubicacion_id` una sede o una ubicación inactiva. Una ubicación con activos `activo` o `en_reparacion` no se desactiva (D2 de la 004, `409 tiene_activos`).
+- `activo_evento` es inmutable: la aplicación solo tiene `SELECT` e `INSERT`; `seq` es una identidad. `sesion_id` y `verificacion_id` no tienen FK hasta la spec 006.
+- La aplicación aún no tiene `UPDATE` sobre `activo` (llega con la 005); nunca sobre `codigo`.
+
 Se eliminó el campo `requiere_revision` (decisión del humano, 2026-11-11): no tiene uso, porque el alta no se revisa (P11) y el precio es obligatorio (P13), y aún no existen migraciones.
 
 ### Conteo e historial

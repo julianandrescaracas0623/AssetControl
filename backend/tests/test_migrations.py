@@ -42,12 +42,14 @@ POLITICAS = "0003_politicas_del_dueno"
 FUNCIONES = "0004_funciones_de_acceso"
 LIMITE_TASA = "0005_limite_tasa"
 CATALOGO = "0006_ubicaciones_y_categorias"
+ACTIVOS = "0007_activos"
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
 MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
 APP_ROLE_VAR = "APP_DB_USER"
 AUTH_TABLES = ["invitacion", "membresia", "refresh_token", "tenant", "usuario"]
 CATALOG_TABLES = ["categoria", "ubicacion"]
+ASSET_TABLES = ["activo", "activo_evento"]
 
 APP_URL = "postgresql+psycopg://assetcontrol_app:valor-secreto-app@db.invalid:5432/assetcontrol"
 MIGRATOR_URL = "postgresql+psycopg://postgres:valor-secreto-migr@db.invalid:5432/assetcontrol"
@@ -185,8 +187,9 @@ def test_revision_chain():
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == [CATALOGO]
+    assert script.get_heads() == [ACTIVOS]
     assert [r.revision for r in revisions] == [
+        ACTIVOS,
         CATALOGO,
         LIMITE_TASA,
         FUNCIONES,
@@ -194,12 +197,13 @@ def test_revision_chain():
         ACCESO,
         BASELINE,
     ]
-    assert revisions[0].down_revision == LIMITE_TASA
-    assert revisions[1].down_revision == FUNCIONES
-    assert revisions[2].down_revision == POLITICAS
-    assert revisions[3].down_revision == ACCESO
-    assert revisions[4].down_revision == BASELINE
-    assert revisions[5].down_revision is None
+    assert revisions[0].down_revision == CATALOGO
+    assert revisions[1].down_revision == LIMITE_TASA
+    assert revisions[2].down_revision == FUNCIONES
+    assert revisions[3].down_revision == POLITICAS
+    assert revisions[4].down_revision == ACCESO
+    assert revisions[5].down_revision == BASELINE
+    assert revisions[6].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -311,13 +315,15 @@ def migrate_env(empty_database, app_role, monkeypatch) -> URL:
 
 def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     config = alembic_config()
-    with_auth = sorted(["alembic_version", "limite_tasa", *AUTH_TABLES, *CATALOG_TABLES])
+    with_auth = sorted(
+        ["alembic_version", "limite_tasa", *AUTH_TABLES, *CATALOG_TABLES, *ASSET_TABLES]
+    )
 
     assert _public_state(migrate_env) == ([], [])
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [CATALOGO])
+    assert _public_state(migrate_env) == (with_auth, [ACTIVOS])
     assert _schema_exists(migrate_env, "acceso")
 
     command.downgrade(config, "base")
@@ -326,7 +332,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [CATALOGO])
+    assert _public_state(migrate_env) == (with_auth, [ACTIVOS])
     assert _schema_exists(migrate_env, "acceso")
 
 
@@ -394,7 +400,7 @@ def test_0006_up_down_up_touches_only_the_catalog_tables(migrate_env):
     command.upgrade(config, LIMITE_TASA)
     owner_before = _owner_state(migrate_env)
 
-    command.upgrade(config, "head")
+    command.upgrade(config, CATALOGO)
     assert _public_state(migrate_env) == (sorted([*before, *CATALOG_TABLES]), [CATALOGO])
     for table in CATALOG_TABLES:
         assert _policy_names(migrate_env, table) == ["tenant_isolation"]
@@ -403,8 +409,47 @@ def test_0006_up_down_up_touches_only_the_catalog_tables(migrate_env):
     command.downgrade(config, LIMITE_TASA)
     assert _public_state(migrate_env) == (before, [LIMITE_TASA])
 
-    command.upgrade(config, "head")
+    command.upgrade(config, CATALOGO)
     assert _public_state(migrate_env) == (sorted([*before, *CATALOG_TABLES]), [CATALOGO])
+
+
+def test_0007_up_down_up_touches_only_the_asset_tables_and_trigger(migrate_env):
+    # Spec 004, T1: 0007 crea activo, activo_evento y la función del disparador D1.
+    config = alembic_config()
+    before = sorted(["alembic_version", "limite_tasa", *AUTH_TABLES, *CATALOG_TABLES])
+
+    command.upgrade(config, CATALOGO)
+    owner_before = _owner_state(migrate_env)
+
+    command.upgrade(config, "head")
+    assert _public_state(migrate_env) == (sorted([*before, *ASSET_TABLES]), [ACTIVOS])
+    for table in ASSET_TABLES:
+        assert _policy_names(migrate_env, table) == ["tenant_isolation"]
+    assert _public_functions(migrate_env) == ["activo_ubicacion_valida"]
+    assert _owner_state(migrate_env) == owner_before
+
+    command.downgrade(config, CATALOGO)
+    assert _public_state(migrate_env) == (before, [CATALOGO])
+    assert _public_functions(migrate_env) == []
+
+    command.upgrade(config, "head")
+    assert _public_state(migrate_env) == (sorted([*before, *ASSET_TABLES]), [ACTIVOS])
+
+
+def _public_functions(url: URL) -> list[str]:
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            return list(
+                conn.scalars(
+                    text(
+                        "select p.proname from pg_proc p join pg_namespace n "
+                        "on n.oid = p.pronamespace where n.nspname = 'public' order by 1"
+                    )
+                )
+            )
+    finally:
+        engine.dispose()
 
 
 def test_0005_rejects_the_migrator_as_app_role(migrate_env, monkeypatch):

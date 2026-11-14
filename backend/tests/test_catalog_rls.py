@@ -54,6 +54,7 @@ from sqlalchemy.engine import URL, Connection
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
+from app.activos import models as activos_models  # noqa: F401 - registra activo y activo_evento
 from app.auth import models
 from app.catalogo import models as catalogo_models  # noqa: F401 - registra ubicacion y categoria
 
@@ -64,7 +65,17 @@ SUPABASE_ROLES = ("anon", "authenticated", "service_role")
 
 # Lista cerrada de tablas de public sin tenant_id; cada una tiene su prueba propia.
 EXCEPTIONS = frozenset({"alembic_version", "tenant", "usuario", "limite_tasa"})
-TENANT_TABLES = frozenset({"membresia", "invitacion", "refresh_token", "ubicacion", "categoria"})
+TENANT_TABLES = frozenset(
+    {
+        "membresia",
+        "invitacion",
+        "refresh_token",
+        "ubicacion",
+        "categoria",
+        "activo",
+        "activo_evento",
+    }
+)
 
 TENANT_EXPR = "(NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid"
 ISOLATION_EXPR = f"(tenant_id = {TENANT_EXPR})"
@@ -130,6 +141,15 @@ EXPECTED_POLICIES = {
         ISOLATION_EXPR,
         ISOLATION_EXPR,
     ),
+    # Spec 004, T1 (0007).
+    ("activo", "tenant_isolation"): ("PERMISSIVE", "ALL", "{app}", ISOLATION_EXPR, ISOLATION_EXPR),
+    ("activo_evento", "tenant_isolation"): (
+        "PERMISSIVE",
+        "ALL",
+        "{app}",
+        ISOLATION_EXPR,
+        ISOLATION_EXPR,
+    ),
     # limite_tasa (T10, docs/03 cambio 6): una política por comando TO la aplicación, sin
     # filtro de tenant (no lo hay antes del login); su defensa es el privilegio mínimo y
     # el HMAC de la clave.
@@ -158,6 +178,33 @@ EXPECTED_PURGE_POLICIES = {
 }
 
 # GRANT del rol de la aplicación (plan.md §3): tabla -> privilegio -> columnas.
+ACTIVO_INSERT = {
+    "id",
+    "tenant_id",
+    "codigo",
+    "nombre",
+    "categoria_id",
+    "ubicacion_id",
+    "serial",
+    "marca",
+    "modelo",
+    "referencia",
+    "color",
+    "subtipo",
+    "atributos",
+    "precio_compra",
+    "fecha_compra",
+    "creado_por",
+}
+EVENTO_INSERT = {
+    "tenant_id",
+    "activo_id",
+    "tipo",
+    "datos",
+    "usuario_id",
+    "sesion_id",
+    "verificacion_id",
+}
 EXPECTED_APP_COLUMNS = {
     "tenant": {"SELECT": {"id", "nombre", "creado_en"}},
     "usuario": {"SELECT": {"id", "email", "nombre", "activo"}},
@@ -222,8 +269,19 @@ EXPECTED_APP_COLUMNS = {
         "INSERT": {"tenant_id", "nombre", "nombre_clave"},
         "UPDATE": {"nombre", "nombre_clave"},
     },
+    # Spec 004, T1 (0007): estado, row_version y fechas por DEFAULT; sin UPDATE hasta la
+    # 005 (el código es inmutable); el historial es inmutable (sin UPDATE nunca).
+    "activo": {
+        "SELECT": {*ACTIVO_INSERT, "estado", "row_version", "creado_en", "actualizado_en"},
+        "INSERT": ACTIVO_INSERT,
+    },
+    "activo_evento": {
+        "SELECT": {*EVENTO_INSERT, "id", "ocurrido_en", "seq"},
+        "INSERT": EVENTO_INSERT,
+    },
 }
 # Privilegios a nivel de tabla del rol de la aplicación (sin columnas).
+
 EXPECTED_APP_TABLE_PRIVILEGES = {
     "alembic_version": set(),
     "tenant": {"SELECT"},
@@ -234,6 +292,8 @@ EXPECTED_APP_TABLE_PRIVILEGES = {
     "limite_tasa": {"SELECT", "INSERT"},
     "ubicacion": {"SELECT"},
     "categoria": {"SELECT"},
+    "activo": {"SELECT"},
+    "activo_evento": {"SELECT"},
 }
 
 
@@ -394,6 +454,8 @@ EXPECTED_OWNER_COLUMNS = {
     "limite_tasa": {},
     "ubicacion": {},
     "categoria": {},
+    "activo": {},
+    "activo_evento": {},
 }
 TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
 COLUMN_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "REFERENCES")
@@ -1054,14 +1116,16 @@ def test_supabase_roles_cannot_execute_acceso_functions(catalog, role, name):
         engine.dispose()
 
 
-def test_no_own_functions_in_public(conn):
+def test_public_functions_are_a_closed_list(conn):
+    # Spec 004 (0007): solo la función del disparador D1, SECURITY INVOKER y sin EXECUTE
+    # para PUBLIC (su prueba de comportamiento está en test_activos_db.py).
     functions = conn.scalars(
         text(
             "select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
             "where n.nspname = 'public'"
         )
     ).all()
-    assert functions == []
+    assert functions == ["activo_ubicacion_valida"]
 
 
 # --- Claves, CHECK e índices ----------------------------------------------------

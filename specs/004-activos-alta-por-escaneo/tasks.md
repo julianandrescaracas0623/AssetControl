@@ -18,4 +18,4 @@
 
 ## Notas por tarea
 
-_(se completan al cerrar cada tarea)_
+- **T1 (hecha, 2026-11-14):** migración `0007_activos` (`activo` con `CHECK` de código y precio, únicos, FK compuestas a categoría, ubicación y membresía, índices de búsqueda; `activo_evento` inmutable con `seq` por identidad; disparador `activo_ubicacion_valida` para D1; RLS y `GRANT` por columna, sin `UPDATE` ni `DELETE`). Modelos `app/activos/models.py`. Catálogo de RLS ampliado (la lista de funciones de `public` pasa de vacía a solo la del disparador), `test_migrations.py` con la nueva cabeza y su subir/bajar, `test_activos_db.py` (formato y unicidad del código, precio, D1, referencias de otro tenant, sin escrituras prohibidas, atributos de la función). `docs/03` actualizado. Backend 1369 pruebas, ruff limpio.
