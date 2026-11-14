@@ -4,23 +4,21 @@ import { toast } from 'sonner'
 
 import { CountShell } from '@/components/app/CountShell'
 import { Button } from '@/components/ui/button'
-import { useEnlace } from '@/lib/simulacion'
 import { RESUMEN } from '@/mocks/datos-ficticios'
 
 // Escáner (docs/08 §7.1). Visor SIMULADO: la lectura real con ZXing llega en
 // la spec 004. "Escribir código" siempre está a la mano.
 
 export default function Escanear() {
-  const enlace = useEnlace()
   return (
     <CountShell
       titulo={RESUMEN.conteoAbierto.nombre}
       subtitulo="Administración"
-      volver={enlace('/contar')}
+      volver="/contar"
       estadoRed="en_linea"
       acciones={
         <Button asChild variant="outline">
-          <Link to={enlace('/contar/escribir')}>
+          <Link to="/contar/escribir">
             <Keyboard />
             Escribir código
           </Link>
@@ -45,7 +43,7 @@ export default function Escanear() {
           <span className="text-sm text-primary-foreground/80">Se lee solo, sin tocar nada</span>
         </div>
         <Link
-          to={enlace('/contar/activo/000215')}
+          to="/contar/activo/000215"
           className="absolute inset-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none"
           aria-label="Simular lectura del sticker 000215"
         />

@@ -3,12 +3,14 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { routes } from '@/router'
+import { simularSesion } from '@/test/sesion'
 import { simularAncho } from '@/test/matchMedia'
 
 // Spec 001b, T4: AdminShell (R4, R5, R6; A4). Sin @testing-library/user-event
 // (no aprobada): fireEvent; los menús de Radix se abren con Enter.
 
 function renderAt(path: string) {
+  simularSesion('admin')
   render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: [path] })} />)
 }
 

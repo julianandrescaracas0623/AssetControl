@@ -12,7 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useEnlace, useSimulacion } from '@/lib/simulacion'
+import { useRol } from '@/lib/sesion'
 import { CATEGORIAS, UBICACIONES, rutaUbicacion, type ActivoFicticio } from '@/mocks/datos-ficticios'
 
 // Alta por escaneo (docs/08 §7.3, CU-CAT-02/03) a 375 px, en una columna.
@@ -45,8 +45,7 @@ const Obligatorio = () => <span className="text-destructive" aria-hidden="true">
 export default function Alta() {
   const [params] = useSearchParams()
   const codigo = params.get('codigo') ?? ''
-  const { rol } = useSimulacion()
-  const enlace = useEnlace()
+  const rol = useRol()
   const [confirmado, setConfirmado] = useState(false)
   const [nombre, setNombre] = useState('')
   const [precio, setPrecio] = useState('')
@@ -85,10 +84,10 @@ export default function Alta() {
 
   if (creado) {
     return (
-      <CountShell titulo="Registrar activo" subtitulo="Conteo nov 2026" volver={enlace('/contar')} estadoRed="guardado"
+      <CountShell titulo="Registrar activo" subtitulo="Conteo nov 2026" volver="/contar" estadoRed="guardado"
         acciones={
           <Button asChild className="min-h-14 font-semibold">
-            <Link to={enlace('/contar/escanear')}>Escanear otro</Link>
+            <Link to="/contar/escanear">Escanear otro</Link>
           </Button>
         }
       >
@@ -108,7 +107,7 @@ export default function Alta() {
     <CountShell
       titulo="Registrar activo"
       subtitulo="Conteo nov 2026"
-      volver={enlace('/contar/escribir')}
+      volver="/contar/escribir"
       estadoRed="en_linea"
       acciones={
         <Button type="submit" form="alta" className="min-h-14 font-semibold">

@@ -1,19 +1,14 @@
-import { useCallback } from 'react'
 import { useSearchParams } from 'react-router'
 
-// Simulación de las maquetas (spec 001b, plan §4): el rol y el estado se eligen
-// con la URL (?rol=contador&estado=vacio) para revisar sin tocar código.
-// SOLO PRESENTACIÓN: la autorización real la hace el servidor (spec 002b) y
-// esconder una pantalla en el cliente no es seguridad.
+// Simulación de las maquetas (spec 001b, plan §4): el estado de la pantalla se elige
+// con la URL (?estado=vacio) para revisar sin tocar código. El rol ya no se simula:
+// sale de la sesión real (spec 002b, plan §5).
 
-export const ROLES = ['admin', 'contador'] as const
 export const ESTADOS = ['exito', 'cargando', 'vacio', 'error'] as const
 
-export type RolSimulado = (typeof ROLES)[number]
 export type EstadoSimulado = (typeof ESTADOS)[number]
 
 export interface Simulacion {
-  rol: RolSimulado
   estado: EstadoSimulado
 }
 
@@ -23,7 +18,6 @@ function elegir<T extends string>(valor: string | null, opciones: readonly T[], 
 
 export function leerSimulacion(params: URLSearchParams): Simulacion {
   return {
-    rol: elegir(params.get('rol'), ROLES, 'admin'),
     estado: elegir(params.get('estado'), ESTADOS, 'exito'),
   }
 }
@@ -31,20 +25,4 @@ export function leerSimulacion(params: URLSearchParams): Simulacion {
 export function useSimulacion(): Simulacion {
   const [params] = useSearchParams()
   return leerSimulacion(params)
-}
-
-/**
- * Enlaces que conservan el rol simulado de la URL (?rol=) al navegar entre
- * maquetas; el estado (?estado=) no se arrastra.
- */
-export function useEnlace(): (ruta: string) => string {
-  const [params] = useSearchParams()
-  const rol = params.get('rol')
-  return useCallback(
-    (ruta: string) => {
-      if (!rol) return ruta
-      return `${ruta}${ruta.includes('?') ? '&' : '?'}rol=${encodeURIComponent(rol)}`
-    },
-    [rol],
-  )
 }

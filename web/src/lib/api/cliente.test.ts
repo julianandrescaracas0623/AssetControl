@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { api, ErrorApi, pedir } from './cliente'
+import { api, ErrorApi, pedir, TIEMPO_MAXIMO_MS } from './cliente'
 
 // Spec 002b, T2 (plan §3): cliente tipado con el contrato. Sin red real.
 
@@ -115,6 +115,27 @@ describe('errores', () => {
   it('un JSON con otra forma es error_interno', async () => {
     responder(500, { mensaje: 'otra cosa' })
     await expect(api.refresh()).rejects.toMatchObject({ status: 500, code: 'error_interno' })
+  })
+
+  it('si la API no responde a tiempo es sin_conexion', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          (_url: string, init: RequestInit) =>
+            new Promise<Response>((_, rechazar) =>
+              init.signal?.addEventListener('abort', () => rechazar(new DOMException('plazo', 'TimeoutError'))),
+            ),
+        ),
+      )
+      const promesa = api.refresh()
+      const verificacion = expect(promesa).rejects.toMatchObject({ status: 0, code: 'sin_conexion' })
+      await vi.advanceTimersByTimeAsync(TIEMPO_MAXIMO_MS + 1)
+      await verificacion
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('propaga la cancelación', async () => {

@@ -1,18 +1,20 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
+import type { Rol } from '@/lib/api/cliente'
+import { simularSesion } from '@/test/sesion'
 import { routes } from './router'
 
-// Spec 001b, T3: rutas de la web, pantallas de sistema y simulación por URL.
-// El rol simulado solo cambia la presentación de las maquetas; la autorización
-// real es del servidor (spec 002b).
+// Spec 001b, T3: rutas de la web y pantallas de sistema. Desde la spec 002b /admin y
+// /contar exigen sesión (simulada en fetch); las guardas se prueban en
+// routes/acceso.test.tsx.
 
 afterEach(cleanup)
 
-function renderAt(path: string) {
-  // /health consulta la API: aquí nunca sale a la red.
-  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})))
+function renderAt(path: string, rol: Rol | null = 'admin') {
+  // /health consulta la API: la sesión simulada deja pendiente todo lo demás.
+  simularSesion(rol)
   const router = createMemoryRouter(routes, { initialEntries: [path] })
   render(<RouterProvider router={router} />)
   return router
@@ -20,41 +22,28 @@ function renderAt(path: string) {
 
 describe('rutas', () => {
   it.each([
-    ['/admin', 'Resumen'],
-    ['/contar', 'Conteo nov 2026'],
-    ['/login', 'Iniciar sesión'],
-    ['/dev/componentes', 'Sistema de diseño · Grafito y Cobalto'],
-  ])('%s muestra «%s»', async (path, heading) => {
-    renderAt(path)
+    ['/admin', 'admin', 'Resumen'],
+    ['/contar', 'contador', 'Conteo nov 2026'],
+    ['/login', null, 'Iniciar sesión'],
+    ['/dev/componentes', null, 'Sistema de diseño · Grafito y Cobalto'],
+  ] as const)('%s muestra «%s»', async (path, rol, heading) => {
+    renderAt(path, rol)
     expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeTruthy()
   })
 
   it('/health conserva la pantalla de estado del servidor', async () => {
-    renderAt('/health')
+    renderAt('/health', null)
     expect(await screen.findByText('Estado del servidor')).toBeTruthy()
   })
 
-  it('/ lleva a /admin', async () => {
-    const router = renderAt('/')
-    await screen.findByRole('heading', { level: 1, name: 'Resumen' })
-    expect(router.state.location.pathname).toBe('/admin')
-  })
-
   it('una ruta inexistente muestra «No encontramos esta página»', async () => {
-    renderAt('/no-existe')
+    renderAt('/no-existe', null)
     expect(await screen.findByRole('heading', { name: 'No encontramos esta página' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Ir al inicio' })).toBeTruthy()
-  })
-
-  it('con rol simulado contador, /admin muestra «Sin permiso»', async () => {
-    renderAt('/admin?rol=contador')
-    expect(await screen.findByRole('heading', { name: 'No tienes permiso para ver esto' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Volver' })).toBeTruthy()
-    expect(screen.queryByRole('heading', { level: 1, name: 'Resumen' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Ir al inicio' }).getAttribute('href')).toBe('/')
   })
 
   it('las maquetas muestran la banda «Datos ficticios»', async () => {
-    renderAt('/contar?rol=contador')
+    renderAt('/contar', 'contador')
     expect(await screen.findByText(/Datos ficticios/)).toBeTruthy()
   })
 })

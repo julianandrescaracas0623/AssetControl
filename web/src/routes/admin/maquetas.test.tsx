@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { routes } from '@/router'
+import { simularSesion } from '@/test/sesion'
 
 // Spec 001b, T8: maquetas de administración con datos ficticios y sus cuatro
 // estados (R13, A9). Sin gráficas (spec 010).
@@ -10,6 +11,7 @@ import { routes } from '@/router'
 afterEach(cleanup)
 
 async function abrir(path: string) {
+  simularSesion('admin')
   const router = createMemoryRouter(routes, { initialEntries: [path] })
   render(<RouterProvider router={router} />)
   await screen.findByRole('heading', { level: 1 })

@@ -41,13 +41,11 @@ import {
 } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { etiquetaRol, iniciales, useCerrarSesion, useSesion } from '@/lib/sesion'
 
 // App shell de administración (docs/08 §4.1, spec 001b T4): barra lateral
 // colapsable a íconos (estado recordado en la cookie de shadcn), menú tipo
 // sheet por debajo de md, migas de pan, buscador y menú de usuario.
-
-// Usuario ficticio de las maquetas; el real llega con la spec 002b.
-const USUARIO = { nombre: 'Ana Torres', email: 'ana.torres@clinica.example', iniciales: 'AT', rol: 'Admin' }
 
 function barraAbierta(): boolean {
   return !document.cookie.split('; ').includes('sidebar_state=false')
@@ -164,23 +162,28 @@ function BotonBuscar({ onAbrir }: { onAbrir: () => void }) {
 }
 
 function MenuUsuario() {
+  const { sesion } = useSesion()
+  const cerrarSesion = useCerrarSesion()
+  if (!sesion) return null
+  const { nombre, email } = sesion.usuario
+  const rol = etiquetaRol(sesion.rol)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="h-11 gap-2 px-1.5 md:h-9">
-          <span className="sr-only">{`Menú de usuario: ${USUARIO.nombre}, ${USUARIO.rol}`}</span>
+          <span className="sr-only">{`Menú de usuario: ${nombre}, ${rol}`}</span>
           <Avatar className="size-7" aria-hidden="true">
-            <AvatarFallback className="text-[11px] font-semibold">{USUARIO.iniciales}</AvatarFallback>
+            <AvatarFallback className="text-[11px] font-semibold">{iniciales(nombre)}</AvatarFallback>
           </Avatar>
-          <span className="hidden text-sm md:inline" aria-hidden="true">{USUARIO.nombre.split(' ')[0]}</span>
+          <span className="hidden max-w-32 truncate text-sm md:inline" aria-hidden="true">{nombre.trim().split(/\s+/)[0]}</span>
           <ChevronsUpDown className="hidden size-3.5 text-muted-foreground md:block" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel className="flex flex-col gap-0.5">
-          <span className="text-sm font-medium text-foreground">{USUARIO.nombre}</span>
-          <span className="truncate text-xs font-normal text-muted-foreground">{USUARIO.email}</span>
-          <span className="text-xs font-normal text-muted-foreground">Rol: {USUARIO.rol}</span>
+          <span className="truncate text-sm font-medium text-foreground">{nombre}</span>
+          <span className="truncate text-xs font-normal text-muted-foreground">{email}</span>
+          <span className="text-xs font-normal text-muted-foreground">Rol: {rol}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
@@ -190,11 +193,9 @@ function MenuUsuario() {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/login">
-            <LogOut />
-            Cerrar sesión
-          </Link>
+        <DropdownMenuItem onSelect={cerrarSesion}>
+          <LogOut />
+          Cerrar sesión
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

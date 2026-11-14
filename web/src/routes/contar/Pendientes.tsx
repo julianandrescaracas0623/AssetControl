@@ -4,24 +4,22 @@ import { Link } from 'react-router'
 import { CountShell } from '@/components/app/CountShell'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useEnlace } from '@/lib/simulacion'
 import { ACTIVOS, RESUMEN } from '@/mocks/datos-ficticios'
 
 // Pendientes por ubicación (docs/08 §6.1, CU-VER-04): activos sin verificar
 // en la sesión. Con la API, la lista la entrega el servidor por ubicación.
 
 export default function Pendientes() {
-  const enlace = useEnlace()
   const c = RESUMEN.conteoAbierto
   return (
     <CountShell
       titulo="Pendientes"
       subtitulo={`${c.pendientes} sin verificar`}
-      volver={enlace('/contar')}
+      volver="/contar"
       estadoRed="en_linea"
       acciones={
         <Button asChild className="min-h-14 font-semibold">
-          <Link to={enlace('/contar/escanear')}>
+          <Link to="/contar/escanear">
             <ScanBarcode className="size-5" />
             Escanear
           </Link>
@@ -48,7 +46,7 @@ export default function Pendientes() {
               <ul className="divide-y">
                 {lista.map((a) => (
                   <li key={a.codigo}>
-                    <Link to={enlace(`/contar/activo/${a.codigo}`)} className="flex min-h-16 items-center gap-3 py-2">
+                    <Link to={`/contar/activo/${a.codigo}`} className="flex min-h-16 items-center gap-3 py-2">
                       <span className="min-w-0 flex-1">
                         <span className="block font-medium break-words">{a.nombre}</span>
                         <span className="text-sm text-muted-foreground">

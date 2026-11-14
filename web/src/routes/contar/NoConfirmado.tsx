@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router'
 
 import { CountShell } from '@/components/app/CountShell'
 import { Button } from '@/components/ui/button'
-import { useEnlace, useSimulacion } from '@/lib/simulacion'
+import { useSimulacion } from '@/lib/simulacion'
 import { ACTIVOS, RESUMEN } from '@/mocks/datos-ficticios'
 
 // "No se pudo confirmar / Reintentar" (docs/08 §7.4, CU-VER-06) y sesión
@@ -13,7 +13,6 @@ import { ACTIVOS, RESUMEN } from '@/mocks/datos-ficticios'
 export default function NoConfirmado() {
   const { codigo = '' } = useParams()
   const { estado } = useSimulacion()
-  const enlace = useEnlace()
   const activo = ACTIVOS.find((a) => a.codigo === codigo)
   const cerrada = estado === 'error'
 
@@ -21,20 +20,20 @@ export default function NoConfirmado() {
     <CountShell
       titulo={RESUMEN.conteoAbierto.nombre}
       subtitulo="Administración"
-      volver={enlace('/contar/escanear')}
+      volver="/contar/escanear"
       estadoRed={cerrada ? 'en_linea' : 'no_confirmado'}
       acciones={
         cerrada ? (
           <Button asChild className="min-h-14 font-semibold">
-            <Link to={enlace('/contar')}>Volver al inicio</Link>
+            <Link to="/contar">Volver al inicio</Link>
           </Button>
         ) : (
           <>
             <Button asChild variant="ghost">
-              <Link to={enlace('/contar/escanear')}>Descartar y seguir</Link>
+              <Link to="/contar/escanear">Descartar y seguir</Link>
             </Button>
             <Button asChild className="min-h-14 font-semibold">
-              <Link to={enlace(`/contar/verificado/${codigo}`)}>
+              <Link to={`/contar/verificado/${codigo}`}>
                 <RefreshCw />
                 Reintentar
               </Link>

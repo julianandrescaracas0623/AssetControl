@@ -7,6 +7,8 @@ import type { components, paths } from './schema'
 
 export const API_BASE = '/api'
 export const CSRF_HEADER = 'X-AssetControl-CSRF'
+/** Sin respuesta en este tiempo la llamada falla con `sin_conexion` (nunca espera para siempre). */
+export const TIEMPO_MAXIMO_MS = 20_000
 
 export type Esquemas = components['schemas']
 export type Sesion = Esquemas['Sesion']
@@ -31,6 +33,12 @@ export class ErrorApi extends Error {
     this.code = code
     this.requestId = requestId
   }
+}
+
+/** Texto para la persona: el del servidor (en español) o uno genérico. */
+export function mensajeDeError(error: unknown): string {
+  if (error instanceof ErrorApi) return error.message
+  return MENSAJE_INESPERADO
 }
 
 type Metodo = 'get' | 'post'
@@ -90,23 +98,30 @@ export async function pedir<R extends Ruta, M extends MetodoDe<R>>(
   if (opciones.token) headers.set('Authorization', `Bearer ${opciones.token}`)
   if (opciones.csrf) headers.set(CSRF_HEADER, '1')
 
-  let respuesta: Response
+  const plazo = new AbortController()
+  const reloj = setTimeout(() => plazo.abort(), TIEMPO_MAXIMO_MS)
   try {
-    respuesta = await fetch(`${API_BASE}${ruta}`, {
-      method: metodo.toUpperCase(),
-      headers,
-      body: opciones.cuerpo === undefined ? undefined : JSON.stringify(opciones.cuerpo),
-      credentials: 'same-origin',
-      signal: opciones.signal,
-    })
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') throw error
-    throw new ErrorApi(0, 'sin_conexion', MENSAJE_SIN_CONEXION)
-  }
+    let respuesta: Response
+    try {
+      respuesta = await fetch(`${API_BASE}${ruta}`, {
+        method: metodo.toUpperCase(),
+        headers,
+        body: opciones.cuerpo === undefined ? undefined : JSON.stringify(opciones.cuerpo),
+        credentials: 'same-origin',
+        signal: opciones.signal ? AbortSignal.any([opciones.signal, plazo.signal]) : plazo.signal,
+      })
+    } catch (error) {
+      // Cancelación de quien llama: se propaga. Plazo vencido o red caída: sin_conexion.
+      if (opciones.signal?.aborted) throw error
+      throw new ErrorApi(0, 'sin_conexion', MENSAJE_SIN_CONEXION)
+    }
 
-  if (!respuesta.ok) throw await aError(respuesta)
-  if (respuesta.status === 204) return undefined as ExitoDe<Operacion<R, M>>
-  return (await respuesta.json()) as ExitoDe<Operacion<R, M>>
+    if (!respuesta.ok) throw await aError(respuesta)
+    if (respuesta.status === 204) return undefined as ExitoDe<Operacion<R, M>>
+    return (await respuesta.json()) as ExitoDe<Operacion<R, M>>
+  } finally {
+    clearTimeout(reloj)
+  }
 }
 
 export const api = {

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
-import { useEnlace, useSimulacion } from '@/lib/simulacion'
+import { useRol } from '@/lib/sesion'
 import { ACTIVOS, RESUMEN, UBICACIONES, rutaUbicacion } from '@/mocks/datos-ficticios'
 
 // Verificar con un toque (docs/08 §7.2, CU-VER-01..03). La ubicación encontrada
@@ -52,7 +52,6 @@ function EstadoFisico() {
 }
 
 function OtraUbicacion({ abierto, onAbierto, esperada, codigo }: { abierto: boolean; onAbierto: (v: boolean) => void; esperada: string; codigo: string }) {
-  const enlace = useEnlace()
   const [elegida, setElegida] = useState('administracion')
   return (
     <Sheet open={abierto} onOpenChange={onAbierto}>
@@ -88,7 +87,7 @@ function OtraUbicacion({ abierto, onAbierto, esperada, codigo }: { abierto: bool
             </AlertDescription>
           </Alert>
           <Button asChild className="min-h-14 text-base font-semibold">
-            <Link to={enlace(`/contar/verificado/${codigo}`)}>Confirmar en {rutaUbicacion(elegida)}</Link>
+            <Link to={`/contar/verificado/${codigo}`}>Confirmar en {rutaUbicacion(elegida)}</Link>
           </Button>
         </div>
       </SheetContent>
@@ -98,21 +97,20 @@ function OtraUbicacion({ abierto, onAbierto, esperada, codigo }: { abierto: bool
 
 export default function Verificar() {
   const { codigo = '' } = useParams()
-  const { rol } = useSimulacion()
-  const enlace = useEnlace()
+  const rol = useRol()
   const [otra, setOtra] = useState(false)
   const activo = ACTIVOS.find((a) => a.codigo === codigo)
 
   if (!activo) {
     return (
-      <CountShell titulo={RESUMEN.conteoAbierto.nombre} subtitulo={SALA} volver={enlace('/contar/escanear')} estadoRed="en_linea"
+      <CountShell titulo={RESUMEN.conteoAbierto.nombre} subtitulo={SALA} volver="/contar/escanear" estadoRed="en_linea"
         acciones={
           <>
             <Button asChild variant="outline">
-              <Link to={enlace('/contar/escribir')}>Escribir otro</Link>
+              <Link to="/contar/escribir">Escribir otro</Link>
             </Button>
             <Button asChild className="min-h-14 font-semibold">
-              <Link to={enlace(`/contar/nuevo?codigo=${encodeURIComponent(codigo)}`)}>
+              <Link to={`/contar/nuevo?codigo=${encodeURIComponent(codigo)}`}>
                 <Plus />
                 Crear activo con este código
               </Link>
@@ -137,7 +135,7 @@ export default function Verificar() {
     <CountShell
       titulo={RESUMEN.conteoAbierto.nombre}
       subtitulo={SALA}
-      volver={enlace('/contar/escanear')}
+      volver="/contar/escanear"
       estadoRed="en_linea"
       acciones={
         <>
@@ -146,7 +144,7 @@ export default function Verificar() {
             Está en otra ubicación
           </Button>
           <Button asChild className="min-h-14 font-semibold">
-            <Link to={enlace(`/contar/verificado/${activo.codigo}`)}>Confirmar</Link>
+            <Link to={`/contar/verificado/${activo.codigo}`}>Confirmar</Link>
           </Button>
         </>
       }
@@ -161,7 +159,7 @@ export default function Verificar() {
       </div>
       <EstadoFisico />
       <Button variant="ghost" className="min-h-11 self-start px-1 text-brand-strong" asChild>
-        <Link to={enlace(`/contar/activo/${activo.codigo}/historial`)}>
+        <Link to={`/contar/activo/${activo.codigo}/historial`}>
           <History />
           Ver historial del activo
         </Link>

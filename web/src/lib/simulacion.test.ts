@@ -2,21 +2,19 @@ import { describe, expect, it } from 'vitest'
 
 import { leerSimulacion } from './simulacion'
 
-// Spec 001b, T3: rol y estado simulados por parámetros de la URL.
+// Spec 001b, T3: estado simulado por parámetro de la URL (el rol sale de la sesión
+// real desde la spec 002b).
 
 describe('leerSimulacion', () => {
-  it('por defecto: admin y éxito', () => {
-    expect(leerSimulacion(new URLSearchParams(''))).toEqual({ rol: 'admin', estado: 'exito' })
+  it('por defecto: éxito', () => {
+    expect(leerSimulacion(new URLSearchParams(''))).toEqual({ estado: 'exito' })
   })
 
-  it('lee rol y estado válidos', () => {
-    expect(leerSimulacion(new URLSearchParams('rol=contador&estado=vacio'))).toEqual({
-      rol: 'contador',
-      estado: 'vacio',
-    })
+  it('lee un estado válido e ignora ?rol=', () => {
+    expect(leerSimulacion(new URLSearchParams('rol=contador&estado=vacio'))).toEqual({ estado: 'vacio' })
   })
 
   it('ignora valores desconocidos', () => {
-    expect(leerSimulacion(new URLSearchParams('rol=root&estado=x'))).toEqual({ rol: 'admin', estado: 'exito' })
+    expect(leerSimulacion(new URLSearchParams('estado=x'))).toEqual({ estado: 'exito' })
   })
 })

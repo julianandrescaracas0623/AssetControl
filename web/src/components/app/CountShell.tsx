@@ -14,6 +14,7 @@ export function CountShell({
   titulo,
   subtitulo,
   volver,
+  menu,
   estadoRed,
   acciones,
   children,
@@ -22,6 +23,8 @@ export function CountShell({
   subtitulo?: string
   /** Ruta del retroceso; sin ella no hay botón (pantalla de inicio). */
   volver?: string
+  /** En el inicio (sin retroceso): menú de cuenta en su lugar. */
+  menu?: ReactNode
   estadoRed: EstadoRed
   /** Acción principal (y secundaria encima, si hace falta). */
   acciones?: ReactNode
@@ -38,7 +41,7 @@ export function CountShell({
               </Link>
             </Button>
           ) : (
-            <span className="size-11 shrink-0" aria-hidden="true" />
+            (menu ?? <span className="size-11 shrink-0" aria-hidden="true" />)
           )}
           <div className="min-w-0 flex-1 text-center">
             <p className="truncate text-[15px] leading-5 font-semibold">{titulo}</p>

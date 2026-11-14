@@ -6,13 +6,15 @@ import { ConEstado } from '@/components/app/ConEstado'
 import { CountShell } from '@/components/app/CountShell'
 import { EmptyState } from '@/components/app/EmptyState'
 import { LocationPicker } from '@/components/app/LocationPicker'
+import { MenuCuenta } from '@/components/app/MenuCuenta'
 import { PendingList } from '@/components/app/PendingList'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useEnlace, useSimulacion } from '@/lib/simulacion'
+import { useSesion } from '@/lib/sesion'
+import { useSimulacion } from '@/lib/simulacion'
 import { ACTIVIDAD, CLINICA, RESUMEN } from '@/mocks/datos-ficticios'
 
 // Inicio del contador (docs/08 §4.2.1, P25): sin ningún precio. El servidor no
@@ -20,25 +22,27 @@ import { ACTIVIDAD, CLINICA, RESUMEN } from '@/mocks/datos-ficticios'
 
 export default function ContarInicio() {
   const { estado } = useSimulacion()
-  const enlace = useEnlace()
+  const { sesion } = useSesion()
+  const primerNombre = sesion?.usuario.nombre.trim().split(/\s+/)[0]
   const [sala, setSala] = useState('administracion')
   const c = RESUMEN.conteoAbierto
   const actividad = ACTIVIDAD.filter((e) => !e.conPrecio).slice(0, 3)
   return (
     <CountShell
-      titulo={CLINICA.nombre}
-      subtitulo="Hola, Luis"
+      titulo={sesion?.tenant.nombre ?? CLINICA.nombre}
+      subtitulo={primerNombre ? `Hola, ${primerNombre}` : undefined}
+      menu={<MenuCuenta />}
       estadoRed="en_linea"
       acciones={
         <>
           <Button asChild variant="outline">
-            <Link to={enlace('/contar/nuevo')}>
+            <Link to="/contar/nuevo">
               <Plus />
               Registrar activo nuevo
             </Link>
           </Button>
           <Button asChild className="min-h-14 font-semibold">
-            <Link to={enlace('/contar/escanear')}>
+            <Link to="/contar/escanear">
               <ScanBarcode className="size-5" />
               Escanear
             </Link>
@@ -71,7 +75,7 @@ export default function ContarInicio() {
           <p className="text-sm text-muted-foreground">Sesión abierta · corte {c.corte}</p>
           <h1 className="text-[22px] leading-7 font-semibold tracking-tight">{c.nombre}</h1>
         </div>
-        <Link to={enlace('/contar/pendientes')} className="flex flex-col gap-2.5 rounded-xl border p-4">
+        <Link to="/contar/pendientes" className="flex flex-col gap-2.5 rounded-xl border p-4">
           <span className="flex items-center justify-between gap-2">
             <Badge variant="brand">Abierta</Badge>
             <span className="text-2xl font-semibold tabular-nums">{c.porcentaje} %</span>
@@ -90,7 +94,7 @@ export default function ContarInicio() {
         </div>
         <section className="flex flex-col gap-2" aria-label="Pendientes por ubicación">
           <h2 className="text-sm font-medium text-muted-foreground">Pendientes por ubicación</h2>
-          <PendingList items={c.pendientesPorUbicacion.slice(0, 3)} href={enlace('/contar/pendientes')} />
+          <PendingList items={c.pendientesPorUbicacion.slice(0, 3)} href="/contar/pendientes" />
         </section>
         <section className="flex flex-col gap-1" aria-label="Actividad reciente">
           <h2 className="text-sm font-medium text-muted-foreground">Actividad reciente</h2>

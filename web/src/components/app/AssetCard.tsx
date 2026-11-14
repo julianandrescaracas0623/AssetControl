@@ -1,7 +1,7 @@
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
 import { Badge } from '@/components/ui/badge'
 import { formatCOP } from '@/lib/format'
-import type { RolSimulado } from '@/lib/simulacion'
+import type { Rol } from '@/lib/api/cliente'
 import type { EstadoActivo } from '@/mocks/datos-ficticios'
 
 // Tarjeta del activo (docs/08 §3.2). El precio solo existe para el admin
@@ -17,7 +17,7 @@ export interface ActivoTarjeta {
   precio?: string
 }
 
-export function AssetCard({ activo, rol, titulo: Titulo = 'h2' }: { activo: ActivoTarjeta; rol: RolSimulado; titulo?: 'h1' | 'h2' }) {
+export function AssetCard({ activo, rol, titulo: Titulo = 'h2' }: { activo: ActivoTarjeta; rol: Rol; titulo?: 'h1' | 'h2' }) {
   const verPrecio = rol === 'admin' && activo.precio !== undefined
   return (
     <article className="flex min-w-0 flex-col gap-3">

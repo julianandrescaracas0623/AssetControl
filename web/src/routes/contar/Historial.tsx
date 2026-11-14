@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router'
 
 import { CountShell } from '@/components/app/CountShell'
 import { Button } from '@/components/ui/button'
-import { useEnlace } from '@/lib/simulacion'
 import { ACTIVOS } from '@/mocks/datos-ficticios'
 
 // Historial del activo en el celular (docs/08 §6.1, CU-HIS-01). Sin eventos
@@ -20,16 +19,15 @@ const EVENTOS = [
 
 export default function Historial() {
   const { codigo = '' } = useParams()
-  const enlace = useEnlace()
   const activo = ACTIVOS.find((a) => a.codigo === codigo)
   return (
     <CountShell
       titulo="Historial"
-      volver={enlace(`/contar/activo/${codigo}`)}
+      volver={`/contar/activo/${codigo}`}
       estadoRed="en_linea"
       acciones={
         <Button asChild variant="outline">
-          <Link to={enlace('/contar/escanear')}>Volver a escanear</Link>
+          <Link to="/contar/escanear">Volver a escanear</Link>
         </Button>
       }
     >

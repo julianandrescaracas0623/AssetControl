@@ -4,7 +4,6 @@ import { Link, useParams } from 'react-router'
 import { CountShell } from '@/components/app/CountShell'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { useEnlace } from '@/lib/simulacion'
 import { ACTIVOS, RESUMEN } from '@/mocks/datos-ficticios'
 
 // Verificado (docs/08 §7.2): banda verde, "Guardado" en el chip y la cámara
@@ -12,17 +11,16 @@ import { ACTIVOS, RESUMEN } from '@/mocks/datos-ficticios'
 
 export default function Verificado() {
   const { codigo = '' } = useParams()
-  const enlace = useEnlace()
   const activo = ACTIVOS.find((a) => a.codigo === codigo)
   return (
     <CountShell
       titulo={RESUMEN.conteoAbierto.nombre}
       subtitulo="Administración"
-      volver={enlace('/contar')}
+      volver="/contar"
       estadoRed="guardado"
       acciones={
         <Button asChild className="min-h-14 font-semibold">
-          <Link to={enlace('/contar/escanear')}>
+          <Link to="/contar/escanear">
             <ScanBarcode className="size-5" />
             Escanear siguiente
           </Link>

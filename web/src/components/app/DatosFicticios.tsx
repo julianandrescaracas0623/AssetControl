@@ -1,11 +1,8 @@
 import { FlaskConical } from 'lucide-react'
 
-import { useSimulacion } from '@/lib/simulacion'
-
 // Banda visible en todas las maquetas (spec 001b): evita confundirlas con
-// funcionalidad real. Muestra el rol simulado que se está viendo.
+// funcionalidad real. La sesión ya es real (spec 002b); los datos todavía no.
 export function DatosFicticios() {
-  const { rol } = useSimulacion()
   return (
     <div
       role="note"
@@ -14,7 +11,7 @@ export function DatosFicticios() {
       <FlaskConical className="size-3.5 text-warning" aria-hidden="true" />
       <span className="font-medium">Datos ficticios</span>
       <span className="text-muted-foreground">
-        Maqueta de diseño (spec 001b) · rol simulado: {rol === 'admin' ? 'Admin' : 'Contador'}
+        Maqueta de diseño (spec 001b): las cifras no son de tu clínica
       </span>
     </div>
   )

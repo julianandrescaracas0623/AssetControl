@@ -1,17 +1,15 @@
 import { Outlet } from 'react-router'
 
-import { DatosFicticios } from '@/components/app/DatosFicticios'
-import { useSimulacion } from '@/lib/simulacion'
+import { useSesion } from '@/lib/sesion'
 import SinPermiso from '../SinPermiso'
 
-// Presentación según el rol SIMULADO. No es seguridad: el servidor responde
-// 403 a un contador en cualquier endpoint de administración (spec 002).
+// /admin/** (spec 002b, T3; R6): con el rol de la sesión que devolvió el servidor.
+// Presentación: la API responde 403 a un contador en cualquier endpoint de admin.
 export default function RequiereAdmin() {
-  const { rol } = useSimulacion()
-  if (rol === 'admin') return <Outlet />
+  const { sesion } = useSesion()
+  if (sesion?.rol === 'admin') return <Outlet />
   return (
     <div className="flex min-h-svh flex-col">
-      <DatosFicticios />
       <SinPermiso />
     </div>
   )

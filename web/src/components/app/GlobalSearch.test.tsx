@@ -3,12 +3,14 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { routes } from '@/router'
+import { simularSesion } from '@/test/sesion'
 
 // Spec 001b, T5: buscador global (R7, A5) sobre datos ficticios.
 
 afterEach(cleanup)
 
 async function abrirEn(path: string) {
+  simularSesion('admin')
   const router = createMemoryRouter(routes, { initialEntries: [path] })
   render(<RouterProvider router={router} />)
   await screen.findByRole('heading', { level: 1 })

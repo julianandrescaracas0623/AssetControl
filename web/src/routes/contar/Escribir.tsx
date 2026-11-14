@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useEnlace, useSimulacion } from '@/lib/simulacion'
+import { useSimulacion } from '@/lib/simulacion'
 import { ACTIVOS, RESUMEN } from '@/mocks/datos-ficticios'
 
 // Entrada manual del código (docs/08 §7.1, CU-VER-05). Con ?estado=error se
@@ -17,7 +17,6 @@ import { ACTIVOS, RESUMEN } from '@/mocks/datos-ficticios'
 
 export default function Escribir() {
   const { estado } = useSimulacion()
-  const enlace = useEnlace()
   const navigate = useNavigate()
   const [codigo, setCodigo] = useState('')
   const [error, setError] = useState('')
@@ -29,14 +28,14 @@ export default function Escribir() {
       setError('Escribe el código del sticker')
       return
     }
-    navigate(enlace(ACTIVOS.some((a) => a.codigo === c) ? `/contar/activo/${c}` : `/contar/nuevo?codigo=${encodeURIComponent(c)}`))
+    navigate(ACTIVOS.some((a) => a.codigo === c) ? `/contar/activo/${c}` : `/contar/nuevo?codigo=${encodeURIComponent(c)}`)
   }
 
   return (
     <CountShell
       titulo={RESUMEN.conteoAbierto.nombre}
       subtitulo="Administración"
-      volver={enlace('/contar/escanear')}
+      volver="/contar/escanear"
       estadoRed="en_linea"
       acciones={
         <Button type="submit" form="buscar-codigo" className="min-h-14 font-semibold">
@@ -52,7 +51,7 @@ export default function Escribir() {
           <AlertDescription className="flex flex-col items-start gap-3">
             Actívala en los permisos del navegador, o escribe el código del sticker.
             <Button asChild variant="outline" className="min-h-11">
-              <Link to={enlace('/contar/escanear')}>
+              <Link to="/contar/escanear">
                 <RefreshCw />
                 Reintentar cámara
               </Link>
