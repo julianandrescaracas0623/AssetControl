@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { EncabezadoPagina } from '@/components/app/ConEstado'
 import { CopiarDeParecido } from '@/components/app/CopiarDeParecido'
+import { InputSugerido } from '@/components/app/InputSugerido'
 import { LocationPicker } from '@/components/app/LocationPicker'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -208,7 +209,7 @@ export default function RegistrarActivo() {
             <CopiarDeParecido onCopiar={alta.copiar} copiado={alta.copiado} />
             <div className="grid gap-4 md:grid-cols-2">
               <Campo id="nombre" etiqueta={<>Nombre <Obligatorio /></>} error={errores.nombre}>
-                <Input id="nombre" value={campos.nombre} onChange={(e) => alta.cambiar('nombre', e.target.value)} maxLength={120} autoComplete="off" aria-invalid={Boolean(errores.nombre)} aria-describedby={describir('nombre')} className="max-md:h-11" />
+                <InputSugerido campo="nombre" id="nombre" value={campos.nombre} onChange={(e) => alta.cambiar('nombre', e.target.value)} maxLength={120} autoComplete="off" aria-invalid={Boolean(errores.nombre)} aria-describedby={describir('nombre')} className="max-md:h-11" />
               </Campo>
               <Campo id="precio" etiqueta={<>Precio de compra (COP) <Obligatorio /></>} error={errores.precio} ayuda="Solo lo ven los administradores.">
                 <div className="relative">
@@ -252,13 +253,13 @@ export default function RegistrarActivo() {
                   <Input id="serial" value={campos.serial} onChange={(e) => alta.cambiar('serial', e.target.value)} maxLength={120} autoComplete="off" className="font-mono max-md:h-11" />
                 </Campo>
                 <Campo id="marca" etiqueta="Marca">
-                  <Input id="marca" value={campos.marca} onChange={(e) => alta.cambiar('marca', e.target.value)} maxLength={120} autoComplete="off" className="max-md:h-11" />
+                  <InputSugerido campo="marca" id="marca" value={campos.marca} onChange={(e) => alta.cambiar('marca', e.target.value)} maxLength={120} autoComplete="off" className="max-md:h-11" />
                 </Campo>
                 <Campo id="modelo" etiqueta="Modelo">
-                  <Input id="modelo" value={campos.modelo} onChange={(e) => alta.cambiar('modelo', e.target.value)} maxLength={120} autoComplete="off" className="max-md:h-11" />
+                  <InputSugerido campo="modelo" id="modelo" value={campos.modelo} onChange={(e) => alta.cambiar('modelo', e.target.value)} maxLength={120} autoComplete="off" className="max-md:h-11" />
                 </Campo>
                 <Campo id="subtipo" etiqueta="Subtipo" ayuda="Por ejemplo: computador, fuente, video.">
-                  <Input id="subtipo" value={campos.subtipo} onChange={(e) => alta.cambiar('subtipo', e.target.value)} maxLength={120} autoComplete="off" className="max-md:h-11" />
+                  <InputSugerido campo="subtipo" id="subtipo" value={campos.subtipo} onChange={(e) => alta.cambiar('subtipo', e.target.value)} maxLength={120} autoComplete="off" className="max-md:h-11" />
                 </Campo>
                 <Campo id="fecha" etiqueta="Fecha de compra" error={errores.fecha}>
                   <Input id="fecha" type="date" value={campos.fecha} onChange={(e) => alta.cambiar('fecha', e.target.value)} aria-invalid={Boolean(errores.fecha)} aria-describedby={describir('fecha')} className="max-md:h-11" />

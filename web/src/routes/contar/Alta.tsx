@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router'
 
 import { CopiarDeParecido } from '@/components/app/CopiarDeParecido'
 import { CountShell } from '@/components/app/CountShell'
+import { InputSugerido } from '@/components/app/InputSugerido'
 import { LocationPicker } from '@/components/app/LocationPicker'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -156,7 +157,7 @@ export default function Alta() {
         ) : (
           <>
             <Campo id="nombre" etiqueta={<>Nombre <Obligatorio /></>} error={errores.nombre}>
-              <Input id="nombre" value={campos.nombre} onChange={(e) => alta.cambiar('nombre', e.target.value)} maxLength={120} autoComplete="off" enterKeyHint="next" {...aria(errores, 'nombre')} className="h-12 text-base" />
+              <InputSugerido campo="nombre" id="nombre" value={campos.nombre} onChange={(e) => alta.cambiar('nombre', e.target.value)} maxLength={120} autoComplete="off" enterKeyHint="next" {...aria(errores, 'nombre')} className="h-12 text-base" />
             </Campo>
             <Campo id="precio" etiqueta={<>Precio de compra (COP) <Obligatorio /></>} error={errores.precio} ayuda="Después de guardar, solo lo verán los administradores.">
               <div className="relative">
@@ -199,9 +200,9 @@ export default function Alta() {
             </Campo>
             {!duplicando && (
               <>
-                <Campo id="marca" etiqueta="Marca"><Input id="marca" value={campos.marca} onChange={(e) => alta.cambiar('marca', e.target.value)} maxLength={120} autoComplete="off" className="h-12 text-base" /></Campo>
-                <Campo id="modelo" etiqueta="Modelo"><Input id="modelo" value={campos.modelo} onChange={(e) => alta.cambiar('modelo', e.target.value)} maxLength={120} autoComplete="off" className="h-12 text-base" /></Campo>
-                <Campo id="subtipo" etiqueta="Subtipo" ayuda="Por ejemplo: computador, fuente, video."><Input id="subtipo" value={campos.subtipo} onChange={(e) => alta.cambiar('subtipo', e.target.value)} maxLength={120} autoComplete="off" className="h-12 text-base" /></Campo>
+                <Campo id="marca" etiqueta="Marca"><InputSugerido campo="marca" id="marca" value={campos.marca} onChange={(e) => alta.cambiar('marca', e.target.value)} maxLength={120} autoComplete="off" className="h-12 text-base" /></Campo>
+                <Campo id="modelo" etiqueta="Modelo"><InputSugerido campo="modelo" id="modelo" value={campos.modelo} onChange={(e) => alta.cambiar('modelo', e.target.value)} maxLength={120} autoComplete="off" className="h-12 text-base" /></Campo>
+                <Campo id="subtipo" etiqueta="Subtipo" ayuda="Por ejemplo: computador, fuente, video."><InputSugerido campo="subtipo" id="subtipo" value={campos.subtipo} onChange={(e) => alta.cambiar('subtipo', e.target.value)} maxLength={120} autoComplete="off" className="h-12 text-base" /></Campo>
                 <Campo id="fecha" etiqueta="Fecha de compra" error={errores.fecha}><Input id="fecha" type="date" value={campos.fecha} onChange={(e) => alta.cambiar('fecha', e.target.value)} {...aria(errores, 'fecha')} className="h-12 text-base" /></Campo>
               </>
             )}
