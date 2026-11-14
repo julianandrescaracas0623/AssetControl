@@ -17,7 +17,7 @@ const EXPECTED = [
 
 // Aprobadas: fundación (spec 001, T8/T9) + D1 de la spec 001b + Q8 de la 002b.
 const ALLOWED_DEPENDENCIES = [
-  '@fontsource-variable/geist', '@fontsource-variable/geist-mono', '@tailwindcss/vite', '@tanstack/react-query',
+  '@fontsource-variable/geist', '@fontsource-variable/geist-mono', '@tailwindcss/vite', '@tanstack/react-query', '@zxing/browser', '@zxing/library',
   'class-variance-authority', 'cmdk', 'cn', 'lucide-react', 'radix-ui', 'react', 'react-dom',
   'react-router', 'sonner', 'tailwindcss', 'tw-animate-css',
 ]

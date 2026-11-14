@@ -1,10 +1,12 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { act } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Rol } from '@/lib/api/cliente'
 import { routes } from '@/router'
 import { catalogoDemo } from '@/test/catalogo'
+import { lectorFalso } from '@/test/lector'
 import { simularAncho } from '@/test/matchMedia'
 import { errorApi, llamadas, simularSesion } from '@/test/sesion'
 
@@ -12,6 +14,12 @@ import { errorApi, llamadas, simularSesion } from '@/test/sesion'
 // administración. El `id` se reutiliza en cada reintento; el contador no ve precios.
 
 afterEach(cleanup)
+
+const lector = vi.hoisted(() => ({ actual: null as ReturnType<typeof import('@/test/lector').lectorFalso> | null }))
+vi.mock('@/lib/lector', async (original) => ({
+  ...(await original<typeof import('@/lib/lector')>()),
+  crearLectorZxing: (...args: Parameters<import('@/lib/lector').CrearLector>) => lector.actual!.crear(...args),
+}))
 
 function abrir(path: string, rol: Rol = 'admin', catalogo = catalogoDemo(rol)) {
   simularAncho({ movil: rol === 'contador' })
@@ -160,5 +168,18 @@ describe('sugerencias (T7)', () => {
     const pedidas = f.mock.calls.map(([url]) => String(url)).filter((url) => url.startsWith('/api/activos/sugerencias'))
     expect(pedidas.at(-1)).toBe('/api/activos/sugerencias?campo=nombre&q=sil')
     expect(lista.textContent).not.toContain('389')
+  })
+})
+
+describe('escanear en administración (T8)', () => {
+  it('la cámara llena el código normalizado y cierra el visor', async () => {
+    lector.actual = lectorFalso()
+    abrir('/admin/activos/nuevo')
+    fireEvent.click(await screen.findByRole('button', { name: 'Escanear con la cámara' }))
+    await screen.findByText('Cámara activa')
+    act(() => lector.actual!.leer('ac-0777'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect((screen.getByRole('textbox', { name: /Código del sticker/ }) as HTMLInputElement).value).toBe('AC-0777')
+    expect(lector.actual.detenido).toBe(1)
   })
 })

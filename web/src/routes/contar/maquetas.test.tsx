@@ -1,11 +1,13 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { act } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Rol } from '@/lib/api/cliente'
 import { routes } from '@/router'
 import { simularAncho } from '@/test/matchMedia'
 import { catalogoDemo } from '@/test/catalogo'
+import { lectorFalso } from '@/test/lector'
 import { simularSesion } from '@/test/sesion'
 
 // Spec 001b, T9: maquetas de conteo a 375 px con datos ficticios. El contador
@@ -13,6 +15,13 @@ import { simularSesion } from '@/test/sesion'
 // cerrada (409) no. El rol sale de la sesión (simulada en fetch, spec 002b).
 
 afterEach(cleanup)
+
+// Spec 004, T8: la cámara se simula (sin ZXing ni getUserMedia en las pruebas).
+const lector = vi.hoisted(() => ({ actual: null as ReturnType<typeof import('@/test/lector').lectorFalso> | null }))
+vi.mock('@/lib/lector', async (original) => ({
+  ...(await original<typeof import('@/lib/lector')>()),
+  crearLectorZxing: (...args: Parameters<import('@/lib/lector').CrearLector>) => lector.actual!.crear(...args),
+}))
 
 async function abrir(path: string, rol: Rol = 'contador') {
   simularAncho({ movil: true })
@@ -42,8 +51,10 @@ describe('Inicio del contador', () => {
 
 describe('flujo de conteo', () => {
   it('escanear → verificar → verificado', async () => {
+    lector.actual = lectorFalso()
     await abrir('/contar/escanear')
-    fireEvent.click(screen.getByRole('link', { name: /Simular lectura del sticker 000215/ }))
+    await screen.findByText('Cámara activa')
+    act(() => lector.actual!.leer('000215'))
     expect(await screen.findByRole('heading', { level: 1, name: 'Impresora multifuncional' })).toBeTruthy()
     fireEvent.click(screen.getByRole('link', { name: 'Confirmar' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Verificado' })).toBeTruthy()

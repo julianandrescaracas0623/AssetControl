@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { EncabezadoPagina } from '@/components/app/ConEstado'
 import { CopiarDeParecido } from '@/components/app/CopiarDeParecido'
+import { Escaner } from '@/components/app/Escaner'
 import { InputSugerido } from '@/components/app/InputSugerido'
 import { LocationPicker } from '@/components/app/LocationPicker'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -12,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -76,6 +78,7 @@ export default function RegistrarActivo() {
   const categorias = useCategorias()
   const ubicaciones = useUbicaciones()
   const [varias, setVarias] = useState(false)
+  const [escaneando, setEscaneando] = useState(false)
   const { campos, errores } = alta
   const codigoEnPausa = useCodigoEnPausa(campos.codigo)
   const revision = useActivoPorCodigo(codigoEnPausa)
@@ -163,7 +166,7 @@ export default function RegistrarActivo() {
                   className="h-12 font-mono text-lg tracking-wider uppercase md:h-10"
                 />
               </Campo>
-              <Button type="button" variant="outline" className="h-12 sm:mt-[1.375rem] md:h-10" onClick={() => toast('La lectura con la cámara llega en la tarea T8 de la spec 004')}>
+              <Button type="button" variant="outline" className="h-12 sm:mt-[1.375rem] md:h-10" onClick={() => setEscaneando(true)}>
                 <ScanBarcode />
                 Escanear con la cámara
               </Button>
@@ -297,6 +300,25 @@ export default function RegistrarActivo() {
           </div>
         </form>
       )}
+
+      <Dialog open={escaneando} onOpenChange={setEscaneando}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Escanear el sticker</DialogTitle>
+            <DialogDescription>Apunta la cámara al código de barras; se lee solo.</DialogDescription>
+          </DialogHeader>
+          {escaneando && (
+            <Escaner
+              className="min-h-[280px]"
+              onLectura={(texto) => {
+                alta.cambiar('codigo', normalizarCodigo(texto) ?? texto)
+                setEscaneando(false)
+                toast.success('Código leído: revisa que coincida con el sticker')
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
