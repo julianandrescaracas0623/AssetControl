@@ -1,6 +1,6 @@
 # Tasks 003 — Ubicaciones y categorías
 
-> **Estado:** Propuestas, pendientes de aprobación humana (G1–G3). Una tarea ≤ 1 día, pruebas primero, revisión y commit por tarea. Plan en `plan.md`.
+> **Estado:** Aprobadas (G1–G3, 2026-11-14). Una tarea ≤ 1 día, pruebas primero, revisión y commit por tarea. Plan en `plan.md`.
 
 | Tarea | Resultado | Verificación | Depende de |
 |---|---|---|---|

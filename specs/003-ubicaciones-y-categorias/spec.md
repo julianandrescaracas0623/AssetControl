@@ -1,6 +1,6 @@
 # Spec 003 — Ubicaciones y categorías
 
-> **Estado:** Propuesta, pendiente de aprobación humana (G1–G3). Fecha: 2026-11-14. Depende de la spec 002 (acceso, hecha) y de la 002b (web con sesión, hecha). Módulo M2 completo y CU-CAT-09 de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Aprobada (G1–G3, 2026-11-14) con Q1–Q4 en la opción recomendada. Fecha: 2026-11-14. Depende de la spec 002 (acceso, hecha) y de la 002b (web con sesión, hecha). Módulo M2 completo y CU-CAT-09 de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 
@@ -39,9 +39,16 @@ Para registrar y contar activos hace falta saber **dónde** está cada uno y **q
 - Riesgo: renombrar cambia el rótulo de informes ya cerrados (que guardan el `id`, `docs/03` §desglose); se acepta y queda la nota `[PENDIENTE]` de la spec 008.
 - Riesgo: comparar nombres "sin tildes" en Python y en PostgreSQL puede diferir; se resuelve con una clave de comparación calculada en la aplicación y guardada (`nombre_clave`) con índice único, no con colación de la base.
 
-## Preguntas abiertas (para G1)
+## Decisiones (2026-11-14, humanas)
 
-- **Q1 Jerarquía:** estricta sede > sala > box (recomendado) o libre (cualquier tipo bajo cualquier padre).
-- **Q2 Desactivar con hijas activas:** rechazar (recomendado) o desactivar en cascada.
-- **Q3 Nombres duplicados:** únicos entre hermanas e insensibles a mayúsculas y tildes (recomendado), o permitidos.
-- **Q4 Categorías iniciales (P8):** botón "Cargar las 6 sugeridas" que el admin pulsa una vez (recomendado), sembrarlas al crear el tenant (toca `acceso.crear_tenant`, del catálogo cerrado C6) o empezar vacías sin sugerencia.
+| Pregunta | Decisión |
+|---|---|
+| Q1 Jerarquía | Estricta: sede sin padre, sala bajo sede, box bajo sala. |
+| Q2 Desactivar con hijas activas | Rechazar (`409 tiene_hijas_activas`). |
+| Q3 Nombres | Únicos sin distinguir mayúsculas ni tildes: entre hermanas (ubicaciones) y en el tenant (categorías). |
+| Q4 Categorías iniciales (P8) | Botón "Cargar las 6 sugeridas", idempotente; sin tocar `acceso.crear_tenant`. |
+| `docs/03` | El implementer aplica en T1 los cambios de `plan.md` §2 (autorizado con la aprobación). |
+
+## Preguntas abiertas
+
+Ninguna para esta spec. Para la 004: si una sede puede recibir activos y qué pasa al desactivar una ubicación con activos vigentes.

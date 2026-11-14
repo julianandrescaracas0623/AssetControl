@@ -1,6 +1,6 @@
 # Plan 003 — Ubicaciones y categorías
 
-> **Estado:** Propuesto, pendiente de aprobación humana (G1–G3). Las decisiones marcadas "(recomendado)" siguen las preguntas Q1–Q4 de `spec.md`; si el humano elige otra opción, se ajustan antes de T1.
+> **Estado:** Aprobado (G1–G3, 2026-11-14) con Q1–Q4 en la opción recomendada (`spec.md`, Decisiones).
 
 ## 1. Enfoque
 
@@ -20,7 +20,7 @@ Primero la base (sin tablas no hay nada que aislar), luego la API con sus prueba
 
 **`nombre_clave`:** la calcula la aplicación (no una colación de la base): `normalize_display_name` (H-3) → NFD → quitar marcas combinantes (`Mn`) → `casefold()` → espacios internos colapsados. "Consultorio  Uno", "consultorio uno" y "Consultorío Uno" chocan.
 
-### Cambios propuestos a `docs/03` (con la aprobación; los aplica el implementer en T1 si el humano lo autoriza)
+### Cambios a `docs/03` (autorizados con la aprobación; los aplica el implementer en T1)
 
 1. `ubicacion`: añadir `nombre_clave` y `creado_en`; documentar la FK compuesta del padre, el `CHECK` de sede y los únicos parciales.
 2. `categoria`: añadir `nombre_clave` y `creado_en`; documentar el `UNIQUE (tenant_id, nombre_clave)`.
