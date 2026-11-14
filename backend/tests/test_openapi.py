@@ -50,6 +50,7 @@ from app.auth.http import AUTH_MAX_BODY_BYTES, CSRF_HEADER, CSRF_HEADER_VALUE
 from app.catalogo import service as catalogo_service
 from app.config import RateLimits
 from app.conteo import service as conteo_service
+from app.conteo import verificaciones as conteo_verificaciones
 from app.invitaciones import routes as invitaciones_routes
 
 CONTRACT_FILE = Path(__file__).resolve().parent.parent / "openapi.yaml"
@@ -740,6 +741,78 @@ def test_sesiones_responses(client, contrato_db):
     for headers in (contador, {}):
         check("get", "/sesiones/{id}", client.get(ruta, headers=headers))
     check("get", "/sesiones/{id}", client.get(f"/sesiones/{uuid.uuid4()}", headers=admin))
+    # Verificar (T3).
+    sufijo = uuid.uuid4().hex[:6]
+
+    def post(path, body):
+        response = client.post(path, json=body, headers=admin)
+        assert response.status_code == 201, response.get_json()
+        return response.get_json()
+
+    sede = post("/ubicaciones", {"nombre": f"Sede V {sufijo}", "tipo": "sede"})["ubicacion"]["id"]
+    sala = post("/ubicaciones", {"nombre": "Sala", "tipo": "sala", "padre_id": sede})
+    sala_id = sala["ubicacion"]["id"]
+    categoria = post("/categorias", {"nombre": f"Cat V {sufijo}"})["categoria"]["id"]
+
+    def activo(codigo):
+        body = {
+            "id": str(uuid.uuid4()),
+            "codigo": codigo,
+            "nombre": "Activo verificado",
+            "precio_compra": "10.00",
+            "categoria_id": categoria,
+            "ubicacion_id": sala_id,
+        }
+        return post("/activos", body)["activo"]["id"]
+
+    a1, baja = activo(f"VA-{sufijo}"), activo(f"VB-{sufijo}")
+    client.post(
+        f"/activos/{baja}/baja", json={"motivo": "perdido"}, headers={**admin, "If-Match": "1"}
+    )
+    ver = f"{ruta}/verificaciones"
+
+    def verificar(body, headers=contador):
+        return check(
+            "post", "/sesiones/{id}/verificaciones", client.post(ver, json=body, headers=headers)
+        )
+
+    def ultima(params, headers=contador):
+        response = client.get(ver, query_string=params, headers=headers)
+        return check("get", "/sesiones/{id}/verificaciones", response)
+
+    ultima({"activo_id": a1})
+    cuerpo_v = {
+        "id": str(uuid.uuid4()),
+        "activo_id": a1,
+        "ubicacion_encontrada_id": sala_id,
+        "estado_fisico": "ok",
+    }
+    verificar(cuerpo_v)
+    verificar(cuerpo_v)
+    verificar({**cuerpo_v, "id": str(uuid.uuid4()), "nota": "Revisado"}, headers=admin)
+    ultima({"activo_id": a1}, headers=admin)
+    ultima({"activo_id": a1}, headers={})
+    ultima({})
+    check(
+        "get",
+        "/sesiones/{id}/verificaciones",
+        client.get(
+            f"/sesiones/{uuid.uuid4()}/verificaciones",
+            query_string={"activo_id": a1},
+            headers=admin,
+        ),
+    )
+    verificar({**cuerpo_v, "id": str(uuid.uuid4()), "estado_fisico": "regular"})
+    verificar({**cuerpo_v, "id": str(uuid.uuid4()), "ubicacion_encontrada_id": sede})
+    verificar({**cuerpo_v, "id": str(uuid.uuid4()), "activo_id": str(uuid.uuid4())})
+    verificar({**cuerpo_v, "id": str(uuid.uuid4()), "activo_id": baja})
+    verificar(cuerpo_v, headers={})
+    check(
+        "post",
+        "/sesiones/{id}/verificaciones",
+        client.post(ver, data="x" * (AUTH_MAX_BODY_BYTES + 1), headers=admin),
+    )
+
     # Una sesión cerrada (el cierre llega con la 008) también cumple el contrato.
     with contrato_db.migrator.begin() as conn:
         conn.execute(
@@ -750,6 +823,8 @@ def test_sesiones_responses(client, contrato_db):
             {"s": sesion["sesion"]["id"]},
         )
     check("get", "/sesiones", client.get("/sesiones", headers=admin))
+    cerrada = verificar({**cuerpo_v, "id": str(uuid.uuid4())})
+    assert cerrada["error"]["code"] == "sesion_cerrada"
 
 
 LIMITED = [
@@ -823,6 +898,7 @@ def backend_error_codes() -> set[str]:
     codes |= {error.code for error in (*activos_service.ERRORES, activos_service.CodigoExistente)}
     codes |= {error.code for error in activos_cambios.ERRORES}
     codes |= {error.code for error in conteo_service.ERRORES}
+    codes |= {error.code for error in conteo_verificaciones.ERRORES}
     return codes | _policy_codes()
 
 

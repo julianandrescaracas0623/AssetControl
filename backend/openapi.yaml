@@ -837,6 +837,78 @@ paths:
         "404":
           $ref: "#/components/responses/NoEncontrado"
 
+  /sesiones/{id}/verificaciones:
+    get:
+      tags: [conteo]
+      operationId: ultimaVerificacion
+      summary: La verificación vigente (mayor seq) de un activo en la sesión, o null
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: activo_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: La última verificación o null.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UltimaVerificacion" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+    post:
+      tags: [conteo]
+      operationId: verificarActivo
+      summary: Verificar un activo (ambos roles; idempotente por id)
+      description: >-
+        Copia del activo el precio, la categoría y la ubicación de ese momento. Un
+        reintento con el mismo id devuelve la guardada (200), aunque la sesión se haya
+        cerrado después.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerificarBody" }
+      responses:
+        "200":
+          description: Reintento; la verificación ya guardada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VerificacionRespuesta" }
+        "201":
+          description: Guardada con su evento "verificado".
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VerificacionRespuesta" }
+        "400":
+          description: Cuerpo no válido o la ubicación encontrada no es una sala o box activos.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [solicitud_invalida, ubicacion_invalida]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: La sesión no está abierta o el activo está dado de baja.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [sesion_cerrada, activo_dado_de_baja]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1007,6 +1079,7 @@ components:
         - activo_dado_de_baja
         - motivo_invalido
         - sesion_abierta_existente
+        - sesion_cerrada
     Error:
       type: object
       required: [error]
@@ -1424,6 +1497,61 @@ components:
       properties:
         sesion: { $ref: "#/components/schemas/SesionConteo" }
         avance: { $ref: "#/components/schemas/Avance" }
+    UbicacionRuta:
+      type: object
+      required: [id, ruta]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        ruta: { type: string }
+    Verificacion:
+      type: object
+      required:
+        [id, sesion_id, activo, ubicacion_esperada, ubicacion_encontrada, estado_fisico, nota, verificado_por, ocurrido_en, recibido_en, seq]
+      additionalProperties: false
+      description: precio_al_contar solo existe en las respuestas al admin (P13).
+      properties:
+        id: { type: string, format: uuid }
+        sesion_id: { type: string, format: uuid }
+        activo: { $ref: "#/components/schemas/ActivoResumen" }
+        ubicacion_esperada: { $ref: "#/components/schemas/UbicacionRuta" }
+        ubicacion_encontrada: { $ref: "#/components/schemas/UbicacionRuta" }
+        estado_fisico: { $ref: "#/components/schemas/EstadoFisico" }
+        nota: { $ref: "#/components/schemas/NotaMotivo" }
+        verificado_por: { $ref: "#/components/schemas/Autor" }
+        ocurrido_en: { type: [string, "null"], format: date-time }
+        recibido_en: { type: string, format: date-time }
+        seq: { type: integer, minimum: 1 }
+        precio_al_contar: { $ref: "#/components/schemas/Precio" }
+    EstadoFisico:
+      type: string
+      enum: [ok, danado]
+    VerificacionRespuesta:
+      type: object
+      required: [verificacion]
+      additionalProperties: false
+      properties:
+        verificacion: { $ref: "#/components/schemas/Verificacion" }
+    UltimaVerificacion:
+      type: object
+      required: [verificacion]
+      additionalProperties: false
+      properties:
+        verificacion:
+          oneOf:
+            - { $ref: "#/components/schemas/Verificacion" }
+            - { type: "null" }
+    VerificarBody:
+      type: object
+      required: [id, activo_id, ubicacion_encontrada_id, estado_fisico]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid, description: Lo genera el cliente; reintentar con el mismo id no duplica. }
+        activo_id: { type: string, format: uuid }
+        ubicacion_encontrada_id: { type: string, format: uuid, description: Sala o box activos donde se vio. }
+        estado_fisico: { $ref: "#/components/schemas/EstadoFisico" }
+        nota: { $ref: "#/components/schemas/NotaMotivo" }
+        ocurrido_en: { type: [string, "null"], format: date-time, description: "Reloj del cliente, informativo." }
     TipoEvento:
       type: string
       enum:
@@ -1474,7 +1602,7 @@ components:
     NotaMotivo:
       type: [string, "null"]
       maxLength: 120
-      description: Obligatoria si el motivo es "otro".
+      description: Texto corto (H-3); en una baja o reactivación, obligatoria si el motivo es "otro".
     EstadoActivoBody:
       type: object
       required: [estado]

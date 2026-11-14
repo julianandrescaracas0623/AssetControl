@@ -42,7 +42,7 @@ R2, R3, R5, R5a y ADR-003 de `docs/03`; P13 (precio solo admin, en el servidor);
 
 ## Riesgos
 
-- Cerrar mientras alguien verifica: la verificación toma la sesión con `FOR SHARE`; el cierre (008) la tomará con `FOR UPDATE`, así que cada verificación queda entera antes o después del cierre.
+- Cerrar mientras alguien verifica: la verificación toma un candado consultivo compartido de la sesión; el cierre (008) tomará el mismo candado exclusivo, así que cada verificación queda entera antes o después del cierre (ajuste de T3; probado con dos conexiones).
 - Un admin cambia el precio mientras se cuenta: lo ya verificado guarda su `precio_al_contar`; el informe no se mueve (ADR-003).
 - La sala de trabajo mal elegida genera discrepancias falsas: la sala se ve siempre en la cabecera y se cambia en un toque.
 

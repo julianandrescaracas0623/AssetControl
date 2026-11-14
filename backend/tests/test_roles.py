@@ -438,6 +438,8 @@ PROTECTED_ENDPOINTS = {
     "sesiones.listar": frozenset({"admin", "contador"}),
     "sesiones.abierta": frozenset({"admin", "contador"}),
     "sesiones.detalle": frozenset({"admin", "contador"}),
+    "sesiones.verificar": frozenset({"admin", "contador"}),
+    "sesiones.ultima_verificacion": frozenset({"admin", "contador"}),
 }
 
 

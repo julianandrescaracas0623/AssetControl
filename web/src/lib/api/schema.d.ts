@@ -437,6 +437,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sesiones/{id}/verificaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** La verificación vigente (mayor seq) de un activo en la sesión, o null */
+        get: operations["ultimaVerificacion"];
+        put?: never;
+        /**
+         * Verificar un activo (ambos roles; idempotente por id)
+         * @description Copia del activo el precio, la categoría y la ubicación de ese momento. Un reintento con el mismo id devuelve la guardada (200), aunque la sesión se haya cerrado después.
+         */
+        post: operations["verificarActivo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -445,7 +466,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -722,6 +743,59 @@ export interface components {
             sesion: components["schemas"]["SesionConteo"];
             avance: components["schemas"]["Avance"];
         };
+        UbicacionRuta: {
+            /** Format: uuid */
+            id: string;
+            ruta: string;
+        };
+        /** @description precio_al_contar solo existe en las respuestas al admin (P13). */
+        Verificacion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            sesion_id: string;
+            activo: components["schemas"]["ActivoResumen"];
+            ubicacion_esperada: components["schemas"]["UbicacionRuta"];
+            ubicacion_encontrada: components["schemas"]["UbicacionRuta"];
+            estado_fisico: components["schemas"]["EstadoFisico"];
+            nota: components["schemas"]["NotaMotivo"];
+            verificado_por: components["schemas"]["Autor"];
+            /** Format: date-time */
+            ocurrido_en: string | null;
+            /** Format: date-time */
+            recibido_en: string;
+            seq: number;
+            precio_al_contar?: components["schemas"]["Precio"];
+        };
+        /** @enum {string} */
+        EstadoFisico: "ok" | "danado";
+        VerificacionRespuesta: {
+            verificacion: components["schemas"]["Verificacion"];
+        };
+        UltimaVerificacion: {
+            verificacion: components["schemas"]["Verificacion"] | null;
+        };
+        VerificarBody: {
+            /**
+             * Format: uuid
+             * @description Lo genera el cliente; reintentar con el mismo id no duplica.
+             */
+            id: string;
+            /** Format: uuid */
+            activo_id: string;
+            /**
+             * Format: uuid
+             * @description Sala o box activos donde se vio.
+             */
+            ubicacion_encontrada_id: string;
+            estado_fisico: components["schemas"]["EstadoFisico"];
+            nota?: components["schemas"]["NotaMotivo"];
+            /**
+             * Format: date-time
+             * @description Reloj del cliente, informativo.
+             */
+            ocurrido_en?: string | null;
+        };
         /** @enum {string} */
         TipoEvento: "creado" | "importado" | "verificado" | "ubicacion_cambiada" | "precio_cambiado" | "estado_cambiado" | "categoria_cambiada" | "datos_cambiados" | "dado_de_baja";
         EventoActivo: {
@@ -749,7 +823,7 @@ export interface components {
              */
             ubicacion_id: string;
         };
-        /** @description Obligatoria si el motivo es "otro". */
+        /** @description Texto corto (H-3); en una baja o reactivación, obligatoria si el motivo es "otro". */
         NotaMotivo: string | null;
         /** @description Entre activo y en_reparacion sin motivo. Un dado de baja solo pasa a activo y con motivo (reactivar). */
         EstadoActivoBody: {
@@ -1875,6 +1949,91 @@ export interface operations {
             };
             401: components["responses"]["NoAutenticado"];
             404: components["responses"]["NoEncontrado"];
+        };
+    };
+    ultimaVerificacion: {
+        parameters: {
+            query: {
+                activo_id: string;
+            };
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La última verificación o null. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UltimaVerificacion"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
+        };
+    };
+    verificarActivo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerificarBody"];
+            };
+        };
+        responses: {
+            /** @description Reintento; la verificación ya guardada. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificacionRespuesta"];
+                };
+            };
+            /** @description Guardada con su evento "verificado". */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerificacionRespuesta"];
+                };
+            };
+            /** @description Cuerpo no válido o la ubicación encontrada no es una sala o box activos. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description La sesión no está abierta o el activo está dado de baja. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["CuerpoDemasiadoGrande"];
         };
     };
 }

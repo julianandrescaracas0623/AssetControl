@@ -1,8 +1,8 @@
-"""Rutas ``/sesiones`` (spec 006; R1–R3, Q1; plan.md §3).
+"""Rutas ``/sesiones`` (spec 006; R1–R9, Q1–Q4; plan.md §3).
 
-Ambos roles ven la sesión abierta, la lista y el avance (sin precios); solo el admin
-abre (Q1). Una sesión de otro tenant es ``404``. Cuerpos JSON de 4 KB como máximo
-(``app.auth.http``).
+Ambos roles ven la sesión abierta, la lista y el avance (sin precios) y verifican; solo
+el admin abre (Q1) y solo él recibe ``precio_al_contar`` (P13). Una sesión de otro
+tenant es ``404``. Cuerpos JSON de 4 KB como máximo (``app.auth.http``).
 """
 
 import uuid
@@ -11,7 +11,7 @@ from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 
 from app.auth.decorators import current_session, current_user, require_auth, require_role
-from app.conteo import service
+from app.conteo import service, verificaciones
 from app.errors import error_response
 
 bp = Blueprint("sesiones", __name__, url_prefix="/sesiones")
@@ -60,3 +60,41 @@ def detalle(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del co
     except service.ErrorConteo as exc:
         return _error(exc)
     return jsonify(sesion=service.vista(session, sesion), avance=service.avance(session, sesion))
+
+
+def _es_admin() -> bool:
+    return current_user().rol == "admin"
+
+
+@bp.post("/<uuid:id>/verificaciones")
+@require_auth
+def verificar(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del contrato
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return error_response(400, "solicitud_invalida", "La solicitud no es válida.")
+    session = current_session()
+    try:
+        datos = verificaciones.datos_de_verificacion(body)
+        verificacion, nueva = verificaciones.verificar(
+            session, id, datos, current_user().usuario_id
+        )
+    except service.ErrorConteo as exc:
+        return _error(exc)
+    vista = verificaciones.vista(session, verificacion, con_precio=_es_admin())
+    return jsonify(verificacion=vista), 201 if nueva else 200
+
+
+@bp.get("/<uuid:id>/verificaciones")
+@require_auth
+def ultima_verificacion(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002
+    session = current_session()
+    try:
+        verificacion = verificaciones.ultima(session, id, request.args.get("activo_id"))
+    except service.ErrorConteo as exc:
+        return _error(exc)
+    vista = (
+        verificaciones.vista(session, verificacion, con_precio=_es_admin())
+        if verificacion
+        else None
+    )
+    return jsonify(verificacion=vista)
