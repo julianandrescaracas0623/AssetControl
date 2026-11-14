@@ -11,7 +11,7 @@ afterEach(cleanup)
 describe('galería de componentes', () => {
   it('muestra cada sección del sistema', () => {
     render(<Componentes />)
-    for (const name of ['Botones', 'Campos', 'Insignias', 'Avisos', 'Superficies']) {
+    for (const name of ['Botones', 'Campos', 'Insignias', 'Avisos', 'Datos', 'Superficies']) {
       expect(screen.getByRole('heading', { name })).toBeTruthy()
     }
   })

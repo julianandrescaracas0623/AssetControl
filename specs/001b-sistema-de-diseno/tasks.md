@@ -110,6 +110,12 @@
 - **Verificación:** `cd web && npm test && npm run typecheck` + galería en `/dev/componentes`.
 - **Depende de:** T2.
 - **Riesgo:** calcular totales en el cliente; las tarjetas solo reciben cifras ya hechas.
+- **Implementada (2026-11-13), revisada (APROBADO):**
+  - `lib/format.ts`: `formatCOP` exacto sobre el texto decimal del servidor (sin float; rechaza formatos ajenos) y `formatEntero`. `lib/cifras.ts`: tipos `InformeCongelado` y `ValorActual` con `fuente` literal distinta.
+  - `components/app/`: `StatCard` (enlace opcional, tono de aviso), `ThreeFiguresCard` ("Último informe cerrado · Informe congelado") y `LiveValueCard` ("Valor actual · Tiempo real · No es el informe") en `FigureCards.tsx`, `AssetCard` (precio solo para admin; nombre que baja de línea y ubicación truncada), `EstadoActivoBadge`, `LocationPicker` (Popover + Command; "Última usada" arriba; boxes con sangría; 44 px en celular), `PendingList`, `EmptyState`. Ninguno calcula totales.
+  - La galería suma la sección "Datos" con todos ellos.
+  - `cmdk` toma el nombre accesible del campo de su `label` (aria-labelledby gana a aria-label): `GlobalSearch` y `LocationPicker` lo pasan en `<Command label>`.
+  - Pruebas primero: `lib/format.test.ts` (9) y `components/app/datos.test.tsx` (12, incluidos los `@ts-expect-error` de A7 que verifica `npm run typecheck`), en rojo antes; total 122/122; lint, typecheck y build en verde. Navegador real a 375 y 1440 px: tarjetas y selector abierto sin desbordes.
 
 ### T8 — Maquetas de administración
 

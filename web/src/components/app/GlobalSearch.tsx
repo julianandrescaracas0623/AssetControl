@@ -37,12 +37,11 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
       description="Busca un activo por código o nombre, o salta a una pantalla."
       className="max-w-[calc(100%-2rem)] sm:max-w-lg"
     >
-      <Command>
+      <Command label="Buscar activo o pantalla">
         <CommandInput
           placeholder="Código o nombre del activo…"
           value={consulta}
           onValueChange={setConsulta}
-          aria-label="Buscar"
         />
         <CommandList className="max-h-[min(60dvh,24rem)]">
           <CommandEmpty>

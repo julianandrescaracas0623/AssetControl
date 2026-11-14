@@ -14,6 +14,15 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
+import { useState } from 'react'
+
+import { AssetCard } from '@/components/app/AssetCard'
+import { EmptyState } from '@/components/app/EmptyState'
+import { LiveValueCard, ThreeFiguresCard } from '@/components/app/FigureCards'
+import { LocationPicker } from '@/components/app/LocationPicker'
+import { NetworkStatus } from '@/components/app/NetworkStatus'
+import { PendingList } from '@/components/app/PendingList'
+import { StatCard } from '@/components/app/StatCard'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -34,6 +43,7 @@ import {
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { ACTIVOS, RESUMEN, ULTIMO_INFORME } from '@/mocks/datos-ficticios'
 
 // Galería del sistema de diseño (spec 001b, T2). Ruta de desarrollo
 // /dev/componentes: equivale a la página "Sistema visual" del lienzo aprobado
@@ -49,6 +59,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export default function Componentes() {
+  const [ubicacion, setUbicacion] = useState('administracion')
   return (
     <main className="mx-auto flex w-full max-w-[1320px] flex-col gap-10 p-4 md:p-8">
       <header className="flex flex-col gap-1 border-b pb-6">
@@ -180,6 +191,58 @@ export default function Componentes() {
             <AlertTitle>La sesión se cerró</AlertTitle>
             <AlertDescription>Esta verificación no se guardó.</AlertDescription>
           </Alert>
+        </div>
+      </Section>
+
+      <Section title="Datos">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard titulo="Activos hoy" valor="219" contexto="Incluye 2 en reparación" />
+          <StatCard titulo="Discrepancias" valor="3" contexto="Sin resolver" tono="aviso" />
+          <StatCard titulo={RESUMEN.conteoAbierto.nombre} valor="60,3 %" contexto="132 de 219 verificados">
+            <Progress value={60.3} aria-label="Avance del conteo" />
+          </StatCard>
+          <LiveValueCard valor={{ fuente: 'valor_actual', valor: RESUMEN.valorActual, activos: 219, consultadoA: '10:42' }} />
+        </div>
+        <ThreeFiguresCard
+          informe={{
+            fuente: 'informe_congelado',
+            sesion: ULTIMO_INFORME.sesion,
+            corte: ULTIMO_INFORME.corte,
+            encontrado: ULTIMO_INFORME.encontrado,
+            noEncontrado: ULTIMO_INFORME.noEncontrado,
+            total: ULTIMO_INFORME.total,
+          }}
+        />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-muted-foreground">AssetCard · admin</p>
+            <AssetCard activo={ACTIVOS[2]} rol="admin" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-muted-foreground">AssetCard · contador (sin precio)</p>
+            <AssetCard activo={ACTIVOS[2]} rol="contador" />
+          </div>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="g-ubicacion">Ubicación</Label>
+            <LocationPicker id="g-ubicacion" valor={ubicacion} ultimaUsada="c1b2" onChange={setUbicacion} />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <NetworkStatus estado="en_linea" />
+            <NetworkStatus estado="enviando" />
+            <NetworkStatus estado="guardado" />
+            <NetworkStatus estado="no_confirmado" />
+            <NetworkStatus estado="sin_conexion" />
+          </div>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <PendingList items={RESUMEN.conteoAbierto.pendientesPorUbicacion} />
+          <EmptyState
+            titulo="Aún no hay activos"
+            descripcion="Escanea un sticker para crear el primero."
+            accion={<Button>Registrar activo</Button>}
+          />
         </div>
       </Section>
 
