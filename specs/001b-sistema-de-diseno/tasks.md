@@ -1,6 +1,6 @@
 # Tasks 001b — Sistema de diseño y app shell
 
-> **Estado:** Aprobada (G1–G3, 2026-11-13) por el humano, con D1–D5 decididos según la recomendación. Máximo 10 tareas, cada una ≤ 1 día, una a la vez, **tests primero**. Solo se instalan las dependencias de `plan.md` §3, tras aprobar D1. Las capturas se toman en navegador real a 375 px y 1440 px (skill `browser-qa`) y se comparan con el lienzo aprobado.
+> **Estado:** Implementada (T1–T10, 2026-11-14), sobre la aprobación G1–G3 del 2026-11-13 con D1–D5. Máximo 10 tareas, cada una ≤ 1 día, una a la vez, **tests primero**. Solo se instalan las dependencias de `plan.md` §3, tras aprobar D1. Las capturas se toman en navegador real a 375 px y 1440 px (skill `browser-qa`) y se comparan con el lienzo aprobado.
 
 ---
 
@@ -162,3 +162,9 @@
 - **Verificación:** `cd web && npm run lint && npm run typecheck && npm test && npm run build` + A2, A3, A8, A9 documentados.
 - **Depende de:** T1–T9; revisión del `reviewer`.
 - **Riesgo:** hallazgos de desborde tardíos; se corrigen en la tarea que los originó antes de cerrar.
+- **Implementada (2026-11-14), revisada (APROBADO):**
+  - Barrido final en Chromium (build de producción con *fallback* de SPA): 24 rutas × 2 anchos (375 y 1440 px) = 48 combinaciones, incluidos estados (vacío, error, sin permiso, 404), rol admin y contador. Resultado: **0** páginas con scroll horizontal, **0** errores de consola y **0** infracciones de axe-core 4 con las reglas WCAG 2.0/2.1 A y AA (incluye `color-contrast`; es el motor de la auditoría de accesibilidad de Lighthouse). Modales, `sheet` y menús se revisaron abiertos en T4–T9.
+  - Hallazgos del barrido, corregidos aquí: (1) `label-content-name-mismatch` en el menú de usuario → nombre en texto `sr-only` y lo visible `aria-hidden`; (2) `aria-valid-attr-value` en las pestañas de Activos (`aria-controls` sin panel) → la lista vive en un `TabsContent`; (3) `scrollable-region-focusable` en tablas que desbordan → el contenedor de `table` de shadcn es enfocable (`tabIndex=0`) con anillo de foco.
+  - `docs/08` actualizado: implementación y rutas en el encabezado; criterios de celular decididos (Activos en tarjetas, Informe con scroll y primera columna fija, Actividad en lista); D2 (1320 px), D4 y D5 (480 px) en sus secciones; pendientes 5, 16 y 18 cerrados o acotados; §11 paso 2 hecho.
+  - `npm run lint`, `npm run typecheck`, `npm test` (153/153) y `npm run build` en verde (Node 22 de la sesión; falta confirmarlo con Node 24 en la CI).
+- **Cierre de la spec (2026-11-14):** T1–T10 implementadas y revisadas. Pendiente del humano: `git push origin develop`, `npm ci` en su equipo y CI verde con Node 24. Deuda para specs siguientes: elegir tabla de datos (`@tanstack/react-table` o `table` simple) y TanStack Query con la primera pantalla con datos; `recharts` en la 010; pantalla "Ver todo" de actividad; criterio de celular de Ubicaciones, Sesiones, Discrepancias y Usuarios cuando se construyan; el visor real de cámara (ZXing) en la 004.

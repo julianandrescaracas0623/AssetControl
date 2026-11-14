@@ -29,7 +29,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { formatCOP, formatEntero } from '@/lib/format'
 import { useSimulacion } from '@/lib/simulacion'
@@ -148,15 +148,14 @@ export default function Activos() {
           />
         }
       >
+        <Tabs value={pestaña} onValueChange={(v) => setPestaña(v as Pestaña)} className="gap-0">
         <section className="min-w-0 rounded-xl border" aria-label="Lista de activos">
           <div className="flex flex-col gap-3 border-b p-3 md:flex-row md:flex-wrap md:items-center md:justify-between">
-            <Tabs value={pestaña} onValueChange={(v) => setPestaña(v as Pestaña)}>
               <TabsList className="max-w-full overflow-x-auto">
                 <TabsTrigger value="vigentes">Vigentes <span className="text-xs text-muted-foreground tabular-nums">12</span></TabsTrigger>
                 <TabsTrigger value="en_reparacion">En reparación <span className="text-xs text-muted-foreground tabular-nums">1</span></TabsTrigger>
                 <TabsTrigger value="dados_de_baja">Dados de baja <span className="text-xs text-muted-foreground tabular-nums">0</span></TabsTrigger>
               </TabsList>
-            </Tabs>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
               <div className="relative min-w-0 sm:w-64">
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -183,6 +182,7 @@ export default function Activos() {
             </div>
           </div>
 
+          <TabsContent value={pestaña} className="min-w-0">
           {filtrados.length === 0 ? (
             <div className="p-4">
               <EmptyState titulo="Nada coincide" descripcion="Prueba con otro código, nombre o categoría." accion={<Button variant="outline" onClick={limpiar}>Limpiar filtros</Button>} />
@@ -242,6 +242,7 @@ export default function Activos() {
             </div>
           )}
 
+          </TabsContent>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm">
             <span className="text-muted-foreground tabular-nums">1–{filtrados.length} de {formatEntero(TOTAL_ACTIVOS)} (maqueta)</span>
             <div className="flex gap-2 [&_[data-slot=button]]:max-md:min-h-11">
@@ -250,6 +251,7 @@ export default function Activos() {
             </div>
           </div>
         </section>
+        </Tabs>
       </ConEstado>
 
       <AlertDialog open={aDarDeBaja !== null} onOpenChange={(abierto) => !abierto && setADarDeBaja(null)}>

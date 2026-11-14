@@ -1,6 +1,6 @@
 # Plan 001b — Sistema de diseño y app shell
 
-> **Estado:** Aprobada (G1–G3, 2026-11-13) por el humano, con D1–D5 decididos según la recomendación. Fecha: 2026-11-13. Referencia visual: lienzo aprobado enlazado en el encabezado de `docs/08`.
+> **Estado:** Implementada (T1–T10, 2026-11-14), sobre la aprobación G1–G3 del 2026-11-13 con D1–D5. Detalle en `tasks.md`. Fecha: 2026-11-13. Referencia visual: lienzo aprobado enlazado en el encabezado de `docs/08`.
 
 ## 1. Enfoque
 

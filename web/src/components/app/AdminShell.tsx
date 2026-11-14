@@ -167,15 +167,12 @@ function MenuUsuario() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="h-11 gap-2 px-1.5 md:h-9"
-          aria-label={`Menú de usuario: ${USUARIO.nombre}, ${USUARIO.rol}`}
-        >
-          <Avatar className="size-7">
+        <Button variant="ghost" className="h-11 gap-2 px-1.5 md:h-9">
+          <span className="sr-only">{`Menú de usuario: ${USUARIO.nombre}, ${USUARIO.rol}`}</span>
+          <Avatar className="size-7" aria-hidden="true">
             <AvatarFallback className="text-[11px] font-semibold">{USUARIO.iniciales}</AvatarFallback>
           </Avatar>
-          <span className="hidden text-sm md:inline">{USUARIO.nombre.split(' ')[0]}</span>
+          <span className="hidden text-sm md:inline" aria-hidden="true">{USUARIO.nombre.split(' ')[0]}</span>
           <ChevronsUpDown className="hidden size-3.5 text-muted-foreground md:block" />
         </Button>
       </DropdownMenuTrigger>

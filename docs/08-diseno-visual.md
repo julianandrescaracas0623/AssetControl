@@ -6,6 +6,8 @@
 
 **Diseño aprobado (decisión del humano, 2026-11-13)**: el humano aprobó la propuesta visual **"Grafito y Cobalto"** como el diseño que se usará. Vive en el lienzo de diseño [AssetControl — Diseño de la aplicación](https://claude.ai/artifact/JL51wegLrd1sJ2W7heqvMe) (sistema visual, 14 pantallas de administración y 10 de conteo a 375 px) y es la referencia para la spec de sistema de diseño y app shell (sección 11). Decide: base zinc, acento cobalto `#2B50E0`, botón principal neutro oscuro (opción A), fuente Geist / Geist Mono (dependencia pendiente de aprobar en esa spec) y la entrada **Registrar activo** en administración (4.1, 4.3, 7.7). El lienzo es una maqueta: no reemplaza la verificación en navegador real a 375 y 1440 px con componentes reales (sección 11, paso 3). Si choca con este documento, manda este documento hasta que se actualice.
 
+**Implementado en la web (spec 001b, 2026-11-14)**: tema, fuente, componentes de shadcn/ui, `AdminShell`, `CountShell`, buscador global y maquetas con datos ficticios de Inicio, Activos, Registrar activo, Informe y el flujo de conteo (`specs/001b-sistema-de-diseno/tasks.md`). Rutas de las maquetas: `/admin`, `/admin/activos`, `/admin/activos/nuevo`, `/admin/activos/:codigo`, `/admin/sesiones/:id/informe`, `/contar`, `/contar/escanear`, `/contar/escribir`, `/contar/activo/:codigo`, `/contar/verificado/:codigo`, `/contar/no-confirmado/:codigo`, `/contar/nuevo?codigo=`, `/contar/pendientes`; galería en `/dev/componentes`; rol y estado simulados con `?rol=` y `?estado=`. Verificación: 48 combinaciones de ruta y ancho (375 y 1440 px) sin scroll horizontal ni infracciones WCAG 2.1 AA de axe-core, contraste incluido.
+
 ## 1. Principios visuales
 
 1. **Profesional y sobrio**: la interfaz transmite control y precisión. Jerarquía por tipografía, espacio y peso, no por color ni decoración. Bordes finos antes que sombras; nada de degradados, ilustraciones ni íconos decorativos.
@@ -53,7 +55,7 @@ Variables CSS de shadcn (`--background`, `--primary`, etc.) en un único archivo
 | Radio base `--radius` | `0.5rem` (8 px) | Botones y campos `rounded-md`; tarjetas, sheets y diálogos `rounded-xl` |
 | Bordes y sombras | Tarjetas y tablas con borde de 1 px, sin sombra o `shadow-xs`; `shadow-lg` solo en sheet, diálogo y menú | Sin sombras de color |
 | Espaciado base | 4 px (escala Tailwind); bloques `gap-4` (16 px) por debajo de `md`, `gap-6` (24 px) desde `md`; márgenes de página 24–32 px desde `md` | Mucho blanco, nunca aire vacío sin propósito |
-| Ancho de contenido admin | Fluido con máximo `[PENDIENTE: ~1280–1440 px]` | Tablas a ancho completo del área |
+| Ancho de contenido admin | Fluido con máximo **1320 px** (D2 de la spec 001b, 2026-11-13) | Tablas a ancho completo del área |
 | Objetivo táctil | `min-h-11` (44 px) en `/contar/**` y en `/admin/**` por debajo de `md`; botón principal `h-12`–`h-14` en conteo | Admin desde `md`: `h-8`/`h-9` |
 | Separación entre objetivos | ≥ 8 px | Evita toques erróneos |
 
@@ -132,7 +134,7 @@ Copiar un componente de shadcn/ui no es "cero dependencias": muchos instalan paq
 | Móvil, formulario corto (alta por escaneo) | Pantalla completa; botón principal fijo abajo |
 | Admin desde `md`, crear o editar corto (ubicación, invitación) | Diálogo |
 | Admin desde `md`, editar un activo desde la tabla | Sheet lateral derecho; la tabla sigue visible |
-| Admin por debajo de `md`, crear o editar | `[PENDIENTE]` (recomendación: sheet inferior o pantalla completa, como en conteo) |
+| Admin por debajo de `md`, crear o editar | **Sheet inferior o pantalla completa, como en conteo** (D4 de la spec 001b, 2026-11-13) |
 | Confirmación destructiva o irreversible (cerrar sesión, dar de baja) | `alert-dialog` en ambos modos, con el efecto explícito |
 | Error que bloquea el flujo (sesión cerrada) | `alert` en pantalla, no toast |
 
@@ -202,13 +204,13 @@ Decisión del humano (2026-11-11): toda la aplicación, también `/admin/**`, se
 
 | Pantalla | Criterio por debajo de `md` |
 |---|---|
-| Activos | `[PENDIENTE]` |
+| Activos | **Lista de tarjetas** (nombre, código, categoría, ubicación, estado, conteo, precio y menú `⋯`), spec 001b |
 | Ubicaciones (vista lista) | `[PENDIENTE]` |
 | Sesiones | `[PENDIENTE]` |
 | Discrepancias | `[PENDIENTE]` |
 | Usuarios | `[PENDIENTE]` |
-| Informe (pestañas por categoría, por ubicación, no encontrados) | `[PENDIENTE]` |
-| Actividad reciente del Inicio | `[PENDIENTE]` |
+| Informe (pestañas por categoría, por ubicación, no encontrados) | **Scroll horizontal dentro de la tabla con la primera columna fija**, spec 001b |
+| Actividad reciente del Inicio | **Lista** (evento, hora, activo, código, usuario y detalle), spec 001b |
 
 - **Formularios**: una sola columna; campos de 16 px mínimo (evita el zoom automático de iOS); objetivos táctiles de 44 px (`min-h-11`) y ≥ 8 px entre ellos.
 - **Inicio**: tarjetas de indicadores en una o dos columnas; **gráficas del dashboard apiladas** (una debajo de otra, a ancho completo), cada una con su rótulo de fuente y su "Ver como tabla".
@@ -222,7 +224,7 @@ Mismo lenguaje visual que admin (tipografía, color, radios, íconos, badges), c
 - **Contenido**: tarjeta con borde, sin sombra; datos en filas rótulo/valor; badges de estado iguales a los de admin.
 - **Barra de acción fija abajo**: fondo `--background`, borde superior, respeta el área segura del teléfono; contiene la acción principal a ancho completo y, si hace falta, una secundaria `outline` encima.
 - Sheets inferiores para elegir y confirmar; nada de diálogos centrados en móvil salvo `alert-dialog`.
-- **En computador** (desde `md`): columna centrada con ancho máximo `[PENDIENTE]`; mismo layout de una mano, verificado también a 1440 px.
+- **En computador** (desde `md`): columna centrada con ancho máximo de **480 px** (D5 de la spec 001b); mismo layout de una mano, verificado también a 1440 px.
 
 ## 6. Inventario de pantallas
 
@@ -501,7 +503,7 @@ Tono: breve, directo, sin tecnicismos ni culpa al usuario. Tuteo.
 2. ~~Botón principal~~: decidido 2026-11-13, neutro oscuro (opción A).
 3. Fuente de producto: Geist / Geist Mono elegida en el diseño aprobado (2026-11-13); falta aprobar la dependencia (autoalojada) en la spec de sistema de diseño.
 4. Modo oscuro: dentro o fuera del MVP.
-5. Dependencias: `lucide-react` (íconos), `@tanstack/react-table` (tablas) y `recharts` (gráficos del Inicio, vía el componente `chart` de shadcn/ui; spec 010), además de las que arrastre cada componente de shadcn/ui.
+5. Dependencias: `lucide-react` (ya instalada en la fundación), `react-router`, `cmdk`, `sonner` y las fuentes Geist **aprobadas en la spec 001b (D1)**. Siguen pendientes `@tanstack/react-table` (tablas, con la primera pantalla con datos) y `recharts` (gráficos del Inicio, spec 010).
 6. Alcance del buscador global (recomendación: activos y navegación).
 7. Paginación, orden y filtro en cliente o en servidor.
 8. "Actividad reciente": ¿pantalla de actividad global o solo historial por activo? Discrepancias: ¿entrada propia en la barra lateral?
@@ -512,13 +514,13 @@ Tono: breve, directo, sin tecnicismos ni culpa al usuario. Tuteo.
 13. Nombre y logo del producto (T9); hasta entonces, texto "AssetControl". El lienzo trae un logo provisional de barras, no aprobado como marca.
 14. Contador: ¿ve discrepancias de su conteo? (CU-DIS-01), ¿sesiones pasadas? (CU-HIS-02), ¿puede editar el precio al duplicar sin verlo? (CU-CAT-03), ¿qué ve en su Inicio? (P25).
 15. Vista previa "no definitiva" del informe con sesión abierta; "buscado y no hallado" frente a "sin verificar" (P16); umbral de "Poca luz".
-16. Nombre y número de la spec de sistema de diseño y app shell (sección 11).
+16. ~~Nombre y número de la spec de sistema de diseño y app shell~~: `specs/001b-sistema-de-diseno/` (decisión del humano, 2026-11-13), implementada el 2026-11-14.
 17. Inicio de admin: fuente por defecto de las gráficas por categoría y ubicación (P23), cuántos conteos muestra la evolución (P22) y base del % encontrado (P24).
-18. `/contar/**` en computador (desde `md`): ancho máximo de la columna centrada (sección 5). Tamaño de íconos de admin por debajo de `md` (sección 2.4).
+18. ~~`/contar/**` en computador~~: columna de 480 px (D5). Pendiente: tamaño de íconos de admin por debajo de `md` (la spec 001b usa 16 px dentro de objetivos de 44 px).
 
 ## 11. Siguientes pasos
 
 1. **No más prototipos hechos a mano.** El diseño se valida sobre la web real, con los componentes reales. Excepción ya hecha: el lienzo de diseño aprobado el 2026-11-13 (ver el encabezado) es la referencia visual; no se hacen más maquetas, se construye.
-2. **Spec corta de "sistema de diseño y app shell"** `[PENDIENTE: nombre y número, decisión humana]`, **después de T8** de [specs/001-fundacion-tecnica](../specs/001-fundacion-tecnica/tasks.md). Monta el shell real (`AdminShell` y `CountShell`) con componentes de shadcn/ui, el tema de la sección 2 y **datos ficticios**, sin backend de negocio: Inicio, tabla de Activos, informe y las pantallas (a)–(d) de conteo como maquetas navegables. Declara para aprobación todas sus dependencias (las que arrastre `npx shadcn@latest add`, `lucide-react`, `@tanstack/react-table`, la fuente si se aprueba y `recharts` solo si la maqueta del Inicio incluye gráficas; si no, las gráficas llegan con la spec 010). T8 sigue limitada a su criterio (esqueleto, tema base y un componente); cualquier ajuste a T8 pasa por el planner y el humano.
+2. **Spec corta de "sistema de diseño y app shell"** — **hecha: `specs/001b-sistema-de-diseno/` (2026-11-14)**, **después de T8** de [specs/001-fundacion-tecnica](../specs/001-fundacion-tecnica/tasks.md). Monta el shell real (`AdminShell` y `CountShell`) con componentes de shadcn/ui, el tema de la sección 2 y **datos ficticios**, sin backend de negocio: Inicio, tabla de Activos, informe y las pantallas (a)–(d) de conteo como maquetas navegables. Declara para aprobación todas sus dependencias (las que arrastre `npx shadcn@latest add`, `lucide-react`, `@tanstack/react-table`, la fuente si se aprueba y `recharts` solo si la maqueta del Inicio incluye gráficas; si no, las gráficas llegan con la spec 010). T8 sigue limitada a su criterio (esqueleto, tema base y un componente); cualquier ajuste a T8 pasa por el planner y el humano.
 3. **Revisión antes de mostrar**: cada pantalla, de admin y de conteo, se revisa con capturas en navegador real a **375 px** y a **1440 px** (skill `browser-qa`), con contraste medido y estados (cargando, vacío, error, éxito) recorridos, **antes** de presentarla al humano.
 4. **Aprobación humana con las capturas**: el humano aprueba o pide cambios sobre las capturas; con eso se fijan los hex, la fuente y los `[PENDIENTE]` que afecten a las specs 004 y 006 (escáner y verificación). Las pantallas reales con datos llegan en las specs 002–010.
