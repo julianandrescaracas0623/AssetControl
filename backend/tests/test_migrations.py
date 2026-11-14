@@ -43,6 +43,7 @@ FUNCIONES = "0004_funciones_de_acceso"
 LIMITE_TASA = "0005_limite_tasa"
 CATALOGO = "0006_ubicaciones_y_categorias"
 ACTIVOS = "0007_activos"
+CAMBIOS = "0008_activo_cambios"
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
 MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
@@ -187,8 +188,9 @@ def test_revision_chain():
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == [ACTIVOS]
+    assert script.get_heads() == [CAMBIOS]
     assert [r.revision for r in revisions] == [
+        CAMBIOS,
         ACTIVOS,
         CATALOGO,
         LIMITE_TASA,
@@ -197,13 +199,14 @@ def test_revision_chain():
         ACCESO,
         BASELINE,
     ]
-    assert revisions[0].down_revision == CATALOGO
-    assert revisions[1].down_revision == LIMITE_TASA
-    assert revisions[2].down_revision == FUNCIONES
-    assert revisions[3].down_revision == POLITICAS
-    assert revisions[4].down_revision == ACCESO
-    assert revisions[5].down_revision == BASELINE
-    assert revisions[6].down_revision is None
+    assert revisions[0].down_revision == ACTIVOS
+    assert revisions[1].down_revision == CATALOGO
+    assert revisions[2].down_revision == LIMITE_TASA
+    assert revisions[3].down_revision == FUNCIONES
+    assert revisions[4].down_revision == POLITICAS
+    assert revisions[5].down_revision == ACCESO
+    assert revisions[6].down_revision == BASELINE
+    assert revisions[7].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -323,7 +326,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [ACTIVOS])
+    assert _public_state(migrate_env) == (with_auth, [CAMBIOS])
     assert _schema_exists(migrate_env, "acceso")
 
     command.downgrade(config, "base")
@@ -332,7 +335,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [ACTIVOS])
+    assert _public_state(migrate_env) == (with_auth, [CAMBIOS])
     assert _schema_exists(migrate_env, "acceso")
 
 
@@ -421,7 +424,7 @@ def test_0007_up_down_up_touches_only_the_asset_tables_and_trigger(migrate_env):
     command.upgrade(config, CATALOGO)
     owner_before = _owner_state(migrate_env)
 
-    command.upgrade(config, "head")
+    command.upgrade(config, ACTIVOS)
     assert _public_state(migrate_env) == (sorted([*before, *ASSET_TABLES]), [ACTIVOS])
     for table in ASSET_TABLES:
         assert _policy_names(migrate_env, table) == ["tenant_isolation"]
@@ -432,8 +435,72 @@ def test_0007_up_down_up_touches_only_the_asset_tables_and_trigger(migrate_env):
     assert _public_state(migrate_env) == (before, [CATALOGO])
     assert _public_functions(migrate_env) == []
 
-    command.upgrade(config, "head")
+    command.upgrade(config, ACTIVOS)
     assert _public_state(migrate_env) == (sorted([*before, *ASSET_TABLES]), [ACTIVOS])
+
+
+def test_0008_up_down_up_changes_only_grants_and_event_types(migrate_env):
+    # Spec 005, T1: 0008 da UPDATE por columna en activo y suma el tipo datos_cambiados;
+    # no crea ni borra tablas ni funciones, y su downgrade deja todo como en 0007.
+    config = alembic_config()
+    tables = sorted(
+        ["alembic_version", "limite_tasa", *AUTH_TABLES, *CATALOG_TABLES, *ASSET_TABLES]
+    )
+
+    command.upgrade(config, ACTIVOS)
+    owner_before = _owner_state(migrate_env)
+    grants_before = _activo_update_columns(migrate_env)
+    assert grants_before == []
+    assert "datos_cambiados" not in _event_type_check(migrate_env)
+
+    command.upgrade(config, "head")
+    assert _public_state(migrate_env) == (tables, [CAMBIOS])
+    assert _public_functions(migrate_env) == ["activo_ubicacion_valida"]
+    assert "codigo" not in _activo_update_columns(migrate_env)
+    assert "precio_compra" in _activo_update_columns(migrate_env)
+    assert "datos_cambiados" in _event_type_check(migrate_env)
+    assert _owner_state(migrate_env) == owner_before
+
+    command.downgrade(config, ACTIVOS)
+    assert _public_state(migrate_env) == (tables, [ACTIVOS])
+    assert _activo_update_columns(migrate_env) == grants_before
+    assert "datos_cambiados" not in _event_type_check(migrate_env)
+
+    command.upgrade(config, "head")
+    assert _public_state(migrate_env) == (tables, [CAMBIOS])
+
+
+def _activo_update_columns(url: URL) -> list[str]:
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            return list(
+                conn.scalars(
+                    text(
+                        "select column_name from information_schema.column_privileges "
+                        "where table_schema = 'public' and table_name = 'activo' "
+                        "and privilege_type = 'UPDATE' and grantee <> current_user "
+                        "order by 1"
+                    )
+                )
+            )
+    finally:
+        engine.dispose()
+
+
+def _event_type_check(url: URL) -> str:
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            return conn.scalar(
+                text(
+                    "select pg_get_constraintdef(c.oid) from pg_constraint c "
+                    "where c.conrelid = 'public.activo_evento'::regclass "
+                    "and c.conname = 'activo_evento_tipo_check'"
+                )
+            )
+    finally:
+        engine.dispose()
 
 
 def _public_functions(url: URL) -> list[str]:

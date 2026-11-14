@@ -196,6 +196,22 @@ ACTIVO_INSERT = {
     "fecha_compra",
     "creado_por",
 }
+ACTIVO_UPDATE = {
+    "nombre",
+    "categoria_id",
+    "ubicacion_id",
+    "serial",
+    "marca",
+    "modelo",
+    "referencia",
+    "color",
+    "subtipo",
+    "precio_compra",
+    "fecha_compra",
+    "estado",
+    "row_version",
+    "actualizado_en",
+}
 EVENTO_INSERT = {
     "tenant_id",
     "activo_id",
@@ -269,11 +285,13 @@ EXPECTED_APP_COLUMNS = {
         "INSERT": {"tenant_id", "nombre", "nombre_clave"},
         "UPDATE": {"nombre", "nombre_clave"},
     },
-    # Spec 004, T1 (0007): estado, row_version y fechas por DEFAULT; sin UPDATE hasta la
-    # 005 (el código es inmutable); el historial es inmutable (sin UPDATE nunca).
+    # Spec 004, T1 (0007): estado, row_version y fechas por DEFAULT. Spec 005, T1 (0008):
+    # UPDATE por columna sin codigo, id, tenant_id, creado_por, creado_en ni atributos
+    # (el código es inmutable); el historial es inmutable (sin UPDATE nunca).
     "activo": {
         "SELECT": {*ACTIVO_INSERT, "estado", "row_version", "creado_en", "actualizado_en"},
         "INSERT": ACTIVO_INSERT,
+        "UPDATE": ACTIVO_UPDATE,
     },
     "activo_evento": {
         "SELECT": {*EVENTO_INSERT, "id", "ocurrido_en", "seq"},

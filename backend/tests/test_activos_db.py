@@ -8,8 +8,11 @@ Con el **rol de la aplicación** sobre una base temporal con dos tenants (A y B)
 - ``precio_compra >= 0`` con dos decimales (Q2).
 - D1: el disparador rechaza una sede o una ubicación inactiva.
 - FK compuestas: categoría, ubicación y creador de otro tenant fallan.
-- Sin ``UPDATE`` ni ``DELETE`` en ``activo`` (hasta la 005) ni en ``activo_evento``
-  (inmutable); ``estado``, ``row_version`` y fechas por ``DEFAULT``.
+- Sin ``DELETE`` en ``activo`` ni escritura alguna sobre ``activo_evento`` (inmutable);
+  ``estado``, ``row_version`` y fechas por ``DEFAULT`` al insertar.
+- Spec 005, T1 (0008): ``UPDATE`` solo de las columnas editables (nunca ``codigo``,
+  ``id``, ``tenant_id``, ``creado_por``, ``creado_en`` ni ``atributos``); D1 también al
+  mover; la RLS no deja cambiar filas de otro tenant; tipo de evento ``datos_cambiados``.
 """
 
 import uuid
@@ -219,9 +222,12 @@ def test_references_of_another_tenant_fail(act_db, catalogo, cambio):
 @pytest.mark.parametrize(
     "sql",
     [
-        "update activo set nombre = 'x'",
         "update activo set codigo = 'X'",
-        "update activo set precio_compra = 0",
+        "update activo set id = gen_random_uuid()",
+        "update activo set tenant_id = :t",
+        "update activo set creado_por = gen_random_uuid()",
+        "update activo set creado_en = now()",
+        "update activo set atributos = '{}'::jsonb",
         "delete from activo",
         "truncate activo",
         "update activo_evento set datos = '{}'::jsonb",
@@ -249,3 +255,106 @@ def test_trigger_function_is_invoker_with_fixed_search_path(act_db):
             )
         ).one()
     assert fila == (False, ["search_path=pg_catalog, pg_temp"], False)
+
+
+# --- Spec 005, T1 (0008): cambios sobre activos existentes ----------------------------
+
+
+def crear(conn: Connection, catalogo, **cambios) -> dict:
+    p = params(catalogo, **cambios)
+    conn.execute(text(INSERT), p)
+    return p
+
+
+def test_app_updates_editable_columns_and_bumps_the_version(act_db, catalogo):
+    with como_app(act_db, TENANT_A) as conn:
+        p = crear(conn, catalogo)
+        cambiadas = conn.execute(
+            text(
+                "update activo set nombre = 'Autoclave 23 L', precio_compra = 0, "
+                "categoria_id = :cat, ubicacion_id = :box, serial = 'S-1', marca = 'M', "
+                "modelo = 'X', referencia = 'R', color = 'Gris', subtipo = 'Vapor', "
+                "fecha_compra = date '2024-01-31', estado = 'en_reparacion', "
+                "row_version = row_version + 1, actualizado_en = now() "
+                "where id = :id and row_version = 1"
+            ),
+            {"id": p["id"], "cat": catalogo["cat"], "box": catalogo["box"]},
+        ).rowcount
+        assert cambiadas == 1
+        fila = conn.execute(
+            text("select nombre, estado, row_version, codigo from activo where id = :id"),
+            {"id": p["id"]},
+        ).one()
+        assert fila == ("Autoclave 23 L", "en_reparacion", 2, p["codigo"])
+
+
+def test_stale_version_updates_nothing(act_db, catalogo):
+    with como_app(act_db, TENANT_A) as conn:
+        p = crear(conn, catalogo)
+        sql = text(
+            "update activo set nombre = :n, row_version = row_version + 1 "
+            "where id = :id and row_version = 1"
+        )
+        assert conn.execute(sql, {"id": p["id"], "n": "Primero"}).rowcount == 1
+        assert conn.execute(sql, {"id": p["id"], "n": "Segundo"}).rowcount == 0
+
+
+@pytest.mark.parametrize("ubicacion", ["sede", "inactiva", "sala_b"])
+def test_d1_also_applies_when_moving(act_db, catalogo, ubicacion):
+    with como_app(act_db, TENANT_A) as conn:
+        p = crear(conn, catalogo)
+        falla(
+            conn,
+            "update activo set ubicacion_id = :u where id = :id",
+            {"u": catalogo[ubicacion], "id": p["id"]},
+            UBICACION_INVALIDA,
+        )
+
+
+def test_state_and_version_checks_still_hold_on_update(act_db, catalogo):
+    with como_app(act_db, TENANT_A) as conn:
+        p = crear(conn, catalogo)
+        for sql in (
+            "update activo set estado = 'perdido' where id = :id",
+            "update activo set row_version = 0 where id = :id",
+            "update activo set precio_compra = -1 where id = :id",
+            "update activo set nombre = '' where id = :id",
+            "update activo set marca = '' where id = :id",
+        ):
+            falla(conn, sql, {"id": p["id"]}, CHECK_VIOLATION)
+
+
+def test_other_tenant_rows_cannot_be_updated(act_db, catalogo):
+    p = params(
+        catalogo, t=TENANT_B, cat=catalogo["cat_b"], ubi=catalogo["sala_b"], por=ADMIN_B.usuario_id
+    )
+    with act_db.migrator.begin() as conn:
+        conn.execute(text(INSERT), p)
+    try:
+        with como_app(act_db, TENANT_A) as conn:
+            cambiadas = conn.execute(
+                text("update activo set nombre = 'robado' where id = :id"), {"id": p["id"]}
+            ).rowcount
+            assert cambiadas == 0
+    finally:
+        with act_db.migrator.begin() as conn:
+            conn.execute(text("delete from activo where id = :id"), {"id": p["id"]})
+
+
+def test_event_types_include_datos_cambiados(act_db, catalogo):
+    with como_app(act_db, TENANT_A) as conn:
+        p = crear(conn, catalogo)
+        evento = (
+            "insert into activo_evento (tenant_id, activo_id, tipo, datos, usuario_id) "
+            "values (:t, :a, :tipo, '{}', :u)"
+        )
+        conn.execute(
+            text(evento),
+            {"t": TENANT_A, "a": p["id"], "tipo": "datos_cambiados", "u": ADMIN_A.usuario_id},
+        )
+        falla(
+            conn,
+            evento,
+            {"t": TENANT_A, "a": p["id"], "tipo": "editado", "u": ADMIN_A.usuario_id},
+            CHECK_VIOLATION,
+        )
