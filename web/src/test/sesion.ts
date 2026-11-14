@@ -45,6 +45,8 @@ export function simularSesion(rol: Rol | null, extra?: Manejador) {
     if (propia) return propia
     if (url === '/api/auth/refresh') return rol ? json(200, sesionDe(rol)) : errorApi(401, 'no_autenticado')
     if (url === '/api/auth/logout') return new Response(null, { status: 204 })
+    // Spec 006: sin catálogo simulado, no hay sesión de conteo abierta.
+    if (url === '/api/sesiones/abierta') return json(200, { sesion: null })
     return new Promise<Response>(() => {})
   })
   vi.stubGlobal('fetch', fetchSimulado)

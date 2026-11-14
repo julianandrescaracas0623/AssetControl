@@ -23,7 +23,7 @@ function renderAt(path: string, rol: Rol | null = 'admin') {
 describe('rutas', () => {
   it.each([
     ['/admin', 'admin', 'Resumen'],
-    ['/contar', 'contador', 'Conteo nov 2026'],
+    ['/contar', 'contador', 'Conteo'],
     ['/login', null, 'Iniciar sesión'],
     ['/dev/componentes', null, 'Sistema de diseño · Grafito y Cobalto'],
   ] as const)('%s muestra «%s»', async (path, rol, heading) => {

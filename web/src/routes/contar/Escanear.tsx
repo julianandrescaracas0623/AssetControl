@@ -7,13 +7,14 @@ import { CountShell } from '@/components/app/CountShell'
 import { Escaner } from '@/components/app/Escaner'
 import { Button } from '@/components/ui/button'
 import { normalizarCodigo } from '@/lib/activos'
-import { RESUMEN } from '@/mocks/datos-ficticios'
+import { useCabeceraConteo } from '@/lib/conteo'
 
 // Escáner (docs/08 §7.1; spec 004, T8). Cada lectura abre el activo de ese código (o
 // el alta si no existe). "Escribir código" siempre está a la mano.
 
 export default function Escanear() {
   const navigate = useNavigate()
+  const cabecera = useCabeceraConteo()
   const alLeer = useCallback(
     (texto: string) => {
       const codigo = normalizarCodigo(texto)
@@ -28,8 +29,8 @@ export default function Escanear() {
 
   return (
     <CountShell
-      titulo={RESUMEN.conteoAbierto.nombre}
-      subtitulo="Administración"
+      titulo={cabecera.titulo}
+      subtitulo={cabecera.subtitulo}
       volver="/contar"
       estadoRed="en_linea"
       acciones={

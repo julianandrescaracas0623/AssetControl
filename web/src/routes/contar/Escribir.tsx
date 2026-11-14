@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useSimulacion } from '@/lib/simulacion'
 import { normalizarCodigo } from '@/lib/activos'
-import { RESUMEN } from '@/mocks/datos-ficticios'
+import { useCabeceraConteo } from '@/lib/conteo'
 
 // Entrada manual del código (docs/08 §7.1, CU-VER-05). Con ?estado=error se
 // ve como cámara denegada. Mismo camino que un escaneo: existe → verificar;
@@ -19,6 +19,7 @@ import { RESUMEN } from '@/mocks/datos-ficticios'
 export default function Escribir() {
   const { estado } = useSimulacion()
   const navigate = useNavigate()
+  const cabecera = useCabeceraConteo()
   const [codigo, setCodigo] = useState('')
   const [error, setError] = useState('')
 
@@ -39,8 +40,8 @@ export default function Escribir() {
 
   return (
     <CountShell
-      titulo={RESUMEN.conteoAbierto.nombre}
-      subtitulo="Administración"
+      titulo={cabecera.titulo}
+      subtitulo={cabecera.subtitulo}
       volver="/contar/escanear"
       estadoRed="en_linea"
       acciones={

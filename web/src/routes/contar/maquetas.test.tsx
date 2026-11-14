@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Rol } from '@/lib/api/cliente'
 import { routes } from '@/router'
 import { simularAncho } from '@/test/matchMedia'
-import { catalogoDemo } from '@/test/catalogo'
+import { catalogoDemo, sesionDe } from '@/test/catalogo'
 import { lectorFalso } from '@/test/lector'
 import { simularSesion } from '@/test/sesion'
 
@@ -23,29 +23,45 @@ vi.mock('@/lib/lector', async (original) => ({
   crearLectorZxing: (...args: Parameters<import('@/lib/lector').CrearLector>) => lector.actual!.crear(...args),
 }))
 
-async function abrir(path: string, rol: Rol = 'contador') {
+async function abrir(path: string, rol: Rol = 'contador', { conSesion = true } = {}) {
   simularAncho({ movil: true })
-  simularSesion(rol, catalogoDemo(rol).manejador)
+  simularSesion(rol, catalogoDemo(rol, { sesiones: conSesion ? [sesionDe()] : [] }).manejador)
   const router = createMemoryRouter(routes, { initialEntries: [path] })
   const { container } = render(<RouterProvider router={router} />)
   await screen.findByRole('heading', { level: 1 })
   return { router, container }
 }
 
-describe('Inicio del contador', () => {
-  it('muestra sesión, pendientes y actividad, sin ningún precio', async () => {
+describe('Inicio del contador (spec 006, T6)', () => {
+  it('muestra la sesión abierta real, su avance y los pendientes por ubicación, sin ningún precio', async () => {
     const { container } = await abrir('/contar')
-    expect(screen.getByRole('heading', { level: 1, name: 'Conteo nov 2026' })).toBeTruthy()
-    expect(screen.getAllByRole('listitem').length).toBeGreaterThan(3)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Conteo nov 2026' })).toBeTruthy()
+    expect(await screen.findByText('2 pendientes')).toBeTruthy()
+    const pendientes = screen.getByRole('region', { name: 'Pendientes por ubicación' })
+    expect(within(pendientes).getAllByRole('listitem')).toHaveLength(2)
     expect(container.textContent).not.toContain('$')
-    expect(container.textContent).not.toContain('Precio cambiado')
+    expect(screen.queryByText(/Actividad reciente/)).toBeNull()
     expect(screen.getByRole('link', { name: /Escanear/ }).getAttribute('href')).toBe('/contar/escanear')
     expect(screen.getByRole('link', { name: /Registrar activo nuevo/ })).toBeTruthy()
   })
 
-  it('sin sesión abierta lo dice y no inventa cifras', async () => {
-    await abrir('/contar?estado=vacio')
-    expect(screen.getByText('No hay una sesión abierta')).toBeTruthy()
+  it('sin sesión abierta lo dice, no inventa cifras y deja consultar', async () => {
+    await abrir('/contar', 'contador', { conSesion: false })
+    expect(await screen.findByText('No hay una sesión abierta')).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Consultar un activo/ })).toBeTruthy()
+    expect(screen.queryByRole('combobox', { name: 'Estás contando en' })).toBeNull()
+  })
+
+  it('la sala de trabajo se recuerda y sale en la cabecera del conteo', async () => {
+    await abrir('/contar')
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Estás contando en' }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Consultorio 1 › Box 2' }))
+    cleanup()
+    lector.actual = lectorFalso()
+    await abrir('/contar/escanear')
+    const cabecera = screen.getByRole('banner')
+    expect(await within(cabecera).findByText('Consultorio 1 › Box 2')).toBeTruthy()
+    expect(within(cabecera).getByText('Conteo nov 2026')).toBeTruthy()
   })
 })
 

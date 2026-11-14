@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { Rol } from '@/lib/api/cliente'
 import { routes } from '@/router'
-import { crearCatalogo, ub } from '@/test/catalogo'
+import { crearCatalogo, sesionDe, ub } from '@/test/catalogo'
 import { simularAncho } from '@/test/matchMedia'
 import { simularSesion } from '@/test/sesion'
 
@@ -27,6 +27,7 @@ describe('selector del inicio de conteo', () => {
           ub('c', 'Consultorios', 'sala', 'n'),
           ub('b', 'Box 2', 'box', 'c'),
         ],
+        sesiones: [sesionDe()],
       }),
     )
     const selector = await screen.findByRole('combobox', { name: 'Estás contando en' })
@@ -42,7 +43,7 @@ describe('selector del inicio de conteo', () => {
     ['contador', 'Pide al administrador que las cree.'],
     ['admin', 'Créalas en Ubicaciones'],
   ] as const)('sin salas activas lo dice al %s', async (rol, texto) => {
-    abrir(crearCatalogo({ ubicaciones: [ub('n', 'Sede Norte', 'sede', null)] }), rol)
+    abrir(crearCatalogo({ ubicaciones: [ub('n', 'Sede Norte', 'sede', null)], sesiones: [sesionDe()] }), rol)
     expect(await screen.findByText(new RegExp(texto))).toBeTruthy()
   })
 })

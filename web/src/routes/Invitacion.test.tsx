@@ -64,7 +64,7 @@ describe('/invitacion', () => {
     const { router, f } = abrir(`/invitacion#${TOKEN}`)
     await h1('Crea tu cuenta')
     crear()
-    await h1('Conteo nov 2026')
+    await h1('Conteo')
     expect(router.state.location.pathname).toBe('/contar')
     const [, init] = llamadas(f, '/api/invitaciones/aceptar')[0]
     expect(JSON.parse(String(init?.body))).toEqual({ token: TOKEN, nombre: 'Luis Pérez', password: 'Una-clave-larga-2026' })

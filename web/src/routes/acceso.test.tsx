@@ -36,7 +36,7 @@ describe('guardas', () => {
     expect(admin.router.state.location.pathname).toBe('/admin')
     cleanup()
     const contador = abrir('/', 'contador')
-    await h1('Conteo nov 2026')
+    await h1('Conteo')
     expect(contador.router.state.location.pathname).toBe('/contar')
   })
 
@@ -48,7 +48,7 @@ describe('guardas', () => {
 
   it('un admin puede contar', async () => {
     abrir('/contar', 'admin')
-    await h1('Conteo nov 2026')
+    await h1('Conteo')
   })
 
   it('mientras renueva muestra «Comprobando la sesión»', async () => {
@@ -103,7 +103,7 @@ describe('/login', () => {
 
   it.each([
     ['admin', '/admin', 'Resumen'],
-    ['contador', '/contar', 'Conteo nov 2026'],
+    ['contador', '/contar', 'Conteo'],
   ] as const)('%s entra y llega a %s', async (rol, ruta, titulo) => {
     const { router, f } = abrir('/login', null, loginResponde(() => json(200, sesionDe(rol))))
     await h1('Iniciar sesión')
@@ -142,7 +142,7 @@ describe('/login', () => {
 
   it('con sesión abierta /login lleva al inicio del rol', async () => {
     const { router } = abrir('/login', 'contador')
-    await h1('Conteo nov 2026')
+    await h1('Conteo')
     expect(router.state.location.pathname).toBe('/contar')
   })
 })
@@ -165,7 +165,7 @@ describe('cuenta y cerrar sesión', () => {
 
   it('el inicio de conteo saluda a la cuenta y cierra sesión', async () => {
     const { router, f } = abrir('/contar', 'contador')
-    await h1('Conteo nov 2026')
+    await h1('Conteo')
     expect(screen.getByText('Hola, Luis')).toBeTruthy()
     fireEvent.keyDown(screen.getByRole('button', { name: 'Menú de cuenta: Luis Pérez, Contador' }), { key: 'Enter' })
     const menu = await screen.findByRole('menu')
