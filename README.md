@@ -105,6 +105,36 @@ read -rs MIGRATION_DATABASE_URL; export MIGRATION_DATABASE_URL
 
 En producción el migrador no es superusuario ni tiene `BYPASSRLS` (Q5); la migración `0004` le concede `EXECUTE` sobre `acceso.crear_tenant`, que es lo único que necesita.
 
+### Límites de tasa y purga de `limite_tasa` (operador, spec 002)
+
+Login, refresh, validar y aceptar invitación cuentan intentos en la tabla `limite_tasa` (migración `0005`) antes de Argon2 y de buscar la cuenta, en una transacción propia. Al superar el umbral responden `429` `demasiadas_solicitudes` con `Retry-After` igual a la ventana, idéntico exista o no la cuenta; si la tabla no responde, `503` `servicio_no_disponible` (falla cerrado). La tabla solo guarda HMAC de la IP o del email normalizado (clave derivada de `SECRET_KEY`) y contadores; la API no puede borrar filas.
+
+| Variable | Por defecto | Uso |
+|---|---|---|
+| `RATE_LIMIT_WINDOW_SECONDS` | `900` | Ventana fija (60–86400 s). |
+| `RATE_LIMIT_LOGIN_ACCOUNT` | `5` | Logins fallidos por cuenta y ventana (exista o no la cuenta). |
+| `RATE_LIMIT_LOGIN_IP` | `20` | Logins fallidos por IP. |
+| `RATE_LIMIT_REFRESH_IP` | `30` | Refresh fallidos por IP. |
+| `RATE_LIMIT_VALIDATE_IP` | `10` | `POST /invitaciones/validar` por IP (todas las peticiones). |
+| `RATE_LIMIT_ACCEPT_IP` | `10` | `POST /invitaciones/aceptar` por IP (las que pasan la política de contraseña). |
+| `TRUSTED_PROXY_HOPS` | `0` | Proxies de confianza delante de la API (0–5). Con `0` la IP es la del par TCP y `X-Forwarded-For` se ignora; con `N`, la que añadió el proxy `N` contando desde la API. Fíjalo al número exacto de proxies: uno de más deja que el cliente elija su IP. |
+| `ARGON2_MAX_CONCURRENCY` | `4` | Hashes Argon2 simultáneos por proceso (1–64); el resto espera hasta 2 s y luego recibe `503`. |
+
+Login y refresh devuelven el intento si la petición termina bien (solo cuentan los fallos); el logout no se limita. IPv6 se agrupa por `/64`. Una clínica detrás de un NAT comparte IP: con 30 usuarios, el umbral de refresh solo se alcanza con 30 refresh **fallidos** en 15 min; si se queda corto, sube `RATE_LIMIT_*` en el entorno. Los valores no numéricos o fuera de rango impiden arrancar.
+
+Las ventanas vencidas se ignoran; para que la tabla no crezca, el operador las purga de vez en cuando con el rol migrador (el único con `DELETE`, y solo sobre ventanas de más de un día). Como `create-tenant`, la URL llega solo por entorno y el comando no acepta argumentos:
+
+```sh
+(
+  set -a; . ./.env; set +a
+  export MIGRATION_DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+  docker compose run --rm -e MIGRATION_DATABASE_URL api uv run flask --app app purgar-limite-tasa
+  unset MIGRATION_DATABASE_URL
+)
+```
+
+Imprime cuántas ventanas borró. Con el rol de la aplicación falla (`42501`): la base le niega el `DELETE`.
+
 ### Pruebas dentro del contenedor `api`
 
 Las pruebas usan una base aparte, `assetcontrol_test`, en el mismo servidor `db`. Si no existe, créala con el rol migrador (las credenciales salen del entorno del contenedor):
@@ -197,7 +227,8 @@ Además, desactiva la Data API en el panel del proyecto (*Project Settings → D
 
 - El comando de producción es **`gunicorn`**, nunca `flask run` (el `CMD` de `backend/Dockerfile` es solo para desarrollo). Escucha solo en local, detrás del proxy inverso, con workers `gthread` o suficientes para que un `/health` lento no bloquee la API, por ejemplo: `gunicorn --worker-class gthread --workers 2 --threads 4 --bind 127.0.0.1:5000 "app:create_app()"`. Si el proxy corre en otra máquina o contenedor, fija `--forwarded-allow-ips` con su IP exacta (nunca `*`) para que las cabeceras `X-Forwarded-*` solo se acepten de él. `gunicorn` aún no es dependencia del proyecto: se añade, con aprobación, en la spec de despliegue.
 - `ENVIRONMENT=production`, sin `FLASK_DEBUG` ni `--reload`; el compose de este repositorio es solo para desarrollo.
-- **`/health` es anónimo y hace ping a la base:** limita su tasa en el proxy inverso (p. ej. unas pocas peticiones por segundo por IP) para que no sirva para saturar la base.
+- **`/health` es anónimo y hace ping a la base:** limita su tasa en el proxy inverso (p. ej. unas pocas peticiones por segundo por IP) para que no sirva para saturar la base. Para las sondas de disponibilidad usa **`GET /ready`** (`200 {"status": "ok"}` o `503 {"status": "error"}`, sin detalles), que guarda el resultado del ping 5 s por proceso.
+- **Proxy y límites de tasa:** fija `TRUSTED_PROXY_HOPS` al número exacto de proxies (ver "Límites de tasa"); limita además `/auth/*` e `/invitaciones/*` en el proxy inverso.
 - **Logs:** pueden arrastrar detalles de PostgreSQL (valores de fila, host). Restringe el acceso a quien opera el servicio y fija una retención acotada (p. ej. 14–30 días) en el alojamiento; nunca los copies a canales abiertos.
 - **Qué no se registra nunca:** la cabecera `Authorization`, cookies, tokens de invitación, URLs de conexión (`DATABASE_URL`, `MIGRATION_DATABASE_URL`), correos, teléfonos ni seriales de activos de la clínica. Sin `echo=True` en SQLAlchemy y con `log_statement = none` en PostgreSQL.
 

@@ -393,10 +393,11 @@ def test_decorators_declare_their_roles():
 
 # Endpoints sin token, cerrados. Añadir uno aquí exige justificarlo en la spec. Sin la ruta
 # ``static`` de Flask (H7 de T8: ``static_folder=None``); validar y aceptar invitación son
-# públicos por plan.md §4 (T9).
+# públicos por plan.md §4 (T9); /ready también (plan.md §4, R16, T10).
 PUBLIC_ENDPOINTS = frozenset(
     {
         "meta.health",
+        "meta.ready",
         "auth.login",
         "auth.refresh",
         "auth.logout",

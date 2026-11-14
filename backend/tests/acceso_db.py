@@ -36,7 +36,7 @@ from app.auth.credentials import (
     derive_key,
     encode_access_token,
 )
-from app.config import Config
+from app.config import Config, RateLimits
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
@@ -168,12 +168,15 @@ def temporary_acceso_db(prefix: str) -> Iterator[AccesoDb]:
         admin.dispose()
 
 
-def make_app(db: AccesoDb) -> Flask:
+def make_app(db: AccesoDb, rate_limits: RateLimits | None = None) -> Flask:
+    """App de prueba; ``rate_limits`` solo para módulos que repiten muchas peticiones
+    desde la misma IP sin probar los límites (T10; esos los prueba test_rate_limits)."""
     return create_app(
         Config(
             database_url=db.app_url.render_as_string(hide_password=False),
             secret_key=SECRET_KEY,
             environment="test",
+            rate_limits=rate_limits or RateLimits(),
         )
     )
 

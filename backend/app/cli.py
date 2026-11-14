@@ -1,5 +1,8 @@
 """Comandos del operador (spec 002, T5; R6; plan.md §2.3).
 
+``flask purgar-limite-tasa`` (T10, Q10) borra las ventanas de ``limite_tasa`` de
+más de un día, con el mismo rol migrador y las mismas reglas de entorno y errores.
+
 ``flask create-tenant <nombre> <email>`` crea un ``tenant`` y la primera
 invitación ``admin`` (24 h, ``creada_por`` NULL; Q3, Q17):
 
@@ -103,6 +106,48 @@ def create_tenant_command(nombre: str, email: str) -> None:
     click.echo(f"{INVITATION_LINK_PREFIX}{token}")
 
 
+# Misma condición que las políticas de purga de 0005: nunca una ventana vigente.
+_PURGAR_LIMITE_TASA = text(
+    "delete from limite_tasa where ventana_inicio < now() - interval '1 day'"
+)
+
+
+@click.command("purgar-limite-tasa")
+def purge_rate_limit_command() -> None:
+    """Borra las ventanas de límite de tasa de más de un día (T10, Q10, R5).
+
+    Lo ejecuta el operador con el rol migrador de MIGRATION_DATABASE_URL (solo por
+    entorno): es el único rol con DELETE en limite_tasa. No acepta argumentos.
+    """
+    config_error: str | None = None
+    try:
+        url = load_migration_url()
+    except (MissingConfigError, SameDatabaseRoleError, InvalidDatabaseUrlError) as exc:
+        config_error = str(exc)
+    if config_error is not None:
+        raise click.ClickException(config_error)
+
+    engine = create_engine(
+        url,
+        poolclass=NullPool,
+        hide_parameters=True,
+        connect_args={"connect_timeout": CONNECT_TIMEOUT_SECONDS},
+    )
+    failure: str | None = None
+    deleted = 0
+    try:
+        with engine.begin() as conn:
+            deleted = conn.execute(_PURGAR_LIMITE_TASA).rowcount
+    except (SQLAlchemyError, psycopg.Error) as exc:
+        failure = _database_error_summary(exc)
+    finally:
+        engine.dispose()
+    if failure is not None:
+        raise click.ClickException(f"No se pudo purgar limite_tasa ({failure}).")
+    click.echo(f"Ventanas de límite de tasa purgadas (más de un día): {deleted}")
+
+
 def register_cli(app: Flask) -> None:
     """Registra los comandos del operador en ``flask``."""
     app.cli.add_command(create_tenant_command)
+    app.cli.add_command(purge_rate_limit_command)

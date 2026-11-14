@@ -230,6 +230,15 @@ def client(login_app):
     return login_app.test_client()
 
 
+@pytest.fixture(autouse=True)
+def fresh_rate_limits(login_db) -> Iterator[None]:
+    """T10: cada prueba parte sin contadores de ``limite_tasa`` (los límites tienen sus
+    propias pruebas en ``test_rate_limits.py``); la base del módulo es compartida."""
+    with login_db.migrator.begin() as conn:
+        conn.execute(text("delete from limite_tasa"))
+    yield
+
+
 # --- Utilidades -----------------------------------------------------------------
 
 

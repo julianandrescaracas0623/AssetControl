@@ -23,14 +23,16 @@ email ya registrado (Q16), ``500`` genérico si la cuenta se creó pero la sesi�
 (A22: entra con el login).
 
 Las cabeceras ``no-store``/``no-referrer`` y el límite de 4 KB los pone
-``app.auth.http`` para todo ``/invitaciones``. El límite de tasa de validar y
-aceptar es de T10. Nada aquí registra el token ni la contraseña.
+``app.auth.http`` para todo ``/invitaciones``. Límite de tasa (T10, R13): validar y
+aceptar por IP, contados antes de la base y de Argon2 (aceptar, tras la política
+Q9); ``429`` genérico o ``503``. Nada aquí registra el token ni la contraseña.
 """
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 
-from app.auth.credentials import PasswordPolicyError
+from app.auth import limits
+from app.auth.credentials import PasswordPolicyError, check_password_policy
 from app.auth.decorators import current_session, current_user, require_role
 from app.auth.routes import session_response
 from app.errors import error_response
@@ -96,6 +98,7 @@ def validar() -> ResponseReturnValue:
     if fields is None:
         return error_response(400, *BAD_REQUEST)
     (token,) = fields
+    limits.limit_validate()
     return jsonify(vigente=service.is_valid_invitation(token))
 
 
@@ -111,6 +114,9 @@ def aceptar() -> ResponseReturnValue:
 
     policy_error = None
     try:
+        # Q9 antes de contar: no depende del token ni cuesta Argon2.
+        check_password_policy(password)
+        limits.limit_accept()
         result = service.accept_invitation(token, nombre, password)
     except PasswordPolicyError as exc:
         policy_error = (exc.code, str(exc))

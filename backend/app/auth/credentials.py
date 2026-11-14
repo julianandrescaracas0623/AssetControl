@@ -19,8 +19,11 @@ los mensajes de error.
 import hashlib
 import hmac
 import secrets
+import threading
 import unicodedata
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -30,6 +33,7 @@ from argon2.exceptions import InvalidHashError, VerificationError
 from flask import Flask, current_app
 
 from app import config as config_module
+from app.errors import ServiceUnavailableError
 
 # Argon2id. Perfil mínimo de OWASP (Password Storage Cheat Sheet; RFC 9106 §4 admite
 # perfiles de menor memoria): m = 19 MiB, t = 2, p = 1. Hash de 32 bytes y sal de 16.
@@ -163,19 +167,52 @@ def check_password_policy(password: str) -> None:
         )
 
 
-class Passwords:
-    """Hash y verificación Argon2id con hash simulado del mismo costo."""
+DEFAULT_ARGON2_WAIT_SECONDS = 2.0
 
-    def __init__(self, params: argon2.Parameters) -> None:
+
+class Passwords:
+    """Hash y verificación Argon2id con hash simulado del mismo costo.
+
+    **Semáforo (T10, H-1 de T9):** como mucho ``max_concurrency`` cálculos de Argon2
+    a la vez por proceso (19 MiB y ~28 ms de CPU cada uno). Quien no consigue cupo en
+    ``wait_seconds`` recibe ``ServiceUnavailableError`` (``503``) en lugar de encolar
+    sin fin. Los rechazos rápidos (sin texto, sobre el máximo, no codificable) no
+    toman cupo. El cupo se libera siempre, también si Argon2 falla.
+    """
+
+    def __init__(
+        self,
+        params: argon2.Parameters,
+        *,
+        max_concurrency: int = config_module.DEFAULT_ARGON2_MAX_CONCURRENCY,
+        wait_seconds: float = DEFAULT_ARGON2_WAIT_SECONDS,
+    ) -> None:
         self.params = params
+        self.max_concurrency = max_concurrency
+        self._wait_seconds = wait_seconds
+        self._slots = threading.BoundedSemaphore(max_concurrency)
         self._hasher = argon2.PasswordHasher.from_parameters(params)
         # Secreto aleatorio que no se conserva: el hash simulado no verifica nada.
         self._dummy_hash = self._hasher.hash(secrets.token_urlsafe(32))
 
+    @contextmanager
+    def _slot(self) -> Iterator[None]:
+        if self._wait_seconds > 0:
+            acquired = self._slots.acquire(timeout=self._wait_seconds)
+        else:
+            acquired = self._slots.acquire(blocking=False)
+        if not acquired:
+            raise ServiceUnavailableError()
+        try:
+            yield
+        finally:
+            self._slots.release()
+
     def hash(self, password: str) -> str:
         """Hash de una contraseña nueva; aplica la política antes de hashear."""
         check_password_policy(password)
-        return self._hasher.hash(password)
+        with self._slot():
+            return self._hasher.hash(password)
 
     def verify(self, stored_hash: str | None, password: object) -> bool:
         """``True`` solo si ``password`` corresponde a ``stored_hash``.
@@ -191,10 +228,11 @@ class Passwords:
         ):
             return False
         target = self._dummy_hash if stored_hash is None else stored_hash
-        try:
-            self._hasher.verify(target, password)
-        except (VerificationError, InvalidHashError):
-            return False
+        with self._slot():
+            try:
+                self._hasher.verify(target, password)
+            except (VerificationError, InvalidHashError):
+                return False
         return stored_hash is not None
 
 
@@ -206,7 +244,13 @@ def init_credentials(app: Flask) -> None:
     # Doble condición: TESTING puesto a mano fuera de pytest no abarata Argon2.
     cheap = app.testing and config_module.is_test_context()
     params = ARGON2_TEST_PARAMS if cheap else ARGON2_PARAMS
-    app.extensions[_EXTENSION_KEY] = Passwords(params)
+    config = app.extensions.get(config_module.CONFIG_EXTENSION_KEY)
+    max_concurrency = (
+        config.argon2_max_concurrency
+        if config is not None
+        else config_module.DEFAULT_ARGON2_MAX_CONCURRENCY
+    )
+    app.extensions[_EXTENSION_KEY] = Passwords(params, max_concurrency=max_concurrency)
 
 
 def get_passwords() -> Passwords:

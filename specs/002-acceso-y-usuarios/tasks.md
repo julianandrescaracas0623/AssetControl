@@ -218,6 +218,17 @@
 - **Verificación:** `cd backend && uv run alembic upgrade head && uv run alembic downgrade base && uv run alembic upgrade head && uv run pytest tests/test_rate_limits.py tests/test_ready.py tests/test_no_secrets_in_logs.py tests/test_catalog_rls.py && uv run pytest && uv run ruff check . && git grep -nEi "(secret|password|token)[a-z_]*\s*=\s*['\"][^'\"]+['\"]" -- . ':!*/tests/*'` (sin coincidencias reales; criterio A18)
 - **Depende de:** T6–T9; cambio 6 a `docs/03` (`limite_tasa`) aplicado por el humano (T10 no empieza sin él); Q10 y Q12 decididos.
 - **Riesgo:** `X-Forwarded-For` falsificable; el contador revertido por el fallo de la petición; tabla sin `tenant_id` mal acotada (privilegio mínimo y prueba propia).
+- **Pendiente del humano (T10, A18):** `.env.example` debe listar **vacías** (sin valor: vacío o ausente = valor por defecto de `backend/app/config.py`) las 8 variables nuevas que `docker-compose.yml` ya pasa a la API como `${VAR:-}`: `RATE_LIMIT_WINDOW_SECONDS=`, `RATE_LIMIT_LOGIN_ACCOUNT=`, `RATE_LIMIT_LOGIN_IP=`, `RATE_LIMIT_REFRESH_IP=`, `RATE_LIMIT_VALIDATE_IP=`, `RATE_LIMIT_ACCEPT_IP=`, `TRUSTED_PROXY_HOPS=`, `ARGON2_MAX_CONCURRENCY=`. Sigue vigente lo anotado en T4 (`ENVIRONMENT=development` y `SECRET_KEY` de ≥ 32 bytes). Sus permisos impiden que lo editen los agentes.
+- **Cierre (T10):** hecha (2026-11-13); aprobada por `reviewer` y `security-reviewer`; 1186 pruebas verdes, `ruff check` limpio; mutaciones a mano detectadas. Con T10 queda completo el backend de la spec 002 (T1–T10).
+- **Deuda aceptada o diferida (decide el humano):**
+  - (a) Condición 10, tope de invitaciones pendientes (H2 de T8): `POST /invitaciones` sigue sin tope por tenant/creador ni límite de tasa.
+  - (b) Condición 11, servidor WSGI real (gunicorn): solo documentado en el `README.md`; es requisito de la spec de despliegue. R1: no exponer login, refresh, validar ni aceptar sin ella.
+  - (c) Enmienda de `plan.md` §7.1: `limite_tasa.clave_hash` es una segunda columna con hash legible; reflejarlo en el plan.
+  - (d) Riesgo de disponibilidad: 5 fallos por ventana bloquean la cuenta de un `admin` 15 min desde cualquier IP (diseño de Q10).
+  - (e) `TRUSTED_PROXY_HOPS=0` por defecto autodeniega detrás de un proxy (todas las peticiones comparten la IP del proxy): sugerido un aviso de arranque en producción y una nota en el `README.md` sobre el formato de `X-Forwarded-For` (un valor `ip:puerto` cae en el cubo "desconocida").
+  - (f) Purga: las políticas de `limite_tasa` van `TO` el rol migrador original; si cambia el migrador, `purgar-limite-tasa` borra 0 filas sin error. Documentarlo en el `README.md` y vigilar el conteo devuelto. No hay programador de la purga.
+  - (g) Pruebas opcionales sugeridas: un login exitoso no devuelve el intento de otro contador; `X-Forwarded-For` con valores no IP no produce 500; purga con un migrador distinto; purga con el migrador de Supabase (C8).
+- **Pendiente del humano (T10):** `.env.example` con las 8 variables ya listadas arriba; enmienda de `plan.md` §7.1; `uv run alembic upgrade head` en la base de desarrollo (hoy en 0002).
 
 ---
 

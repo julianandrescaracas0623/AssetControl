@@ -57,6 +57,7 @@ from app.auth.credentials import (
     token_storage_hash,
 )
 from app.auth.http import AUTH_MAX_BODY_BYTES, REFRESH_COOKIE_SECURE_NAME
+from app.config import RateLimits
 from app.invitaciones import service as inv_service
 
 VALIDAR = "/invitaciones/validar"
@@ -77,7 +78,9 @@ def acc_db(database_residue_guard) -> Iterator[AccesoDb]:
 
 @pytest.fixture(scope="module")
 def acc_app(acc_db) -> Iterator[Flask]:
-    flask_app = make_app(acc_db)
+    # T10: los casos de indistinguibilidad mandan más de 10 validar/aceptar seguidos desde
+    # la misma IP; aquí no se prueba el límite (test_rate_limits.py), se sube su umbral.
+    flask_app = make_app(acc_db, RateLimits(validate_ip=1000, accept_ip=1000))
     yield flask_app
     dispose(flask_app)
 
@@ -85,6 +88,15 @@ def acc_app(acc_db) -> Iterator[Flask]:
 @pytest.fixture
 def client(acc_app):
     return acc_app.test_client(use_cookies=False)
+
+
+@pytest.fixture(autouse=True)
+def fresh_rate_limits(acc_db) -> Iterator[None]:
+    """T10: cada prueba parte sin contadores de ``limite_tasa`` (los límites tienen sus
+    propias pruebas en ``test_rate_limits.py``); la base del módulo es compartida."""
+    with acc_db.migrator.begin() as conn:
+        conn.execute(text("delete from limite_tasa"))
+    yield
 
 
 def nuevo_email() -> str:

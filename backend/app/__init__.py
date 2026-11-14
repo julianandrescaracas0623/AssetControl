@@ -5,6 +5,7 @@ se crea en ``create_app`` (``init_db``) y la primera conexión se abre al usarlo
 """
 
 from flask import Flask
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.auth.credentials import init_credentials
 from app.auth.http import register_auth_http_policy
@@ -50,4 +51,11 @@ def create_app(config: Config | None = None) -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(invitaciones_bp)
     register_cli(app)
+    if config.trusted_proxy_hops:
+        # T10: la IP del cliente para el límite de tasa sale de X-Forwarded-For solo con
+        # saltos de proxy de confianza explícitos; nada más (Host, esquema, puerto, prefijo)
+        # se toma de cabeceras reenviadas: lo usa la comprobación de mismo sitio (Q14).
+        app.wsgi_app = ProxyFix(  # type: ignore[method-assign]
+            app.wsgi_app, x_for=config.trusted_proxy_hops, x_proto=0, x_host=0, x_port=0, x_prefix=0
+        )
     return app

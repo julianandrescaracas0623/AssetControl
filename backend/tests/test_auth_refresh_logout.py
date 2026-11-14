@@ -208,6 +208,15 @@ def client(refresh_app):
     return refresh_app.test_client(use_cookies=False)
 
 
+@pytest.fixture(autouse=True)
+def fresh_rate_limits(refresh_db) -> Iterator[None]:
+    """T10: cada prueba parte sin contadores de ``limite_tasa`` (los límites tienen sus
+    propias pruebas en ``test_rate_limits.py``); la base del módulo es compartida."""
+    with refresh_db.migrator.begin() as conn:
+        conn.execute(text("delete from limite_tasa"))
+    yield
+
+
 # --- Utilidades -----------------------------------------------------------------
 
 

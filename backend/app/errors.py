@@ -49,6 +49,37 @@ _HTTP_ERRORS: dict[int, tuple[str, str]] = {
 }
 
 
+SERVICE_UNAVAILABLE = (
+    "servicio_no_disponible",
+    "El servicio no está disponible en este momento. Intenta de nuevo en unos segundos.",
+)
+SERVICE_UNAVAILABLE_RETRY_AFTER_SECONDS = 10
+TOO_MANY_REQUESTS = (
+    "demasiadas_solicitudes",
+    "Demasiados intentos. Espera unos minutos e intenta de nuevo.",
+)
+
+
+class ServiceUnavailableError(Exception):
+    """``503`` genérico: el límite de tasa no pudo contar (falla cerrado) o Argon2 está
+    saturado (spec 002, T10). El mensaje es fijo: no lleva datos de la petición."""
+
+    def __init__(self) -> None:
+        super().__init__("Servicio no disponible temporalmente.")
+
+
+class TooManyRequestsError(Exception):
+    """``429`` genérico del límite de tasa (R13): igual exista o no la cuenta.
+
+    ``retry_after`` es la duración de la ventana (constante, no el tiempo restante,
+    que variaría entre cuentas y peticiones).
+    """
+
+    def __init__(self, retry_after: int) -> None:
+        self.retry_after = int(retry_after)
+        super().__init__("Límite de tasa superado.")
+
+
 def current_request_id() -> str:
     """``request_id`` de la petición en curso; lo crea si aún no existe."""
     request_id = g.get("request_id")
@@ -133,6 +164,18 @@ def _handle_unexpected(exc: Exception) -> ResponseReturnValue:
     return error_response(500, INTERNAL_ERROR_CODE, INTERNAL_ERROR_MESSAGE)
 
 
+def _handle_service_unavailable(exc: ServiceUnavailableError) -> ResponseReturnValue:
+    response, status = error_response(503, *SERVICE_UNAVAILABLE)
+    response.headers["Retry-After"] = str(SERVICE_UNAVAILABLE_RETRY_AFTER_SECONDS)
+    return response, status
+
+
+def _handle_too_many_requests(exc: TooManyRequestsError) -> ResponseReturnValue:
+    response, status = error_response(429, *TOO_MANY_REQUESTS)
+    response.headers["Retry-After"] = str(exc.retry_after)
+    return response, status
+
+
 def register_error_handlers(app: Flask) -> None:
     """Registra el ``request_id`` por petición y los manejadores de error."""
 
@@ -146,4 +189,6 @@ def register_error_handlers(app: Flask) -> None:
         return response
 
     app.register_error_handler(HTTPException, _handle_http_exception)
+    app.register_error_handler(ServiceUnavailableError, _handle_service_unavailable)
+    app.register_error_handler(TooManyRequestsError, _handle_too_many_requests)
     app.register_error_handler(Exception, _handle_unexpected)

@@ -369,6 +369,69 @@ def aceptar_invitacion(clave: str, nombre: str, password_hash: str) -> AcceptedI
     return AcceptedInvitation(usuario_id=row.usuario_id, tenant_id=row.tenant_id, rol=row.rol)
 
 
+# --- limite_tasa (T10; R13, Q10, A13; docs/03 cambio 6) ---------------------------------
+
+# Ventana fija: el inicio es ``now()`` truncado a múltiplos de la duración (en segundos
+# desde la época). El incremento es atómico: un solo ``INSERT ... ON CONFLICT DO UPDATE``.
+_CONTAR_INTENTO = text(
+    "insert into limite_tasa (ambito, clave_hash, ventana_inicio, intentos) "
+    "values (:ambito, :clave, pg_catalog.to_timestamp(pg_catalog.floor("
+    "extract(epoch from now()) / cast(:ventana as integer)) * cast(:ventana as integer)), 1) "
+    "on conflict (ambito, clave_hash, ventana_inicio) "
+    "do update set intentos = limite_tasa.intentos + 1 "
+    "returning intentos, ventana_inicio"
+)
+_DEVOLVER_INTENTO = text(
+    "update limite_tasa set intentos = intentos - 1 "
+    "where ambito = :ambito and clave_hash = :clave and ventana_inicio = :ventana "
+    "and intentos > 0"
+)
+
+
+@dataclass(frozen=True)
+class CounterRow:
+    """Un contador de ``limite_tasa`` tras sumarle un intento."""
+
+    intentos: int
+    ventana_inicio: Any
+
+
+def contar_intentos(items: list[tuple[str, bytes]], window_seconds: int) -> list[CounterRow]:
+    """Suma un intento a cada ``(ambito, clave_hash)`` en una transacción propia y confirmada.
+
+    Sin tenant (como ``buscar_login``) y fuera de cualquier otra transacción: el
+    ``COMMIT`` ocurre antes de volver, así que el fallo posterior de la petición no
+    revierte el contador. Los contadores se actualizan en orden de ``(ambito, clave)``
+    para que dos peticiones con los mismos contadores no se bloqueen entre sí; el
+    resultado sale en el orden de ``items``. Cualquier error se propaga.
+    """
+    database = _get_database()
+    order = sorted(range(len(items)), key=lambda i: items[i])
+    results: dict[int, CounterRow] = {}
+    with database.engine.begin() as connection:
+        for index in order:
+            ambito, clave = items[index]
+            row = connection.execute(
+                _CONTAR_INTENTO, {"ambito": ambito, "clave": clave, "ventana": window_seconds}
+            ).one()
+            results[index] = CounterRow(intentos=row.intentos, ventana_inicio=row.ventana_inicio)
+    return [results[index] for index in range(len(items))]
+
+
+def devolver_intentos(items: list[tuple[str, bytes, Any]]) -> None:
+    """Resta el intento sumado por una petición que terminó bien (login y refresh, Q10).
+
+    ``(ambito, clave_hash, ventana_inicio)`` de ``contar_intentos``; nunca baja de 0.
+    Transacción propia; cualquier error se propaga.
+    """
+    database = _get_database()
+    with database.engine.begin() as connection:
+        for ambito, clave, ventana in sorted(items):
+            connection.execute(
+                _DEVOLVER_INTENTO, {"ambito": ambito, "clave": clave, "ventana": ventana}
+            )
+
+
 def _session_tenant(session: Session) -> uuid.UUID:
     if not isinstance(session, _TenantSession):
         raise MissingTenantError("El acceso a datos requiere un tenant_id.")

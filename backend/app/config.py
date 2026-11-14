@@ -4,6 +4,7 @@ Nunca incluye valores de las variables en mensajes de error ni en ``repr``.
 """
 
 import os
+import re
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -75,6 +76,64 @@ class WeakSecretKeyError(RuntimeError):
         )
 
 
+class InvalidSettingError(RuntimeError):
+    """Una variable numérica opcional no es un entero en su rango (T10). No repite el valor."""
+
+    def __init__(self, name: str, low: int, high: int) -> None:
+        self.name = name
+        super().__init__(f"{name} no es válida: debe ser un entero entre {low} y {high}.")
+
+
+@dataclass(frozen=True)
+class RateLimits:
+    """Umbrales de los límites de tasa (R13, Q10): ventana fija y máximos por ventana.
+
+    Los valores por defecto son los de referencia de Q10 (ventana de 15 min; login 5
+    fallidos por cuenta y 20 por IP; validar y aceptar 10 por IP; refresh 30 por IP);
+    se ajustan con ``RATE_LIMIT_*``.
+    """
+
+    window_seconds: int = 900
+    login_account: int = 5
+    login_ip: int = 20
+    refresh_ip: int = 30
+    validate_ip: int = 10
+    accept_ip: int = 10
+
+
+# Variable de entorno -> (campo de RateLimits, mínimo, máximo). La ventana máxima es un día:
+# la purga (``purgar-limite-tasa``) solo borra ventanas de más de un día.
+RATE_LIMIT_VARS: dict[str, tuple[str, int, int]] = {
+    "RATE_LIMIT_WINDOW_SECONDS": ("window_seconds", 60, 86400),
+    "RATE_LIMIT_LOGIN_ACCOUNT": ("login_account", 1, 10000),
+    "RATE_LIMIT_LOGIN_IP": ("login_ip", 1, 10000),
+    "RATE_LIMIT_REFRESH_IP": ("refresh_ip", 1, 10000),
+    "RATE_LIMIT_VALIDATE_IP": ("validate_ip", 1, 10000),
+    "RATE_LIMIT_ACCEPT_IP": ("accept_ip", 1, 10000),
+}
+TRUSTED_PROXY_HOPS_VAR = "TRUSTED_PROXY_HOPS"
+TRUSTED_PROXY_HOPS_RANGE = (0, 5)
+ARGON2_MAX_CONCURRENCY_VAR = "ARGON2_MAX_CONCURRENCY"
+ARGON2_MAX_CONCURRENCY_RANGE = (1, 64)
+DEFAULT_ARGON2_MAX_CONCURRENCY = 4
+_ASCII_INTEGER = re.compile(r"[0-9]{1,6}")
+
+
+def _int_setting(source: Mapping[str, str], name: str, default: int, low: int, high: int) -> int:
+    """Entero ASCII de ``name`` en ``[low, high]``; vacío o ausente -> ``default``."""
+    raw = (source.get(name) or "").strip()
+    if not raw:
+        return default
+    if not _ASCII_INTEGER.fullmatch(raw) or not low <= int(raw) <= high:
+        raise InvalidSettingError(name, low, high)
+    return int(raw)
+
+
+def _check_range(name: str, value: object, low: int, high: int) -> None:
+    if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
+        raise InvalidSettingError(name, low, high)
+
+
 @dataclass(frozen=True)
 class Config:
     """Configuración validada al construirse (arranque, R15).
@@ -88,10 +147,21 @@ class Config:
     database_url: str = field(repr=False)
     secret_key: str = field(repr=False)
     environment: str
+    # T10 (R13, Q10): umbrales del límite de tasa, saltos de proxy de confianza para la IP
+    # del cliente (0 = sin ProxyFix: REMOTE_ADDR) y tope de hashes Argon2 simultáneos.
+    rate_limits: RateLimits = field(default_factory=RateLimits)
+    trusted_proxy_hops: int = 0
+    argon2_max_concurrency: int = DEFAULT_ARGON2_MAX_CONCURRENCY
 
     def __post_init__(self) -> None:
         if self.environment not in ALLOWED_ENVIRONMENTS:
             raise InvalidEnvironmentError()
+        _check_range(TRUSTED_PROXY_HOPS_VAR, self.trusted_proxy_hops, *TRUSTED_PROXY_HOPS_RANGE)
+        _check_range(
+            ARGON2_MAX_CONCURRENCY_VAR, self.argon2_max_concurrency, *ARGON2_MAX_CONCURRENCY_RANGE
+        )
+        for name, (attribute, low, high) in RATE_LIMIT_VARS.items():
+            _check_range(name, getattr(self.rate_limits, attribute), low, high)
         if self.environment == TEST_ENVIRONMENT and not is_test_context():
             raise UnsafeTestEnvironmentError()
         if (
@@ -184,8 +254,25 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
     missing = [name for name in REQUIRED_VARS if not (source.get(name) or "").strip()]
     if missing:
         raise MissingConfigError(missing)
+    defaults = RateLimits()
+    rate_limits = RateLimits(
+        **{
+            attribute: _int_setting(source, name, getattr(defaults, attribute), low, high)
+            for name, (attribute, low, high) in RATE_LIMIT_VARS.items()
+        }
+    )
     return Config(
         database_url=source["DATABASE_URL"],
         secret_key=source["SECRET_KEY"],
         environment=source["ENVIRONMENT"].strip(),
+        rate_limits=rate_limits,
+        trusted_proxy_hops=_int_setting(
+            source, TRUSTED_PROXY_HOPS_VAR, 0, *TRUSTED_PROXY_HOPS_RANGE
+        ),
+        argon2_max_concurrency=_int_setting(
+            source,
+            ARGON2_MAX_CONCURRENCY_VAR,
+            DEFAULT_ARGON2_MAX_CONCURRENCY,
+            *ARGON2_MAX_CONCURRENCY_RANGE,
+        ),
     )

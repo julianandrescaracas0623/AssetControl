@@ -8,8 +8,9 @@ los catálogos de PostgreSQL:
   ``TO`` el rol de la aplicación (sin ``PUBLIC``).
 - Ningún rol distinto del dueño tiene ``DELETE`` (ni ``TRUNCATE``) en ``public``.
 - Las excepciones (``alembic_version``, ``tenant``, ``usuario`` y
-  ``limite_tasa``) tienen su prueba propia; ``limite_tasa`` se crea en T10 y la
-  excepción es por nombre.
+  ``limite_tasa``) tienen su prueba propia; ``limite_tasa`` (T10, 0005) es de
+  infraestructura: sin ``tenant_id``, sin ``DELETE`` para la aplicación, solo
+  ``intentos`` actualizable y la purga solo para el migrador (docs/03, A13).
 - Las políticas de ``public`` y las ``RESTRICTIVE`` forman listas cerradas. Desde
   T2 (0003) la lista incluye las políticas ``TO auth_owner``, con su texto exacto
   desde T3 (C6); su comportamiento lo prueban ``test_auth_tables_isolation.py`` y
@@ -113,6 +114,31 @@ EXPECTED_POLICIES = {
         ISOLATION_EXPR,
         ISOLATION_EXPR,
     ),
+    # limite_tasa (T10, docs/03 cambio 6): una política por comando TO la aplicación, sin
+    # filtro de tenant (no lo hay antes del login); su defensa es el privilegio mínimo y
+    # el HMAC de la clave.
+    ("limite_tasa", "limite_tasa_leer"): ("PERMISSIVE", "SELECT", "{app}", "true", None),
+    ("limite_tasa", "limite_tasa_contar"): (
+        "PERMISSIVE",
+        "INSERT",
+        "{app}",
+        None,
+        "(intentos = 1)",
+    ),
+    ("limite_tasa", "limite_tasa_sumar"): (
+        "PERMISSIVE",
+        "UPDATE",
+        "{app}",
+        "true",
+        "(intentos >= 0)",
+    ),
+}
+# Purga de limite_tasa (T10, R5, Q10): única política de otro rol, el migrador (dueño de la
+# tabla, sujeto a FORCE RLS si no es superusuario); solo ventanas de más de un día.
+PURGE_EXPR = "(ventana_inicio < (now() - '1 day'::interval))"
+EXPECTED_PURGE_POLICIES = {
+    ("limite_tasa", "limite_tasa_purga_leer"): ("PERMISSIVE", "SELECT", PURGE_EXPR, None),
+    ("limite_tasa", "limite_tasa_purga"): ("PERMISSIVE", "DELETE", PURGE_EXPR, None),
 }
 
 # GRANT del rol de la aplicación (plan.md §3): tabla -> privilegio -> columnas.
@@ -152,6 +178,13 @@ EXPECTED_APP_COLUMNS = {
         },
         "UPDATE": {"usado_en", "revocado_en"},
     },
+    # T10: el SELECT completo es necesario para ON CONFLICT (la inferencia del índice lee
+    # clave_hash) y el RETURNING (docs/03 cambio 6, A13); solo se actualiza intentos.
+    "limite_tasa": {
+        "SELECT": {"ambito", "clave_hash", "ventana_inicio", "intentos"},
+        "INSERT": {"ambito", "clave_hash", "ventana_inicio", "intentos"},
+        "UPDATE": {"intentos"},
+    },
 }
 # Privilegios a nivel de tabla del rol de la aplicación (sin columnas).
 EXPECTED_APP_TABLE_PRIVILEGES = {
@@ -161,6 +194,7 @@ EXPECTED_APP_TABLE_PRIVILEGES = {
     "membresia": {"SELECT"},
     "invitacion": set(),
     "refresh_token": {"SELECT", "INSERT"},
+    "limite_tasa": {"SELECT", "INSERT"},
 }
 
 
@@ -318,6 +352,7 @@ EXPECTED_OWNER_COLUMNS = {
         "INSERT": {"tenant_id", "email", "rol", "token_hash", "expira_en"},
     },
     "refresh_token": {},
+    "limite_tasa": {},
 }
 TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
 COLUMN_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "REFERENCES")
@@ -449,7 +484,20 @@ OWNER_ROLES = "{" + AUTH_OWNER + "}"
 
 
 def _app_policies(conn: Connection) -> dict[tuple[str, str], tuple]:
-    return {k: v for k, v in _policies(conn).items() if v[2] != OWNER_ROLES}
+    """Políticas que no son de ``auth_owner`` ni de la purga del migrador."""
+    return {
+        k: v
+        for k, v in _policies(conn).items()
+        if v[2] != OWNER_ROLES and k not in EXPECTED_PURGE_POLICIES
+    }
+
+
+def _purge_policies(conn: Connection) -> dict[tuple[str, str], tuple]:
+    return {
+        k: (v[0], v[1], _normalize(v[3]), _normalize(v[4]))
+        for k, v in _policies(conn).items()
+        if k in EXPECTED_PURGE_POLICIES
+    }
 
 
 def _normalize(expression: str | None) -> str | None:
@@ -540,8 +588,7 @@ def test_exception_list_is_closed():
 
 
 def test_public_tables_are_exactly_the_expected(conn):
-    # limite_tasa llega en T10: hasta entonces su excepción no exige que exista.
-    assert _public_tables(conn) == {"alembic_version", "tenant", "usuario"} | TENANT_TABLES
+    assert _public_tables(conn) == EXCEPTIONS | TENANT_TABLES
 
 
 def test_every_non_exception_table_is_tenant_isolated(conn, catalog):
@@ -598,7 +645,10 @@ def test_tables_are_owned_by_the_migrator(conn, catalog):
 def test_public_policies_are_a_closed_list(conn, catalog):
     assert _app_policies(conn) == _expected_policies(catalog.app_role)
     assert _owner_policies(conn) == EXPECTED_OWNER_POLICIES
-    assert len(_policies(conn)) == len(EXPECTED_POLICIES) + len(EXPECTED_OWNER_POLICIES)
+    assert _purge_policies(conn) == EXPECTED_PURGE_POLICIES
+    assert len(_policies(conn)) == (
+        len(EXPECTED_POLICIES) + len(EXPECTED_OWNER_POLICIES) + len(EXPECTED_PURGE_POLICIES)
+    )
 
 
 def test_restrictive_policies_are_a_closed_list(conn, catalog):
@@ -607,9 +657,13 @@ def test_restrictive_policies_are_a_closed_list(conn, catalog):
 
 
 def test_no_policy_targets_public_and_each_targets_a_single_role(conn, catalog):
-    # Cada política es de un solo rol: la aplicación o auth_owner, nunca los dos ni PUBLIC.
+    # Cada política es de un solo rol: la aplicación o auth_owner, nunca los dos ni PUBLIC;
+    # la única excepción es la purga de limite_tasa, solo del migrador (T10).
     for (table, name), (_, _, roles, _, _) in _policies(conn).items():
         assert "public" not in roles, (table, name)
+        if (table, name) in EXPECTED_PURGE_POLICIES:
+            assert roles == "{" + catalog.migrator + "}", (table, name)
+            continue
         assert roles in ("{" + catalog.app_role + "}", OWNER_ROLES), (table, name)
 
 
@@ -663,8 +717,11 @@ def test_app_can_read_only_the_allowed_hash_columns(conn, catalog):
     # Regla general de §7.1 enmendada (Q20): ninguna columna con "hash" en el nombre es
     # legible por la aplicación salvo la lista cerrada. refresh_token.token_hash es la
     # única excepción (lo guardado es sha256 de la clave, I1).
-    # Ojo: en T10, limite_tasa.clave_hash será otra excepción; antes hay que enmendar
-    # plan.md §7.1/§3.1 con decisión humana y solo entonces ampliar esta lista.
+    # T10: limite_tasa.clave_hash es la segunda, por docs/03 (cambio 6, aplicado por el
+    # humano) y A13: GRANT SELECT de la tabla completa, porque ON CONFLICT exige SELECT
+    # sobre las columnas del índice inferido (sin él, "permission denied"). Es un HMAC de
+    # la IP o del email con clave derivada de SECRET_KEY: no autentica ni revela nada.
+    # plan.md §7.1 aún dice "única excepción": pendiente de enmienda (decisión humana).
     rows = conn.execute(
         text(
             "select table_name, column_name from information_schema.columns "
@@ -680,7 +737,7 @@ def test_app_can_read_only_the_allowed_hash_columns(conn, catalog):
             {"r": catalog.app_role, "t": f"public.{table}", "c": column},
         )
     }
-    assert readable == {("refresh_token", "token_hash")}
+    assert readable == {("refresh_token", "token_hash"), ("limite_tasa", "clave_hash")}
 
 
 def test_app_has_no_insert_or_update_on_tenant_usuario_membresia(conn, catalog):
@@ -726,9 +783,26 @@ def test_exception_usuario(conn, catalog):
     assert _table_privileges(conn, catalog.app_role, "usuario") == set()
 
 
-def test_exception_limite_tasa_does_not_exist_until_t10(conn):
-    assert "limite_tasa" in EXCEPTIONS
-    assert "limite_tasa" not in _public_tables(conn)
+def test_exception_limite_tasa(conn, catalog):
+    # Tabla de infraestructura (docs/03 cambio 6, plan.md §3.1, A13): sin tenant_id, solo
+    # hashes y contadores, RLS forzada, una política por comando TO la aplicación, sin
+    # DELETE para nadie salvo la purga del migrador (dueño).
+    assert _columns(conn, "limite_tasa") == {
+        "ambito": ("text", True),
+        "clave_hash": ("bytea", True),
+        "ventana_inicio": ("timestamp with time zone", True),
+        "intentos": ("integer", True),
+    }
+    assert _rls_flags(conn, "limite_tasa") == (True, True)
+    app_policies = {k: v for k, v in _app_policies(conn).items() if k[0] == "limite_tasa"}
+    assert {v[1] for v in app_policies.values()} == {"SELECT", "INSERT", "UPDATE"}
+    assert len(app_policies) == 3
+    assert {k for k in _owner_policies(conn) if k[0] == "limite_tasa"} == set()
+    assert _table_privileges(conn, catalog.app_role, "limite_tasa") == {"SELECT", "INSERT"}
+    assert _column_privileges(conn, catalog.app_role, "limite_tasa")["UPDATE"] == {"intentos"}
+    for role in (catalog.app_role, AUTH_OWNER, *SUPABASE_ROLES):
+        assert not _table_privileges(conn, role, "limite_tasa") & {"DELETE", "TRUNCATE"}, role
+    assert _purge_policies(conn) == EXPECTED_PURGE_POLICIES
 
 
 # --- Roles de Supabase y auth_owner ---------------------------------------------
@@ -1007,6 +1081,13 @@ def test_keys_and_checks(conn):
         "FOREIGN KEY (tenant_id, membresia_id) REFERENCES membresia(tenant_id, id)",
         "UNIQUE (token_hash)",
         hash32,
+    }
+    assert _constraints(conn, "limite_tasa") == {
+        "PRIMARY KEY (ambito, clave_hash, ventana_inicio)",
+        "CHECK ((ambito = ANY (ARRAY['login_ip'::text, 'login_cuenta'::text, "
+        "'refresh_ip'::text, 'validar_ip'::text, 'aceptar_ip'::text])))",
+        "CHECK ((octet_length(clave_hash) = 32))",
+        "CHECK ((intentos >= 0))",
     }
 
 

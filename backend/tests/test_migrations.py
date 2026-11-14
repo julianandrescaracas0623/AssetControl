@@ -40,6 +40,7 @@ BASELINE = "0001_baseline"
 ACCESO = "0002_acceso_y_usuarios"
 POLITICAS = "0003_politicas_del_dueno"
 FUNCIONES = "0004_funciones_de_acceso"
+LIMITE_TASA = "0005_limite_tasa"
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
 MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
@@ -182,12 +183,19 @@ def test_revision_chain():
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == [FUNCIONES]
-    assert [r.revision for r in revisions] == [FUNCIONES, POLITICAS, ACCESO, BASELINE]
-    assert revisions[0].down_revision == POLITICAS
-    assert revisions[1].down_revision == ACCESO
-    assert revisions[2].down_revision == BASELINE
-    assert revisions[3].down_revision is None
+    assert script.get_heads() == [LIMITE_TASA]
+    assert [r.revision for r in revisions] == [
+        LIMITE_TASA,
+        FUNCIONES,
+        POLITICAS,
+        ACCESO,
+        BASELINE,
+    ]
+    assert revisions[0].down_revision == FUNCIONES
+    assert revisions[1].down_revision == POLITICAS
+    assert revisions[2].down_revision == ACCESO
+    assert revisions[3].down_revision == BASELINE
+    assert revisions[4].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -299,13 +307,13 @@ def migrate_env(empty_database, app_role, monkeypatch) -> URL:
 
 def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     config = alembic_config()
-    with_auth = sorted(["alembic_version", *AUTH_TABLES])
+    with_auth = sorted(["alembic_version", "limite_tasa", *AUTH_TABLES])
 
     assert _public_state(migrate_env) == ([], [])
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [FUNCIONES])
+    assert _public_state(migrate_env) == (with_auth, [LIMITE_TASA])
     assert _schema_exists(migrate_env, "acceso")
 
     command.downgrade(config, "base")
@@ -314,7 +322,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [FUNCIONES])
+    assert _public_state(migrate_env) == (with_auth, [LIMITE_TASA])
     assert _schema_exists(migrate_env, "acceso")
 
 
@@ -326,6 +334,64 @@ def test_downgrade_to_baseline_removes_only_0002(migrate_env):
 
     assert _public_state(migrate_env) == (["alembic_version"], [BASELINE])
     assert not _schema_exists(migrate_env, "acceso")
+
+
+def _policy_names(url: URL, table: str) -> list[str]:
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            return list(
+                conn.scalars(
+                    text(
+                        "select policyname from pg_policies where schemaname = 'public' "
+                        "and tablename = :t order by policyname"
+                    ),
+                    {"t": table},
+                )
+            )
+    finally:
+        engine.dispose()
+
+
+def test_0005_up_down_up_touches_only_limite_tasa(migrate_env):
+    # T10: 0005 crea solo limite_tasa (con sus políticas) y su downgrade solo la quita.
+    config = alembic_config()
+    with_auth = sorted(["alembic_version", *AUTH_TABLES])
+
+    command.upgrade(config, FUNCIONES)
+    assert _public_state(migrate_env) == (with_auth, [FUNCIONES])
+    owner_before = _owner_state(migrate_env)
+
+    command.upgrade(config, "head")
+    assert _public_state(migrate_env) == (sorted([*with_auth, "limite_tasa"]), [LIMITE_TASA])
+    assert _policy_names(migrate_env, "limite_tasa") == [
+        "limite_tasa_contar",
+        "limite_tasa_leer",
+        "limite_tasa_purga",
+        "limite_tasa_purga_leer",
+        "limite_tasa_sumar",
+    ]
+    assert _owner_state(migrate_env) == owner_before
+
+    command.downgrade(config, FUNCIONES)
+    assert _public_state(migrate_env) == (with_auth, [FUNCIONES])
+    assert _policy_names(migrate_env, "limite_tasa") == []
+    assert _owner_state(migrate_env) == owner_before
+
+    command.upgrade(config, "head")
+    assert _public_state(migrate_env) == (sorted([*with_auth, "limite_tasa"]), [LIMITE_TASA])
+
+
+def test_0005_rejects_the_migrator_as_app_role(migrate_env, monkeypatch):
+    config = alembic_config()
+    command.upgrade(config, FUNCIONES)
+    monkeypatch.setenv(APP_ROLE_VAR, migrate_env.username)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        command.upgrade(config, "head")
+
+    assert APP_ROLE_VAR in str(excinfo.value)
+    assert _public_state(migrate_env)[1] == [FUNCIONES]
 
 
 @pytest.mark.parametrize("value", [None, "", "   "])
@@ -455,7 +521,8 @@ def test_upgrade_accepts_an_app_role_with_a_colon_in_its_name(migrate_env, monke
                 ).all()
         finally:
             engine.dispose()
-        assert sorted(roles) == sorted([name, "auth_owner"])
+        # T10 (0005): la purga de limite_tasa es la única política del migrador.
+        assert sorted(roles) == sorted([name, "auth_owner", migrate_env.username])
     finally:
         # Quita los GRANT y políticas del rol para poder borrarlo en el teardown.
         command.downgrade(config, "base")

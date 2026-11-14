@@ -49,6 +49,16 @@ services:
       # Fijo y explícito: este compose es solo de desarrollo (cookies sin Secure sobre
       # http local). Fuera de aquí, cualquier otro valor se trata como producción (B4).
       ENVIRONMENT: development
+      # Opcionales (spec 002, T10): vacías o ausentes en .env -> valor por defecto de
+      # backend/app/config.py (umbrales de Q10, sin proxy de confianza, 4 hashes Argon2).
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-}
+      RATE_LIMIT_LOGIN_ACCOUNT: ${RATE_LIMIT_LOGIN_ACCOUNT:-}
+      RATE_LIMIT_LOGIN_IP: ${RATE_LIMIT_LOGIN_IP:-}
+      RATE_LIMIT_REFRESH_IP: ${RATE_LIMIT_REFRESH_IP:-}
+      RATE_LIMIT_VALIDATE_IP: ${RATE_LIMIT_VALIDATE_IP:-}
+      RATE_LIMIT_ACCEPT_IP: ${RATE_LIMIT_ACCEPT_IP:-}
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-}
+      ARGON2_MAX_CONCURRENCY: ${ARGON2_MAX_CONCURRENCY:-}
     # Código montado para la recarga; el entorno virtual vive en /opt/venv (imagen).
     volumes:
       - ./backend:/app

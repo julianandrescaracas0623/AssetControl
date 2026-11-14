@@ -12,13 +12,18 @@ refresh responde lo mismo que el login y rota la cookie; cualquier rechazo es un
 pestaña que pierde una carrera dentro de la ventana de gracia cerrara la sesión
 de la que ganó). El logout siempre responde ``204`` y limpia la cookie, haya o
 no una válida. El valor de la cookie no se registra.
+
+Límites de tasa (T10, R13; ``app.auth.limits``): login por IP y cuenta y refresh por
+IP, contados antes de Argon2 y de la base; ``429`` genérico o ``503`` si no se puede
+contar. Si la petición termina bien se devuelve su intento (solo cuentan los fallos).
+El logout no se limita.
 """
 
 from flask import Blueprint, abort, current_app, jsonify, request
 from flask.typing import ResponseReturnValue
 from flask.wrappers import Response
 
-from app.auth import service
+from app.auth import limits, service
 from app.auth.credentials import ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL
 from app.auth.decorators import current_user, require_auth
 from app.auth.http import is_same_site_request, refresh_cookie_options
@@ -64,9 +69,12 @@ def login() -> ResponseReturnValue:
     if not isinstance(email, str) or not isinstance(password, str):
         return error_response(400, *BAD_REQUEST)
 
+    # T10: antes de Argon2 y de buscar la cuenta (429/503 si no se puede seguir).
+    attempts = limits.limit_login(email)
     result = service.login(email, password)
     if result is None:
         return error_response(401, *INVALID_CREDENTIALS)
+    limits.give_back(attempts)
     return session_response(result)
 
 
@@ -74,9 +82,11 @@ def login() -> ResponseReturnValue:
 def refresh() -> ResponseReturnValue:
     if not is_same_site_request():
         abort(403)
+    attempts = limits.limit_refresh()
     result = service.refresh(_refresh_cookie_value())
     if result is None:
         return error_response(401, *NOT_AUTHENTICATED)
+    limits.give_back(attempts)
     return session_response(result)
 
 
