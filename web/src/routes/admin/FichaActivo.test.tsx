@@ -104,3 +104,75 @@ describe('editar (T5)', () => {
     expect(await screen.findByRole('dialog', { name: 'Editar activo' })).toBeTruthy()
   })
 })
+
+async function elegirEnSelect(nombre: RegExp | string, opcion: string) {
+  const disparador = screen.getByRole('combobox', { name: nombre })
+  fireEvent.keyDown(disparador, { key: 'Enter' })
+  fireEvent.click(await screen.findByRole('option', { name: opcion }))
+}
+
+describe('ciclo de vida (T6)', () => {
+  it('mueve a otra sala o box con If-Match', async () => {
+    const { f } = abrir()
+    fireEvent.click(await screen.findByRole('button', { name: 'Mover' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Mover activo' })
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Mover' }))
+    expect(await within(dialogo).findByText('Elige la sala o el box de destino')).toBeTruthy()
+    fireEvent.click(within(dialogo).getByRole('combobox'))
+    fireEvent.click(await screen.findByRole('option', { name: /Administración/ }))
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Mover' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(await screen.findByText('Administración', { selector: 'dd' })).toBeTruthy()
+    const [[url, init]] = cambios(f)
+    expect(String(url)).toBe(`/api/activos/${SILLA}/mover`)
+    expect(JSON.parse(String(init?.body))).toEqual({ ubicacion_id: '00000000-0000-4000-8000-0000000000a2' })
+  })
+
+  it('envía a reparación y vuelve a activo en un toque', async () => {
+    const { f } = abrir()
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar a reparación' }))
+    expect(await screen.findByRole('button', { name: 'Volver a activo' })).toBeTruthy()
+    expect(screen.getByText('En reparación')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a activo' }))
+    expect(await screen.findByRole('button', { name: 'Enviar a reparación' })).toBeTruthy()
+    const envios = cambios(f)
+    expect(envios.map(([, init]) => new Headers(init?.headers).get('If-Match'))).toEqual(['"1"', '"2"'])
+  })
+
+  it('dar de baja exige motivo (y nota con «otro»), deja la ficha en solo lectura y se reactiva', async () => {
+    const { f } = abrir()
+    fireEvent.click(await screen.findByRole('button', { name: 'Dar de baja' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Dar de baja' })
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Dar de baja' }))
+    expect(await within(dialogo).findByText('Elige un motivo', { selector: 'p' })).toBeTruthy()
+    await elegirEnSelect(/Motivo/, 'Otro')
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Dar de baja' }))
+    expect(await within(dialogo).findByText('Con «Otro», escribe una nota')).toBeTruthy()
+    await elegirEnSelect(/Motivo/, 'Perdido')
+    fireEvent.change(within(dialogo).getByLabelText(/Nota/), { target: { value: 'No apareció en el conteo' } })
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Dar de baja' }))
+
+    const aviso = await screen.findByText('Dado de baja: perdido')
+    expect(aviso).toBeTruthy()
+    expect(await screen.findByText('«No apareció en el conteo»')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Editar' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Mover' })).toBeNull()
+    expect(JSON.parse(String(cambios(f)[0][1]?.body))).toEqual({ motivo: 'perdido', nota: 'No apareció en el conteo' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reactivar' }))
+    const reactivar = await screen.findByRole('dialog', { name: 'Reactivar activo' })
+    await elegirEnSelect(/Motivo/, 'Apareció')
+    fireEvent.click(within(reactivar).getByRole('button', { name: 'Reactivar' }))
+    expect(await screen.findByRole('button', { name: 'Editar' })).toBeTruthy()
+    expect(JSON.parse(String(cambios(f)[1][1]?.body))).toEqual({ estado: 'activo', motivo: 'encontrado', nota: null })
+  })
+
+  it('si otra persona lo cambió, avisa y muestra el vigente', async () => {
+    const { catalogo } = abrir()
+    await screen.findByRole('button', { name: 'Enviar a reparación' })
+    catalogo.cambiarPorOtro(SILLA, { nombre: 'Silla renombrada' })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar a reparación' }))
+    expect(await screen.findByText(/Alguien cambió este activo/)).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Silla renombrada' })).toBeTruthy()
+  })
+})

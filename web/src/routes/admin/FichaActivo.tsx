@@ -1,19 +1,69 @@
-import { CircleAlert, Pencil, RefreshCw, SearchX } from 'lucide-react'
+import { Archive, ArchiveRestore, CircleAlert, MapPin, Pencil, RefreshCw, SearchX, Wrench } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
+import { DarDeBaja, MoverActivo, Reactivar } from '@/components/app/AccionesActivo'
 import { EditarActivo } from '@/components/app/EditarActivo'
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { normalizarCodigo, useActivoPorCodigo } from '@/lib/activos'
+import { type Activo, normalizarCodigo, useActivoPorCodigo } from '@/lib/activos'
 import { mensajeDeError } from '@/lib/api/cliente'
+import { etiquetaMotivo, useAlternarReparacion, useHistorial } from '@/lib/cambiosActivo'
 import { formatCOP } from '@/lib/format'
 
 // Ficha del activo (spec 004, T9; destino de la lista, del alta y del buscador). Spec
-// 005: editar (T5). `?accion=editar` la abre con el formulario abierto (menú de la lista).
+// 005: editar (T5), mover, reparación, baja y reactivar (T6). `?accion=editar|mover|baja`
+// la abre con esa acción (menú de la lista). Un dado de baja es de solo lectura (Q1).
+
+type Accion = 'editar' | 'mover' | 'baja' | 'reactivar'
+const ACCIONES: Accion[] = ['editar', 'mover', 'baja', 'reactivar']
+
+function AvisoDeBaja({ activo, onReactivar }: { activo: Activo; onReactivar: () => void }) {
+  const historial = useHistorial(activo.id)
+  const baja = historial.data?.pages[0]?.eventos.find((e) => e.tipo === 'dado_de_baja')
+  const { motivo, nota } = (baja?.datos ?? {}) as { motivo?: string; nota?: string }
+  return (
+    <Alert variant="warning">
+      <Archive />
+      <AlertTitle>Dado de baja{motivo ? `: ${etiquetaMotivo(motivo).toLowerCase()}` : ''}</AlertTitle>
+      <AlertDescription className="flex flex-col items-start gap-3 text-foreground">
+        {nota && <span>«{nota}»</span>}
+        <span>No cuenta en el valor del inventario y no se puede editar ni verificar.</span>
+        <Button size="sm" variant="outline" className="max-md:min-h-11" onClick={onReactivar}>
+          <ArchiveRestore />
+          Reactivar
+        </Button>
+      </AlertDescription>
+    </Alert>
+  )
+}
+
+function Acciones({ activo, abrir }: { activo: Activo; abrir: (a: Accion) => void }) {
+  const reparacion = useAlternarReparacion(activo)
+  return (
+    <div className="flex flex-wrap gap-2 [&_[data-slot=button]]:max-md:min-h-11">
+      <Button variant="outline" onClick={() => abrir('editar')}>
+        <Pencil />
+        Editar
+      </Button>
+      <Button variant="outline" onClick={() => abrir('mover')}>
+        <MapPin />
+        Mover
+      </Button>
+      <Button variant="outline" onClick={reparacion.alternar} disabled={reparacion.guardando}>
+        <Wrench />
+        {reparacion.etiqueta}
+      </Button>
+      <Button variant="destructive" onClick={() => abrir('baja')}>
+        <Archive />
+        Dar de baja
+      </Button>
+    </div>
+  )
+}
 
 const fecha = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' })
 
@@ -31,9 +81,9 @@ export default function FichaActivo() {
   const codigo = normalizarCodigo(crudo) ?? crudo
   const consulta = useActivoPorCodigo(codigo)
   const [params, setParams] = useSearchParams()
-  const [accion, setAccion] = useState<string | null>(() => params.get('accion'))
+  const [accion, setAccion] = useState<Accion | null>(() => ACCIONES.find((a) => a === params.get('accion')) ?? null)
 
-  function abrir(nueva: string | null) {
+  function abrir(nueva: Accion | null) {
     setAccion(nueva)
     if (params.has('accion')) {
       params.delete('accion')
@@ -95,15 +145,9 @@ export default function FichaActivo() {
             <EstadoActivoBadge estado={activo.estado} />
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 [&_[data-slot=button]]:max-md:min-h-11">
-          {!deBaja && (
-            <Button variant="outline" onClick={() => abrir('editar')}>
-              <Pencil />
-              Editar
-            </Button>
-          )}
-        </div>
+        {!deBaja && <Acciones activo={activo} abrir={abrir} />}
       </div>
+      {deBaja && <AvisoDeBaja activo={activo} onReactivar={() => abrir('reactivar')} />}
       <dl className="divide-y rounded-xl border px-4">
         <Dato etiqueta="Ubicación">{activo.ubicacion.ruta}</Dato>
         <Dato etiqueta="Precio de compra">{activo.precio_compra ? formatCOP(activo.precio_compra) : null}</Dato>
@@ -115,6 +159,9 @@ export default function FichaActivo() {
         <Dato etiqueta="Registrado">{fecha.format(new Date(activo.creado_en))}</Dato>
       </dl>
       <EditarActivo activo={activo} abierto={accion === 'editar' && !deBaja} onAbierto={(v) => abrir(v ? 'editar' : null)} />
+      <MoverActivo activo={activo} abierto={accion === 'mover' && !deBaja} onAbierto={(v) => abrir(v ? 'mover' : null)} />
+      <DarDeBaja activo={activo} abierto={accion === 'baja' && !deBaja} onAbierto={(v) => abrir(v ? 'baja' : null)} />
+      <Reactivar activo={activo} abierto={accion === 'reactivar' && deBaja} onAbierto={(v) => abrir(v ? 'reactivar' : null)} />
     </div>
   )
 }

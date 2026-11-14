@@ -1,8 +1,9 @@
 import { type QueryClient, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { toast } from 'sonner'
 
 import { type Activo, aPrecioCanonico, CLAVE_ACTIVOS, precioParaCampo } from '@/lib/activos'
-import { api, ErrorApi, type Esquemas } from '@/lib/api/cliente'
+import { api, ErrorApi, type Esquemas, mensajeDeError } from '@/lib/api/cliente'
 import { useApiAutenticada } from '@/lib/sesion'
 
 // Cambios sobre un activo existente e historial (spec 005, T5–T7). Toda escritura va
@@ -61,6 +62,31 @@ export const useEditarActivo = () => useCambio(api.editarActivo)
 export const useMoverActivo = () => useCambio(api.moverActivo)
 export const useCambiarEstado = () => useCambio(api.cambiarEstadoActivo)
 export const useDarDeBaja = () => useCambio(api.darDeBajaActivo)
+
+/** Aviso de un cambio fallido: un 412 pide revisar (la ficha ya muestra el vigente). */
+export function avisarErrorDeCambio(error: unknown) {
+  if (vigenteDe(error)) toast.error('Alguien cambió este activo. Revisa los datos actuales y vuelve a intentarlo.')
+  else toast.error(mensajeDeError(error))
+}
+
+/** `activo` ↔ `en_reparacion` en un toque (se deshace igual de fácil). */
+export function useAlternarReparacion(activo: Activo) {
+  const cambiar = useCambiarEstado()
+  const destino = activo.estado === 'en_reparacion' ? 'activo' : 'en_reparacion'
+  return {
+    etiqueta: destino === 'activo' ? 'Volver a activo' : 'Enviar a reparación',
+    guardando: cambiar.isPending,
+    alternar: () =>
+      cambiar.mutate(
+        { activo, cuerpo: { estado: destino } },
+        {
+          onSuccess: () => toast.success(destino === 'activo' ? 'El activo volvió a estar activo' : 'Marcado en reparación: sigue contando en el inventario'),
+          onError: avisarErrorDeCambio,
+        },
+      ),
+  }
+}
+
 
 export function useHistorial(id: string | undefined) {
   const conToken = useApiAutenticada()
