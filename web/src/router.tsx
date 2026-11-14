@@ -9,12 +9,12 @@ import Discrepancias from './routes/admin/Discrepancias'
 import Sesiones from './routes/admin/Sesiones'
 import Informe from './routes/admin/Informe'
 import AdminInicio from './routes/admin/Inicio'
-import Pendiente from './routes/admin/Pendiente'
 import RegistrarActivo from './routes/admin/RegistrarActivo'
 import RequiereAdmin from './routes/admin/RequiereAdmin'
 import Categorias from './routes/admin/Categorias'
 import Ubicaciones from './routes/admin/Ubicaciones'
 import Usuarios from './routes/admin/Usuarios'
+import Valor from './routes/admin/Valor'
 import Alta from './routes/contar/Alta'
 import Escanear from './routes/contar/Escanear'
 import Escribir from './routes/contar/Escribir'
@@ -62,9 +62,7 @@ export const routes: RouteObject[] = [
                   { path: 'usuarios', element: <Usuarios /> },
                   { path: 'ubicaciones', element: <Ubicaciones /> },
                   { path: 'categorias', element: <Categorias /> },
-                  ...['valor'].map(
-                    (path) => ({ path, element: <Pendiente /> }),
-                  ),
+                  { path: 'valor', element: <Valor /> },
                   { path: 'activos/:codigo', element: <FichaActivo /> },
                 ],
               },

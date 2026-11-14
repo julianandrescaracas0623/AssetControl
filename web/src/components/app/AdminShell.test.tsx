@@ -75,10 +75,11 @@ describe('AdminShell en computador', () => {
     expect(await screen.findByRole('menuitem', { name: 'Cerrar sesión' })).toBeTruthy()
   })
 
-  it('las pantallas aún no construidas dicen qué spec las trae', async () => {
+  it('el valor actual ya es una pantalla real, sin banda de maqueta (spec 008)', async () => {
     renderAt('/admin/valor')
     expect(await screen.findByRole('heading', { level: 1, name: 'Valor actual' })).toBeTruthy()
-    expect(screen.getByText(/spec 008/)).toBeTruthy()
+    expect(screen.queryByText(/Datos ficticios/)).toBeNull()
+    expect(screen.queryByText(/Pantalla en preparación/)).toBeNull()
   })
 })
 
