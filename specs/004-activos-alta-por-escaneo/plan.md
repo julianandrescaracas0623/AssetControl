@@ -1,6 +1,6 @@
 # Plan 004 — Activos: alta por escaneo
 
-> **Estado:** Propuesto, pendiente de aprobación humana (G1–G3). Las opciones "(recomendado)" son las de Q1–Q6 de `spec.md`; si el humano elige otra, se ajusta antes de T1.
+> **Estado:** Aprobado (G1–G3, 2026-11-14) con Q1–Q6 en la opción recomendada (`spec.md`).
 
 ## 1. Enfoque
 

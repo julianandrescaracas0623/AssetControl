@@ -1,6 +1,6 @@
 # Spec 004 — Activos: alta por escaneo
 
-> **Estado:** Propuesta, pendiente de aprobación humana (G1–G3). Fecha: 2026-11-14. Depende de la 003 (ubicaciones y categorías, hecha). Módulo M3 parcial: CU-CAT-01 a CU-CAT-04 de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Aprobada (G1–G3, 2026-11-14) con Q1–Q6 en la opción recomendada. Fecha: 2026-11-14. Depende de la 003 (ubicaciones y categorías, hecha). Módulo M3 parcial: CU-CAT-01 a CU-CAT-04 de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 
@@ -51,11 +51,17 @@ La clínica cuenta unos 300 activos y hoy los lleva en un Excel con nombres y ub
 - La cámara exige HTTPS y un navegador reciente (P4): en desarrollo, `localhost` vale en el computador, pero un teléfono necesita HTTPS en la red local.
 - Los stickers aún no están comprados (P9): el formato del código (Q1) debe aceptar lo que se compre; la prueba con teléfonos reales lo confirma antes de comprar el lote.
 
-## Preguntas abiertas (para G1)
+## Decisiones de G1 (humano, 2026-11-14)
 
-- **Q1 Formato del código:** recomendado: de 1 a 40 caracteres, solo letras sin tilde, números y `-` `.` `/` `_`, sin espacios; se guarda en **mayúsculas** para que escribirlo a mano coincida con lo escaneado.
-- **Q2 Precio:** recomendado: mayor o igual a 0 (una donación vale 0), con dos decimales como máximo y tope de `999.999.999.999,99` (`NUMERIC(14,2)`).
-- **Q3 Contador al duplicar:** recomendado: hereda el precio del original sin verlo ni cambiarlo (lo que dice hoy `docs/07`); el admin sí lo ve y puede cambiarlo antes de guardar.
-- **Q4 Dependencias:** `@zxing/browser` 0.2.1 y `@zxing/library` 0.23.0 (escáner, ya decidido en `docs/07`); `@vitejs/plugin-basic-ssl` 2.3.0 solo de desarrollo para probar con teléfonos en la red local.
-- **Q5 Fecha de compra (P7):** recomendado: incluirla como opcional; proveedor queda fuera.
-- **Q6 Lista y ficha:** recomendado: `/admin/activos` y la ficha pasan a datos reales en solo lectura (búsqueda incluida); sus acciones (editar, mover, dar de baja) siguen como maqueta hasta la 005.
+| Pregunta | Decisión |
+|---|---|
+| Q1 Código | 1 a 40 caracteres: letras sin tilde, números y `-` `.` `/` `_`, sin espacios; se guarda en mayúsculas. |
+| Q2 Precio | Mayor o igual a 0, máximo dos decimales, tope de `NUMERIC(14,2)`. |
+| Q3 Duplicar | El contador hereda el precio del original sin verlo ni cambiarlo; el admin lo ve y puede cambiarlo. |
+| Q4 Dependencias | `@zxing/browser` 0.2.1, `@zxing/library` 0.23.0 y `@vitejs/plugin-basic-ssl` 2.3.0 (solo desarrollo). |
+| Q5 Fecha de compra | Opcional; proveedor fuera. |
+| Q6 Lista y ficha | Con datos reales en solo lectura; acciones en la 005. |
+
+## Preguntas abiertas
+
+Ninguna para esta spec.
