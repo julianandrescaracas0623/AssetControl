@@ -96,6 +96,11 @@
 - **Verificación:** `cd web && npm test` + capturas a 375 px; objetivos medidos ≥ 44 px.
 - **Depende de:** T3.
 - **Riesgo:** área segura de iOS; se usa `env(safe-area-inset-bottom)`.
+- **Implementada (2026-11-13), revisada (APROBADO):**
+  - `components/app/NetworkStatus.tsx`: cinco estados con texto, ícono (`aria-hidden`) y color del tema; `role="status"` + `aria-live="polite"`; "Enviando…" con giro (se detiene con `prefers-reduced-motion`).
+  - `components/app/CountShell.tsx`: encabezado de 56 px con retroceso de 44 px (`aria-label="Volver"`), sesión y sala truncadas, `NetworkStatus`; contenido y barra de acción `sticky` abajo con `env(safe-area-inset-bottom)`, botones a ancho completo de 48 px o más (la principal de 56 px); columna centrada de 480 px en computador (D5). `/contar` ya lo usa (maqueta completa en T9).
+  - Pruebas primero: `NetworkStatus.test.tsx` (5) y `CountShell.test.tsx` (3), en rojo antes; total 102/102; lint, typecheck y build en verde.
+  - Navegador real: `/contar` a 375 y 1440 px sin scroll horizontal y sin ningún objetivo táctil menor de 44 px (medido en Chromium).
 
 ### T7 — Componentes propios de datos
 
