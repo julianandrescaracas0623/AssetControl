@@ -1,7 +1,8 @@
-import { CircleAlert, RefreshCw, SearchX } from 'lucide-react'
-import type { ReactNode } from 'react'
-import { Link, useParams } from 'react-router'
+import { CircleAlert, Pencil, RefreshCw, SearchX } from 'lucide-react'
+import { type ReactNode, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router'
 
+import { EditarActivo } from '@/components/app/EditarActivo'
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -11,8 +12,8 @@ import { normalizarCodigo, useActivoPorCodigo } from '@/lib/activos'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { formatCOP } from '@/lib/format'
 
-// Ficha del activo en solo lectura (spec 004, T9; destino de la lista, del alta y del
-// buscador). Editar, mover, dar de baja e historial llegan con la spec 005.
+// Ficha del activo (spec 004, T9; destino de la lista, del alta y del buscador). Spec
+// 005: editar (T5). `?accion=editar` la abre con el formulario abierto (menú de la lista).
 
 const fecha = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' })
 
@@ -29,6 +30,16 @@ export default function FichaActivo() {
   const { codigo: crudo = '' } = useParams()
   const codigo = normalizarCodigo(crudo) ?? crudo
   const consulta = useActivoPorCodigo(codigo)
+  const [params, setParams] = useSearchParams()
+  const [accion, setAccion] = useState<string | null>(() => params.get('accion'))
+
+  function abrir(nueva: string | null) {
+    setAccion(nueva)
+    if (params.has('accion')) {
+      params.delete('accion')
+      setParams(params, { replace: true })
+    }
+  }
 
   if (consulta.isPending) {
     return (
@@ -71,15 +82,27 @@ export default function FichaActivo() {
     )
   }
 
+  const deBaja = activo.estado === 'dado_de_baja'
+
   return (
     <div className="flex max-w-3xl flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight break-words">{activo.nombre}</h1>
-        <p className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="rounded bg-muted px-2 py-0.5 font-mono">{activo.codigo}</span>
-          <Badge variant="outline">{activo.categoria.nombre}</Badge>
-          <EstadoActivoBadge estado={activo.estado} />
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight break-words">{activo.nombre}</h1>
+          <p className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="rounded bg-muted px-2 py-0.5 font-mono">{activo.codigo}</span>
+            <Badge variant="outline">{activo.categoria.nombre}</Badge>
+            <EstadoActivoBadge estado={activo.estado} />
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 [&_[data-slot=button]]:max-md:min-h-11">
+          {!deBaja && (
+            <Button variant="outline" onClick={() => abrir('editar')}>
+              <Pencil />
+              Editar
+            </Button>
+          )}
+        </div>
       </div>
       <dl className="divide-y rounded-xl border px-4">
         <Dato etiqueta="Ubicación">{activo.ubicacion.ruta}</Dato>
@@ -91,7 +114,7 @@ export default function FichaActivo() {
         <Dato etiqueta="Fecha de compra">{activo.fecha_compra ? fecha.format(new Date(`${activo.fecha_compra}T12:00:00`)) : null}</Dato>
         <Dato etiqueta="Registrado">{fecha.format(new Date(activo.creado_en))}</Dato>
       </dl>
-      <p className="text-sm text-muted-foreground">Editar, mover, dar de baja y el historial llegan con la spec 005.</p>
+      <EditarActivo activo={activo} abierto={accion === 'editar' && !deBaja} onAbierto={(v) => abrir(v ? 'editar' : null)} />
     </div>
   )
 }

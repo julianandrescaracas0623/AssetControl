@@ -74,6 +74,8 @@ export interface Opciones<B> {
   token?: string | null
   /** Cabecera `X-AssetControl-CSRF: 1` (refresh y logout, Q14). */
   csrf?: boolean
+  /** `If-Match` con la `row_version` leída (cambios sobre un activo, spec 005). */
+  version?: number
   signal?: AbortSignal
 }
 
@@ -107,6 +109,7 @@ export async function pedir<R extends Ruta, M extends MetodoDe<R>>(
   if (opciones.cuerpo !== undefined) headers.set('Content-Type', 'application/json')
   if (opciones.token) headers.set('Authorization', `Bearer ${opciones.token}`)
   if (opciones.csrf) headers.set(CSRF_HEADER, '1')
+  if (opciones.version !== undefined) headers.set('If-Match', `"${opciones.version}"`)
 
   const url = String(ruta).replace(/\{(\w+)\}/g, (_, nombre: string) => {
     const valor = opciones.parametros?.[nombre]
@@ -168,10 +171,21 @@ export const api = {
   resolverCodigo: (token: string, codigo: string) =>
     pedir('get', '/activos/por-codigo', { token, consulta: { codigo } }),
   fichaActivo: (token: string, id: string) => pedir('get', '/activos/{id}', { token, parametros: { id } }),
-  buscarActivos: (token: string, consulta: { q?: string; estado?: string; pagina?: number }) =>
+  buscarActivos: (token: string, consulta: { q?: string; estado?: string; ubicacion_id?: string; pagina?: number }) =>
     pedir('get', '/activos', { token, consulta }),
   sugerenciasActivos: (token: string, campo: string, q: string) =>
     pedir('get', '/activos/sugerencias', { token, consulta: { campo, q } }),
   crearActivo: (token: string, cuerpo: Esquemas['CrearActivoBody'] | Esquemas['DuplicarActivoBody']) =>
     pedir('post', '/activos', { token, cuerpo }),
+  // Spec 005: cambios (solo admin, con If-Match) e historial (ambos roles).
+  editarActivo: (token: string, id: string, version: number, cuerpo: Esquemas['EditarActivoBody']) =>
+    pedir('patch', '/activos/{id}', { token, cuerpo, version, parametros: { id } }),
+  moverActivo: (token: string, id: string, version: number, cuerpo: Esquemas['MoverActivoBody']) =>
+    pedir('post', '/activos/{id}/mover', { token, cuerpo, version, parametros: { id } }),
+  cambiarEstadoActivo: (token: string, id: string, version: number, cuerpo: Esquemas['EstadoActivoBody']) =>
+    pedir('post', '/activos/{id}/estado', { token, cuerpo, version, parametros: { id } }),
+  darDeBajaActivo: (token: string, id: string, version: number, cuerpo: Esquemas['BajaActivoBody']) =>
+    pedir('post', '/activos/{id}/baja', { token, cuerpo, version, parametros: { id } }),
+  historialActivo: (token: string, id: string, antesDe?: number) =>
+    pedir('get', '/activos/{id}/historial', { token, parametros: { id }, consulta: { antes_de: antesDe } }),
 }

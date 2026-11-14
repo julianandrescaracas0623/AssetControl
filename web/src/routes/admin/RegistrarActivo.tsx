@@ -3,6 +3,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
 
+import { Campo, Obligatorio } from '@/components/app/CampoFormulario'
 import { EncabezadoPagina } from '@/components/app/ConEstado'
 import { CopiarDeParecido } from '@/components/app/CopiarDeParecido'
 import { Escaner } from '@/components/app/Escaner'
@@ -15,7 +16,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { type Activo, normalizarCodigo, useActivoPorCodigo } from '@/lib/activos'
@@ -27,25 +27,6 @@ import { cn } from '@/lib/utils'
 // T6). R8: sin código de sticker no hay alta. Obligatorios: código, nombre, precio,
 // categoría y ubicación; solo se teclean nombre y precio (lo demás se elige o se copia
 // de un parecido). La validación definitiva es del servidor.
-
-function Campo({ id, etiqueta, error, ayuda, children, className }: { id: string; etiqueta: ReactNode; error?: string; ayuda?: ReactNode; children: ReactNode; className?: string }) {
-  return (
-    <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
-      <Label htmlFor={id}>{etiqueta}</Label>
-      {children}
-      {error ? (
-        <p id={`${id}-error`} className="flex items-center gap-1.5 text-xs text-destructive">
-          <CircleAlert className="size-3.5 shrink-0" aria-hidden="true" />
-          {error}
-        </p>
-      ) : (
-        ayuda && <p id={`${id}-ayuda`} className="text-xs text-muted-foreground">{ayuda}</p>
-      )}
-    </div>
-  )
-}
-
-const Obligatorio = () => <span className="text-destructive" aria-hidden="true">*</span>
 
 function Paso({ n, titulo, nota, children }: { n: number; titulo: string; nota?: string; children: ReactNode }) {
   const id = useId()

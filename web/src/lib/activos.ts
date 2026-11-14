@@ -90,7 +90,10 @@ export function useActivo(id: string | undefined) {
   })
 }
 
-export function useBuscarActivos(params: { q?: string; estado?: Activo['estado']; pagina?: number }, activa = true) {
+export function useBuscarActivos(
+  params: { q?: string; estado?: Activo['estado']; ubicacion_id?: string; pagina?: number },
+  activa = true,
+) {
   const conToken = useApiAutenticada()
   return useQuery({
     queryKey: [...CLAVE_ACTIVOS, 'buscar', params],

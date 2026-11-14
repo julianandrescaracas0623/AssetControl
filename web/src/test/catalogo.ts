@@ -15,7 +15,7 @@ export function crearCatalogo(
   const activos = [...(inicial.activos ?? [])]
   const rol = inicial.rol ?? 'admin'
   const sinPrecio = (a: Activo) => {
-    if (rol === 'admin') return a
+    if (rol === 'admin') return { ...a }
     const resto: Partial<Activo> = { ...a }
     delete resto.precio_compra
     return resto
@@ -27,6 +27,7 @@ export function crearCatalogo(
     return sala ? `${sala.nombre} › ${u.nombre}` : u.nombre
   }
   const fallos = new Map<string, () => Response>()
+  const eventos: { seq: number; tipo: string; datos: Record<string, unknown>; activo: string }[] = []
   let siguiente = 1
   const nuevoId = () => `00000000-0000-4000-8000-${String(siguiente++).padStart(12, '0')}`
   const cuerpo = (init: RequestInit) => JSON.parse(String(init.body ?? '{}')) as Record<string, unknown>
@@ -73,8 +74,13 @@ export function crearCatalogo(
     }
     if (ruta0 === '/api/activos' && metodo === 'GET') {
       const texto = (q.get('q') ?? '').toLowerCase()
+      const ubicacionId = q.get('ubicacion_id')
+      const estado = q.get('estado')
       const encontrados = activos.filter(
-        (a) => !texto || a.codigo.toLowerCase().includes(texto) || a.nombre.toLowerCase().includes(texto),
+        (a) =>
+          (!texto || a.codigo.toLowerCase().includes(texto) || a.nombre.toLowerCase().includes(texto)) &&
+          (!ubicacionId || a.ubicacion.id === ubicacionId) &&
+          (!estado || a.estado === estado),
       )
       const pagina = Number(q.get('pagina') ?? '1')
       return json(200, {
@@ -88,6 +94,71 @@ export function crearCatalogo(
     if (act && metodo === 'GET') {
       const a = activos.find((x) => x.id === act[1])
       return a ? json(200, { activo: sinPrecio(a) }) : errorApi(404, 'no_encontrado', 'El recurso no existe.')
+    }
+    // Spec 005: cambios con If-Match (412 con el vigente) e historial.
+    const cambio = ruta0.match(/^\/api\/activos\/([0-9a-f-]{36})(?:\/(mover|estado|baja))?$/)
+    if (cambio && (metodo === 'PATCH' || (metodo === 'POST' && cambio[2]))) {
+      const a = activos.find((x) => x.id === cambio[1])
+      if (!a) return errorApi(404, 'no_encontrado', 'El recurso no existe.')
+      const version = new Headers(init.headers).get('If-Match')?.replace(/"/g, '')
+      if (!version) return errorApi(428, 'falta_version', 'Falta la versión del activo.')
+      if (Number(version) !== a.row_version) {
+        return json(412, {
+          error: { code: 'version_desactualizada', message: 'Alguien cambió este activo.', request_id: 'r' },
+          activo: { ...a },
+        })
+      }
+      const b = cuerpo(init)
+      const reactivar = cambio[2] === 'estado' && a.estado === 'dado_de_baja' && b.estado === 'activo'
+      if (a.estado === 'dado_de_baja' && !reactivar) {
+        return errorApi(409, 'activo_dado_de_baja', 'El activo está dado de baja: solo se puede reactivar.')
+      }
+      const evento = (tipo: string, datos: Record<string, unknown>) =>
+        eventos.unshift({ seq: eventos.length + 100, tipo, datos, activo: a.id })
+      if (metodo === 'PATCH') {
+        if ('nombre' in b) a.nombre = String(b.nombre)
+        if ('precio_compra' in b) {
+          evento('precio_cambiado', { antes: a.precio_compra, despues: b.precio_compra })
+          a.precio_compra = String(b.precio_compra)
+        }
+        if ('categoria_id' in b) {
+          const c = categorias.find((x) => x.id === b.categoria_id)!
+          a.categoria = { id: c.id, nombre: c.nombre }
+        }
+        for (const campo of ['serial', 'marca', 'modelo', 'subtipo', 'fecha_compra'] as const) {
+          if (campo in b) a[campo] = (b[campo] as string | null) ?? null
+        }
+      } else if (cambio[2] === 'mover') {
+        const destino = String(b.ubicacion_id)
+        evento('ubicacion_cambiada', { antes: { id: a.ubicacion.id, ruta: a.ubicacion.ruta }, despues: { id: destino, ruta: ruta(destino) } })
+        a.ubicacion = { id: destino, nombre: ubicaciones.find((u) => u.id === destino)?.nombre ?? '', ruta: ruta(destino) }
+      } else if (cambio[2] === 'estado') {
+        evento('estado_cambiado', { antes: a.estado, despues: b.estado, ...(b.motivo ? { motivo: b.motivo } : {}) })
+        a.estado = b.estado as Activo['estado']
+      } else {
+        evento('dado_de_baja', { motivo: b.motivo, ...(b.nota ? { nota: b.nota } : {}) })
+        a.estado = 'dado_de_baja'
+      }
+      a.row_version += 1
+      return json(200, { activo: { ...a } }, { ETag: `"${a.row_version}"` })
+    }
+    const his = ruta0.match(/^\/api\/activos\/([0-9a-f-]{36})\/historial$/)
+    if (his && metodo === 'GET') {
+      const a = activos.find((x) => x.id === his[1])
+      if (!a) return errorApi(404, 'no_encontrado', 'El recurso no existe.')
+      const propios = [
+        ...eventos.filter((e) => e.activo === a.id),
+        { seq: 1, tipo: 'creado', datos: { codigo: a.codigo, nombre: a.nombre, precio_compra: a.precio_compra }, activo: a.id },
+      ]
+        .filter((e) => rol === 'admin' || e.tipo !== 'precio_cambiado')
+        .map(({ seq, tipo, datos }) => ({
+          seq,
+          tipo,
+          ocurrido_en: '2026-11-14T15:30:00+00:00',
+          autor: { id: '00000000-0000-4000-8000-00000000000a', nombre: 'Ana Torres' },
+          datos: rol === 'admin' ? datos : Object.fromEntries(Object.entries(datos).filter(([k]) => !k.includes('precio'))),
+        }))
+      return json(200, { eventos: propios, siguiente: null })
     }
     if (ruta0 === '/api/activos' && metodo === 'POST') {
       const b = cuerpo(init)
@@ -159,6 +230,12 @@ export function crearCatalogo(
     manejador,
     fallar(clave: string, respuesta: () => Response) {
       fallos.set(clave, respuesta)
+    },
+    /** Otra persona cambia el activo: sube su versión sin que la pantalla lo sepa. */
+    cambiarPorOtro(id: string, cambios: Partial<Activo>) {
+      const a = activos.find((x) => x.id === id)!
+      Object.assign(a, cambios)
+      a.row_version += 1
     },
   }
 }
