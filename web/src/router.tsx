@@ -20,6 +20,7 @@ import Verificado from './routes/contar/Verificado'
 import Verificar from './routes/contar/Verificar'
 import Componentes from './routes/dev/Componentes'
 import InicioPorRol from './routes/InicioPorRol'
+import Invitacion from './routes/Invitacion'
 import Login from './routes/Login'
 import Maqueta from './routes/Maqueta'
 import NoEncontrado from './routes/NoEncontrado'
@@ -36,6 +37,7 @@ export const routes: RouteObject[] = [
       { path: '/', element: <InicioPorRol /> },
       { path: '/health', element: <App /> },
       { path: '/login', element: <Login /> },
+      { path: '/invitacion', element: <Invitacion /> },
       { path: '/dev/componentes', element: <Componentes /> },
       {
         element: <RequiereSesion />,
