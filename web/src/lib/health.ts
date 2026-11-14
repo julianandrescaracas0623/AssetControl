@@ -1,14 +1,13 @@
 // Consulta de GET /health de la API (spec 001, R5).
 // En desarrollo, /api lo reenvía el proxy de Vite a la API (ver vite.config.ts).
 
+import type { components } from './api/schema'
+
 export const HEALTH_URL = '/api/health'
 const HEALTH_TIMEOUT_MS = 10_000
 
-export type HealthPayload = {
-  status: 'ok' | 'error'
-  db: 'ok' | 'error'
-  version: string
-}
+// Forma de backend/openapi.yaml (spec 002b, T2).
+export type HealthPayload = components['schemas']['Health']
 
 export type HealthResult =
   | { kind: 'ok'; payload: HealthPayload }
