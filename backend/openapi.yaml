@@ -564,6 +564,43 @@ paths:
           $ref: "#/components/responses/NoAutenticado"
         "404":
           $ref: "#/components/responses/NoEncontrado"
+    patch:
+      tags: [activos]
+      operationId: editarActivo
+      summary: Editar un activo (solo admin; cada cambio deja su evento)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EditarActivoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/ActivoCambiado"
+        "400":
+          description: Cuerpo o precio no válidos, o se intentó cambiar el código.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [solicitud_invalida, precio_invalido, codigo_inmutable]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/ActivoDadoDeBaja"
+        "412":
+          $ref: "#/components/responses/VersionDesactualizada"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "428":
+          $ref: "#/components/responses/FaltaVersion"
 
 components:
   securitySchemes:
@@ -574,6 +611,12 @@ components:
       description: Token de acceso (15 minutos). Guárdalo solo en memoria.
 
   parameters:
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: 'row_version del activo leído, "3" o 3; si no coincide, 412.'
+      schema: { type: string }
     Id:
       name: id
       in: path
@@ -635,6 +678,34 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
       x-codigos: [prohibido]
+    ActivoDadoDeBaja:
+      description: El activo está dado de baja; solo se puede reactivar.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [activo_dado_de_baja]
+    FaltaVersion:
+      description: Falta If-Match o no tiene la forma "N".
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [falta_version]
+    VersionDesactualizada:
+      description: La versión no coincide; no se guardó nada. Trae el activo vigente.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/VersionDesactualizada" }
+      x-codigos: [version_desactualizada]
+    ActivoCambiado:
+      description: Guardado (o sin cambios); el activo con precio y su versión.
+      headers:
+        ETag:
+          description: La versión nueva entre comillas, para el próximo If-Match.
+          required: true
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ActivoRespuesta" }
     CuerpoDemasiadoGrande:
       description: El cuerpo supera 4 KB.
       content:
@@ -695,6 +766,10 @@ components:
         - precio_invalido
         - ubicacion_invalida
         - codigo_existente
+        - falta_version
+        - version_desactualizada
+        - codigo_inmutable
+        - activo_dado_de_baja
     Error:
       type: object
       required: [error]
@@ -916,7 +991,7 @@ components:
     Activo:
       type: object
       required:
-        [id, codigo, nombre, categoria, ubicacion, serial, marca, modelo, subtipo, fecha_compra, estado, creado_en]
+        [id, codigo, nombre, categoria, ubicacion, serial, marca, modelo, subtipo, fecha_compra, estado, row_version, creado_en]
       additionalProperties: false
       description: precio_compra solo existe en las respuestas al admin (P13).
       properties:
@@ -931,6 +1006,10 @@ components:
         subtipo: { $ref: "#/components/schemas/TextoOpcional" }
         fecha_compra: { type: [string, "null"], format: date }
         estado: { $ref: "#/components/schemas/EstadoActivo" }
+        row_version:
+          type: integer
+          minimum: 1
+          description: Versión para If-Match al cambiar el activo (spec 005).
         creado_en: { type: string, format: date-time }
         precio_compra: { $ref: "#/components/schemas/Precio" }
     UbicacionDeActivo:
@@ -988,6 +1067,36 @@ components:
             message: { type: string }
             request_id: { type: string, format: uuid }
         activo: { $ref: "#/components/schemas/ActivoResumen" }
+    VersionDesactualizada:
+      type: object
+      required: [error, activo]
+      additionalProperties: false
+      description: El activo cambió desde que se leyó; trae el vigente (con precio, solo admin).
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          additionalProperties: false
+          properties:
+            code: { $ref: "#/components/schemas/ErrorCode" }
+            message: { type: string }
+            request_id: { type: string, format: uuid }
+        activo: { $ref: "#/components/schemas/Activo" }
+    EditarActivoBody:
+      type: object
+      additionalProperties: false
+      description: >-
+        Solo los campos que cambian; null o "" borra un opcional. El código no se puede
+        cambiar (400 codigo_inmutable).
+      properties:
+        nombre: { $ref: "#/components/schemas/NombreVisible" }
+        categoria_id: { type: string, format: uuid }
+        precio_compra: { $ref: "#/components/schemas/Precio" }
+        serial: { $ref: "#/components/schemas/TextoOpcional" }
+        marca: { $ref: "#/components/schemas/TextoOpcional" }
+        modelo: { $ref: "#/components/schemas/TextoOpcional" }
+        subtipo: { $ref: "#/components/schemas/TextoOpcional" }
+        fecha_compra: { type: [string, "null"], format: date, description: No futura. }
     CrearActivoBody:
       type: object
       required: [id, codigo, nombre, precio_compra, categoria_id, ubicacion_id]

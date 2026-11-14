@@ -426,6 +426,8 @@ PROTECTED_ENDPOINTS = {
     "activos.crear": frozenset({"admin", "contador"}),
     "activos.buscar": frozenset({"admin", "contador"}),
     "activos.sugerencias": frozenset({"admin", "contador"}),
+    # Spec 005: cambiar un activo existente es solo del admin (R9).
+    "activos.editar": frozenset({"admin"}),
 }
 
 

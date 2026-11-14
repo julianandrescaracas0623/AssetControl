@@ -1,7 +1,8 @@
-"""Rutas ``/activos`` (spec 004; R1–R7; plan.md §4).
+"""Rutas ``/activos`` (spec 004; R1–R7; spec 005; plan.md §4).
 
 Ambos roles leen y dan de alta (P11); el precio solo sale en las respuestas del admin
 (R5, P13: la clave no existe para el contador). Un ``id`` de otro tenant es ``404``.
+Cambiar un activo existente es solo del admin y exige ``If-Match`` (spec 005, R2, R9).
 Cuerpos JSON de 4 KB como máximo (``app.auth.http``).
 """
 
@@ -10,8 +11,9 @@ import uuid
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
 
-from app.activos import service
-from app.auth.decorators import current_session, current_user, require_auth
+from app.activos import cambios, service
+from app.activos.models import Activo
+from app.auth.decorators import current_session, current_user, require_auth, require_role
 from app.errors import current_request_id, error_response
 
 bp = Blueprint("activos", __name__, url_prefix="/activos")
@@ -22,13 +24,23 @@ def _es_admin() -> bool:
 
 
 def _error(exc: service.ErrorActivo) -> ResponseReturnValue:
-    if isinstance(exc, service.CodigoExistente):
+    if isinstance(exc, service.CodigoExistente | cambios.VersionDesactualizada):
+        activo = exc.activo
+        if isinstance(activo, Activo):
+            # Solo el admin escribe sobre activos existentes: el vigente va con precio.
+            activo = service.vista(current_session(), activo, con_precio=True)
         cuerpo = {
             "error": {"code": exc.code, "message": exc.message, "request_id": current_request_id()},
-            "activo": exc.activo,
+            "activo": activo,
         }
         return jsonify(cuerpo), exc.status
     return error_response(exc.status, exc.code, exc.message)
+
+
+def _con_version(activo: Activo) -> ResponseReturnValue:
+    """Respuesta de una escritura del admin: el activo con precio y su ``ETag``."""
+    vista = service.vista(current_session(), activo, con_precio=True)
+    return jsonify(activo=vista), 200, {"ETag": f'"{activo.row_version}"'}
 
 
 @bp.get("/por-codigo")
@@ -106,3 +118,21 @@ def sugerencias() -> ResponseReturnValue:
     except service.ErrorActivo as exc:
         return _error(exc)
     return jsonify(valores=valores)
+
+
+# --- Spec 005: cambios (solo admin, con If-Match) ----------------------------------------
+
+
+@bp.patch("/<uuid:id>")
+@require_role("admin")
+def editar(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del contrato
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return error_response(400, "solicitud_invalida", "La solicitud no es válida.")
+    try:
+        datos = cambios.edicion(body)
+        version = cambios.leer_version(request.headers.get("If-Match"))
+        activo = cambios.editar(current_session(), id, version, datos, current_user().usuario_id)
+    except service.ErrorActivo as exc:
+        return _error(exc)
+    return _con_version(activo)

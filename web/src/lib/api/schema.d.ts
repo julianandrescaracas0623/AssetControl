@@ -310,7 +310,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Editar un activo (solo admin; cada cambio deja su evento) */
+        patch: operations["editarActivo"];
         trace?: never;
     };
 }
@@ -321,7 +322,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -472,6 +473,8 @@ export interface components {
             /** Format: date */
             fecha_compra: string | null;
             estado: components["schemas"]["EstadoActivo"];
+            /** @description Versión para If-Match al cambiar el activo (spec 005). */
+            row_version: number;
             /** Format: date-time */
             creado_en: string;
             precio_compra?: components["schemas"]["Precio"];
@@ -509,6 +512,32 @@ export interface components {
                 request_id: string;
             };
             activo: components["schemas"]["ActivoResumen"];
+        };
+        /** @description El activo cambió desde que se leyó; trae el vigente (con precio, solo admin). */
+        VersionDesactualizada: {
+            error: {
+                code: components["schemas"]["ErrorCode"];
+                message: string;
+                /** Format: uuid */
+                request_id: string;
+            };
+            activo: components["schemas"]["Activo"];
+        };
+        /** @description Solo los campos que cambian; null o "" borra un opcional. El código no se puede cambiar (400 codigo_inmutable). */
+        EditarActivoBody: {
+            nombre?: components["schemas"]["NombreVisible"];
+            /** Format: uuid */
+            categoria_id?: string;
+            precio_compra?: components["schemas"]["Precio"];
+            serial?: components["schemas"]["TextoOpcional"];
+            marca?: components["schemas"]["TextoOpcional"];
+            modelo?: components["schemas"]["TextoOpcional"];
+            subtipo?: components["schemas"]["TextoOpcional"];
+            /**
+             * Format: date
+             * @description No futura.
+             */
+            fecha_compra?: string | null;
         };
         CrearActivoBody: {
             /**
@@ -622,6 +651,44 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description El activo está dado de baja; solo se puede reactivar. */
+        ActivoDadoDeBaja: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Falta If-Match o no tiene la forma "N". */
+        FaltaVersion: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description La versión no coincide; no se guardó nada. Trae el activo vigente. */
+        VersionDesactualizada: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["VersionDesactualizada"];
+            };
+        };
+        /** @description Guardado (o sin cambios); el activo con precio y su versión. */
+        ActivoCambiado: {
+            headers: {
+                /** @description La versión nueva entre comillas, para el próximo If-Match. */
+                ETag: string;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ActivoRespuesta"];
+            };
+        };
         /** @description El cuerpo supera 4 KB. */
         CuerpoDemasiadoGrande: {
             headers: {
@@ -655,6 +722,8 @@ export interface components {
         };
     };
     parameters: {
+        /** @description row_version del activo leído, "3" o 3; si no coincide, 412. */
+        IfMatch: string;
         /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
         Id: string;
         /** @description Debe valer 1; además la petición debe venir del mismo sitio. */
@@ -1294,6 +1363,44 @@ export interface operations {
             };
             401: components["responses"]["NoAutenticado"];
             404: components["responses"]["NoEncontrado"];
+        };
+    };
+    editarActivo: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description row_version del activo leído, "3" o 3; si no coincide, 412. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditarActivoBody"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ActivoCambiado"];
+            /** @description Cuerpo o precio no válidos, o se intentó cambiar el código. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            409: components["responses"]["ActivoDadoDeBaja"];
+            412: components["responses"]["VersionDesactualizada"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            428: components["responses"]["FaltaVersion"];
         };
     };
 }

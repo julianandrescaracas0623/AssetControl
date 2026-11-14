@@ -120,6 +120,7 @@ export function crearCatalogo(
         subtipo: (origen?.subtipo ?? b.subtipo ?? null) as string | null,
         fecha_compra: (b.fecha_compra as string | null) ?? null,
         estado: 'activo',
+        row_version: 1,
         creado_en: '2026-11-14T12:00:00+00:00',
         precio_compra: String(b.precio_compra ?? origen?.precio_compra ?? '0.00'),
       }
@@ -183,6 +184,7 @@ export function activoDe(
     subtipo: null,
     fecha_compra: null,
     estado: 'activo',
+    row_version: 1,
     creado_en: '2026-11-01T12:00:00+00:00',
     precio_compra: '1390000.00',
     ...datos,

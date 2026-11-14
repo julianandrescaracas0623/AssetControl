@@ -8,7 +8,7 @@ Base primero (permiso de `UPDATE` por columna y el tipo de evento nuevo), luego 
 
 ## 2. Base de datos (migración `0008_activo_cambios`, T1)
 
-- `GRANT UPDATE (nombre, categoria_id, ubicacion_id, serial, marca, modelo, referencia, color, subtipo, precio_compra, fecha_compra, estado, row_version, actualizado_en) ON activo` al rol de la aplicación. Sin `codigo`, `tenant_id`, `id`, `creado_por`, `creado_en` ni `atributos` (nadie los cambia en esta spec). La RLS forzada ya limita el `UPDATE` al tenant (política `FOR ALL` con `WITH CHECK`).
+- `GRANT UPDATE (nombre, categoria_id, ubicacion_id, serial, marca, modelo, subtipo, precio_compra, fecha_compra, estado, row_version, actualizado_en) ON activo` al rol de la aplicación. Sin `codigo`, `tenant_id`, `id`, `creado_por`, `creado_en`, `atributos`, `referencia` ni `color` (la API no los expone). La RLS forzada ya limita el `UPDATE` al tenant (política `FOR ALL` con `WITH CHECK`).
 - El `CHECK` de `activo_evento.tipo` suma `datos_cambiados` (Q3). `activo_evento` sigue con solo `SELECT` e `INSERT`.
 - El disparador de D1 (`BEFORE INSERT OR UPDATE OF ubicacion_id`) ya cubre mover: no cambia.
 - Índice `(tenant_id, activo_id, seq)` en `activo_evento` para el historial (si el de la 0007 no lo cubre).
@@ -20,7 +20,7 @@ Base primero (permiso de `UPDATE` por columna y el tipo de evento nuevo), luego 
 - Eventos y su `datos`:
   - `precio_cambiado`: `{antes, despues}` (texto canónico).
   - `categoria_cambiada`: `{antes: {id, nombre}, despues: {id, nombre}}`.
-  - `datos_cambiados`: `{campos: {<campo>: {antes, despues}}}` para nombre, serial, marca, modelo, referencia, color, subtipo y fecha de compra.
+  - `datos_cambiados`: `{campos: {<campo>: {antes, despues}}}` para nombre, serial, marca, modelo, subtipo y fecha de compra.
   - `ubicacion_cambiada`: `{antes: {id, ruta}, despues: {id, ruta}}` (la ruta se copia para que el historial no cambie si después se renombra la sala).
   - `estado_cambiado`: `{antes, despues, motivo?, nota?}` (motivo solo al reactivar, Q1: `encontrado`, `baja_por_error`, `otro`; nota obligatoria con `otro`).
   - `dado_de_baja`: `{motivo, nota?}` (Q2).

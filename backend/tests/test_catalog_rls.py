@@ -203,8 +203,6 @@ ACTIVO_UPDATE = {
     "serial",
     "marca",
     "modelo",
-    "referencia",
-    "color",
     "subtipo",
     "precio_compra",
     "fecha_compra",

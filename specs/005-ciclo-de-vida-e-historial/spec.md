@@ -18,7 +18,7 @@ Con la 004 los activos se registran, pero quedan fijos: un precio mal tecleado p
 
 ## Requisitos (EARS)
 
-1. **R1 Editar (CU-CAT-05).** Cuando el admin guarde cambios de un activo, el sistema debe aceptar nombre (H-3), categoría, precio de compra (Q2 de la 004), serial, marca, modelo, referencia, color, subtipo y fecha de compra; nunca `codigo` (`400 codigo_inmutable`). Un campo opcional vacío se borra.
+1. **R1 Editar (CU-CAT-05).** Cuando el admin guarde cambios de un activo, el sistema debe aceptar nombre (H-3), categoría, precio de compra (Q2 de la 004), serial, marca, modelo, subtipo y fecha de compra (los mismos campos que el alta); nunca `codigo` (`400 codigo_inmutable`). Un campo opcional vacío se borra.
 2. **R2 Concurrencia.** Toda escritura sobre un activo existente (editar, mover, estado, baja, reactivar) debe traer `If-Match` con su `row_version`: sin él `428 falta_version`; si no coincide, `412 version_desactualizada` con el activo vigente, sin guardar nada. Cada escritura con cambios incrementa `row_version` una vez.
 3. **R3 Eventos.** Cada cambio debe escribir su evento en la misma transacción, con autor y `{antes, despues}`: `precio_cambiado`, `categoria_cambiada`, `datos_cambiados` (los demás campos, Q3), `ubicacion_cambiada`, `estado_cambiado`, `dado_de_baja`. Guardar sin cambios no escribe evento ni cambia la versión.
 4. **R4 Mover (CU-CAT-06).** Cuando el admin mueva un activo, el sistema debe aceptar solo una sala o un box activos de su tenant (D1, `400 ubicacion_invalida`).

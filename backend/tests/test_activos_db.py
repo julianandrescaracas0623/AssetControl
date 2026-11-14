@@ -11,7 +11,8 @@ Con el **rol de la aplicación** sobre una base temporal con dos tenants (A y B)
 - Sin ``DELETE`` en ``activo`` ni escritura alguna sobre ``activo_evento`` (inmutable);
   ``estado``, ``row_version`` y fechas por ``DEFAULT`` al insertar.
 - Spec 005, T1 (0008): ``UPDATE`` solo de las columnas editables (nunca ``codigo``,
-  ``id``, ``tenant_id``, ``creado_por``, ``creado_en`` ni ``atributos``); D1 también al
+  ``id``, ``tenant_id``, ``creado_por``, ``creado_en``, ``atributos``, ``referencia`` ni
+  ``color``); D1 también al
   mover; la RLS no deja cambiar filas de otro tenant; tipo de evento ``datos_cambiados``.
 """
 
@@ -228,6 +229,8 @@ def test_references_of_another_tenant_fail(act_db, catalogo, cambio):
         "update activo set creado_por = gen_random_uuid()",
         "update activo set creado_en = now()",
         "update activo set atributos = '{}'::jsonb",
+        "update activo set referencia = 'R'",
+        "update activo set color = 'Gris'",
         "delete from activo",
         "truncate activo",
         "update activo_evento set datos = '{}'::jsonb",
@@ -273,7 +276,7 @@ def test_app_updates_editable_columns_and_bumps_the_version(act_db, catalogo):
             text(
                 "update activo set nombre = 'Autoclave 23 L', precio_compra = 0, "
                 "categoria_id = :cat, ubicacion_id = :box, serial = 'S-1', marca = 'M', "
-                "modelo = 'X', referencia = 'R', color = 'Gris', subtipo = 'Vapor', "
+                "modelo = 'X', subtipo = 'Vapor', "
                 "fecha_compra = date '2024-01-31', estado = 'en_reparacion', "
                 "row_version = row_version + 1, actualizado_en = now() "
                 "where id = :id and row_version = 1"

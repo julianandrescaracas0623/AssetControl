@@ -1,11 +1,12 @@
 """Cambios sobre activos existentes (spec 005, T1; R1–R7, Q1–Q3; plan.md §2).
 
 - ``GRANT UPDATE`` por columna en ``activo`` al rol de la aplicación: solo lo editable
-  (nombre, categoría, ubicación, opcionales, precio, fecha de compra), más ``estado``,
-  ``row_version`` y ``actualizado_en``, que el servidor sube en cada cambio. Nunca
-  ``codigo`` (inmutable, R8 de docs/03), ``id``, ``tenant_id``, ``creado_por``,
-  ``creado_en`` ni ``atributos``. La RLS forzada de 0007 ya limita el ``UPDATE`` al
-  tenant; el disparador D1 (``UPDATE OF ubicacion_id``) ya cubre mover.
+  (nombre, categoría, ubicación, serial, marca, modelo, subtipo, precio y fecha de
+  compra), más ``estado``, ``row_version`` y ``actualizado_en``, que el servidor sube en
+  cada cambio. Nunca ``codigo`` (inmutable, R8 de docs/03), ``id``, ``tenant_id``,
+  ``creado_por``, ``creado_en``, ``atributos``, ``referencia`` ni ``color`` (no los
+  expone la API). La RLS forzada de 0007 ya limita el ``UPDATE`` al tenant; el
+  disparador D1 (``UPDATE OF ubicacion_id``) ya cubre mover.
 - El ``CHECK`` de ``activo_evento.tipo`` suma ``datos_cambiados`` (Q3). El historial
   sigue inmutable: solo ``SELECT`` e ``INSERT``.
 
@@ -86,8 +87,6 @@ EDITABLES = (
     "serial",
     "marca",
     "modelo",
-    "referencia",
-    "color",
     "subtipo",
     "precio_compra",
     "fecha_compra",

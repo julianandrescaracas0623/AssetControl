@@ -40,6 +40,7 @@ from sqlalchemy import text
 
 import app.meta.routes as meta_routes
 from app import errors
+from app.activos import cambios as activos_cambios
 from app.activos import service as activos_service
 from app.auth import limits
 from app.auth import routes as auth_routes
@@ -512,7 +513,7 @@ def test_categorias_responses(client):
     check("post", sugeridas, client.post(sugeridas, headers=contador))
 
 
-def test_activos_responses(client):
+def test_activos_responses(client, contrato_db):
     admin, contador = bearer(ADMIN_A, TENANT_A), bearer(CONTADOR_A, TENANT_A)
     sufijo = uuid.uuid4().hex[:6]
 
@@ -588,6 +589,44 @@ def test_activos_responses(client):
     ):
         check("get", sugerencias, client.get(sugerencias, query_string=params, headers=headers))
 
+    # Spec 005, T2: editar (solo admin, con If-Match).
+    ruta = f"/activos/{body['id']}"
+
+    def editar(payload, headers=admin, version="1", **kwargs):
+        extra = {"If-Match": f'"{version}"'} if version is not None else {}
+        response = client.patch(ruta, json=payload, headers={**headers, **extra}, **kwargs)
+        return check("patch", "/activos/{id}", response)
+
+    assert (
+        editar({"nombre": "Activo editado", "precio_compra": "120.00"})["activo"]["row_version"]
+        == 2
+    )
+    assert editar({"nombre": "Viejo"})["error"]["code"] == "version_desactualizada"
+    assert editar({"nombre": "X"}, version=None)["error"]["code"] == "falta_version"
+    assert editar({"codigo": "OTRO"}, version="2")["error"]["code"] == "codigo_inmutable"
+    editar({"nombre": "X"}, headers=contador, version="2")
+    editar({"nombre": "X"}, headers={}, version="2")
+    check(
+        "patch",
+        "/activos/{id}",
+        client.patch(
+            f"/activos/{uuid.uuid4()}", json={"nombre": "X"}, headers={**admin, "If-Match": "1"}
+        ),
+    )
+    check(
+        "patch",
+        "/activos/{id}",
+        client.patch(
+            ruta, data="x" * (AUTH_MAX_BODY_BYTES + 1), headers={**admin, "If-Match": "2"}
+        ),
+    )
+    with contrato_db.migrator.begin() as conn:
+        conn.execute(
+            text("update activo set estado = 'dado_de_baja', row_version = 3 where id = :a"),
+            {"a": body["id"]},
+        )
+    assert editar({"nombre": "X"}, version="3")["error"]["code"] == "activo_dado_de_baja"
+
     # D2 en el contrato de ubicaciones.
     patch = client.patch(f"/ubicaciones/{sala['id']}", json={"activa": False}, headers=admin)
     assert check("patch", "/ubicaciones/{id}", patch)["error"]["code"] == "tiene_activos"
@@ -662,6 +701,7 @@ def backend_error_codes() -> set[str]:
     }
     codes |= {error.code for error in catalogo_service.ERRORES}
     codes |= {error.code for error in (*activos_service.ERRORES, activos_service.CodigoExistente)}
+    codes |= {error.code for error in activos_cambios.ERRORES}
     return codes | _policy_codes()
 
 

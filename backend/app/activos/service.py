@@ -113,6 +113,7 @@ def vista(session: Session, activo: Activo, *, con_precio: bool) -> dict[str, ob
         **{campo: getattr(activo, campo) for campo in OPCIONALES},
         "fecha_compra": activo.fecha_compra.isoformat() if activo.fecha_compra else None,
         "estado": activo.estado,
+        "row_version": activo.row_version,
         "creado_en": activo.creado_en.isoformat(),
     }
     if con_precio:
