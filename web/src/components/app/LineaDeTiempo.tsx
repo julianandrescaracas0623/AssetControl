@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, Check, CircleAlert, CircleDollarSign, FileInput, Loader2, MapPin, Pencil, Plus, RefreshCw, Tag, Wrench } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowLeftRight, Check, CircleAlert, CircleDollarSign, FileInput, Loader2, MapPin, Pencil, Plus, RefreshCw, Tag, Wrench } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -51,8 +51,23 @@ function vista(evento: EventoActivo): Vista {
     }
     case 'importado':
       return { icono: FileInput, tono: 'marca', titulo: 'Importado' }
-    case 'verificado':
-      return { icono: Check, tono: 'exito', titulo: 'Verificado' }
+    case 'verificado': {
+      const esperada = d.ubicacion_esperada as { id?: string } | undefined
+      const encontrada = d.ubicacion_encontrada as { id?: string } | undefined
+      const otra = Boolean(esperada?.id && encontrada?.id && esperada.id !== encontrada.id)
+      const partes = [
+        d.sesion ? String(d.sesion) : null,
+        `en ${ruta(d.ubicacion_encontrada)}${otra ? ` (esperada ${ruta(d.ubicacion_esperada)})` : ''}`,
+        d.estado_fisico === 'danado' ? 'dañado' : 'ok',
+        d.nota ? `«${String(d.nota)}»` : null,
+      ].filter(Boolean)
+      return {
+        icono: otra ? ArrowLeftRight : Check,
+        tono: otra || d.estado_fisico === 'danado' ? 'aviso' : 'exito',
+        titulo: otra ? 'Verificado en otra ubicación' : 'Verificado',
+        detalle: partes.join(' · '),
+      }
+    }
     case 'precio_cambiado':
       return { icono: CircleDollarSign, tono: 'neutro', titulo: 'Precio cambiado', detalle: `${precio(d.antes)} → ${precio(d.despues)}` }
     case 'categoria_cambiada':

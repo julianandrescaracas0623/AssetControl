@@ -19,9 +19,7 @@ import Escanear from './routes/contar/Escanear'
 import Escribir from './routes/contar/Escribir'
 import Historial from './routes/contar/Historial'
 import ContarInicio from './routes/contar/Inicio'
-import NoConfirmado from './routes/contar/NoConfirmado'
 import Pendientes from './routes/contar/Pendientes'
-import Verificado from './routes/contar/Verificado'
 import Verificar from './routes/contar/Verificar'
 import Componentes from './routes/dev/Componentes'
 import InicioPorRol from './routes/InicioPorRol'
@@ -33,8 +31,7 @@ import RequiereSesion from './routes/RequiereSesion'
 import Raiz from './routes/Raiz'
 
 // Rutas de la web (spec 001b, T3; sesión y guardas de la spec 002b, T3). /admin y
-// /contar exigen sesión; sus pantallas siguen siendo maquetas con datos ficticios
-// hasta que cada spec conecte la API.
+// /contar exigen sesión; las pantallas que aún son maqueta lo dicen con su banda.
 export const routes: RouteObject[] = [
   {
     element: <Raiz />,
@@ -82,8 +79,6 @@ export const routes: RouteObject[] = [
                   { path: 'escribir', element: <Escribir /> },
                   { path: 'activo/:codigo', element: <Verificar /> },
                   { path: 'activo/:codigo/historial', element: <Historial /> },
-                  { path: 'verificado/:codigo', element: <Verificado /> },
-                  { path: 'no-confirmado/:codigo', element: <NoConfirmado /> },
                   { path: 'nuevo', element: <Alta /> },
                   { path: 'pendientes', element: <Pendientes /> },
                 ],

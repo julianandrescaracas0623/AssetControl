@@ -141,22 +141,6 @@ describe('escribir código', () => {
   })
 })
 
-describe('no confirmado y sesión cerrada', () => {
-  it('no confirmado ofrece reintentar con el mismo envío', async () => {
-    await abrir('/contar/no-confirmado/000301')
-    expect(screen.getByRole('heading', { level: 1, name: 'No se pudo confirmar' })).toBeTruthy()
-    expect(screen.getByText(/Reintentar no la duplica/)).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Reintentar' })).toBeTruthy()
-    expect(screen.getByRole('status').textContent).toBe('No confirmado')
-  })
-
-  it('sesión cerrada (409) no ofrece reintentar', async () => {
-    await abrir('/contar/no-confirmado/000301?estado=error')
-    expect(screen.getByRole('heading', { level: 1, name: 'La sesión se cerró' })).toBeTruthy()
-    expect(screen.queryByRole('link', { name: 'Reintentar' })).toBeNull()
-  })
-})
-
 describe('alta por escaneo', () => {
   it('exige nombre, precio, categoría y ubicación', async () => {
     await abrir('/contar/nuevo?codigo=000458')

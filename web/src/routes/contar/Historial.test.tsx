@@ -29,6 +29,19 @@ describe('historial (T7)', () => {
     catalogo.fallar(`GET /api/activos/${SILLA}/historial`, () =>
       json(200, {
         eventos: [
+          evento(7, 'verificado', {
+            sesion: 'Conteo nov 2026',
+            estado_fisico: 'danado',
+            nota: 'Bandeja rota',
+            ubicacion_esperada: { id: 'a', ruta: 'Consultorio 1 › Box 2' },
+            ubicacion_encontrada: { id: 'b', ruta: 'Bodega' },
+          }),
+          evento(6, 'verificado', {
+            sesion: 'Conteo nov 2026',
+            estado_fisico: 'ok',
+            ubicacion_esperada: { id: 'a', ruta: 'Consultorio 1 › Box 2' },
+            ubicacion_encontrada: { id: 'a', ruta: 'Consultorio 1 › Box 2' },
+          }),
           evento(5, 'dado_de_baja', { motivo: 'perdido', nota: 'No apareció' }),
           evento(4, 'estado_cambiado', { antes: 'activo', despues: 'en_reparacion' }),
           evento(3, 'ubicacion_cambiada', { antes: { id: 'a', ruta: 'Consultorio 1 › Box 2' }, despues: { id: 'b', ruta: 'Bodega' } }),
@@ -45,18 +58,22 @@ describe('historial (T7)', () => {
     const lista = await screen.findByRole('list')
     const items = within(lista).getAllByRole('listitem')
     expect(items.map((li) => li.querySelector('.font-semibold')?.textContent)).toEqual([
+      'Verificado en otra ubicación',
+      'Verificado',
       'Dado de baja',
       'Enviado a reparación',
       'Ubicación cambiada',
       'Datos editados',
       'Activo creado',
     ])
-    expect(items[0].textContent).toContain('Perdido · «No apareció»')
-    expect(items[2].textContent).toContain('Consultorio 1 › Box 2 → Bodega')
-    expect(items[3].textContent).toContain('Marca: Rimax → vacío')
-    expect(items[4].textContent).toContain('Ana Torres')
+    expect(items[0].textContent).toContain('Conteo nov 2026 · en Bodega (esperada Consultorio 1 › Box 2) · dañado · «Bandeja rota»')
+    expect(items[1].textContent).toContain('Conteo nov 2026 · en Consultorio 1 › Box 2 · ok')
+    expect(items[2].textContent).toContain('Perdido · «No apareció»')
+    expect(items[4].textContent).toContain('Consultorio 1 › Box 2 → Bodega')
+    expect(items[5].textContent).toContain('Marca: Rimax → vacío')
+    expect(items[6].textContent).toContain('Ana Torres')
     expect(screen.queryByText(/\$/)).toBeNull()
-    expect(screen.queryByText(/Datos ficticios/)).toBeTruthy() // la cabecera de conteo sigue siendo maqueta
+    expect(screen.queryByText(/Datos ficticios/)).toBeNull() // spec 006: el conteo ya es real
   })
 
   it('el admin ve precios en la ficha y carga más páginas', async () => {
