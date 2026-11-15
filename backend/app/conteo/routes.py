@@ -215,3 +215,13 @@ def exportar_excel(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre
     except service.ErrorConteo as exc:
         return _error(exc)
     return _archivo(exportar.a_excel(doc), exportar.XLSX, f"{nombre}.xlsx")
+
+
+@bp.get("/<uuid:id>/informe/pdf")
+@require_role("admin")
+def exportar_pdf(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del contrato
+    try:
+        doc, nombre = _documento(current_session(), id)
+    except service.ErrorConteo as exc:
+        return _error(exc)
+    return _archivo(exportar.a_pdf(doc), exportar.PDF, f"{nombre}.pdf")

@@ -5,9 +5,12 @@ El Excel y el PDF salen de un mismo documento construido desde el dict de
 mismos de la web (``web/src/lib/format.ts`` y ``porcentaje`` de ``lib/sesiones.ts``).
 """
 
+import copy
+import io
 from decimal import Decimal
 
 import pytest
+from pypdf import PdfReader
 
 from app.conteo import exportar
 
@@ -180,3 +183,29 @@ def test_document_of_an_empty_session_is_all_zeros():
 )
 def test_file_name_is_ascii_and_safe(nombre, corte, archivo):
     assert exportar.nombre_base(nombre, corte) == archivo
+
+
+def _lineas(contenido: bytes) -> list[str]:
+    lector = PdfReader(io.BytesIO(contenido))
+    return [li.strip() for pagina in lector.pages for li in pagina.extract_text().splitlines()]
+
+
+def test_pdf_replaces_characters_the_standard_fonts_cannot_draw():
+    informe = copy.deepcopy(INFORME)
+    informe["no_encontrados"][0]["nombre"] = "Silla 日本 «ergonómica»"
+    lineas = _lineas(exportar.a_pdf(exportar.documento(informe)))
+    assert "Silla ?? «ergonómica»" in lineas
+
+
+def test_long_pdf_numbers_pages_and_repeats_the_header():
+    informe = copy.deepcopy(INFORME)
+    fila = informe["no_encontrados"][0]
+    informe["no_encontrados"] = [{**fila, "codigo": f"AC-{i:04d}"} for i in range(150)]
+    lector = PdfReader(io.BytesIO(exportar.a_pdf(exportar.documento(informe))))
+    paginas = len(lector.pages)
+    assert paginas >= 3
+    for numero, pagina in enumerate(lector.pages, start=1):
+        texto = pagina.extract_text()
+        assert texto.rstrip().endswith(f"Página {numero} de {paginas}")
+        if numero > 1:
+            assert "Código" in texto  # encabezado repetido

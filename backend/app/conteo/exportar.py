@@ -296,3 +296,241 @@ def a_excel(doc: Documento) -> bytes:
 
     libro.close()
     return salida.getvalue()
+
+
+# --- PDF (T3; Q3: Carta horizontal) --------------------------------------------------------
+
+PDF = "application/pdf"
+
+
+def _latin(texto: str) -> str:
+    """Las fuentes estándar del PDF (Helvetica, WinAnsi) no dibujan otros alfabetos: «?»."""
+    return "".join(c if _cabe_en_winansi(c) else "?" for c in texto)
+
+
+def _cabe_en_winansi(caracter: str) -> bool:
+    try:
+        caracter.encode("cp1252")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def a_pdf(doc: Documento) -> bytes:
+    """Informe en Carta horizontal: metadatos, tres cifras, desglose y no encontrados."""
+    from xml.sax.saxutils import escape
+
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import landscape, letter
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas as rl_canvas
+    from reportlab.platypus import (
+        KeepTogether,
+        LongTable,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
+
+    tinta, gris, linea, fondo = (
+        colors.HexColor("#18181B"),
+        colors.HexColor("#52525B"),
+        colors.HexColor("#D4D4D8"),
+        colors.HexColor("#F4F4F5"),
+    )
+    base = ParagraphStyle("base", fontName="Helvetica", fontSize=9, leading=11, textColor=tinta)
+    estilos = {
+        "titulo": ParagraphStyle(
+            "titulo", parent=base, fontName="Helvetica-Bold", fontSize=16, leading=20
+        ),
+        "meta": ParagraphStyle("meta", parent=base, textColor=gris),
+        "seccion": ParagraphStyle(
+            "seccion",
+            parent=base,
+            fontName="Helvetica-Bold",
+            fontSize=11,
+            leading=14,
+            spaceBefore=10,
+            spaceAfter=4,
+        ),
+        "celda": base,
+        "nota": ParagraphStyle("nota", parent=base, fontSize=8, leading=10, textColor=gris),
+    }
+
+    def p(texto: str, estilo: str = "celda") -> Paragraph:
+        return Paragraph(escape(_latin(texto)), estilos[estilo])
+
+    def tabla(filas: list[list], anchos: list[float], numericas: range, total: bool) -> LongTable:
+        t = LongTable(filas, colWidths=anchos, repeatRows=1, hAlign="LEFT")
+        estilo = [
+            ("FONT", (0, 0), (-1, -1), "Helvetica", 8.5),
+            ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 8.5),
+            ("BACKGROUND", (0, 0), (-1, 0), fondo),
+            ("LINEBELOW", (0, 0), (-1, 0), 0.6, linea),
+            ("LINEBELOW", (0, 1), (-1, -1), 0.3, linea),
+            ("ALIGN", (numericas.start, 0), (numericas.stop - 1, -1), "RIGHT"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]
+        if total:
+            estilo += [
+                ("FONT", (0, -1), (-1, -1), "Helvetica-Bold", 8.5),
+                ("BACKGROUND", (0, -1), (-1, -1), fondo),
+                ("LINEABOVE", (0, -1), (-1, -1), 0.8, tinta),
+            ]
+        t.setStyle(TableStyle(estilo))
+        return t
+
+    def desglose(filas: tuple[Fila, ...], rotulo: str) -> LongTable:
+        cuerpo: list[list] = [[rotulo, *ENCABEZADO_DESGLOSE]]
+        for f in (*filas, doc.totales):
+            cuerpo.append(
+                [
+                    _latin(f.etiqueta) if f is doc.totales else p(f.etiqueta),
+                    formato_cop(f.encontrado.valor),
+                    formato_entero(f.encontrado.unidades),
+                    formato_cop(f.no_encontrado.valor),
+                    formato_entero(f.no_encontrado.unidades),
+                    formato_cop(f.registrado.valor),
+                    formato_entero(f.registrado.unidades),
+                    f.porcentaje,
+                ]
+            )
+        return tabla(
+            cuerpo,
+            [62 * mm, 32 * mm, 12 * mm, 32 * mm, 12 * mm, 34 * mm, 12 * mm, 22 * mm],
+            range(1, 8),
+            True,
+        )
+
+    t = doc.totales
+    cifras = Table(
+        [
+            ["Encontrado", "No encontrado", "Total registrado"],
+            [formato_cop(c.valor) for c in (t.encontrado, t.no_encontrado, t.registrado)],
+            [_unidades(c.unidades) for c in (t.encontrado, t.no_encontrado, t.registrado)],
+        ],
+        colWidths=[72 * mm] * 3,
+        hAlign="LEFT",
+    )
+    cifras.setStyle(
+        TableStyle(
+            [
+                ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9),
+                ("TEXTCOLOR", (0, 0), (0, 0), colors.HexColor("#15803D")),
+                ("TEXTCOLOR", (1, 0), (1, 0), colors.HexColor("#B91C1C")),
+                ("TEXTCOLOR", (2, 0), (2, 0), gris),
+                ("FONT", (0, 1), (-1, 1), "Helvetica-Bold", 15),
+                ("FONT", (0, 2), (-1, 2), "Helvetica", 8.5),
+                ("TEXTCOLOR", (0, 2), (-1, 2), gris),
+                ("BOX", (0, 0), (-1, -1), 0.6, linea),
+                ("LINEBEFORE", (1, 0), (-1, -1), 0.6, linea),
+                ("BACKGROUND", (0, 0), (-1, -1), fondo),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 1), (-1, 1), 6),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ]
+        )
+    )
+
+    lista: list[list] = [
+        ["Código", "Activo", "Categoría", "Ubicación esperada", "Nota al cierre", "Precio"]
+    ]
+    for n in doc.no_encontrados:
+        lista.append(
+            [
+                p(n.codigo),
+                p(n.nombre),
+                p(n.categoria),
+                p(n.ubicacion),
+                "En reparación" if n.en_reparacion else "",
+                formato_cop(n.precio),
+            ]
+        )
+    lista.append(
+        [
+            _cuantos_no_encontrados(len(doc.no_encontrados)),
+            "",
+            "",
+            "",
+            "",
+            formato_cop(t.no_encontrado.valor),
+        ]
+    )
+    tabla_lista = tabla(
+        lista, [30 * mm, 66 * mm, 40 * mm, 56 * mm, 24 * mm, 32 * mm], range(5, 6), True
+    )
+    tabla_lista.setStyle(TableStyle([("SPAN", (0, -1), (4, -1))]))
+
+    meta = (
+        f"Fecha de corte <b>{escape(doc.corte)}</b> · Cerrada <b>{escape(doc.cerrada_en)}</b> · "
+        f"Por <b>{escape(_latin(doc.cerrada_por))}</b> · Valores en COP · <b>Informe congelado</b>"
+    )
+    historia = [
+        p(f"Informe · {doc.sesion}", "titulo"),
+        Spacer(0, 2 * mm),
+        Paragraph(meta, estilos["meta"]),
+        Spacer(0, 5 * mm),
+        cifras,
+        Spacer(0, 2 * mm),
+        p(f"{t.porcentaje} de las unidades encontradas.", "meta"),
+        KeepTogether(
+            [p("Por categoría (al cierre)", "seccion"), desglose(doc.por_categoria, "Categoría")]
+        ),
+        KeepTogether(
+            [p("Por ubicación (al cierre)", "seccion"), desglose(doc.por_ubicacion, "Ubicación")]
+        ),
+        p("No encontrados (lista congelada al cierre)", "seccion"),
+        tabla_lista,
+        Spacer(0, 4 * mm),
+        p(NOTA, "nota"),
+    ]
+
+    pie = _latin(f"Informe congelado al cierre · {doc.sesion}")
+
+    class ConPaginas(rl_canvas.Canvas):
+        """Pie con «página N de M»: guarda las páginas y las numera al final."""
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._paginas: list[dict] = []
+
+        def showPage(self):  # noqa: N802 - API de reportlab
+            self._paginas.append(dict(self.__dict__))
+            self._startPage()
+
+        def save(self):
+            total = len(self._paginas)
+            for estado in self._paginas:
+                self.__dict__.update(estado)
+                self.setFont("Helvetica", 7.5)
+                self.setFillColor(gris)
+                self.drawString(15 * mm, 9 * mm, pie)
+                self.drawRightString(
+                    self._pagesize[0] - 15 * mm, 9 * mm, f"Página {self._pageNumber} de {total}"
+                )
+                super().showPage()
+            super().save()
+
+    salida = io.BytesIO()
+    plantilla = SimpleDocTemplate(
+        salida,
+        pagesize=landscape(letter),
+        leftMargin=15 * mm,
+        rightMargin=15 * mm,
+        topMargin=14 * mm,
+        bottomMargin=16 * mm,
+        title=_latin(f"Informe · {doc.sesion}"),
+        author="AssetControl",
+        subject="Informe congelado",
+    )
+    plantilla.build(historia, canvasmaker=ConPaginas)
+    return salida.getvalue()
+
+
+def _unidades(n: int) -> str:
+    return f"{formato_entero(n)} {'unidad' if n == 1 else 'unidades'}"

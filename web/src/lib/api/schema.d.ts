@@ -583,6 +583,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sesiones/{id}/informe/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Informe congelado en PDF, Carta horizontal (solo admin)
+         * @description Mismas cifras que GET /sesiones/{id}/informe (lee lo congelado al cierre; no recalcula). Se descarga como adjunto con Cache-Control no-store.
+         */
+        get: operations["exportarInformePdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/valor-actual": {
         parameters: {
             query?: never;
@@ -2516,6 +2536,44 @@ export interface operations {
                 };
                 content: {
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description La sesión sigue abierta. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    exportarInformePdf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Archivo del informe (adjunto). */
+            200: {
+                headers: {
+                    /** @description attachment con filename ASCII y filename* UTF-8. */
+                    "Content-Disposition": string;
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
                 };
             };
             401: components["responses"]["NoAutenticado"];

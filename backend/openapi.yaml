@@ -1120,6 +1120,44 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
           x-codigos: [sesion_abierta]
+  /sesiones/{id}/informe/pdf:
+    get:
+      tags: [conteo]
+      operationId: exportarInformePdf
+      summary: Informe congelado en PDF, Carta horizontal (solo admin)
+      description: >-
+        Mismas cifras que GET /sesiones/{id}/informe (lee lo congelado al cierre; no
+        recalcula). Se descarga como adjunto con Cache-Control no-store.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Archivo del informe (adjunto).
+          headers:
+            Content-Disposition:
+              required: true
+              description: attachment con filename ASCII y filename* UTF-8.
+              schema: { type: string }
+            Cache-Control:
+              required: true
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: La sesión sigue abierta.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [sesion_abierta]
   /valor-actual:
     get:
       tags: [activos]

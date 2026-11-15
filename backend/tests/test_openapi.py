@@ -308,7 +308,7 @@ def test_flask_routes_and_contract_paths_are_the_same(contrato_app):
 
 
 EXERCISED: set[tuple[str, str, str]] = set()
-FORMATOS_EXPORTAR = ("excel",)
+FORMATOS_EXPORTAR = ("excel", "pdf")
 
 
 def check(method: str, path: str, response) -> dict | None:

@@ -28,6 +28,7 @@ from acceso_db import (
 )
 from flask import Flask
 from openpyxl import load_workbook
+from pypdf import PdfReader
 from sqlalchemy import text
 from test_cierre_api import Clinica
 
@@ -270,5 +271,96 @@ def test_export_does_not_log_figures_or_names(client, caplog):
     _, sesion, _, _ = cerrada(client)
     with caplog.at_level(logging.DEBUG):
         assert excel(client, sesion).status_code == 200
+        assert client.get(f"/sesiones/{sesion}/informe/pdf", headers=ADMIN).status_code == 200
     registros = " ".join(r.getMessage() for r in caplog.records)
     assert not re.search(r"1390000|Autoclave|Conteo nov", registros)
+
+
+# --- PDF (T3) ------------------------------------------------------------------------------
+
+
+def pdf(client, sesion, headers=ADMIN):
+    return client.get(f"/sesiones/{sesion}/informe/pdf", headers=headers)
+
+
+def lineas_pdf(response) -> list[str]:
+    lector = PdfReader(io.BytesIO(response.data))
+    return [
+        linea.strip() for pagina in lector.pages for linea in pagina.extract_text().splitlines()
+    ]
+
+
+def contiene_seguidas(lineas: list[str], esperadas: list[str]) -> bool:
+    n = len(esperadas)
+    return any(lineas[i : i + n] == esperadas for i in range(len(lineas) - n + 1))
+
+
+def test_pdf_has_exactly_the_figures_of_the_report(client):
+    _, sesion, informe, _ = cerrada(client)
+    response = pdf(client, sesion)
+    assert response.status_code == 200
+    assert response.mimetype == "application/pdf"
+    lector = PdfReader(io.BytesIO(response.data))
+    alto, ancho = float(lector.pages[0].mediabox.height), float(lector.pages[0].mediabox.width)
+    assert (round(ancho), round(alto)) == (792, 612)  # Carta horizontal (Q3).
+    lineas = lineas_pdf(response)
+    assert "Informe · Conteo nov 2026" in lineas
+    assert any("Fecha de corte 30/11/2026" in li and "Informe congelado" in li for li in lineas)
+    t = informe["totales"]
+    cop = exportar.formato_cop
+    assert contiene_seguidas(
+        lineas, [cop(Decimal(t[k])) for k in ("encontrado", "no_encontrado", "registrado")]
+    )
+    assert "50 % de las unidades encontradas." in lineas
+    for dimension in ("categorias", "ubicaciones"):
+        for fila in esperado_desglose(informe, dimension):
+            etiqueta, e, ue, n, un, r, ur, pct = fila
+            esperadas = [etiqueta, cop(e), str(ue), cop(n), str(un), cop(r), str(ur), pct]
+            assert contiene_seguidas(lineas, esperadas), esperadas
+    for n in informe["no_encontrados"]:
+        esperadas = [n["codigo"], n["nombre"], n["categoria"]["nombre"], n["ubicacion"]["ruta"]]
+        if n["en_reparacion"]:
+            esperadas.append("En reparación")
+        esperadas.append(cop(Decimal(n["precio"])))
+        assert contiene_seguidas(lineas, esperadas), esperadas
+    assert contiene_seguidas(lineas, ["2 activos no encontrados", cop(Decimal(t["no_encontrado"]))])
+    assert lineas[-1] == "Página 1 de 1"
+
+
+def test_pdf_download_headers(client):
+    _, sesion, _, _ = cerrada(client)
+    response = pdf(client, sesion)
+    disposicion = response.headers["Content-Disposition"]
+    assert disposicion.startswith("attachment;")
+    assert 'filename="informe-conteo-nov-2026-corte-2026-11-30.pdf"' in disposicion
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+
+
+def test_pdf_of_an_empty_session_has_zeros(client):
+    c = Clinica(client)
+    sesion = c.abrir()
+    assert client.post(f"/sesiones/{sesion}/cerrar", headers=ADMIN).status_code == 200
+    lineas = lineas_pdf(pdf(client, sesion))
+    assert contiene_seguidas(lineas, ["$ 0,00", "$ 0,00", "$ 0,00"])
+    assert contiene_seguidas(lineas, ["0 activos no encontrados", "$ 0,00"])
+
+
+def test_pdf_reads_the_frozen_report_after_later_changes(client):
+    c, sesion, _, ids = cerrada(client)
+    antes = lineas_pdf(pdf(client, sesion))
+    c.precio(ids["autoclave"], "1.00")
+    c.mover(ids["silla"], c.box)
+    client.patch(f"/categorias/{c.bio}", json={"nombre": "Equipos"}, headers=ADMIN)
+    assert lineas_pdf(pdf(client, sesion)) == antes
+
+
+def test_pdf_errors_roles_and_tenant(client):
+    c = Clinica(client)
+    abierta = c.abrir()
+    assert pdf(client, abierta).get_json()["error"]["code"] == "sesion_abierta"
+    assert pdf(client, str(uuid.uuid4())).status_code == 404
+    assert client.post(f"/sesiones/{abierta}/cerrar", headers=ADMIN).status_code == 200
+    assert pdf(client, abierta, CONTADOR).status_code == 403
+    assert pdf(client, abierta, {}).status_code == 401
+    assert pdf(client, abierta, ADMIN_OTRO).status_code == 404
