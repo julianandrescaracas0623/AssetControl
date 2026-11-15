@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Crea el rol de la aplicación y la base de pruebas (spec 001, R4c; plan.md §2).
 #
+# Solo para el PostgreSQL local, donde el migrador es superusuario. En Supabase (migrador
+# no superusuario) se usa `flask preparar-roles` (spec 010b, T4; docs/09-despliegue.md).
+#
 # Lo ejecuta la imagen oficial de PostgreSQL desde /docker-entrypoint-initdb.d/
 # solo cuando el volumen de datos está vacío. Con un volumen existente se recrea
 # el volumen o se ejecuta este mismo script a mano dentro del contenedor.

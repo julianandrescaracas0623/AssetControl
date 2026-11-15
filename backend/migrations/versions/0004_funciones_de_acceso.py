@@ -245,10 +245,16 @@ _ROLE_UNSAFE = text(
 _APP_IS_OWNER_MEMBER = text("select pg_has_role(:app, :owner, 'MEMBER')")
 # Por rolname exacto, no con to_regrole: to_regrole interpreta el texto como identificador
 # (pasa a minúsculas) y da NULL con un migrador como "Migrador_X" (H1 de la auditoría de T3).
+# Spec 010b, T4 (C8): en Supabase el migrador no es superusuario y PostgreSQL 16+ le da,
+# al crear auth_owner, una membresía con ADMIN OPTION concedida por el superusuario del
+# proveedor que él no puede revocar. Sin INHERIT ni SET no le da los privilegios de
+# auth_owner (solo administrarlo), así que no cuenta; cualquier otra sí.
 _MIGRATOR_IS_MEMBER = text(
     "select exists (select 1 from pg_auth_members m "
     "where m.roleid = (select oid from pg_roles where rolname = :owner) "
-    "and m.member = (select oid from pg_roles where rolname = current_user))"
+    "and m.member = (select oid from pg_roles where rolname = current_user) "
+    "and (m.inherit_option or m.set_option or m.grantor = m.member "
+    "or m.grantor = (select oid from pg_roles where rolname = current_user)))"
 )
 _OWNER_CAN_CREATE = text(
     "select case when to_regnamespace('acceso') is null then false "

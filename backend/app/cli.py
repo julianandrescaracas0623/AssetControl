@@ -19,15 +19,24 @@ invitación ``admin`` (24 h, ``creada_por`` NULL; Q3, Q17):
   estándar, después de confirmar la transacción. No lo guarda ni lo registra en
   logs; un error de base se informa solo con su tipo y ``sqlstate`` (el mensaje de
   PostgreSQL podría traer valores de fila).
+
+``flask preparar-roles`` (spec 010b, T4; C8) crea o reafirma el rol de la aplicación y
+``auth_owner`` en un PostgreSQL administrado donde el migrador no es superusuario
+(Supabase), con el usuario y la contraseña solo por entorno (``APP_DB_USER``,
+``APP_DB_PASSWORD``) y la contraseña enviada como verificador SCRAM (``app.roles``).
 """
+
+import os
 
 import click
 import psycopg
 from flask import Flask
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
+from app import roles
 from app.auth.credentials import new_token, token_key
 from app.config import (
     InvalidDatabaseUrlError,
@@ -153,7 +162,44 @@ def purge_rate_limit_command() -> None:
     click.echo(f"Ventanas de límite de tasa purgadas (más de un día): {deleted}")
 
 
+@click.command("preparar-roles")
+def preparar_roles_command() -> None:
+    """Crea o reafirma el rol de la aplicación y auth_owner (Supabase u otro administrado).
+
+    Usa el rol migrador de MIGRATION_DATABASE_URL y lee APP_DB_USER y APP_DB_PASSWORD
+    solo del entorno. La contraseña viaja como verificador SCRAM, nunca en claro.
+    """
+    config_error: str | None = None
+    try:
+        url = load_migration_url()
+    except (MissingConfigError, SameDatabaseRoleError, InvalidDatabaseUrlError) as exc:
+        config_error = str(exc)
+    if config_error is not None:
+        raise click.ClickException(config_error)
+    app_user = (os.environ.get("APP_DB_USER") or "").strip()
+    contrasena = os.environ.get("APP_DB_PASSWORD") or ""
+    if not app_user or not contrasena:
+        raise click.ClickException("Faltan APP_DB_USER o APP_DB_PASSWORD en el entorno.")
+    conninfo = make_url(url).set(drivername="postgresql").render_as_string(hide_password=False)
+    failure: str | None = None
+    try:
+        resultado = roles.preparar(conninfo, app_user, contrasena)
+    except roles.ErrorRoles as exc:
+        failure = str(exc)
+    except psycopg.Error as exc:
+        failure = f"error de base ({_database_error_summary(exc)})"
+    if failure is not None:
+        raise click.ClickException(f"No se pudieron preparar los roles: {failure}")
+    estado = "creado" if resultado.creado else "actualizado"
+    click.echo(
+        f"Rol de la aplicación {estado} y auth_owner listo; "
+        f"membresías revocadas: {resultado.revocadas}; conservadas (solo ADMIN del creador): "
+        f"{resultado.conservadas}."
+    )
+
+
 def register_cli(app: Flask) -> None:
     """Registra los comandos del operador en ``flask``."""
     app.cli.add_command(create_tenant_command)
     app.cli.add_command(purge_rate_limit_command)
+    app.cli.add_command(preparar_roles_command)
