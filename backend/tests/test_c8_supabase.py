@@ -102,6 +102,27 @@ def test_access_functions_belong_to_auth_owner_and_only_the_app_runs_them():
         assert concedidos == ({migrador} if nombre == "crear_tenant" else {APP_USER}), nombre
 
 
+def test_supabase_roles_receive_nothing_despite_default_privileges():
+    # Supabase concede por defecto todo lo nuevo de public a anon, authenticated y
+    # service_role (ALTER DEFAULT PRIVILEGES); service_role además tiene BYPASSRLS. Las
+    # migraciones lo revocan tabla por tabla y función por función.
+    tablas = consulta(
+        MIGRADOR,
+        "select grantee, table_name, privilege_type from information_schema.role_table_grants "
+        "where table_schema in ('public', 'acceso') and grantee = any(%s)",
+        (["anon", "authenticated", "service_role"],),
+    )
+    assert tablas == []
+    funciones = consulta(
+        MIGRADOR,
+        "select r.rolname, p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+        "cross join pg_roles r where n.nspname in ('public', 'acceso') "
+        "and r.rolname = any(%s) and has_function_privilege(r.oid, p.oid, 'EXECUTE')",
+        (["anon", "authenticated", "service_role"],),
+    )
+    assert funciones == []
+
+
 def test_the_app_role_logs_in_with_its_password_and_cannot_skip_rls():
     ((usuario, bypass),) = consulta(
         APLICACION,

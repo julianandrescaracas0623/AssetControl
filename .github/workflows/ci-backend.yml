@@ -284,7 +284,12 @@ jobs:
             -c "CREATE ROLE service_role NOLOGIN BYPASSRLS" \
             -c "GRANT anon, authenticated, service_role TO postgres WITH ADMIN OPTION" \
             -c "CREATE DATABASE assetcontrol OWNER postgres"
-          psql -X -v ON_ERROR_STOP=1 -d assetcontrol -c "ALTER SCHEMA public OWNER TO postgres"
+          # Como Supabase: todo lo que "postgres" cree en public queda concedido a sus roles.
+          psql -X -v ON_ERROR_STOP=1 -d assetcontrol -c "ALTER SCHEMA public OWNER TO postgres" \
+            -c "GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role" \
+            -c "ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role" \
+            -c "ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role" \
+            -c "ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role"
 
       - name: Roles con el migrador no superusuario (flask preparar-roles)
         run: uv run flask --app app preparar-roles

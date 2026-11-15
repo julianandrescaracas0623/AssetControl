@@ -1,6 +1,6 @@
 # Spec 010b — Despliegue
 
-> **Estado:** Aprobada (G1–G3, 2026-11-15) con Q2 = Free, Q3 = un solo contenedor y **Q1 (plataforma) pendiente**: el humano la revisa; esta spec deja todo independiente de la plataforma. Requisito del piloto (011): R1 de `MEMORY.md` y deuda (b) y (e) de la spec 002 («no exponer login, refresh, validar ni aceptar sin servidor WSGI real»). Cierra T10 de `docs/05` y C8 (validar con el PostgreSQL de Supabase). Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Implementada (T1–T6, 2026-11-15) salvo el paso de la plataforma (Q1 pendiente). Aprobada (G1–G3, 2026-11-15) con Q2 = Free, Q3 = un solo contenedor y **Q1 (plataforma) pendiente**: el humano la revisa; esta spec deja todo independiente de la plataforma. Requisito del piloto (011): R1 de `MEMORY.md` y deuda (b) y (e) de la spec 002 («no exponer login, refresh, validar ni aceptar sin servidor WSGI real»). Cierra T10 de `docs/05` y C8 (validar con el PostgreSQL de Supabase). Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 

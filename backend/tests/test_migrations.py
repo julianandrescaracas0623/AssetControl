@@ -47,6 +47,7 @@ CAMBIOS = "0008_activo_cambios"
 CONTEO = "0009_sesiones_y_verificacion"
 DISCREPANCIAS = "0010_discrepancias"
 CIERRE = "0011_cierre_e_informe"
+SUPABASE_FUNCIONES = "0012_funciones_sin_supabase"
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
 MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
@@ -193,8 +194,9 @@ def test_revision_chain():
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == [CIERRE]
+    assert script.get_heads() == [SUPABASE_FUNCIONES]
     assert [r.revision for r in revisions] == [
+        SUPABASE_FUNCIONES,
         CIERRE,
         DISCREPANCIAS,
         CONTEO,
@@ -207,17 +209,18 @@ def test_revision_chain():
         ACCESO,
         BASELINE,
     ]
-    assert revisions[0].down_revision == DISCREPANCIAS
-    assert revisions[1].down_revision == CONTEO
-    assert revisions[2].down_revision == CAMBIOS
-    assert revisions[3].down_revision == ACTIVOS
-    assert revisions[4].down_revision == CATALOGO
-    assert revisions[5].down_revision == LIMITE_TASA
-    assert revisions[6].down_revision == FUNCIONES
-    assert revisions[7].down_revision == POLITICAS
-    assert revisions[8].down_revision == ACCESO
-    assert revisions[9].down_revision == BASELINE
-    assert revisions[10].down_revision is None
+    assert revisions[0].down_revision == CIERRE
+    assert revisions[1].down_revision == DISCREPANCIAS
+    assert revisions[2].down_revision == CONTEO
+    assert revisions[3].down_revision == CAMBIOS
+    assert revisions[4].down_revision == ACTIVOS
+    assert revisions[5].down_revision == CATALOGO
+    assert revisions[6].down_revision == LIMITE_TASA
+    assert revisions[7].down_revision == FUNCIONES
+    assert revisions[8].down_revision == POLITICAS
+    assert revisions[9].down_revision == ACCESO
+    assert revisions[10].down_revision == BASELINE
+    assert revisions[11].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -345,7 +348,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [CIERRE])
+    assert _public_state(migrate_env) == (with_auth, [SUPABASE_FUNCIONES])
     assert _schema_exists(migrate_env, "acceso")
 
     command.downgrade(config, "base")
@@ -354,7 +357,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [CIERRE])
+    assert _public_state(migrate_env) == (with_auth, [SUPABASE_FUNCIONES])
     assert _schema_exists(migrate_env, "acceso")
 
 

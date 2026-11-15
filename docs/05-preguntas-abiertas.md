@@ -32,7 +32,7 @@ Las preguntas P11–P26, surgidas de los casos de uso y del cambio de alcance de
 | T7 | Valor total: informe de sesión congelado al cierre + vista en tiempo real separada. | Sí. | Propuesta |
 | T8 | Un solo cliente web (React + Vite + Tailwind + shadcn/ui), móvil primero para contar; toda la web, también la administración, es responsive (celular y computador; decisión del 2026-11-11). | Sí. Ver [ADR-001](adr/ADR-001-stack.md). | Propuesta |
 | T9 | Nombre de la app y del repositorio remoto. | Por decidir. | Abierta |
-| T10 | Dónde se aloja el backend y quién paga el hosting. | **Parcial (2026-11-11):** base de datos y fotos en Supabase (solo como PostgreSQL administrado y almacenamiento; sin Supabase Auth ni API automática; Flask sigue siendo el único backend). Backend: `[PENDIENTE]`. Costo: `[PENDIENTE]`. | Abierta |
+| T10 | Dónde se aloja el backend y quién paga el hosting. | **Parcial (2026-11-11):** base de datos y fotos en Supabase (solo como PostgreSQL administrado y almacenamiento; sin Supabase Auth ni API automática; Flask sigue siendo el único backend). **2026-11-15 (G1 de la 010b):** Supabase plan Free (riesgos de pausa y sin copias aceptados, con respaldo manual por conteo); web y API en un solo contenedor. Plataforma del contenedor y costo: `[PENDIENTE]` (el humano lo revisa). | Abierta |
 | T11 | Gestor de dependencias de Python. | **Decidido (2026-11-11): uv** con `pyproject.toml` (spec 001). | Decidido |
 
 ## C. Para los socios

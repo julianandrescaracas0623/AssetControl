@@ -68,7 +68,7 @@ Todas las tablas de negocio tienen `tenant_id`. Las consultas del backend se fil
 
 ## Despliegue
 
-Un contenedor para la API (que también sirve los estáticos de `web/` o los sirve un CDN); dónde se aloja el backend: `[PENDIENTE]` (T10 de [05](05-preguntas-abiertas.md)). Base de datos y fotos en Supabase. Dependencias de Python con uv. HTTPS obligatorio: sin él el navegador no entrega acceso a la cámara. Migraciones y despliegue desde GitHub Actions.
+Un solo contenedor (`Dockerfile.prod`, spec 010b): gunicorn sirve la web compilada en `/` y la API bajo `/api`, en el mismo origen. Dónde se aloja: `[PENDIENTE]` (T10 de [05](05-preguntas-abiertas.md)); la guía para cualquier plataforma está en [09](09-despliegue.md). Base de datos y fotos en Supabase. Dependencias de Python con uv. HTTPS obligatorio: sin él el navegador no entrega acceso a la cámara. Migraciones y despliegue desde GitHub Actions.
 
 ## Riesgos conocidos
 
