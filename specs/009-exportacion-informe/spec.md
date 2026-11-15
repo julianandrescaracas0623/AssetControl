@@ -1,6 +1,6 @@
 # Spec 009 — Exportar el informe a Excel y PDF
 
-> **Estado:** Aprobada (G1–G3, 2026-11-15) con Q1–Q3 en la opción recomendada. Depende de la 008 (cierre e informe, hecha). Módulo M7 (CU-INF-03) de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Implementada (T1–T5, 2026-11-15). Aprobada (G1–G3, 2026-11-15) con Q1–Q3 en la opción recomendada. Depende de la 008 (cierre e informe, hecha). Módulo M7 (CU-INF-03) de `docs/07`. Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 
