@@ -308,6 +308,7 @@ def test_flask_routes_and_contract_paths_are_the_same(contrato_app):
 
 
 EXERCISED: set[tuple[str, str, str]] = set()
+FORMATOS_EXPORTAR = ("excel",)
 
 
 def check(method: str, path: str, response) -> dict | None:
@@ -328,6 +329,13 @@ def check(method: str, path: str, response) -> dict | None:
     content = spec.get("content")
     if content is None:
         assert response.data == b"", f"{method.upper()} {path} {status}: cuerpo no declarado"
+        return None
+    if "application/json" not in content:
+        # Respuesta binaria (spec 009): el tipo declarado y un cuerpo no vacío.
+        (mime,) = content
+        assert content[mime]["schema"] == {"type": "string", "format": "binary"}
+        assert response.mimetype == mime, (method, path, response.mimetype)
+        assert response.data, f"{method.upper()} {path} {status}: archivo vacío"
         return None
     assert response.mimetype == "application/json"
     body = response.get_json()
@@ -892,6 +900,12 @@ def test_sesiones_responses(client, contrato_db):
     # Spec 008: informe de una abierta, cerrar (y repetir), informe.
     informe = f"{ruta}/informe"
     check("get", "/sesiones/{id}/informe", client.get(informe, headers=admin))
+    for formato in FORMATOS_EXPORTAR:  # Spec 009: abierta → 409.
+        check(
+            "get",
+            f"/sesiones/{{id}}/informe/{formato}",
+            client.get(f"{informe}/{formato}", headers=admin),
+        )
     for headers in (contador, {}):
         check("post", "/sesiones/{id}/cerrar", client.post(f"{ruta}/cerrar", headers=headers))
         check("get", "/sesiones/{id}/informe", client.get(informe, headers=headers))
@@ -918,6 +932,14 @@ def test_sesiones_responses(client, contrato_db):
     check("get", "/sesiones", client.get("/sesiones", headers=admin))
     for headers in (admin, contador, {}):
         check("get", "/valor-actual", client.get("/valor-actual", headers=headers))
+
+    # Spec 009: exportar (cerrada, abierta, roles, inexistente).
+    for formato in FORMATOS_EXPORTAR:
+        plantilla = f"/sesiones/{{id}}/informe/{formato}"
+        for headers in (admin, contador, {}):
+            check("get", plantilla, client.get(f"{ruta}/informe/{formato}", headers=headers))
+        otra = uuid.uuid4()
+        check("get", plantilla, client.get(f"/sesiones/{otra}/informe/{formato}", headers=admin))
     cerrada = verificar({**cuerpo_v, "id": str(uuid.uuid4())})
     assert cerrada["error"]["code"] == "sesion_cerrada"
 

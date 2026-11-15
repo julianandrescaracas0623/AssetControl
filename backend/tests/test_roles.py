@@ -449,6 +449,8 @@ PROTECTED_ENDPOINTS = {
     "sesiones.cerrar": frozenset({"admin"}),
     "sesiones.ver_informe": frozenset({"admin"}),
     "valor.ver_valor_actual": frozenset({"admin"}),
+    # Spec 009: exportar el informe, solo admin (P13).
+    "sesiones.exportar_excel": frozenset({"admin"}),
 }
 
 

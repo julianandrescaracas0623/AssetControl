@@ -6,12 +6,13 @@ tenant es ``404``. Cuerpos JSON de 4 KB como máximo (``app.auth.http``).
 """
 
 import uuid
+from urllib.parse import quote
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 from flask.typing import ResponseReturnValue
 
 from app.auth.decorators import current_session, current_user, require_auth, require_role
-from app.conteo import cierre, discrepancias, service, verificaciones
+from app.conteo import cierre, discrepancias, exportar, service, verificaciones
 from app.errors import error_response
 
 bp = Blueprint("sesiones", __name__, url_prefix="/sesiones")
@@ -182,3 +183,35 @@ def ver_informe(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre de
         return jsonify(cierre.informe(session, service.obtener(session, id)))
     except service.ErrorConteo as exc:
         return _error(exc)
+
+
+# --- Spec 009: exportar el informe (solo admin) --------------------------------------------
+
+
+def _archivo(contenido: bytes, mimetype: str, nombre: str) -> Response:
+    """Descarga segura (R6): adjunto con nombre ASCII, sin caché y sin adivinar el tipo."""
+    respuesta = Response(contenido, mimetype=mimetype)
+    respuesta.headers["Content-Disposition"] = (
+        f"attachment; filename=\"{nombre}\"; filename*=UTF-8''{quote(nombre)}"
+    )
+    respuesta.headers["Cache-Control"] = "no-store"
+    respuesta.headers["X-Content-Type-Options"] = "nosniff"
+    return respuesta
+
+
+def _documento(session, id: uuid.UUID) -> tuple[exportar.Documento, str]:  # noqa: A002
+    informe = cierre.informe(session, service.obtener(session, id))
+    sesion = informe["sesion"]
+    return exportar.documento(informe), exportar.nombre_base(
+        sesion["nombre"], sesion["fecha_corte"]
+    )
+
+
+@bp.get("/<uuid:id>/informe/excel")
+@require_role("admin")
+def exportar_excel(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del contrato
+    try:
+        doc, nombre = _documento(current_session(), id)
+    except service.ErrorConteo as exc:
+        return _error(exc)
+    return _archivo(exportar.a_excel(doc), exportar.XLSX, f"{nombre}.xlsx")
