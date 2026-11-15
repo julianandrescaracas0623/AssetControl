@@ -16,7 +16,7 @@ Las pruebas por ruta se escriben en T6/T8/T9, cuando existan las rutas.
 import io
 from urllib.parse import urlsplit
 
-from flask import Flask, abort, request
+from flask import Flask, abort, has_request_context, request
 from flask.wrappers import Response
 
 from app.config import Config
@@ -54,12 +54,15 @@ def is_small_body_path(path: str) -> bool:
 def refresh_cookie_options(config: Config) -> dict[str, object]:
     """Atributos de la cookie de refresh: ``Secure`` salvo ``development`` explícito."""
     secure = config.secure_cookies
+    # Spec 010b: en producción la API vive bajo ``/api`` (``SCRIPT_NAME``) y la cookie
+    # debe ir a ``/api/auth``; en desarrollo no hay prefijo (el proxy de Vite la reescribe).
+    prefijo = request.script_root if has_request_context() else ""
     return {
         "key": REFRESH_COOKIE_SECURE_NAME if secure else REFRESH_COOKIE_DEVELOPMENT_NAME,
         "secure": secure,
         "httponly": True,
         "samesite": "Lax",
-        "path": "/auth",
+        "path": f"{prefijo}/auth",
     }
 
 
