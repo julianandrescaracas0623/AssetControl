@@ -243,15 +243,25 @@ export function crearCatalogo(
       if (rol !== 'admin') return errorApi(403, 'prohibido', 'No tienes permiso.')
       return json(200, valorActual())
     }
-    const cie = ruta0.match(/^\/api\/sesiones\/([0-9a-f-]{36})\/(cerrar|informe)$/)
+    const cie = ruta0.match(/^\/api\/sesiones\/([0-9a-f-]{36})\/(cerrar|informe|informe\/excel|informe\/pdf)$/)
     if (cie) {
       if (rol !== 'admin') return errorApi(403, 'prohibido', 'No tienes permiso.')
       const sesion = sesiones.find((x) => x.id === cie[1])
       if (!sesion) return errorApi(404, 'no_encontrado', 'El recurso no existe.')
       if (cie[2] === 'cerrar' && metodo === 'POST') return json(200, cerrar(sesion))
-      if (cie[2] === 'informe' && metodo === 'GET') {
+      if (cie[2].startsWith('informe') && metodo === 'GET') {
         if (sesion.estado === 'abierta') return errorApi(409, 'sesion_abierta', 'La sesión sigue abierta: el informe se genera al cerrarla.')
-        return json(200, cerrar(sesion))
+        if (cie[2] === 'informe') return json(200, cerrar(sesion))
+        // Spec 009: el archivo lo arma el servidor; aquí basta un binario con su nombre.
+        const pdf = cie[2].endsWith('pdf')
+        const nombre = `informe-conteo-nov-2026-corte-${sesion.fecha_corte}.${pdf ? 'pdf' : 'xlsx'}`
+        return new Response(pdf ? '%PDF-1.4' : 'PK', {
+          status: 200,
+          headers: {
+            'Content-Type': pdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': `attachment; filename="${nombre}"; filename*=UTF-8''${nombre}`,
+          },
+        })
       }
     }
     const dis = ruta0.match(/^\/api\/sesiones\/([0-9a-f-]{36})\/(discrepancias(?:\/aplicar|\/descartar)?|pendientes)$/)

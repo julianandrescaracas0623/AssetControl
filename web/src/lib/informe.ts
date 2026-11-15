@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { api, type Esquemas } from '@/lib/api/cliente'
+import { api, type Archivo, type Esquemas, type FormatoInforme } from '@/lib/api/cliente'
 import { CLAVE_SESIONES } from '@/lib/sesiones'
 import { useApiAutenticada } from '@/lib/sesion'
 
@@ -51,3 +51,26 @@ export function useValorActual() {
     queryFn: () => conToken((t) => api.valorActual(t)),
   })
 }
+
+/** Entrega el archivo al navegador con un enlace temporal (y lo libera al terminar). */
+export function guardarArchivo({ blob, nombre }: Archivo) {
+  const url = URL.createObjectURL(blob)
+  const enlace = document.createElement('a')
+  enlace.href = url
+  enlace.download = nombre
+  enlace.rel = 'noopener'
+  document.body.append(enlace)
+  enlace.click()
+  enlace.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1_000)
+}
+
+/** Exportar el informe (spec 009): el servidor arma el archivo con las mismas cifras. */
+export function useExportarInforme(id: string) {
+  const conToken = useApiAutenticada()
+  return useMutation({
+    mutationFn: (formato: FormatoInforme) => conToken((t) => api.exportarInforme(t, id, formato)),
+    onSuccess: (archivo) => guardarArchivo(archivo),
+  })
+}
+

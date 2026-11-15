@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { api, ErrorApi, pedir, TIEMPO_MAXIMO_MS } from './cliente'
+import { api, ErrorApi, nombreDeArchivo, pedir, TIEMPO_MAXIMO_MS } from './cliente'
 
 // Spec 002b, T2 (plan §3): cliente tipado con el contrato. Sin red real.
 
@@ -187,4 +187,14 @@ describe('tipos (los comprueba npm run typecheck)', () => {
     }
     expect(typeof nunca).toBe('function')
   })
+})
+
+describe('nombreDeArchivo (spec 009)', () => {
+  it.each([
+    [`attachment; filename="informe.xlsx"; filename*=UTF-8''informe-a%C3%B1o.xlsx`, 'informe-año.xlsx'],
+    ['attachment; filename="informe-corte.pdf"', 'informe-corte.pdf'],
+    [`attachment; filename="simple.pdf"; filename*=UTF-8''%E0%A4`, 'simple.pdf'],
+    [null, 'informe.pdf'],
+    ['attachment', 'informe.pdf'],
+  ])('%s → %s', (cabecera, esperado) => expect(nombreDeArchivo(cabecera, 'informe.pdf')).toBe(esperado))
 })

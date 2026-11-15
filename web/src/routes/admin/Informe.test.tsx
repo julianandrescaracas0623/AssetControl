@@ -1,12 +1,12 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { routes } from '@/router'
 import { catalogoDemo, sesionDe } from '@/test/catalogo'
 import { simularAncho } from '@/test/matchMedia'
 import { fechaCorte } from '@/lib/sesiones'
-import { simularSesion } from '@/test/sesion'
+import { errorApi, simularSesion } from '@/test/sesion'
 
 // Spec 008, T5: /admin/sesiones/:id/informe real (R7; CU-INF-01). La pantalla lee lo
 // congelado: las cifras salen del servidor y no cambian con los datos actuales.
@@ -119,3 +119,67 @@ describe('Informe de sesión (spec 008, T5)', () => {
     expect(await screen.findByText('No había activos que contar')).toBeTruthy()
   })
 })
+
+describe('Exportar el informe (spec 009, T4)', () => {
+  function capturarDescargas() {
+    const descargas: { nombre: string; tipo: string }[] = []
+    const blobs = new Map<string, Blob>()
+    let n = 0
+    vi.stubGlobal('URL', Object.assign(URL, {
+      createObjectURL: (blob: Blob) => {
+        const url = `blob:prueba/${n++}`
+        blobs.set(url, blob)
+        return url
+      },
+      revokeObjectURL: vi.fn(),
+    }))
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      descargas.push({ nombre: this.download, tipo: blobs.get(this.href)?.type ?? '' })
+    })
+    return descargas
+  }
+
+  afterEach(() => vi.restoreAllMocks())
+
+  it.each([
+    ['Exportar Excel', 'excel', 'informe-conteo-nov-2026-corte-2026-11-30.xlsx'],
+    ['Exportar PDF', 'pdf', 'informe-conteo-nov-2026-corte-2026-11-30.pdf'],
+  ])('«%s» descarga el archivo del servidor con su nombre', async (boton, formato, nombre) => {
+    const descargas = capturarDescargas()
+    const { f } = abrir(INFORME, cerrado())
+    await screen.findByRole('heading', { level: 1, name: 'Informe · Conteo nov 2026' })
+    fireEvent.click(screen.getByRole('button', { name: boton }))
+    await waitFor(() => expect(descargas.map((d) => d.nombre)).toEqual([nombre]))
+    expect(await screen.findByText(`Se descargó «${nombre}»`)).toBeTruthy()
+    const llamada = f.mock.calls.find(([url]) => url === `/api/sesiones/${SESION}/informe/${formato}`)!
+    expect(new Headers(llamada[1]?.headers).get('Authorization')).toBe('Bearer jwt.admin')
+  })
+
+  it('mientras descarga, los dos botones esperan', async () => {
+    capturarDescargas()
+    const catalogo = cerrado()
+    let soltar: () => void = () => {}
+    const manejador = catalogo.manejador
+    catalogo.manejador = (url, init) =>
+      url.endsWith('/informe/excel') ? new Promise<Response>((r) => (soltar = () => r(manejador(url, init) as Response))) : manejador(url, init)
+    abrir(INFORME, catalogo)
+    await screen.findByRole('heading', { level: 1, name: 'Informe · Conteo nov 2026' })
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar Excel' }))
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Exportar PDF' }) as HTMLButtonElement).disabled).toBe(true))
+    expect(screen.getByRole('button', { name: 'Exportar Excel' }).getAttribute('aria-busy')).toBe('true')
+    soltar()
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Exportar PDF' }) as HTMLButtonElement).disabled).toBe(false))
+  })
+
+  it('si falla lo explica y no descarga nada', async () => {
+    const descargas = capturarDescargas()
+    const catalogo = cerrado()
+    catalogo.fallar(`GET /api/sesiones/${SESION}/informe/pdf`, () => errorApi(500, 'error_interno', 'Algo falló.'))
+    abrir(INFORME, catalogo)
+    await screen.findByRole('heading', { level: 1, name: 'Informe · Conteo nov 2026' })
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar PDF' }))
+    expect(await screen.findByText('No se pudo exportar: Algo falló.')).toBeTruthy()
+    expect(descargas).toEqual([])
+  })
+})
+

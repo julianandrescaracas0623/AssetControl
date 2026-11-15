@@ -147,6 +147,54 @@ export async function pedir<R extends Ruta, M extends MetodoDe<R>>(
   }
 }
 
+export interface Archivo {
+  blob: Blob
+  nombre: string
+}
+
+/** Nombre que manda el servidor en `Content-Disposition` (prefiere `filename*` UTF-8). */
+export function nombreDeArchivo(disposicion: string | null, porDefecto: string): string {
+  if (!disposicion) return porDefecto
+  const extendido = /filename\*=UTF-8''([^;]+)/i.exec(disposicion)
+  if (extendido) {
+    try {
+      return decodeURIComponent(extendido[1].trim())
+    } catch {
+      // Mal codificado: se usa el nombre simple.
+    }
+  }
+  const simple = /filename="([^"]+)"/i.exec(disposicion)
+  return simple ? simple[1] : porDefecto
+}
+
+/**
+ * Descarga un archivo de la API (spec 009): mismo token, plazo y errores que `pedir`,
+ * pero el cuerpo es binario. No lo guarda: devuelve el blob y el nombre del servidor.
+ */
+export async function descargar(ruta: string, token: string, porDefecto: string): Promise<Archivo> {
+  const plazo = new AbortController()
+  const reloj = setTimeout(() => plazo.abort(), TIEMPO_MAXIMO_MS)
+  try {
+    let respuesta: Response
+    try {
+      respuesta = await fetch(`${API_BASE}${ruta}`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'same-origin',
+        signal: plazo.signal,
+      })
+    } catch {
+      throw new ErrorApi(0, 'sin_conexion', MENSAJE_SIN_CONEXION)
+    }
+    if (!respuesta.ok) throw await aError(respuesta)
+    return { blob: await respuesta.blob(), nombre: nombreDeArchivo(respuesta.headers.get('Content-Disposition'), porDefecto) }
+  } finally {
+    clearTimeout(reloj)
+  }
+}
+
+export type FormatoInforme = 'excel' | 'pdf'
+
 export const api = {
   login: (cuerpo: Esquemas['LoginBody']) => pedir('post', '/auth/login', { cuerpo }),
   refresh: () => pedir('post', '/auth/refresh', { csrf: true }),
@@ -210,4 +258,7 @@ export const api = {
   cerrarSesion: (token: string, sesionId: string) => pedir('post', '/sesiones/{id}/cerrar', { token, parametros: { id: sesionId } }),
   informeSesion: (token: string, sesionId: string) => pedir('get', '/sesiones/{id}/informe', { token, parametros: { id: sesionId } }),
   valorActual: (token: string) => pedir('get', '/valor-actual', { token }),
+  // Spec 009: el informe congelado como archivo (solo admin).
+  exportarInforme: (token: string, sesionId: string, formato: FormatoInforme) =>
+    descargar(`/sesiones/${encodeURIComponent(sesionId)}/informe/${formato}`, token, formato === 'excel' ? 'informe.xlsx' : 'informe.pdf'),
 }

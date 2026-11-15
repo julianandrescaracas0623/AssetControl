@@ -1,5 +1,6 @@
-import { CircleAlert, ClipboardList, Lock, RefreshCw, Wrench } from 'lucide-react'
+import { CircleAlert, ClipboardList, Download, Loader2, Lock, RefreshCw, Wrench } from 'lucide-react'
 import { Link, useParams } from 'react-router'
+import { toast } from 'sonner'
 
 import { EncabezadoPagina } from '@/components/app/ConEstado'
 import { EmptyState } from '@/components/app/EmptyState'
@@ -12,13 +13,15 @@ import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, Table
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ErrorApi, mensajeDeError } from '@/lib/api/cliente'
 import { formatCOP, formatEntero } from '@/lib/format'
-import { type FilaDesglose, type Informe as InformeSesion, type NoEncontrado, useInforme } from '@/lib/informe'
+import type { FormatoInforme } from '@/lib/api/cliente'
+import { type FilaDesglose, type Informe as InformeSesion, type NoEncontrado, useExportarInforme, useInforme } from '@/lib/informe'
 import { fechaCorte, porcentaje } from '@/lib/sesiones'
 
 // Informe de una sesión cerrada (spec 008, T5; docs/08 §7.5, CU-INF-01; R7 de la spec):
 // tres cifras, desglose y no encontrados congelados al cierre, con los nombres de ese
 // momento (Q3). La pantalla solo lee: cada total, también el de cada tabla, viene del
-// servidor. El % encontrado es una proporción de unidades, no una suma.
+// servidor. El % encontrado es una proporción de unidades, no una suma. Spec 009: el
+// Excel y el PDF los arma el servidor con las mismas cifras (CU-INF-03).
 
 const fechaHora = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -170,6 +173,28 @@ function Contenido({ informe }: { informe: InformeSesion }) {
   )
 }
 
+function Exportar({ id }: { id: string }) {
+  const exportar = useExportarInforme(id)
+  const enCurso = exportar.isPending ? exportar.variables : undefined
+  const pedir = (formato: FormatoInforme) =>
+    exportar.mutate(formato, {
+      onSuccess: ({ nombre }) => toast.success(`Se descargó «${nombre}»`),
+      onError: (error) => toast.error(`No se pudo exportar: ${mensajeDeError(error)}`),
+    })
+  const boton = (formato: FormatoInforme, rotulo: string, variante: 'outline' | 'default') => (
+    <Button variant={variante} disabled={exportar.isPending} aria-busy={enCurso === formato} onClick={() => pedir(formato)}>
+      {enCurso === formato ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Download aria-hidden="true" />}
+      {rotulo}
+    </Button>
+  )
+  return (
+    <>
+      {boton('excel', 'Exportar Excel', 'outline')}
+      {boton('pdf', 'Exportar PDF', 'default')}
+    </>
+  )
+}
+
 export default function Informe() {
   const { id = '' } = useParams()
   const consulta = useInforme(id)
@@ -256,9 +281,12 @@ export default function Informe() {
           </span>
         }
         acciones={
-          <Button asChild variant="outline">
-            <Link to="/admin/valor">Ver valor actual</Link>
-          </Button>
+          <>
+            <Button asChild variant="ghost">
+              <Link to="/admin/valor">Ver valor actual</Link>
+            </Button>
+            <Exportar id={id} />
+          </>
         }
       />
       <Contenido informe={consulta.data} />
