@@ -1,6 +1,6 @@
 # Spec 010 — Dashboard (Inicio)
 
-> **Estado:** Aprobada (G1–G3, 2026-11-15) con Q1–Q3 en la opción recomendada y P22, P24 y P26 por defecto. Depende de la 008 (cierre, informe y valor actual, hecha); la 009 no es requisito. Módulo M11 (CU-DSH-01..04) de `docs/07`; cierra P22–P26 de `docs/05`. Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Implementada (T1–T9, 2026-11-15). Aprobada (G1–G3, 2026-11-15) con Q1–Q3 en la opción recomendada y P22, P24 y P26 por defecto. Depende de la 008 (cierre, informe y valor actual, hecha); la 009 no es requisito. Módulo M11 (CU-DSH-01..04) de `docs/07`; cierra P22–P26 de `docs/05`. Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 
