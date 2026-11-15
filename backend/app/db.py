@@ -55,7 +55,7 @@ from typing import Any
 
 from flask import Flask, current_app, has_app_context
 from sqlalchemy import Uuid, create_engine, event, text
-from sqlalchemy.engine import Connection, Engine
+from sqlalchemy.engine import Connection, Engine, make_url
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlalchemy.orm import (
     Mapped,
@@ -193,10 +193,36 @@ class _Database:
     session_factory: sessionmaker[_TenantSession]
 
 
+TLS_ESTRICTOS = frozenset({"require", "verify-ca", "verify-full"})
+SIN_TLS_OBLIGATORIO = frozenset({"development", "test"})
+
+
+def _tls(database_url: str, environment: str) -> dict[str, object]:
+    """Spec 010b (R3, R5): fuera de desarrollo y pruebas la base va siempre por TLS.
+
+    Sin ``sslmode`` en la URL se exige ``require``; uno igual o más estricto se respeta;
+    uno más débil (``disable``, ``allow``, ``prefer``) detiene el arranque. El mensaje no
+    incluye la URL.
+    """
+    if environment in SIN_TLS_OBLIGATORIO:
+        return {}
+    modo = make_url(database_url).query.get("sslmode")
+    if modo is None:
+        return {"sslmode": "require"}
+    if modo not in TLS_ESTRICTOS:
+        raise RuntimeError(
+            "La conexión a la base debe usar TLS fuera de desarrollo: sslmode debe ser "
+            "require, verify-ca o verify-full."
+        )
+    return {}
+
+
 def init_db(app: Flask) -> None:
     """Crea el engine y la fábrica de sesiones de ``app`` sin conectar."""
     # Antes de create_engine: el engine y el pool fijan su logger al construirse.
     _quiet_sqlalchemy_logs()
+    connect_args: dict[str, object] = {"connect_timeout": CONNECT_TIMEOUT_SECONDS}
+    connect_args.update(_tls(app.config["DATABASE_URL"], app.config["ENVIRONMENT"]))
     engine = create_engine(
         app.config["DATABASE_URL"],
         echo=False,
@@ -204,7 +230,7 @@ def init_db(app: Flask) -> None:
         pool_pre_ping=True,
         pool_recycle=POOL_RECYCLE_SECONDS,
         hide_parameters=True,
-        connect_args={"connect_timeout": CONNECT_TIMEOUT_SECONDS},
+        connect_args=connect_args,
     )
     event.listen(engine, "connect", _verify_role_on_connect)
     factory = sessionmaker(bind=engine, class_=_TenantSession, expire_on_commit=False)

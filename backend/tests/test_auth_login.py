@@ -894,8 +894,11 @@ def test_token_of_a_user_with_two_memberships_only_reaches_the_claimed_tenant(cl
     ],
 )
 def test_refresh_cookie_is_secure_unless_development_is_explicit(
-    login_db, environment, name, secure
+    login_db, environment, name, secure, monkeypatch
 ):
+    # La base local de pruebas no tiene TLS; la regla de TLS fuera de desarrollo (spec
+    # 010b) se prueba en test_produccion.py. Aquí solo importan los atributos de la cookie.
+    monkeypatch.setattr("app.db._tls", lambda url, environment: {})
     flask_app = make_app(login_db, environment)
     try:
         response = login(flask_app.test_client(), ADMIN_A.email)

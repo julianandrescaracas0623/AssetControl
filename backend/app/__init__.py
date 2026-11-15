@@ -62,6 +62,14 @@ def create_app(config: Config | None = None) -> Flask:
     app.register_blueprint(valor_bp)
     app.register_blueprint(inicio_bp)
     register_cli(app)
+    if config.environment == "production" and not config.trusted_proxy_hops:
+        # Deuda (e) de la spec 002 / spec 010b (R3): detrás del proxy de la plataforma,
+        # sin saltos de confianza todas las peticiones parecen venir de la IP del proxy
+        # y el límite de tasa las cuenta juntas.
+        app.logger.warning(
+            "ENVIRONMENT=production con TRUSTED_PROXY_HOPS=0: detrás de un proxy, fija "
+            "TRUSTED_PROXY_HOPS (normalmente 1) o el límite de tasa tratará a todos como uno."
+        )
     if config.trusted_proxy_hops:
         # T10: la IP del cliente para el límite de tasa sale de X-Forwarded-For solo con
         # saltos de proxy de confianza explícitos; nada más (Host, esquema, puerto, prefijo)
