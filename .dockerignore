@@ -1,0 +1,22 @@
+# Contexto de Dockerfile.prod (spec 010b): solo lo que la imagen copia. Nada del arnés
+# local, secretos, datos de la clínica ni artefactos.
+**
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/app/**
+!backend/migrations/**
+!backend/alembic.ini
+!backend/gunicorn.conf.py
+!web/package.json
+!web/package-lock.json
+!web/index.html
+!web/vite.config.ts
+!web/tsconfig*.json
+!web/components.json
+!web/src/**
+!web/public/**
+**/__pycache__
+**/*.pyc
+**/node_modules
+**/.env
+**/.env.*

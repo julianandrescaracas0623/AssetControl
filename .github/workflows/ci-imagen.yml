@@ -1,0 +1,130 @@
+name: CI imagen
+
+# Spec 010b, T3 (A2): construye la imagen de producción (Dockerfile.prod) y la prueba de
+# punta a punta contra un PostgreSQL con TLS, como en producción (ENVIRONMENT=production
+# exige TLS a la base y cookies Secure). No publica la imagen ni despliega nada.
+on:
+  pull_request:
+    branches: [main, develop, "feat/**", "docs/**"]
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-imagen-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  imagen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Valores efímeros de esta prueba desechable: no son secretos ni datos reales.
+      POSTGRES_USER: assetcontrol_admin
+      POSTGRES_PASSWORD: ci-migrador-efimera
+      POSTGRES_DB: assetcontrol
+      APP_DB_USER: assetcontrol_app
+      APP_DB_PASSWORD: ci-app-efimera
+      SECRET_KEY: ci-clave-efimera-de-la-imagen-0123456789
+      DATABASE_URL: postgresql+psycopg://assetcontrol_app:ci-app-efimera@localhost:5432/assetcontrol
+      MIGRATION_DATABASE_URL: postgresql+psycopg://assetcontrol_admin:ci-migrador-efimera@localhost:5432/assetcontrol?sslmode=require
+      ENVIRONMENT: production
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Construir la imagen de producción
+        run: docker build -f Dockerfile.prod -t assetcontrol:ci .
+
+      - name: La imagen no lleva el arnés, secretos ni pruebas
+        run: |
+          set -euo pipefail
+          listado="$(docker run --rm --entrypoint sh assetcontrol:ci -c 'ls -A /app /app/backend; whoami')"
+          echo "$listado"
+          for prohibido in .claude .cursor AGENTS.md CLAUDE.md MEMORY.md .env tests datos; do
+            if grep -qx "$prohibido" <<<"$listado"; then echo "La imagen contiene $prohibido" >&2; exit 1; fi
+          done
+          grep -qx app <<<"$listado"
+
+      - name: PostgreSQL 17 con TLS (certificado efímero)
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pgtls
+          openssl req -new -x509 -days 1 -nodes -subj "/CN=localhost" \
+            -keyout /tmp/pgtls/server.key -out /tmp/pgtls/server.crt 2>/dev/null
+          sudo chown 999:999 /tmp/pgtls/server.key /tmp/pgtls/server.crt
+          sudo chmod 600 /tmp/pgtls/server.key
+          docker run -d --name db --network host \
+            -e POSTGRES_USER -e POSTGRES_PASSWORD -e POSTGRES_DB \
+            -v /tmp/pgtls:/tls:ro postgres:17 \
+            -c ssl=on -c ssl_cert_file=/tls/server.crt -c ssl_key_file=/tls/server.key
+          for _ in $(seq 1 30); do
+            docker exec db pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" && break
+            sleep 1
+          done
+
+      - name: Roles (mismo script que docker-compose)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGPASSWORD: ci-migrador-efimera
+        run: bash docker/postgres/init/01-app-role.sh
+
+      - name: Migraciones con la imagen
+        run: docker run --rm --network host -e MIGRATION_DATABASE_URL -e DATABASE_URL -e SECRET_KEY -e ENVIRONMENT assetcontrol:ci alembic upgrade head
+
+      - name: Tenant e invitación del primer admin
+        run: |
+          set -euo pipefail
+          salida="$(docker run --rm --network host -e MIGRATION_DATABASE_URL -e DATABASE_URL -e SECRET_KEY -e ENVIRONMENT \
+            assetcontrol:ci flask --app app create-tenant "Clínica CI" "admin@ci.ejemplo.test")"
+          token="$(grep -o '#.*' <<<"$salida" | cut -c2-)"
+          test -n "$token"
+          echo "::add-mask::$token"
+          echo "TOKEN=$token" >> "$GITHUB_ENV"
+
+      - name: Arrancar el contenedor de producción
+        run: |
+          docker run -d --name api --network host -e PORT=8000 \
+            -e DATABASE_URL -e SECRET_KEY -e ENVIRONMENT -e TRUSTED_PROXY_HOPS=0 assetcontrol:ci
+          for _ in $(seq 1 40); do
+            curl -fsS http://127.0.0.1:8000/api/ready >/dev/null && break
+            sleep 1
+          done
+
+      - name: Prueba de humo
+        run: |
+          set -euo pipefail
+          base=http://127.0.0.1:8000
+          curl -fsS "$base/api/ready"
+          # La web en "/" y las rutas de la SPA, con CSP; la API bajo /api.
+          curl -fsS -D /tmp/h-web -o /tmp/index.html "$base/admin/activos"
+          grep -qi '^content-type: text/html' /tmp/h-web
+          grep -qi "^content-security-policy: default-src 'self'" /tmp/h-web
+          grep -qi '^strict-transport-security:' /tmp/h-web
+          grep -q '<div id="root">' /tmp/index.html
+          asset="$(grep -o '/assets/index-[^"]*\.js' /tmp/index.html | head -1)"
+          curl -fsS -D /tmp/h-asset -o /dev/null "$base$asset"
+          grep -qi '^cache-control: public, max-age=31536000, immutable' /tmp/h-asset
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$base/assets/no-existe.js")" = 404
+          # Aceptar la invitación: sesión y cookie Secure en /api/auth.
+          curl -fsS -D /tmp/h-login -o /tmp/login.json -H 'Content-Type: application/json' \
+            -d "{\"token\": \"$TOKEN\", \"nombre\": \"Admin CI\", \"password\": \"Clave-CI-Efimera-2026\"}" \
+            "$base/api/invitaciones/aceptar"
+          grep -qi '^set-cookie: __Secure-refresh=.*Path=/api/auth' /tmp/h-login
+          grep -qi '^set-cookie: .*Secure' /tmp/h-login
+          python3 -c "import json; d = json.load(open('/tmp/login.json')); assert d['rol'] == 'admin', d"
+          # El contenedor queda sano para Docker.
+          for _ in $(seq 1 30); do
+            estado="$(docker inspect -f '{{.State.Health.Status}}' api)"
+            [ "$estado" = healthy ] && break
+            sleep 2
+          done
+          test "$estado" = healthy
+
+      - name: Registros del contenedor
+        if: always()
+        run: docker logs api 2>&1 | tail -n 100 || true
