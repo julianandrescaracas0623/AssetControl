@@ -452,6 +452,8 @@ PROTECTED_ENDPOINTS = {
     # Spec 009: exportar el informe, solo admin (P13).
     "sesiones.exportar_excel": frozenset({"admin"}),
     "sesiones.exportar_pdf": frozenset({"admin"}),
+    # Spec 010: Inicio; los indicadores filtran por rol (P13).
+    "inicio.ver_indicadores": frozenset({"admin", "contador"}),
 }
 
 

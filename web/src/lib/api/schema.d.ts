@@ -603,6 +603,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inicio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Indicadores del Inicio según el rol (el contador no recibe dinero)
+         * @description Ambos roles reciben activos_hoy y sesion_abierta. Solo el admin recibe valor_actual, discrepancias, danados y ultimo_informe (P13): para el contador esas claves no existen.
+         */
+        get: operations["inicio"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/valor-actual": {
         parameters: {
             query?: never;
@@ -1088,6 +1108,56 @@ export interface components {
             por_ubicacion: components["schemas"]["FilaValor"][];
             /** Format: date-time */
             calculado_en: string;
+        };
+        RefSesion: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+        };
+        /** @description Porcentaje con un decimal y punto ("33.3"), calculado por el servidor. */
+        Porcentaje: string;
+        Inicio: {
+            activos_hoy: {
+                unidades: number;
+                en_reparacion: number;
+            };
+            sesion_abierta: {
+                /** Format: uuid */
+                id: string;
+                nombre: string;
+                /** Format: date */
+                fecha_corte: string;
+                avance: {
+                    total: number;
+                    verificados: number;
+                    pendientes: number;
+                    porcentaje: components["schemas"]["Porcentaje"];
+                };
+            } | null;
+            /** @description Solo admin. Valor vivo (R7); no es el informe. */
+            valor_actual?: {
+                total: components["schemas"]["Precio"];
+                unidades: number;
+                /** Format: date-time */
+                calculado_en: string;
+            };
+            /** @description Solo admin. Por resolver en la sesión de referencia (abierta o última cerrada). */
+            discrepancias?: {
+                por_resolver: number;
+                sesion: components["schemas"]["RefSesion"];
+            } | null;
+            /** @description Solo admin. En reparación ∪ dañados en la sesión de referencia (P26). */
+            danados?: {
+                total: number;
+                en_reparacion: number;
+                danados: number;
+                sesion: components["schemas"]["RefSesion"] | null;
+            };
+            /** @description Solo admin. Tres cifras congeladas del último cierre de tipo conteo. */
+            ultimo_informe?: {
+                sesion: components["schemas"]["SesionConteo"];
+                totales: components["schemas"]["Cifras"];
+            } | null;
         };
         /** @enum {string} */
         TipoEvento: "creado" | "importado" | "verificado" | "ubicacion_cambiada" | "precio_cambiado" | "estado_cambiado" | "categoria_cambiada" | "datos_cambiados" | "dado_de_baja" | "discrepancia_descartada";
@@ -2588,6 +2658,27 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    inicio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Indicadores. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Inicio"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
         };
     };
     valorActual: {

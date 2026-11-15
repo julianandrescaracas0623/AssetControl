@@ -900,6 +900,7 @@ def test_sesiones_responses(client, contrato_db):
     # Spec 008: informe de una abierta, cerrar (y repetir), informe.
     informe = f"{ruta}/informe"
     check("get", "/sesiones/{id}/informe", client.get(informe, headers=admin))
+    check("get", "/inicio", client.get("/inicio", headers=admin))  # Spec 010: con abierta.
     for formato in FORMATOS_EXPORTAR:  # Spec 009: abierta → 409.
         check(
             "get",
@@ -932,6 +933,9 @@ def test_sesiones_responses(client, contrato_db):
     check("get", "/sesiones", client.get("/sesiones", headers=admin))
     for headers in (admin, contador, {}):
         check("get", "/valor-actual", client.get("/valor-actual", headers=headers))
+    # Spec 010: Inicio (sin sesión abierta, con último informe).
+    for headers in (admin, contador, {}):
+        check("get", "/inicio", client.get("/inicio", headers=headers))
 
     # Spec 009: exportar (cerrada, abierta, roles, inexistente).
     for formato in FORMATOS_EXPORTAR:

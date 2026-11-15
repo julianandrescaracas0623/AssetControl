@@ -1158,6 +1158,26 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
           x-codigos: [sesion_abierta]
+  /inicio:
+    get:
+      tags: [inicio]
+      operationId: inicio
+      summary: Indicadores del Inicio según el rol (el contador no recibe dinero)
+      description: >-
+        Ambos roles reciben activos_hoy y sesion_abierta. Solo el admin recibe
+        valor_actual, discrepancias, danados y ultimo_informe (P13): para el contador
+        esas claves no existen.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Indicadores.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Inicio" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
   /valor-actual:
     get:
       tags: [activos]
@@ -2029,6 +2049,89 @@ components:
           type: array
           items: { $ref: "#/components/schemas/FilaValor" }
         calculado_en: { type: string, format: date-time }
+    RefSesion:
+      type: object
+      required: [id, nombre]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+    Porcentaje:
+      type: string
+      description: Porcentaje con un decimal y punto ("33.3"), calculado por el servidor.
+    Inicio:
+      type: object
+      required: [activos_hoy, sesion_abierta]
+      additionalProperties: false
+      properties:
+        activos_hoy:
+          type: object
+          required: [unidades, en_reparacion]
+          additionalProperties: false
+          properties:
+            unidades: { type: integer, minimum: 0 }
+            en_reparacion: { type: integer, minimum: 0 }
+        sesion_abierta:
+          oneOf:
+            - type: object
+              required: [id, nombre, fecha_corte, avance]
+              additionalProperties: false
+              properties:
+                id: { type: string, format: uuid }
+                nombre: { type: string }
+                fecha_corte: { type: string, format: date }
+                avance:
+                  type: object
+                  required: [total, verificados, pendientes, porcentaje]
+                  additionalProperties: false
+                  properties:
+                    total: { type: integer, minimum: 0 }
+                    verificados: { type: integer, minimum: 0 }
+                    pendientes: { type: integer, minimum: 0 }
+                    porcentaje: { $ref: "#/components/schemas/Porcentaje" }
+            - { type: "null" }
+        valor_actual:
+          type: object
+          description: Solo admin. Valor vivo (R7); no es el informe.
+          required: [total, unidades, calculado_en]
+          additionalProperties: false
+          properties:
+            total: { $ref: "#/components/schemas/Precio" }
+            unidades: { type: integer, minimum: 0 }
+            calculado_en: { type: string, format: date-time }
+        discrepancias:
+          description: Solo admin. Por resolver en la sesión de referencia (abierta o última cerrada).
+          oneOf:
+            - type: object
+              required: [por_resolver, sesion]
+              additionalProperties: false
+              properties:
+                por_resolver: { type: integer, minimum: 0 }
+                sesion: { $ref: "#/components/schemas/RefSesion" }
+            - { type: "null" }
+        danados:
+          type: object
+          description: Solo admin. En reparación ∪ dañados en la sesión de referencia (P26).
+          required: [total, en_reparacion, danados, sesion]
+          additionalProperties: false
+          properties:
+            total: { type: integer, minimum: 0 }
+            en_reparacion: { type: integer, minimum: 0 }
+            danados: { type: integer, minimum: 0 }
+            sesion:
+              oneOf:
+                - { $ref: "#/components/schemas/RefSesion" }
+                - { type: "null" }
+        ultimo_informe:
+          description: Solo admin. Tres cifras congeladas del último cierre de tipo conteo.
+          oneOf:
+            - type: object
+              required: [sesion, totales]
+              additionalProperties: false
+              properties:
+                sesion: { $ref: "#/components/schemas/SesionConteo" }
+                totales: { $ref: "#/components/schemas/Cifras" }
+            - { type: "null" }
     TipoEvento:
       type: string
       enum:
