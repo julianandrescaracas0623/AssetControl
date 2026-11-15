@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.activos.models import ActivoEvento
+from app.activos.models import Activo, ActivoEvento
 from app.activos.service import ErrorActivo, obtener
 from app.auth.models import Membresia, Usuario
 
@@ -60,26 +60,62 @@ def _autores(session: Session, ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
     return {fila.id: fila.nombre for fila in filas}
 
 
-def leer(session: Session, activo_id: uuid.UUID, *, antes_de: object, con_precio: bool) -> Pagina:
-    cursor = _cursor(antes_de)
-    obtener(session, activo_id)  # 404 si no existe en este tenant
-    consulta = select(ActivoEvento).where(ActivoEvento.activo_id == activo_id)
+def _pagina(
+    session: Session, consulta, *, cursor: int | None, con_precio: bool, por_pagina: int
+) -> tuple[list[ActivoEvento], int | None, dict[uuid.UUID, str]]:
+    """Filtro por rol en la consulta (P13), cursor por ``seq`` y autores del tenant."""
     if not con_precio:
         consulta = consulta.where(ActivoEvento.tipo != "precio_cambiado")
     if cursor is not None:
         consulta = consulta.where(ActivoEvento.seq < cursor)
-    filas = list(session.scalars(consulta.order_by(ActivoEvento.seq.desc()).limit(POR_PAGINA + 1)))
-    hay_mas = len(filas) > POR_PAGINA
-    filas = filas[:POR_PAGINA]
+    filas = list(session.scalars(consulta.order_by(ActivoEvento.seq.desc()).limit(por_pagina + 1)))
+    hay_mas = len(filas) > por_pagina
+    filas = filas[:por_pagina]
     nombres = _autores(session, {f.usuario_id for f in filas})
-    eventos = [
-        {
-            "seq": f.seq,
-            "tipo": f.tipo,
-            "ocurrido_en": f.ocurrido_en.isoformat(),
-            "autor": {"id": str(f.usuario_id), "nombre": nombres.get(f.usuario_id, "")},
-            "datos": f.datos if con_precio else _sin_precio(f.datos),
-        }
-        for f in filas
-    ]
-    return Pagina(eventos=eventos, siguiente=filas[-1].seq if hay_mas else None)
+    return filas, (filas[-1].seq if hay_mas else None), nombres
+
+
+def _evento(f: ActivoEvento, nombres: dict[uuid.UUID, str], con_precio: bool) -> dict[str, object]:
+    return {
+        "seq": f.seq,
+        "tipo": f.tipo,
+        "ocurrido_en": f.ocurrido_en.isoformat(),
+        "autor": {"id": str(f.usuario_id), "nombre": nombres.get(f.usuario_id, "")},
+        "datos": f.datos if con_precio else _sin_precio(f.datos),
+    }
+
+
+def leer(session: Session, activo_id: uuid.UUID, *, antes_de: object, con_precio: bool) -> Pagina:
+    cursor = _cursor(antes_de)
+    obtener(session, activo_id)  # 404 si no existe en este tenant
+    filas, siguiente, nombres = _pagina(
+        session,
+        select(ActivoEvento).where(ActivoEvento.activo_id == activo_id),
+        cursor=cursor,
+        con_precio=con_precio,
+        por_pagina=POR_PAGINA,
+    )
+    return Pagina(eventos=[_evento(f, nombres, con_precio) for f in filas], siguiente=siguiente)
+
+
+def leer_tenant(session: Session, *, antes_de: object, con_precio: bool, por_pagina: int) -> Pagina:
+    """Actividad de todo el tenant (spec 010, CU-DSH-02): mismo filtro y cursor, con el
+    activo de cada evento (código y nombre, nunca su precio)."""
+    cursor = _cursor(antes_de)
+    filas, siguiente, nombres = _pagina(
+        session, select(ActivoEvento), cursor=cursor, con_precio=con_precio, por_pagina=por_pagina
+    )
+    activos = {
+        a.id: a
+        for a in session.scalars(select(Activo).where(Activo.id.in_({f.activo_id for f in filas})))
+    }
+    eventos = []
+    for f in filas:
+        activo = activos[f.activo_id]
+        eventos.append(
+            {
+                **_evento(f, nombres, con_precio),
+                "activo": {"id": str(activo.id), "codigo": activo.codigo, "nombre": activo.nombre},
+            }
+        )
+    return Pagina(eventos=eventos, siguiente=siguiente)

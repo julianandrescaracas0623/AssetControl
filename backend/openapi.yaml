@@ -1178,6 +1178,33 @@ paths:
         "401":
           $ref: "#/components/responses/NoAutenticado"
 
+  /inicio/actividad:
+    get:
+      tags: [inicio]
+      operationId: actividadInicio
+      summary: Actividad reciente del tenant, lo más reciente primero (20 por página)
+      description: >-
+        Mismo filtro que el historial: al contador se le omiten los eventos
+        precio_cambiado y toda clave de precio de los demás (P13).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: antes_de
+          in: query
+          required: false
+          description: El valor de "siguiente" de la página anterior.
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Una página de eventos con su activo.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Actividad" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
   /valor-actual:
     get:
       tags: [activos]
@@ -2132,6 +2159,43 @@ components:
                 sesion: { $ref: "#/components/schemas/SesionConteo" }
                 totales: { $ref: "#/components/schemas/Cifras" }
             - { type: "null" }
+    EventoActividad:
+      type: object
+      required: [seq, tipo, ocurrido_en, autor, datos, activo]
+      additionalProperties: false
+      properties:
+        seq: { type: integer, minimum: 1 }
+        tipo: { $ref: "#/components/schemas/TipoEvento" }
+        ocurrido_en: { type: string, format: date-time }
+        autor:
+          type: object
+          required: [id, nombre]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            nombre: { type: string }
+        datos:
+          type: object
+          description: Contenido por tipo (docs/03, spec 005); sin precios para el contador.
+        activo:
+          type: object
+          required: [id, codigo, nombre]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            codigo: { type: string }
+            nombre: { type: string }
+    Actividad:
+      type: object
+      required: [eventos, siguiente]
+      additionalProperties: false
+      properties:
+        eventos:
+          type: array
+          items: { $ref: "#/components/schemas/EventoActividad" }
+        siguiente:
+          type: [integer, "null"]
+          description: Cursor para la página siguiente (antes_de); null si no hay más.
     TipoEvento:
       type: string
       enum:

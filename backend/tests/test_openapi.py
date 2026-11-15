@@ -936,6 +936,9 @@ def test_sesiones_responses(client, contrato_db):
     # Spec 010: Inicio (sin sesión abierta, con último informe).
     for headers in (admin, contador, {}):
         check("get", "/inicio", client.get("/inicio", headers=headers))
+    for headers in (admin, contador, {}):
+        check("get", "/inicio/actividad", client.get("/inicio/actividad", headers=headers))
+    check("get", "/inicio/actividad", client.get("/inicio/actividad?antes_de=0", headers=admin))
 
     # Spec 009: exportar (cerrada, abierta, roles, inexistente).
     for formato in FORMATOS_EXPORTAR:
