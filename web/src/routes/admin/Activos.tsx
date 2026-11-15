@@ -83,10 +83,14 @@ function useRetrasado(valor: string, ms = 300) {
 
 export default function Activos() {
   const movil = useIsMobile()
-  const [pestaña, setPestaña] = useState<Pestaña>('todos')
+  const [params, setParams] = useSearchParams()
+  // Spec 010: el Inicio enlaza a «en reparación» con ?estado=.
+  const [pestaña, setPestaña] = useState<Pestaña>(() => {
+    const estado = params.get('estado')
+    return estado === 'activo' || estado === 'en_reparacion' || estado === 'dado_de_baja' ? estado : 'todos'
+  })
   const [texto, setTexto] = useState('')
   const [pagina, setPagina] = useState(1)
-  const [params, setParams] = useSearchParams()
   const ubicacion = params.get('ubicacion') ?? ''
   const ubicaciones = useUbicaciones()
   const q = useRetrasado(texto.trim())

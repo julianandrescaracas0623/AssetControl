@@ -258,6 +258,11 @@ export const api = {
   cerrarSesion: (token: string, sesionId: string) => pedir('post', '/sesiones/{id}/cerrar', { token, parametros: { id: sesionId } }),
   informeSesion: (token: string, sesionId: string) => pedir('get', '/sesiones/{id}/informe', { token, parametros: { id: sesionId } }),
   valorActual: (token: string) => pedir('get', '/valor-actual', { token }),
+  // Spec 010: Inicio (indicadores por rol, actividad y evolución).
+  inicio: (token: string) => pedir('get', '/inicio', { token }),
+  actividadInicio: (token: string, antesDe?: number) =>
+    pedir('get', '/inicio/actividad', { token, consulta: { antes_de: antesDe } }),
+  evolucionInicio: (token: string) => pedir('get', '/inicio/evolucion', { token }),
   // Spec 009: el informe congelado como archivo (solo admin).
   exportarInforme: (token: string, sesionId: string, formato: FormatoInforme) =>
     descargar(`/sesiones/${encodeURIComponent(sesionId)}/informe/${formato}`, token, formato === 'excel' ? 'informe.xlsx' : 'informe.pdf'),

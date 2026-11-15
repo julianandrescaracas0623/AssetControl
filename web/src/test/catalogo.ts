@@ -1,6 +1,7 @@
 import type { Categoria, Rol, Ubicacion } from '@/lib/api/cliente'
 import type { Activo } from '@/lib/activos'
 import type { FilaDesglose, Informe, ValorEnVivo } from '@/lib/informe'
+import type { EventoActividad, Evolucion, Indicadores } from '@/lib/inicio'
 import type { SesionConteo, Verificacion } from '@/lib/sesiones'
 import { errorApi, json, type Manejador } from './sesion'
 
@@ -150,6 +151,100 @@ export function crearCatalogo(
     }
   }
 
+  // Spec 010: Inicio, con las mismas reglas que el servidor en pequeño.
+  const porcentajeTexto = (parte: number, total: number) => (total === 0 ? '0.0' : (Math.round((parte * 1000) / total) / 10).toFixed(1))
+  const cerradas = () =>
+    sesiones.filter((x) => x.estado === 'cerrada' && x.tipo === 'conteo').sort((x, y) => String(y.cerrada_en).localeCompare(String(x.cerrada_en)))
+  function vigentesDe(sesionId: string) {
+    const v = new Map<string, Verificacion>()
+    for (const x of verificaciones.filter((y) => y.sesion_id === sesionId)) v.set(x.activo.id, x)
+    return v
+  }
+  function indicadores(): Indicadores {
+    const hoy = activos.filter((a) => a.estado !== 'dado_de_baja')
+    const abierta = sesiones.find((x) => x.estado === 'abierta') ?? null
+    let sesion_abierta: Indicadores['sesion_abierta'] = null
+    if (abierta) {
+      const v = vigentesDe(abierta.id)
+      const verificados = hoy.filter((a) => v.has(a.id)).length
+      sesion_abierta = {
+        id: abierta.id,
+        nombre: abierta.nombre,
+        fecha_corte: abierta.fecha_corte,
+        avance: { total: hoy.length, verificados, pendientes: hoy.length - verificados, porcentaje: porcentajeTexto(verificados, hoy.length) },
+      }
+    }
+    const datos: Indicadores = {
+      activos_hoy: { unidades: hoy.length, en_reparacion: hoy.filter((a) => a.estado === 'en_reparacion').length },
+      sesion_abierta,
+    }
+    if (rol !== 'admin') return datos
+    const ultima = cerradas()[0] ?? null
+    const ref = abierta ?? ultima
+    const valor = valorActual()
+    datos.valor_actual = { total: valor.total, unidades: valor.unidades, calculado_en: valor.calculado_en }
+    const v = ref ? vigentesDe(ref.id) : new Map<string, Verificacion>()
+    datos.discrepancias = ref
+      ? {
+          por_resolver: [...v.values()].filter((x) => x.ubicacion_encontrada.id !== x.ubicacion_esperada.id && !resoluciones.has(x.id)).length,
+          sesion: { id: ref.id, nombre: ref.nombre },
+        }
+      : null
+    const reparacion = new Set(hoy.filter((a) => a.estado === 'en_reparacion').map((a) => a.id))
+    const danados = new Set([...v.values()].filter((x) => x.estado_fisico === 'danado' && hoy.some((a) => a.id === x.activo.id)).map((x) => x.activo.id))
+    datos.danados = {
+      total: new Set([...reparacion, ...danados]).size,
+      en_reparacion: reparacion.size,
+      danados: danados.size,
+      sesion: ref ? { id: ref.id, nombre: ref.nombre } : null,
+    }
+    datos.ultimo_informe = ultima ? (({ sesion, totales }) => ({ sesion, totales }))(cerrar(ultima)) : null
+    return datos
+  }
+  function evolucion(): Evolucion {
+    const lista = cerradas().slice(0, 12).reverse()
+    const porCategoria = new Map<string, Evolucion['por_categoria'][number]>()
+    const puntos = lista.map((x) => {
+      const inf = cerrar(x)
+      for (const f of inf.desglose.categorias) {
+        const c = porCategoria.get(f.id) ?? { categoria_id: f.id, etiqueta: f.etiqueta, puntos: [] }
+        c.etiqueta = f.etiqueta
+        c.puntos.push({ sesion_id: x.id, total_registrado: f.total_registrado, unidades_registrado: f.unidades_registrado })
+        porCategoria.set(f.id, c)
+      }
+      const t = inf.totales
+      return {
+        sesion: { id: x.id, nombre: x.nombre, fecha_corte: x.fecha_corte, cerrada_en: x.cerrada_en },
+        total_registrado: t.registrado,
+        unidades_registrado: t.unidades_registrado,
+        unidades_encontrado: t.unidades_encontrado,
+        porcentaje_encontrado: porcentajeTexto(t.unidades_encontrado, t.unidades_registrado),
+      }
+    })
+    return { sesiones: puntos, por_categoria: [...porCategoria.values()].sort((x, y) => x.etiqueta.localeCompare(y.etiqueta)) }
+  }
+  function actividad(): EventoActividad[] {
+    const todos = [
+      ...eventos,
+      ...activos.map((a, i) => ({ seq: i + 1, tipo: 'creado', datos: { codigo: a.codigo, nombre: a.nombre, precio_compra: a.precio_compra } as Record<string, unknown>, activo: a.id })),
+    ]
+    return todos
+      .filter((e) => rol === 'admin' || e.tipo !== 'precio_cambiado')
+      .sort((x, y) => y.seq - x.seq)
+      .slice(0, 20)
+      .map((e) => {
+        const a = activos.find((x) => x.id === e.activo)!
+        return {
+          seq: e.seq,
+          tipo: e.tipo as EventoActividad['tipo'],
+          ocurrido_en: '2026-11-14T15:30:00+00:00',
+          autor: { id: '00000000-0000-4000-8000-00000000000a', nombre: 'Ana Torres' },
+          datos: (rol === 'admin' ? e.datos : Object.fromEntries(Object.entries(e.datos).filter(([k]) => !k.includes('precio')))) as EventoActividad['datos'],
+          activo: { id: a.id, codigo: a.codigo, nombre: a.nombre },
+        }
+      })
+  }
+
   const manejador: Manejador = (url, init) => {
     const metodo = (init.method ?? 'GET').toUpperCase()
     const forzado = fallos.get(`${metodo} ${url}`)
@@ -237,6 +332,12 @@ export function crearCatalogo(
       }
       sesiones.unshift(nueva)
       return json(201, { sesion: nueva })
+    }
+    if (ruta0 === '/api/inicio' && metodo === 'GET') return json(200, indicadores())
+    if (ruta0 === '/api/inicio/actividad' && metodo === 'GET') return json(200, { eventos: actividad(), siguiente: null })
+    if (ruta0 === '/api/inicio/evolucion' && metodo === 'GET') {
+      if (rol !== 'admin') return errorApi(403, 'prohibido', 'No tienes permiso.')
+      return json(200, evolucion())
     }
     // Spec 008: cierre, informe congelado y valor actual (solo admin).
     if (ruta0 === '/api/valor-actual' && metodo === 'GET') {
