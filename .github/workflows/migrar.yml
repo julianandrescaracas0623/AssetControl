@@ -1,0 +1,71 @@
+name: Migrar producción
+
+# Spec 010b, T5 (R6): aplica las migraciones a la base de producción, solo a pedido del
+# humano y con la aprobación del entorno "production" (Settings → Environments). No
+# despliega: el paso de despliegue se añade cuando se elija la plataforma (Q1).
+#
+# Antes de migrar exige que la CI del mismo commit esté en verde (backend, C8 e imagen).
+# Secretos y variables del entorno "production" (los crea el humano, docs/09-despliegue.md):
+#   - secreto MIGRATION_DATABASE_URL: rol migrador de Supabase (pooler en modo sesión,
+#     sslmode=require).
+#   - variable APP_DB_USER: nombre del rol de la aplicación (los GRANT de las migraciones).
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: 'Escribe "migrar" para aplicar las migraciones a producción'
+        required: true
+
+permissions:
+  contents: read
+  checks: read
+
+concurrency:
+  group: migrar-produccion
+  cancel-in-progress: false
+
+jobs:
+  migrar:
+    if: github.ref == 'refs/heads/main' && inputs.confirmar == 'migrar'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: La CI de este commit está en verde
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for trabajo in backend c8 imagen; do
+            estado="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs" \
+              --jq ".check_runs | map(select(.name == \"${trabajo}\")) | sort_by(.completed_at) | last | .conclusion")"
+            echo "${trabajo}: ${estado}"
+            test "${estado}" = success
+          done
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Instalar uv
+        run: python -m pip install "uv==0.13.7"
+
+      - name: Instalar dependencias (sin las de desarrollo)
+        run: uv sync --locked --no-dev
+
+      - name: Migrar
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+          APP_DB_USER: ${{ vars.APP_DB_USER }}
+        run: |
+          set -euo pipefail
+          echo "Antes: $(uv run alembic current 2>/dev/null | tail -1)"
+          uv run alembic upgrade head
+          echo "Después: $(uv run alembic current 2>/dev/null | tail -1)" | tee -a "$GITHUB_STEP_SUMMARY"
