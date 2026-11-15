@@ -636,6 +636,7 @@ export function crearCatalogo(
     },
     sesiones,
     verificaciones,
+    eventos,
     /** Cierra como lo haría otra persona (el informe queda congelado igual que en el servidor). */
     cerrarSesion(id: string) {
       cerrar(sesiones.find((y) => y.id === id)!)

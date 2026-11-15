@@ -147,3 +147,26 @@ describe('Gráficas y evolución (spec 010, T6)', () => {
   })
 })
 
+describe('Actividad reciente (spec 010, T7)', () => {
+  it('muestra los eventos del tenant, lo más reciente arriba, con enlace al activo', async () => {
+    const catalogo = catalogoDemo('admin')
+    const [impresora] = catalogo.activos
+    catalogo.eventos.unshift({ seq: 200, tipo: 'precio_cambiado', datos: { antes: '1390000.00', despues: '1500000.00' }, activo: impresora.id })
+    abrir(catalogo)
+    const seccion = await screen.findByRole('region', { name: 'Actividad reciente' })
+    const items = await within(seccion).findAllByRole('listitem')
+    expect(cop(items[0].textContent)).toContain('Precio cambiado')
+    expect(cop(items[0].textContent)).toContain('$ 1.390.000,00 → $ 1.500.000,00')
+    expect(within(items[0]).getByRole('link', { name: /Impresora multifuncional/ }).getAttribute('href')).toBe('/admin/activos/000215')
+    expect(items.map((i) => i.textContent).filter((t) => t?.includes('Activo creado'))).toHaveLength(2)
+  })
+
+  it('si falla la actividad, solo esa parte muestra el error', async () => {
+    const catalogo = catalogoDemo('admin')
+    catalogo.fallar('GET /api/inicio/actividad', () => errorApi(500, 'error_interno', 'Algo falló.'))
+    abrir(catalogo)
+    expect(await screen.findByText('No se pudo cargar la actividad')).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Activos hoy/ })).toBeTruthy()
+  })
+})
+

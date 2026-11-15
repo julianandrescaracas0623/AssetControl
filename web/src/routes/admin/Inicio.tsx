@@ -2,6 +2,7 @@ import { CircleAlert, ClipboardList, Plus, RefreshCw } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { Link } from 'react-router'
 
+import { ActividadReciente } from '@/components/app/ActividadReciente'
 import { Barras } from '@/components/app/Barras'
 import { EncabezadoPagina } from '@/components/app/ConEstado'
 import { EmptyState } from '@/components/app/EmptyState'
@@ -321,6 +322,7 @@ export default function AdminInicio() {
       <Seccion titulo="Evolución entre conteos">
         <EvolucionConteos />
       </Seccion>
+      <ActividadReciente enlace={(a) => `/admin/activos/${encodeURIComponent(a.codigo)}`} />
     </div>
   )
 }
