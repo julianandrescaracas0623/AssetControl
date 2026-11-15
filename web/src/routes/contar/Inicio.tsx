@@ -1,6 +1,7 @@
 import { CircleAlert, ClipboardList, Plus, RefreshCw, ScanBarcode } from 'lucide-react'
 import { Link } from 'react-router'
 
+import { ActividadReciente } from '@/components/app/ActividadReciente'
 import { CountShell } from '@/components/app/CountShell'
 import { EmptyState } from '@/components/app/EmptyState'
 import { LocationPicker } from '@/components/app/LocationPicker'
@@ -14,13 +15,15 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { useSalaDeTrabajo } from '@/lib/conteo'
 import { formatEntero } from '@/lib/format'
+import { useIndicadores } from '@/lib/inicio'
 import { useSesion } from '@/lib/sesion'
 import { fechaCorte, pendientes, porcentaje, type SesionConteo, useDetalleSesion, useSesionAbierta } from '@/lib/sesiones'
 
 // Inicio del conteo (spec 006, T6; docs/08 §4.2.1, CU-SES-02, Q4): la sesión abierta
 // real con su avance, la sala de trabajo y los pendientes por ubicación. Sin ningún
-// precio (P13). La actividad reciente llega con la spec 010. Spec 007: cada fila de
-// pendientes abre la lista de esa ubicación.
+// precio (P13). Spec 007: cada fila de pendientes abre la lista de esa ubicación.
+// Spec 010 (Q3, P25): además, activos hoy (unidades) y la actividad reciente, sin precios:
+// el servidor no se los manda al contador.
 
 function SalaDeTrabajo({ rol }: { rol: string | undefined }) {
   const { sala, elegir, ubicaciones } = useSalaDeTrabajo()
@@ -116,6 +119,31 @@ function SesionAbierta({ sesion, rol }: { sesion: SesionConteo; rol: string | un
   )
 }
 
+function ActivosHoy() {
+  const consulta = useIndicadores()
+  if (consulta.isPending) return <Skeleton role="status" aria-label="Cargando los activos de hoy" className="h-16 rounded-xl" />
+  if (consulta.isError) {
+    return (
+      <p className="flex flex-wrap items-center gap-x-2 text-sm text-destructive">
+        No se pudo cargar el total de activos.
+        <Button variant="link" className="h-11 px-0 md:h-auto" onClick={() => void consulta.refetch()}>
+          Reintentar
+        </Button>
+      </p>
+    )
+  }
+  const { unidades, en_reparacion } = consulta.data.activos_hoy
+  return (
+    <section aria-label="Activos hoy" className="flex items-center justify-between gap-3 rounded-xl border p-4">
+      <span className="flex flex-col">
+        <span className="text-sm text-muted-foreground">Activos hoy</span>
+        <span className="text-xs text-muted-foreground">{en_reparacion > 0 ? `Incluye ${formatEntero(en_reparacion)} en reparación` : 'Ninguno en reparación'}</span>
+      </span>
+      <span className="text-2xl font-semibold tabular-nums">{formatEntero(unidades)}</span>
+    </section>
+  )
+}
+
 export default function ContarInicio() {
   const { sesion: cuenta } = useSesion()
   const primerNombre = cuenta?.usuario.nombre.trim().split(/\s+/)[0]
@@ -183,6 +211,8 @@ export default function ContarInicio() {
           />
         </>
       )}
+      <ActivosHoy />
+      <ActividadReciente enlace={(a) => `/contar/activo/${encodeURIComponent(a.codigo)}/historial`} />
     </CountShell>
   )
 }

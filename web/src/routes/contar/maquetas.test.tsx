@@ -41,7 +41,8 @@ describe('Inicio del contador (spec 006, T6)', () => {
     const pendientes = screen.getByRole('region', { name: 'Pendientes por ubicación' })
     expect(within(pendientes).getAllByRole('listitem')).toHaveLength(2)
     expect(container.textContent).not.toContain('$')
-    expect(screen.queryByText(/Actividad reciente/)).toBeNull()
+    // Spec 010: ahora hay actividad reciente (sin precios; ver la prueba de P25).
+    expect(await screen.findByRole('region', { name: 'Actividad reciente' })).toBeTruthy()
     expect(screen.getByRole('link', { name: /Escanear/ }).getAttribute('href')).toBe('/contar/escanear')
     expect(screen.getByRole('link', { name: /Registrar activo nuevo/ })).toBeTruthy()
   })
@@ -51,6 +52,27 @@ describe('Inicio del contador (spec 006, T6)', () => {
     expect(await screen.findByText('No hay una sesión abierta')).toBeTruthy()
     expect(screen.getByRole('link', { name: /Consultar un activo/ })).toBeTruthy()
     expect(screen.queryByRole('combobox', { name: 'Estás contando en' })).toBeNull()
+  })
+
+  it('spec 010 (P25): activos hoy en unidades y la actividad reciente, sin ningún precio', async () => {
+    simularAncho({ movil: true })
+    const catalogo = catalogoDemo('contador', { sesiones: [sesionDe()] })
+    catalogo.activos[1].estado = 'en_reparacion'
+    catalogo.eventos.unshift({ seq: 200, tipo: 'precio_cambiado', datos: { antes: '1.00', despues: '2.00' }, activo: catalogo.activos[0].id })
+    const f = simularSesion('contador', catalogo.manejador)
+    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/contar'] })} />)
+    const hoy = await screen.findByRole('region', { name: 'Activos hoy' })
+    expect(hoy.textContent).toContain('2')
+    expect(hoy.textContent).toContain('Incluye 1 en reparación')
+    const actividad = await screen.findByRole('region', { name: 'Actividad reciente' })
+    const items = await within(actividad).findAllByRole('listitem')
+    expect(items.map((i) => i.textContent).some((t) => t?.includes('Precio cambiado'))).toBe(false)
+    expect(within(items[0]).getByRole('link', { name: /Silla ergonómica|Impresora multifuncional/ }).getAttribute('href')).toMatch(/^\/contar\/activo\/\d+\/historial$/)
+    expect(actividad.textContent).not.toMatch(/\$/)
+    expect(document.body.textContent).not.toMatch(/\$\s?\d/)
+    // El contador no pide valor, gráficas ni evolución.
+    const urls = f.mock.calls.map(([u]) => String(u))
+    expect(urls.some((u) => u.includes('/valor-actual') || u.includes('/inicio/evolucion'))).toBe(false)
   })
 
   it('la sala de trabajo se recuerda y sale en la cabecera del conteo', async () => {
