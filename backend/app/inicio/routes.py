@@ -5,9 +5,9 @@ from flask.typing import ResponseReturnValue
 
 from app.activos import historial
 from app.activos.service import ErrorActivo
-from app.auth.decorators import current_session, current_user, require_auth
+from app.auth.decorators import current_session, current_user, require_auth, require_role
 from app.errors import error_response
-from app.inicio import indicadores
+from app.inicio import evolucion, indicadores
 
 ACTIVIDAD_POR_PAGINA = 20
 
@@ -34,3 +34,10 @@ def ver_actividad() -> ResponseReturnValue:
     except ErrorActivo as exc:
         return error_response(exc.status, exc.code, exc.message)
     return jsonify(eventos=pagina.eventos, siguiente=pagina.siguiente)
+
+
+@bp.get("/evolucion")
+@require_role("admin")
+def ver_evolucion() -> ResponseReturnValue:
+    """Evolución entre conteos (CU-DSH-04), leída de lo congelado; solo admin (P13)."""
+    return jsonify(evolucion.evolucion(current_session()))

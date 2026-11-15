@@ -1205,6 +1205,27 @@ paths:
         "401":
           $ref: "#/components/responses/NoAutenticado"
 
+  /inicio/evolucion:
+    get:
+      tags: [inicio]
+      operationId: evolucionInicio
+      summary: Evolución entre conteos cerrados, leída de lo congelado (solo admin)
+      description: >-
+        Hasta los 12 conteos cerrados más recientes en orden cronológico (P22); % encontrado
+        en unidades con un decimal (P24). Una categoría sin fila en una sesión no tiene punto.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Puntos por sesión y por categoría.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Evolucion" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+
   /valor-actual:
     get:
       tags: [activos]
@@ -2196,6 +2217,50 @@ components:
         siguiente:
           type: [integer, "null"]
           description: Cursor para la página siguiente (antes_de); null si no hay más.
+    Evolucion:
+      type: object
+      required: [sesiones, por_categoria]
+      additionalProperties: false
+      properties:
+        sesiones:
+          type: array
+          items:
+            type: object
+            required: [sesion, total_registrado, unidades_registrado, unidades_encontrado, porcentaje_encontrado]
+            additionalProperties: false
+            properties:
+              sesion:
+                type: object
+                required: [id, nombre, fecha_corte, cerrada_en]
+                additionalProperties: false
+                properties:
+                  id: { type: string, format: uuid }
+                  nombre: { type: string }
+                  fecha_corte: { type: string, format: date }
+                  cerrada_en: { type: [string, "null"], format: date-time }
+              total_registrado: { $ref: "#/components/schemas/Precio" }
+              unidades_registrado: { type: integer, minimum: 0 }
+              unidades_encontrado: { type: integer, minimum: 0 }
+              porcentaje_encontrado: { $ref: "#/components/schemas/Porcentaje" }
+        por_categoria:
+          type: array
+          items:
+            type: object
+            required: [categoria_id, etiqueta, puntos]
+            additionalProperties: false
+            properties:
+              categoria_id: { type: string, format: uuid }
+              etiqueta: { type: string, description: Nombre al cierre más reciente en que aparece. }
+              puntos:
+                type: array
+                items:
+                  type: object
+                  required: [sesion_id, total_registrado, unidades_registrado]
+                  additionalProperties: false
+                  properties:
+                    sesion_id: { type: string, format: uuid }
+                    total_registrado: { $ref: "#/components/schemas/Precio" }
+                    unidades_registrado: { type: integer, minimum: 0 }
     TipoEvento:
       type: string
       enum:

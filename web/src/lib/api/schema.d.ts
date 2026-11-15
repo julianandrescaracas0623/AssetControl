@@ -643,6 +643,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inicio/evolucion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Evolución entre conteos cerrados, leída de lo congelado (solo admin)
+         * @description Hasta los 12 conteos cerrados más recientes en orden cronológico (P22); % encontrado en unidades con un decimal (P24). Una categoría sin fila en una sesión no tiene punto.
+         */
+        get: operations["evolucionInicio"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/valor-actual": {
         parameters: {
             query?: never;
@@ -1202,6 +1222,35 @@ export interface components {
             eventos: components["schemas"]["EventoActividad"][];
             /** @description Cursor para la página siguiente (antes_de); null si no hay más. */
             siguiente: number | null;
+        };
+        Evolucion: {
+            sesiones: {
+                sesion: {
+                    /** Format: uuid */
+                    id: string;
+                    nombre: string;
+                    /** Format: date */
+                    fecha_corte: string;
+                    /** Format: date-time */
+                    cerrada_en: string | null;
+                };
+                total_registrado: components["schemas"]["Precio"];
+                unidades_registrado: number;
+                unidades_encontrado: number;
+                porcentaje_encontrado: components["schemas"]["Porcentaje"];
+            }[];
+            por_categoria: {
+                /** Format: uuid */
+                categoria_id: string;
+                /** @description Nombre al cierre más reciente en que aparece. */
+                etiqueta: string;
+                puntos: {
+                    /** Format: uuid */
+                    sesion_id: string;
+                    total_registrado: components["schemas"]["Precio"];
+                    unidades_registrado: number;
+                }[];
+            }[];
         };
         /** @enum {string} */
         TipoEvento: "creado" | "importado" | "verificado" | "ubicacion_cambiada" | "precio_cambiado" | "estado_cambiado" | "categoria_cambiada" | "datos_cambiados" | "dado_de_baja" | "discrepancia_descartada";
@@ -2748,6 +2797,28 @@ export interface operations {
             };
             400: components["responses"]["SolicitudInvalida"];
             401: components["responses"]["NoAutenticado"];
+        };
+    };
+    evolucionInicio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Puntos por sesión y por categoría. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Evolucion"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
         };
     };
     valorActual: {

@@ -455,6 +455,7 @@ PROTECTED_ENDPOINTS = {
     # Spec 010: Inicio; los indicadores filtran por rol (P13).
     "inicio.ver_indicadores": frozenset({"admin", "contador"}),
     "inicio.ver_actividad": frozenset({"admin", "contador"}),
+    "inicio.ver_evolucion": frozenset({"admin"}),
 }
 
 

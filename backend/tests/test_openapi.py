@@ -939,6 +939,8 @@ def test_sesiones_responses(client, contrato_db):
     for headers in (admin, contador, {}):
         check("get", "/inicio/actividad", client.get("/inicio/actividad", headers=headers))
     check("get", "/inicio/actividad", client.get("/inicio/actividad?antes_de=0", headers=admin))
+    for headers in (admin, contador, {}):
+        check("get", "/inicio/evolucion", client.get("/inicio/evolucion", headers=headers))
 
     # Spec 009: exportar (cerrada, abierta, roles, inexistente).
     for formato in FORMATOS_EXPORTAR:
