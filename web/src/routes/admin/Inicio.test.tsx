@@ -63,7 +63,7 @@ describe('Inicio de administración (spec 010, T5)', () => {
     const avance = await screen.findByRole('link', { name: /Conteo nov 2026.*Abierta/ })
     expect(avance.getAttribute('href')).toBe(`/admin/sesiones/${SESION}`)
     expect(avance.textContent).toContain('50 %')
-    expect(avance.textContent).toContain('1 de 2 verificados · 1 pendientes')
+    expect(avance.textContent).toContain('1 de 2 verificados · 1 pendiente')
     const dis = screen.getByRole('link', { name: /Discrepancias por resolver/ })
     expect(dis.textContent).toContain('1')
     expect(dis.getAttribute('href')).toBe(`/admin/discrepancias?sesion=${SESION}`)
@@ -95,3 +95,55 @@ describe('Inicio de administración (spec 010, T5)', () => {
     expect(await screen.findByRole('link', { name: /Activos hoy/ })).toBeTruthy()
   })
 })
+
+describe('Gráficas y evolución (spec 010, T6)', () => {
+  const textos = (lista: HTMLElement) => within(lista).getAllByRole('listitem').map((li) => cop(li.textContent))
+
+  it('las gráficas por categoría y ubicación leen el valor actual y lo rotulan', async () => {
+    abrir()
+    const figura = await screen.findByRole('figure', { name: 'Valor por categoría' })
+    expect(figura.textContent).toContain('Valor actual · no es el informe')
+    expect(textos(within(figura).getByRole('list'))).toEqual(['Electrónica$ 1.390.000,001 unidad', 'Mobiliario$ 389.900,001 unidad'])
+    const ubicacion = screen.getByRole('figure', { name: 'Valor por ubicación' })
+    expect(textos(within(ubicacion).getByRole('list'))).toContain('Consultorio 1 › Box 2$ 389.900,001 unidad')
+  })
+
+  it('sin conteos cerrados la evolución lo dice', async () => {
+    abrir()
+    expect(await screen.findByText('Aún no hay conteos cerrados')).toBeTruthy()
+  })
+
+  it('cada punto de la evolución es el informe de su conteo; por categoría, lo ausente no es cero', async () => {
+    const catalogo = catalogoDemo('admin', { sesiones: [sesionDe()] })
+    verificar(catalogo, 0)
+    catalogo.cerrarSesion(SESION)
+    catalogo.sesiones[0].cerrada_en = '2026-11-14T16:00:00+00:00'
+    catalogo.activos[0].estado = 'dado_de_baja'
+    const segunda = sesionDe({ id: '00000000-0000-4000-8000-0000000000e2', nombre: 'Conteo dic 2026', fecha_corte: '2026-12-31' })
+    catalogo.sesiones.unshift(segunda)
+    catalogo.cerrarSesion(segunda.id)
+    segunda.cerrada_en = '2026-12-31T16:00:00+00:00'
+    abrir(catalogo)
+    const figura = await screen.findByRole('figure', { name: 'Evolución entre conteos' })
+    expect(figura.textContent).toContain('Informes congelados al cierre')
+    const [nov, dic] = textos(within(figura).getByRole('list'))
+    expect(nov).toMatch(/^Conteo nov 2026 · corte .+\$ 1\.779\.900,002 unidades · 50 % encontrado$/)
+    expect(dic).toMatch(/^Conteo dic 2026 · corte .+\$ 389\.900,001 unidad · 0 % encontrado$/)
+
+    fireEvent.click(within(figura).getByRole('combobox', { name: 'Ver' }))
+    fireEvent.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Electrónica' }))
+    const porCategoria = await screen.findByRole('figure', { name: 'Evolución · Electrónica' })
+    const [n2, d2] = textos(within(porCategoria).getByRole('list'))
+    expect(n2).toMatch(/\$ 1\.390\.000,001 unidad$/)
+    expect(d2).toMatch(/Sin activos en este conteo$/)
+  })
+
+  it('si fallan las gráficas, los indicadores siguen a la vista', async () => {
+    const catalogo = catalogoDemo('admin')
+    catalogo.fallar('GET /api/valor-actual', () => errorApi(500, 'error_interno', 'Algo falló.'))
+    abrir(catalogo)
+    expect(await screen.findByText('No se pudieron cargar las gráficas de valor')).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Activos hoy/ })).toBeTruthy()
+  })
+})
+
