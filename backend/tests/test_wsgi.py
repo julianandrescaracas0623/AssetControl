@@ -110,3 +110,15 @@ def test_hsts_only_in_production(api, dist):
 def test_missing_build_fails_clearly(api, tmp_path):
     with pytest.raises(RuntimeError, match="index.html"):
         crear_wsgi(api, tmp_path / "no-hay", produccion=False)
+
+
+def test_install_manifest_and_icons_are_served_with_their_types(api, dist):
+    # Spec 012 (R10): el atajo tipo app necesita el manifest con su tipo propio.
+    (dist / "manifest.webmanifest").write_text('{"name": "AssetControl"}', encoding="utf-8")
+    (dist / "icono-192.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    cliente = Client(crear_wsgi(api, dist, produccion=False))
+    manifest = cliente.get("/manifest.webmanifest")
+    assert manifest.status_code == 200
+    assert manifest.mimetype == "application/manifest+json"
+    icono = cliente.get("/icono-192.png")
+    assert (icono.status_code, icono.mimetype) == (200, "image/png")

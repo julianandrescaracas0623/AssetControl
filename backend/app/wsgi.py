@@ -9,6 +9,7 @@ pasa por ``ConCabeceras``.
 En desarrollo nada de esto se usa: Vite sirve la web y su proxy reenvía ``/api``.
 """
 
+import mimetypes
 import os
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -53,6 +54,10 @@ CABECERAS: tuple[tuple[str, str], ...] = (
 HSTS = ("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
 WsgiApp = Callable[[dict[str, Any], Callable[..., Any]], Iterable[bytes]]
+
+
+# Spec 012 (R10): el manifest del atajo tipo app con su tipo, aunque el sistema no lo traiga.
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 
 class Estaticos:
