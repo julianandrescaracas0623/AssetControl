@@ -3,6 +3,7 @@ import { type ReactNode, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
 import { DarDeBaja, MoverActivo, Reactivar } from '@/components/app/AccionesActivo'
+import { FotoActivo } from '@/components/app/FotoActivo'
 import { EditarActivo } from '@/components/app/EditarActivo'
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
 import { HistorialActivo } from '@/components/app/LineaDeTiempo'
@@ -149,6 +150,7 @@ export default function FichaActivo() {
         {!deBaja && <Acciones activo={activo} abrir={abrir} />}
       </div>
       {deBaja && <AvisoDeBaja activo={activo} onReactivar={() => abrir('reactivar')} />}
+      <FotoActivo activo={activo} editable={!deBaja} />
       <dl className="divide-y rounded-xl border px-4">
         <Dato etiqueta="Ubicación">{activo.ubicacion.ruta}</Dato>
         <Dato etiqueta="Precio de compra">{activo.precio_compra ? formatCOP(activo.precio_compra) : null}</Dato>

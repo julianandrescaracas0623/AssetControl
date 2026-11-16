@@ -1,7 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
+import { toast } from 'sonner'
 
-import { type Activo, aPrecioCanonico, type CuerpoAlta, normalizarCodigo, precioParaCampo, useCrearActivo } from '@/lib/activos'
-import { ErrorApi, type Rol } from '@/lib/api/cliente'
+import { type Activo, aPrecioCanonico, CLAVE_ACTIVOS, type CuerpoAlta, normalizarCodigo, precioParaCampo, useCrearActivo } from '@/lib/activos'
+import { api, ErrorApi, mensajeDeError, type Rol } from '@/lib/api/cliente'
+import { useFotoPendiente } from '@/lib/fotos'
+import { useApiAutenticada } from '@/lib/sesion'
 
 // Estado y envío del formulario de alta (spec 004, T6; R3, R4, R6, Q3): lo comparten el
 // alta del modo conteo y la de administración, cada una con su diseño.
@@ -10,6 +14,10 @@ import { ErrorApi, type Rol } from '@/lib/api/cliente'
 // - Copiar de un parecido: el contador duplica (`copiar_de`: el servidor copia el precio
 //   sin mostrárselo y no deja cambiar nombre ni categoría); el admin recibe los datos en
 //   el formulario, incluido el precio, y puede editarlos.
+// - Foto opcional (spec 012, R1, R2): se sube después de crear el activo, aparte. Con la
+//   pantalla de «Activo creado», su estado se ve ahí con «Reintentar»; si el formulario
+//   sigue con otro activo («Guardar y registrar otro», varias unidades), sube en segundo
+//   plano y avisa con un mensaje (también con «Reintentar», mismo `id`).
 
 export type CampoAlta =
   | 'codigo'
@@ -50,6 +58,9 @@ export function useAltaActivo({
   ubicacionInicial?: string
 }) {
   const crear = useCrearActivo()
+  const foto = useFotoPendiente()
+  const conToken = useApiAutenticada()
+  const cliente = useQueryClient()
   const id = useRef(crypto.randomUUID())
   const [campos, setCampos] = useState({ ...VACIO, codigo: codigoInicial, ubicacion: ubicacionInicial })
   const [confirmado, setConfirmado] = useState(false)
@@ -132,8 +143,17 @@ export function useAltaActivo({
     setErrores(e)
     setErrorGeneral(null)
     if (!cuerpo) return
+    const archivo = foto.archivo
     crear.mutate(cuerpo, {
-      onSuccess: ({ activo }) => (alCrear ? alCrear(activo) : setCreado(activo)),
+      onSuccess: ({ activo }) => {
+        if (alCrear) {
+          alCrear(activo)
+          if (archivo) void fotoEnSegundoPlano(activo, archivo, crypto.randomUUID())
+          return
+        }
+        setCreado(activo)
+        if (archivo) void foto.enviar((t, f) => api.subirFotoActivo(t, activo.id, f))
+      },
       onError: (error) => {
         if (!(error instanceof ErrorApi)) {
           setErrorGeneral({ mensaje: 'Ocurrió un error inesperado. Intenta de nuevo.', reintentable: true })
@@ -160,8 +180,26 @@ export function useAltaActivo({
     })
   }
 
+  async function fotoEnSegundoPlano(activo: Activo, archivo: Blob, fotoId: string) {
+    try {
+      await conToken((t) => api.subirFotoActivo(t, activo.id, { id: fotoId, archivo }))
+      void cliente.invalidateQueries({ queryKey: CLAVE_ACTIVOS })
+    } catch (error) {
+      toast.error(`La foto de ${activo.nombre} · ${activo.codigo} no se subió. ${mensajeDeError(error)}`, {
+        duration: Infinity,
+        action: { label: 'Reintentar', onClick: () => void fotoEnSegundoPlano(activo, archivo, fotoId) },
+      })
+    }
+  }
+
+  /** Reintenta la foto del activo recién creado (mismo `id`: no duplica). */
+  function reintentarFoto() {
+    if (creado) void foto.enviar((t, f) => api.subirFotoActivo(t, creado.id, f))
+  }
+
   function otro({ conservarUbicacion = true }: { conservarUbicacion?: boolean } = {}) {
     id.current = crypto.randomUUID()
+    foto.limpiar()
     setCampos((actual) => ({ ...VACIO, ubicacion: conservarUbicacion ? actual.ubicacion : '' }))
     setConfirmado(false)
     setCopiado(null)
@@ -175,6 +213,7 @@ export function useAltaActivo({
   /** Otra unidad igual: conserva los datos y limpia código y serial (nuevo `id`). */
   function siguienteUnidad() {
     id.current = crypto.randomUUID()
+    foto.limpiar()
     setCampos((actual) => ({ ...actual, codigo: '', serial: '' }))
     setConfirmado(false)
     setErrores({})
@@ -184,6 +223,8 @@ export function useAltaActivo({
   }
 
   return {
+    foto,
+    reintentarFoto,
     siguienteUnidad,
     campos,
     cambiar,

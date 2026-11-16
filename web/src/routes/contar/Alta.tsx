@@ -2,6 +2,7 @@ import { Check, ChevronDown, CircleAlert, Info, RefreshCw, X } from 'lucide-reac
 import { type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
+import { CampoFoto, EstadoFoto } from '@/components/app/CampoFoto'
 import { CopiarDeParecido } from '@/components/app/CopiarDeParecido'
 import { CountShell } from '@/components/app/CountShell'
 import { InputSugerido } from '@/components/app/InputSugerido'
@@ -67,9 +68,12 @@ export default function Alta() {
         <Alert variant="success">
           <Check />
           <AlertTitle>Activo creado</AlertTitle>
-          <AlertDescription>
-            {alta.creado.nombre} · <span className="font-mono">{alta.creado.codigo}</span> quedó registrado en{' '}
-            {alta.creado.ubicacion.ruta}.
+          <AlertDescription className="flex flex-col items-start gap-2">
+            <span>
+              {alta.creado.nombre} · <span className="font-mono">{alta.creado.codigo}</span> quedó registrado en{' '}
+              {alta.creado.ubicacion.ruta}.
+            </span>
+            <EstadoFoto estado={alta.foto.estado} error={alta.foto.error} onReintentar={alta.reintentarFoto} />
           </AlertDescription>
         </Alert>
       </CountShell>
@@ -208,6 +212,7 @@ export default function Alta() {
             )}
           </CollapsibleContent>
         </Collapsible>
+        <CampoFoto archivo={alta.foto.archivo} onElegir={(f) => void alta.foto.elegir(f)} deshabilitado={alta.guardando} />
       </form>
     </CountShell>
   )

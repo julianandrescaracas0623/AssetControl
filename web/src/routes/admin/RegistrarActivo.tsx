@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { type Activo, normalizarCodigo, useActivoPorCodigo } from '@/lib/activos'
+import { CampoFoto, EstadoFoto } from '@/components/app/CampoFoto'
 import { type ErroresAlta, useAltaActivo } from '@/lib/altaActivo'
 import { useCategorias, useUbicaciones } from '@/lib/catalogo'
 import { cn } from '@/lib/utils'
@@ -96,6 +97,7 @@ export default function RegistrarActivo() {
             <span>
               {alta.creado.nombre} · <span className="font-mono">{alta.creado.codigo}</span> quedó registrado en {alta.creado.ubicacion.ruta}.
             </span>
+            <EstadoFoto estado={alta.foto.estado} error={alta.foto.error} onReintentar={alta.reintentarFoto} />
             <span className="flex flex-wrap gap-2 [&_[data-slot=button]]:max-md:min-h-11">
               <Button size="sm" onClick={() => alta.otro()}>Registrar otro</Button>
               <Button asChild size="sm" variant="outline">
@@ -252,7 +254,11 @@ export default function RegistrarActivo() {
             </Collapsible>
           </Paso>
 
-          <Paso n={3} titulo="Varias unidades iguales">
+          <Paso n={3} titulo="Foto" nota="Opcional. Se sube después de guardar el activo.">
+            <CampoFoto archivo={alta.foto.archivo} onElegir={(f) => void alta.foto.elegir(f)} deshabilitado={alta.guardando} />
+          </Paso>
+
+          <Paso n={4} titulo="Varias unidades iguales">
             <label className="flex min-h-11 items-center justify-between gap-4 text-sm">
               <span>Al guardar, conservar estos datos para escanear el siguiente sticker</span>
               <Switch checked={varias} onCheckedChange={setVarias} />

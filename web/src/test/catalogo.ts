@@ -358,7 +358,7 @@ export function crearCatalogo(
     if (ver && metodo === 'GET') {
       const bytes = fotos.get(ver[1])
       if (!bytes) return errorApi(404, 'sin_foto', 'No hay foto.')
-      return new Response(new Blob([bytes as BlobPart], { type: 'image/jpeg' }), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
+      return new Response(bytes.slice(), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
     }
     // Spec 006: sesiones y verificaciones.
     if (ruta0 === '/api/sesiones' && metodo === 'GET') return json(200, { sesiones })

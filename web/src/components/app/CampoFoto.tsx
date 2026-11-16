@@ -102,6 +102,35 @@ export function CampoFoto({
   )
 }
 
+/** Estado de una foto que se sube después de guardar (alta, verificación). */
+export function EstadoFoto({
+  estado,
+  error,
+  onReintentar,
+}: {
+  estado: EstadoSubida
+  error?: string | null
+  onReintentar: () => void
+}) {
+  if (estado === 'sin_foto') return null
+  if (estado === 'subiendo') {
+    return (
+      <span role="status" className="flex items-center gap-2">
+        <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> Subiendo la foto…
+      </span>
+    )
+  }
+  if (estado === 'subida') return <span role="status">Foto guardada.</span>
+  return (
+    <span role="alert" className="flex flex-col items-start gap-2 text-destructive">
+      La foto no se subió. {error}
+      <Button type="button" size="sm" variant="outline" className="max-md:min-h-11" onClick={onReintentar}>
+        <RotateCcw aria-hidden="true" /> Reintentar la foto
+      </Button>
+    </span>
+  )
+}
+
 /** Miniatura de una foto guardada; al tocarla se abre la imagen completa. */
 export function FotoGuardada({
   fotoId,
