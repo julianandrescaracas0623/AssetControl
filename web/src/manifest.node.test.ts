@@ -9,6 +9,9 @@ import { describe, expect, it } from 'vitest'
 const raiz = resolve(import.meta.dirname, '..')
 const manifest = JSON.parse(readFileSync(resolve(raiz, 'public/manifest.webmanifest'), 'utf8'))
 const indice = readFileSync(resolve(raiz, 'index.html'), 'utf8')
+// El color del tema es el `--primary` de index.css (aquí no se repite el valor).
+const css = readFileSync(resolve(raiz, 'src/index.css'), 'utf8')
+const primario = /--primary:\s*(#[0-9A-Fa-f]{6});/.exec(css)![1]
 
 describe('atajo tipo app', () => {
   it('abre la app en Conteo, sin barra del navegador y en español', () => {
@@ -24,7 +27,8 @@ describe('atajo tipo app', () => {
   it('index.html enlaza el manifest, el ícono de iPhone y el color del tema', () => {
     expect(indice).toContain('<link rel="manifest" href="/manifest.webmanifest" />')
     expect(indice).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png" />')
-    expect(indice).toContain('<meta name="theme-color" content="#18181B" />')
+    expect(indice).toContain(`<meta name="theme-color" content="${primario}" />`)
+    expect(manifest.theme_color).toBe(primario)
     expect(existsSync(resolve(raiz, 'public/apple-touch-icon.png'))).toBe(true)
   })
 })
