@@ -1,6 +1,6 @@
 # Spec 012 — Fotos de activos y atajo tipo app
 
-> **Estado:** Aprobada (G1–G3, 2026-11-15): Q1 **B**, Q2 **B**, Q3 y Q4 **A** (ver «Decisiones de G1»). Decisiones previas del humano (2026-11-15): **una foto principal por activo** (reemplazable), **foto opcional también al contar** y **atajo tipo app** en el teléfono. Cierra P18 («Fotos en el MVP: diferir») de `docs/05`. Depende de 004 (alta), 005 (ficha e historial) y 006 (verificación). Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Implementada (T1–T11, 2026-11-16). Aprobada (G1–G3, 2026-11-15): Q1 **B**, Q2 **B**, Q3 y Q4 **A** (ver «Decisiones de G1»). Decisiones previas del humano (2026-11-15): **una foto principal por activo** (reemplazable), **foto opcional también al contar** y **atajo tipo app** en el teléfono. Cierra P18 («Fotos en el MVP: diferir») de `docs/05`. Depende de 004 (alta), 005 (ficha e historial) y 006 (verificación). Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 

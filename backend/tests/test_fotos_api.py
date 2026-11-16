@@ -234,6 +234,12 @@ def test_other_tenant_and_misused_ids(client, cat, foto_db):
     assert client.delete(f"/activos/{activo['id']}/foto", headers=ADMIN_OTRO).status_code == 404
     otro = nuevo_activo(client, cat)
     assert _codigo(subir(client, otro["id"], foto_id=foto["id"])) == (409, "foto_id_en_uso")
+    # El mismo id desde otro tenant (la RLS no lo deja ver): 409 y nada guardado.
+    assert _codigo(subir(client, ajeno["id"], foto_id=foto["id"], headers=ADMIN_OTRO)) == (
+        409,
+        "foto_id_en_uso",
+    )
+    assert ficha(client, ajeno["id"], headers=ADMIN_OTRO)["foto"] is None
     with foto_db.migrator.begin() as conn:
         conn.execute(
             text("update activo set estado = 'dado_de_baja' where id = :i"), {"i": otro["id"]}

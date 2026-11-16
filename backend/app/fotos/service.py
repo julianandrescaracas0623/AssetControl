@@ -17,6 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from sqlalchemy import event, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.activos import service as activos_service
@@ -163,6 +164,17 @@ def _retirar(session: Session, foto: Foto, usuario_id: uuid.UUID) -> None:
     session.flush()
 
 
+def _insertar(session: Session, foto: Foto) -> None:
+    """Inserta la fila; un ``id`` que ya existe en otro tenant (la RLS no lo deja ver)
+    choca con la clave primaria: ``409 foto_id_en_uso``, sin revelar nada más."""
+    try:
+        with session.begin_nested():
+            session.add(foto)
+            session.flush()
+    except IntegrityError:
+        raise FotoIdEnUso() from None
+
+
 def _evento(session: Session, activo: Activo, tipo: str, datos: dict, usuario_id: uuid.UUID):
     session.add(ActivoEvento(activo_id=activo.id, tipo=tipo, datos=datos, usuario_id=usuario_id))
     session.flush()
@@ -204,8 +216,7 @@ def subir_principal(
         alto=procesada.alto,
         subida_por=usuario_id,
     )
-    session.add(foto)
-    session.flush()
+    _insertar(session, foto)
     if anterior is None:
         _evento(session, activo, "foto_agregada", {"foto_id": str(foto_id)}, usuario_id)
     else:
@@ -279,8 +290,7 @@ def subir_de_verificacion(
         alto=procesada.alto,
         subida_por=usuario_id,
     )
-    session.add(foto)
-    session.flush()
+    _insertar(session, foto)
     return Subida(foto, creada=True)
 
 

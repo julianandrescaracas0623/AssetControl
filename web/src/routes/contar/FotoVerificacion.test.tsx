@@ -45,7 +45,7 @@ describe('foto al verificar', () => {
     expect(verificacion.foto_id).toBe((subida[1]?.body as FormData).get('foto_id'))
     await new Promise((listo) => setTimeout(listo, 1700))
     expect(router.state.location.pathname).toBe('/contar/activo/000215')
-    fireEvent.click(screen.getByRole('link', { name: 'Escanear otro' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Escanear siguiente' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/contar/escanear'))
   })
 

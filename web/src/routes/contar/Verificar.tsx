@@ -222,14 +222,8 @@ function Guardado({ verificacion, sesion }: { verificacion: Verificacion; sesion
         </Button>
       ) : null}
       <EstadoFoto estado={pendiente.estado} error={pendiente.error} onReintentar={() => void pendiente.enviar(subir)} />
-      {quedarse ? (
-        <Button asChild className="min-h-12 font-semibold">
-          <Link to="/contar/escanear">
-            <ScanBarcode className="size-5" />
-            Escanear otro
-          </Link>
-        </Button>
-      ) : (
+      {/* Con foto, la vuelta automática se detiene; «Escanear siguiente» (abajo) sigue. */}
+      {quedarse ? null : (
         <p className="text-center text-sm text-muted-foreground">La cámara vuelve sola en un momento…</p>
       )}
     </>

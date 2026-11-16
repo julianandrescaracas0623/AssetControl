@@ -8,6 +8,12 @@ import { api, crearCuenta, texto, tokenDelTenant } from './ayuda.ts'
 
 test.describe.configure({ mode: 'serial' })
 
+// PNG de 8x8 px de un solo color, generado para la prueba.
+const FOTO = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP4z8CAFWEXHbQSACj/P8Fu7N9hAAAAAElFTkSuQmCC',
+  'base64',
+)
+
 test('un conteo completo: invitar, verificar en el teléfono, cerrar, informe, exportar e Inicio', async ({ browser }) => {
   const admin = await (await browser.newContext()).newPage()
   const errores: string[] = []
@@ -56,6 +62,12 @@ test('un conteo completo: invitar, verificar en el teléfono, cerrar, informe, e
     await expect(telefono.getByRole('heading', { level: 1, name: 'Verificado' })).toBeVisible()
     // El contador nunca ve pesos (P13).
     await expect(telefono.locator('body')).not.toContainText('$')
+  })
+
+  await test.step('el contador agrega una foto a la verificación (spec 012)', async () => {
+    await telefono.getByRole('button', { name: 'Agregar foto (opcional)' }).click()
+    await telefono.getByTestId('entrada-foto-verificacion').setInputFiles({ name: 'daño.png', mimeType: 'image/png', buffer: FOTO })
+    await expect(telefono.getByText('Foto guardada.')).toBeVisible()
   })
 
   await test.step('el admin cierra con el aviso y llega al informe', async () => {
