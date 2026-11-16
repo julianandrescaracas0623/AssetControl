@@ -52,3 +52,6 @@ CLAUDE.md
 MEMORY.md
 /postgres/
 /pgadmin/
+
+# Spec 012: fotos guardadas en la carpeta local de desarrollo (nunca al repo).
+backend/.almacen/

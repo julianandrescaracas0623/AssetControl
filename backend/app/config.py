@@ -8,10 +8,18 @@ import re
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
+
+from app.fotos.almacen import (
+    CARPETA_POR_DEFECTO,
+    S3_VARS,
+    AlmacenConfig,
+    AlmacenNoValido,
+)
 
 if TYPE_CHECKING:
     from flask import Flask
@@ -152,10 +160,18 @@ class Config:
     rate_limits: RateLimits = field(default_factory=RateLimits)
     trusted_proxy_hops: int = 0
     argon2_max_concurrency: int = DEFAULT_ARGON2_MAX_CONCURRENCY
+    # Spec 012 (Q3): dónde se guardan las fotos; ``None`` = fotos desactivadas (503).
+    almacen: AlmacenConfig | None = None
 
     def __post_init__(self) -> None:
         if self.environment not in ALLOWED_ENVIRONMENTS:
             raise InvalidEnvironmentError()
+        if (
+            self.almacen is not None
+            and self.almacen.tipo == "carpeta"
+            and self.environment not in LOCAL_ENVIRONMENTS
+        ):
+            raise AlmacenNoValido(ALMACEN_CARPETA_EN_PRODUCCION)
         _check_range(TRUSTED_PROXY_HOPS_VAR, self.trusted_proxy_hops, *TRUSTED_PROXY_HOPS_RANGE)
         _check_range(
             ARGON2_MAX_CONCURRENCY_VAR, self.argon2_max_concurrency, *ARGON2_MAX_CONCURRENCY_RANGE
@@ -190,6 +206,50 @@ class Config:
 
 
 CONFIG_EXTENSION_KEY = "assetcontrol.config"
+
+# Spec 012 (Q3): la carpeta local solo en desarrollo y pruebas; fuera, el contenedor es
+# efímero y las fotos se perderían.
+LOCAL_ENVIRONMENTS: frozenset[str] = frozenset({DEVELOPMENT_ENVIRONMENT, TEST_ENVIRONMENT})
+ALMACEN_CARPETA_EN_PRODUCCION = (
+    "ALMACEN=carpeta solo se admite en development; en producción usa ALMACEN=s3 "
+    "(Supabase Storage, docs/09-despliegue.md)."
+)
+
+
+def load_almacen(source: Mapping[str, str], environment: str) -> AlmacenConfig | None:
+    """Almacenamiento de fotos desde ``ALMACEN`` y sus variables (spec 012, Q3).
+
+    - Vacío: carpeta local en desarrollo y pruebas; fotos desactivadas fuera (``None``).
+    - ``carpeta``: ``ALMACEN_CARPETA`` o ``backend/.almacen``; no se admite en producción.
+    - ``s3``: exige las cinco ``S3_*`` (falta → ``MissingConfigError`` con sus nombres).
+    Ningún mensaje repite valores.
+    """
+    tipo = (source.get("ALMACEN") or "").strip().lower()
+    if not tipo:
+        if environment not in LOCAL_ENVIRONMENTS:
+            return None
+        tipo = "carpeta"
+    if tipo == "carpeta":
+        if environment not in LOCAL_ENVIRONMENTS:
+            raise AlmacenNoValido(ALMACEN_CARPETA_EN_PRODUCCION)
+        carpeta = (source.get("ALMACEN_CARPETA") or "").strip()
+        return AlmacenConfig(
+            tipo="carpeta", carpeta=Path(carpeta) if carpeta else CARPETA_POR_DEFECTO
+        )
+    if tipo != "s3":
+        raise AlmacenNoValido("ALMACEN debe ser «carpeta» o «s3».")
+    valores = {name: (source.get(name) or "").strip() for name in S3_VARS}
+    faltan = [name for name, valor in valores.items() if not valor]
+    if faltan:
+        raise MissingConfigError(faltan)
+    return AlmacenConfig(
+        tipo="s3",
+        s3_endpoint_url=valores["S3_ENDPOINT_URL"],
+        s3_region=valores["S3_REGION"],
+        s3_bucket=valores["S3_BUCKET"],
+        s3_access_key_id=valores["S3_ACCESS_KEY_ID"],
+        s3_secret_access_key=valores["S3_SECRET_ACCESS_KEY"],
+    )
 
 
 def get_config(app: "Flask") -> Config:
@@ -275,4 +335,5 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
             DEFAULT_ARGON2_MAX_CONCURRENCY,
             *ARGON2_MAX_CONCURRENCY_RANGE,
         ),
+        almacen=load_almacen(source, source["ENVIRONMENT"].strip()),
     )

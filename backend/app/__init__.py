@@ -18,6 +18,7 @@ from app.config import CONFIG_EXTENSION_KEY, Config, load_config
 from app.conteo.routes import bp as sesiones_bp
 from app.db import init_db
 from app.errors import register_error_handlers
+from app.fotos import almacen as fotos_almacen
 from app.inicio.routes import bp as inicio_bp
 from app.invitaciones.routes import bp as invitaciones_bp
 from app.meta.routes import bp as meta_bp
@@ -50,6 +51,12 @@ def create_app(config: Config | None = None) -> Flask:
         )
     init_db(app)
     init_credentials(app)
+    # Spec 012 (Q3): almacenamiento de fotos; ``None`` = fotos desactivadas (503).
+    app.extensions[fotos_almacen.EXTENSION_KEY] = fotos_almacen.crear(config.almacen)
+    if config.almacen is None and not config.is_test:
+        app.logger.warning(
+            "Fotos desactivadas: falta ALMACEN=s3 y sus variables S3_* (docs/09-despliegue.md)."
+        )
     register_error_handlers(app)
     register_auth_http_policy(app)
     app.register_blueprint(meta_bp)
