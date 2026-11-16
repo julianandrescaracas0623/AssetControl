@@ -34,7 +34,7 @@ Tres piezas: un cliente web, una API y una base de datos. Sin colas, sin servici
 
 **PostgreSQL.** Guarda todas las entidades y el historial. Cada fila de negocio tiene `tenant_id`. Se aloja en Supabase como PostgreSQL administrado (decisión 2026-11-11); Supabase es solo infraestructura: no se usa Supabase Auth ni su API REST automática, y Flask es el único acceso a los datos. Las pruebas corren contra un PostgreSQL local en Docker.
 
-**Almacenamiento de fotos.** Supabase Storage (compatible con S3). La API recibe la foto, la guarda y registra su `storage_key`. Las fotos no viven en la base.
+**Almacenamiento de fotos (spec 012).** Supabase Storage (compatible con S3) en producción, con un bucket privado y llaves que solo tiene Flask; en desarrollo y pruebas, una carpeta local (`backend/.almacen`). La API recibe la foto, la valida por su contenido, la vuelve a codificar en JPEG sin metadatos (sin GPS) con una miniatura, la guarda y registra su clave en `foto`. Las fotos no viven en la base y el navegador nunca recibe una URL del almacenamiento: las pide a `GET /api/fotos/{id}` con su sesión.
 
 ## Flujo de conteo
 

@@ -48,6 +48,8 @@ uv run python -c "import secrets; print(secrets.token_urlsafe(32))"   # APP_DB_P
 
    Si la contraseña lleva `@ : / ? # %`, codifícala (por ejemplo `@` → `%40`).
 
+4. **Fotos (spec 012).** En *Storage*, crea un bucket **privado** llamado `fotos` (sin acceso público ni políticas para `anon` o `authenticated`: solo Flask entra, con llaves S3). En *Storage → Settings → S3 Connection* activa la conexión S3, copia el **endpoint** (`https://<ref>.storage.supabase.co/storage/v1/s3`) y la **región**, y crea un par de **llaves de acceso S3** (se muestran una sola vez: guárdalas en tu gestor de contraseñas). El plan Free trae 1 GB: unas 3.000 fotos (cada una ~300 KB con su miniatura; las cambiadas o quitadas se borran). El uso se ve en *Storage → Usage*.
+
 **Riesgos aceptados del plan Free (G1):**
 
 - **Pausa por inactividad:** tras 7 días sin uso el proyecto se pausa y la app responde error de base. **Antes de cada conteo**, entra al panel de Supabase y reactívalo; comprueba `https://<tu-dominio>/api/ready`.
@@ -87,6 +89,9 @@ uv run flask --app app create-tenant "<Nombre de la clínica>" "<correo del prim
 | `TRUSTED_PROXY_HOPS` | Proxies delante del contenedor; normalmente `1`. Con `0` la app avisa al arrancar y el límite de tasa trataría a todos como una sola IP. |
 | `PORT` | Lo pone la plataforma; si no, `8000`. |
 | `RATE_LIMIT_*`, `ARGON2_MAX_CONCURRENCY` | Opcionales (`.env.example`). |
+| `ALMACEN` | `s3` (spec 012). Sin esta variable la app arranca con las **fotos desactivadas** (responden `503`) y lo avisa en el registro; `carpeta` no se admite en producción (el contenedor no guarda archivos). |
+| `S3_ENDPOINT_URL`, `S3_REGION`, `S3_BUCKET` | Los de la sección 3, paso 4 (`S3_BUCKET=fotos`). |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Las llaves S3 de Supabase, como **secretos** de la plataforma. Si falta alguna con `ALMACEN=s3`, la app no arranca y dice cuál. |
 
 `MIGRATION_DATABASE_URL` **no** va en la plataforma: la app nunca usa el rol migrador.
 
@@ -126,6 +131,8 @@ Remove-Item Env:PGPASSWORD
 - Guarda los respaldos **fuera del repositorio** (`datos/` y `*.sql` están prohibidos en git) y en un lugar cifrado; son datos de la clínica.
 - Necesitas las herramientas cliente de PostgreSQL (`pg_dump`, `pg_restore`) de la misma versión mayor que Supabase o superior.
 - **Restaurar:** en un proyecto nuevo, prepara la base (sección 4, sin `create-tenant`) y restaura los datos con `pg_restore --data-only --no-owner --no-privileges` usando el rol migrador. El migrador de Supabase no es superusuario y las tablas tienen disparadores e inmutabilidad, así que **el procedimiento exacto se valida en un ensayo antes del piloto** (pendiente, en un proyecto aparte) y se anota aquí.
+
+**Fotos:** el respaldo de la base no incluye las imágenes. Para guardarlas, descarga el bucket `fotos` desde el panel de Supabase (o con cualquier cliente S3 y las mismas llaves) junto con el respaldo de la base.
 
 ## 9. Rotación de secretos
 

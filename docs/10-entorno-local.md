@@ -134,6 +134,10 @@ npm run dev
 
 Abre `http://localhost:5173/invitacion#<lo que copiaste>` → crea tu cuenta → llegas al **Resumen**. Para dejar de usarla: `Ctrl + C` en la ventana de `npm run dev` y `docker compose stop`.
 
+> **Fotos (spec 012):** en tu PC se guardan en `backend\.almacen\` (ignorada por git; no hace falta configurar nada). Para empezar de cero, borra esa carpeta junto con la base.
+>
+> **Atajo en el teléfono:** abre la app en el teléfono (ver abajo) → Chrome: menú ⋮ → *Agregar a la pantalla principal* (o *Instalar app*); iPhone: Safari → Compartir → *Agregar a inicio*. Queda el ícono de AssetControl y abre directo en Conteo, sin barra del navegador. Necesita conexión: no funciona sin internet.
+>
 > **Probar la cámara en el teléfono:** la cámara solo funciona con HTTPS. En vez de `npm run dev`, usa `$env:VITE_HTTPS = "1"; npm run dev`, abre en el teléfono (misma red Wi-Fi) la dirección `https://<IP de tu PC>:5173` que muestra Vite y acepta el aviso del certificado de desarrollo.
 
 ## 9. Conectarte a la base con un cliente gráfico
