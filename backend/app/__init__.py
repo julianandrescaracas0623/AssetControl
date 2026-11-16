@@ -19,6 +19,7 @@ from app.conteo.routes import bp as sesiones_bp
 from app.db import init_db
 from app.errors import register_error_handlers
 from app.fotos import almacen as fotos_almacen
+from app.fotos.routes import bp as fotos_bp
 from app.inicio.routes import bp as inicio_bp
 from app.invitaciones.routes import bp as invitaciones_bp
 from app.meta.routes import bp as meta_bp
@@ -68,6 +69,7 @@ def create_app(config: Config | None = None) -> Flask:
     app.register_blueprint(sesiones_bp)
     app.register_blueprint(valor_bp)
     app.register_blueprint(inicio_bp)
+    app.register_blueprint(fotos_bp)
     register_cli(app)
     if config.environment == "production" and not config.trusted_proxy_hops:
         # Deuda (e) de la spec 002 / spec 010b (R3): detrás del proxy de la plataforma,

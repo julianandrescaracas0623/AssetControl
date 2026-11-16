@@ -754,6 +754,154 @@ paths:
         "428":
           $ref: "#/components/responses/FaltaVersion"
 
+  /activos/{id}/foto:
+    put:
+      tags: [fotos]
+      operationId: subirFotoActivo
+      summary: Crear o cambiar la foto principal (admin y contador; spec 012)
+      description: >-
+        multipart/form-data con foto_id (UUID del cliente: reintentar con el mismo no
+        duplica) y archivo (JPEG, PNG o WebP, hasta 10 MB). El servidor la vuelve a
+        codificar en JPEG sin metadatos (lado ≤ 1600 px y miniatura de 320). Si ya había
+        una principal, queda retirada y su imagen se borra (evento foto_cambiada).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/SubirFotoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/FotoGuardada"
+        "201":
+          $ref: "#/components/responses/FotoGuardada"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: Activo dado de baja o foto_id ya usado en otro activo.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [activo_dado_de_baja, foto_id_en_uso]
+        "413":
+          $ref: "#/components/responses/FotoDemasiadoGrande"
+        "415":
+          $ref: "#/components/responses/FotoTipoNoAdmitido"
+        "422":
+          $ref: "#/components/responses/FotoInvalida"
+        "503":
+          $ref: "#/components/responses/FotosNoDisponibles"
+    delete:
+      tags: [fotos]
+      operationId: quitarFotoActivo
+      summary: Quitar la foto principal (admin y contador; su imagen se borra)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Foto quitada (evento foto_retirada).
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          description: El activo no existe o no tiene foto.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [no_encontrado, sin_foto]
+        "503":
+          $ref: "#/components/responses/FotosNoDisponibles"
+
+  /sesiones/{sid}/verificaciones/{vid}/foto:
+    put:
+      tags: [fotos]
+      operationId: subirFotoVerificacion
+      summary: Foto opcional de una verificación (quien verificó o un admin; sesión abierta)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: sid, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: vid, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/SubirFotoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/FotoGuardada"
+        "201":
+          $ref: "#/components/responses/FotoGuardada"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: Sesión cerrada, la verificación ya tiene foto o foto_id usado en otra.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [sesion_cerrada, foto_existente, foto_id_en_uso]
+        "413":
+          $ref: "#/components/responses/FotoDemasiadoGrande"
+        "415":
+          $ref: "#/components/responses/FotoTipoNoAdmitido"
+        "422":
+          $ref: "#/components/responses/FotoInvalida"
+        "503":
+          $ref: "#/components/responses/FotosNoDisponibles"
+
+  /fotos/{id}:
+    get:
+      tags: [fotos]
+      operationId: verFoto
+      summary: La imagen de una foto vigente del tenant (JPEG; privada)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: tamano
+          in: query
+          required: false
+          schema: { type: string, enum: [completa, mini] }
+      responses:
+        "200":
+          description: La imagen. Una foto nunca cambia (cambiarla crea otra con otro id).
+          headers:
+            Cache-Control:
+              required: true
+              schema: { type: string, enum: ["private, max-age=86400"] }
+            X-Content-Type-Options:
+              required: true
+              schema: { type: string, enum: [nosniff] }
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          description: No existe, es de otro tenant o se retiró.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [sin_foto]
+        "503":
+          $ref: "#/components/responses/FotosNoDisponibles"
+
   /sesiones:
     get:
       tags: [conteo]
@@ -1380,6 +1528,36 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
       x-codigos: [servicio_no_disponible]
 
+    FotoGuardada:
+      description: La foto guardada (201 nueva; 200 si ya existía con ese foto_id).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/FotoRespuesta" }
+    FotoDemasiadoGrande:
+      description: La foto o el cuerpo superan el límite.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [imagen_demasiado_grande, cuerpo_demasiado_grande]
+    FotoTipoNoAdmitido:
+      description: El archivo no es JPEG, PNG ni WebP (se mira el contenido).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [tipo_no_admitido]
+    FotoInvalida:
+      description: La imagen está dañada o es demasiado grande en píxeles.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [imagen_invalida]
+    FotosNoDisponibles:
+      description: El almacenamiento de fotos no está configurado.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [fotos_no_disponibles]
+
   schemas:
     ErrorCode:
       type: string
@@ -1419,6 +1597,13 @@ components:
         - sesion_abierta_existente
         - sesion_cerrada
         - sesion_abierta
+        - fotos_no_disponibles
+        - sin_foto
+        - foto_id_en_uso
+        - foto_existente
+        - imagen_demasiado_grande
+        - tipo_no_admitido
+        - imagen_invalida
     Error:
       type: object
       required: [error]
@@ -1661,6 +1846,33 @@ components:
           description: Versión para If-Match al cambiar el activo (spec 005).
         creado_en: { type: string, format: date-time }
         precio_compra: { $ref: "#/components/schemas/Precio" }
+        foto:
+          description: Foto principal vigente; solo en la ficha y en por-codigo (spec 012).
+          oneOf:
+            - { $ref: "#/components/schemas/Foto" }
+            - { type: "null" }
+    Foto:
+      type: object
+      required: [id, creada_en, ancho, alto]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        creada_en: { type: string, format: date-time }
+        ancho: { type: integer, minimum: 1 }
+        alto: { type: integer, minimum: 1 }
+    FotoRespuesta:
+      type: object
+      required: [foto]
+      additionalProperties: false
+      properties:
+        foto: { $ref: "#/components/schemas/Foto" }
+    SubirFotoBody:
+      type: object
+      required: [foto_id, archivo]
+      additionalProperties: false
+      properties:
+        foto_id: { type: string, format: uuid }
+        archivo: { type: string, description: "Archivo de imagen (binario)." }
     UbicacionDeActivo:
       type: object
       required: [id, nombre, ruta]
@@ -1846,7 +2058,7 @@ components:
     Verificacion:
       type: object
       required:
-        [id, sesion_id, activo, ubicacion_esperada, ubicacion_encontrada, estado_fisico, nota, verificado_por, ocurrido_en, recibido_en, seq]
+        [id, sesion_id, activo, ubicacion_esperada, ubicacion_encontrada, estado_fisico, nota, verificado_por, ocurrido_en, recibido_en, seq, foto_id]
       additionalProperties: false
       description: precio_al_contar solo existe en las respuestas al admin (P13).
       properties:
@@ -1861,6 +2073,10 @@ components:
         ocurrido_en: { type: [string, "null"], format: date-time }
         recibido_en: { type: string, format: date-time }
         seq: { type: integer, minimum: 1 }
+        foto_id:
+          type: [string, "null"]
+          format: uuid
+          description: Foto opcional de esta verificación (spec 012).
         precio_al_contar: { $ref: "#/components/schemas/Precio" }
     EstadoFisico:
       type: string
@@ -2274,6 +2490,9 @@ components:
         - datos_cambiados
         - dado_de_baja
         - discrepancia_descartada
+        - foto_agregada
+        - foto_cambiada
+        - foto_retirada
     EventoActivo:
       type: object
       required: [seq, tipo, ocurrido_en, autor, datos]
@@ -2292,6 +2511,10 @@ components:
         datos:
           type: object
           description: Contenido por tipo (docs/03, spec 005); sin precios para el contador.
+        foto_id:
+          type: string
+          format: uuid
+          description: Foto de la verificación del evento, si la tiene (spec 012).
     Historial:
       type: object
       required: [eventos, siguiente]

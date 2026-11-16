@@ -15,6 +15,7 @@ from app.activos import cambios, historial, service
 from app.activos.models import Activo
 from app.auth.decorators import current_session, current_user, require_auth, require_role
 from app.errors import current_request_id, error_response
+from app.fotos import service as fotos_service
 
 bp = Blueprint("activos", __name__, url_prefix="/activos")
 
@@ -37,6 +38,15 @@ def _error(exc: service.ErrorActivo) -> ResponseReturnValue:
     return error_response(exc.status, exc.code, exc.message)
 
 
+def _con_foto(activo: Activo) -> dict[str, object]:
+    """La ficha con su foto principal vigente (spec 012, R7) o ``null``."""
+    session = current_session()
+    datos = service.vista(session, activo, con_precio=_es_admin())
+    foto = fotos_service.principal(session, activo.id)
+    datos["foto"] = fotos_service.vista(foto) if foto else None
+    return datos
+
+
 def _con_version(activo: Activo) -> ResponseReturnValue:
     """Respuesta de una escritura del admin: el activo con precio y su ``ETag``."""
     vista = service.vista(current_session(), activo, con_precio=True)
@@ -51,7 +61,7 @@ def por_codigo() -> ResponseReturnValue:
         activo = service.resolver(session, request.args.get("codigo"))
     except service.ErrorActivo as exc:
         return _error(exc)
-    return jsonify(activo=service.vista(session, activo, con_precio=_es_admin()))
+    return jsonify(activo=_con_foto(activo))
 
 
 @bp.get("/<uuid:id>")
@@ -62,7 +72,7 @@ def ficha(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del cont
         activo = service.obtener(session, id)
     except service.ErrorActivo as exc:
         return _error(exc)
-    return jsonify(activo=service.vista(session, activo, con_precio=_es_admin()))
+    return jsonify(activo=_con_foto(activo))
 
 
 @bp.post("")

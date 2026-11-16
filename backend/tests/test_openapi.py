@@ -52,6 +52,10 @@ from app.config import RateLimits
 from app.conteo import cierre as conteo_cierre
 from app.conteo import service as conteo_service
 from app.conteo import verificaciones as conteo_verificaciones
+from app.fotos import imagen as fotos_imagen
+from app.fotos import service as fotos_service
+from app.fotos.almacen import EXTENSION_KEY as ALMACEN_KEY
+from app.fotos.almacen import CarpetaLocal
 from app.invitaciones import routes as invitaciones_routes
 
 CONTRACT_FILE = Path(__file__).resolve().parent.parent / "openapi.yaml"
@@ -258,11 +262,13 @@ def contrato_db(database_residue_guard) -> Iterator[AccesoDb]:
 
 
 @pytest.fixture(scope="module")
-def contrato_app(contrato_db) -> Iterator[Flask]:
+def contrato_app(contrato_db, tmp_path_factory) -> Iterator[Flask]:
     flask_app = make_app(
         contrato_db,
         RateLimits(login_account=1000, login_ip=1000, validate_ip=1000, accept_ip=1000),
     )
+    # Spec 012: fotos en una carpeta temporal.
+    flask_app.extensions[ALMACEN_KEY] = CarpetaLocal(tmp_path_factory.mktemp("almacen"))
     yield flask_app
     dispose(flask_app)
 
@@ -953,6 +959,154 @@ def test_sesiones_responses(client, contrato_db):
     assert cerrada["error"]["code"] == "sesion_cerrada"
 
 
+def _jpeg() -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (40, 30), (10, 20, 30)).save(buffer, "JPEG")
+    return buffer.getvalue()
+
+
+def _multipart(foto_id=None, datos=None) -> dict:
+    from io import BytesIO
+
+    form: dict = {}
+    if foto_id is not None:
+        form["foto_id"] = str(foto_id)
+    if datos is not None:
+        form["archivo"] = (BytesIO(datos), "foto.jpg")
+    return form
+
+
+def test_fotos_responses(client, contrato_app, contrato_db, monkeypatch):
+    """Spec 012: foto principal, foto de una verificación y entrega de la imagen."""
+    admin = bearer(ADMIN_A, TENANT_A)
+    contador = bearer(CONTADOR_A, TENANT_A, rol="contador")
+    mp = "multipart/form-data"
+
+    def post(ruta, body):
+        response = client.post(ruta, json=body, headers=admin)
+        assert response.status_code == 201, response.get_json()
+        return response.get_json()
+
+    sede = post("/ubicaciones", {"nombre": f"SF {uuid.uuid4().hex[:6]}", "tipo": "sede"})
+    sala = post(
+        "/ubicaciones",
+        {"nombre": "Sala F", "tipo": "sala", "padre_id": sede["ubicacion"]["id"]},
+    )["ubicacion"]["id"]
+    categoria = post("/categorias", {"nombre": f"Fotos {uuid.uuid4().hex[:6]}"})["categoria"]["id"]
+
+    def activo() -> str:
+        return post(
+            "/activos",
+            {
+                "id": str(uuid.uuid4()),
+                "codigo": f"FC-{uuid.uuid4().hex[:6].upper()}",
+                "nombre": "Silla",
+                "categoria_id": categoria,
+                "ubicacion_id": sala,
+                "precio_compra": "1.00",
+            },
+        )["activo"]["id"]
+
+    a = activo()
+    principal = "/activos/{id}/foto"
+
+    def put(ruta, form, headers=admin):
+        return client.put(ruta, data=form, headers=headers, content_type=mp)
+
+    foto_id = uuid.uuid4()
+    creada = check("put", principal, put(f"/activos/{a}/foto", _multipart(foto_id, _jpeg())))
+    check("put", principal, put(f"/activos/{a}/foto", _multipart(foto_id, _jpeg())))  # 200
+    check("put", principal, put(f"/activos/{a}/foto", _multipart(None, _jpeg())))  # 400
+    check("put", principal, client.put(f"/activos/{a}/foto", data={}, content_type=mp))  # 401
+    check("put", principal, put(f"/activos/{uuid.uuid4()}/foto", _multipart(uuid.uuid4(), _jpeg())))
+    check("put", principal, put(f"/activos/{activo()}/foto", _multipart(foto_id, _jpeg())))  # 409
+    check("put", principal, put(f"/activos/{a}/foto", _multipart(uuid.uuid4(), b"GIF89a")))  # 415
+    check(
+        "put",
+        principal,
+        put(f"/activos/{a}/foto", _multipart(uuid.uuid4(), _jpeg()[:200])),
+    )  # 422
+    check(
+        "put",
+        principal,
+        put(f"/activos/{a}/foto", _multipart(uuid.uuid4(), b"0" * (11 * 1024 * 1024))),
+    )  # 413
+
+    ver = "/fotos/{id}"
+    check("get", ver, client.get(f"/fotos/{creada['foto']['id']}?tamano=mini", headers=contador))
+    check("get", ver, client.get(f"/fotos/{creada['foto']['id']}?tamano=x", headers=admin))
+    check("get", ver, client.get(f"/fotos/{creada['foto']['id']}"))
+    check("get", ver, client.get(f"/fotos/{uuid.uuid4()}", headers=admin))
+    ficha = check("get", "/activos/{id}", client.get(f"/activos/{a}", headers=contador))
+    assert ficha["activo"]["foto"]["id"] == creada["foto"]["id"]
+
+    check("delete", principal, client.delete(f"/activos/{a}/foto", headers=contador))  # 204
+    check("delete", principal, client.delete(f"/activos/{a}/foto", headers=admin))  # 404
+    check("delete", principal, client.delete(f"/activos/{a}/foto"))  # 401
+    historial = client.get(f"/activos/{a}/historial", headers=admin)
+    check("get", "/activos/{id}/historial", historial)
+
+    # Foto de una verificación.
+    sesion = client.post(
+        "/sesiones", json={"nombre": "Fotos", "fecha_corte": "2026-11-15"}, headers=admin
+    )
+    if sesion.status_code == 409:  # otra prueba dejó una abierta
+        sid = client.get("/sesiones/abierta", headers=admin).get_json()["sesion"]["id"]
+    else:
+        sid = sesion.get_json()["sesion"]["id"]
+    vid = str(uuid.uuid4())
+    verificada = client.post(
+        f"/sesiones/{sid}/verificaciones",
+        json={
+            "id": vid,
+            "activo_id": a,
+            "ubicacion_encontrada_id": sala,
+            "estado_fisico": "danado",
+        },
+        headers=admin,
+    )
+    assert verificada.status_code in (200, 201), verificada.get_json()
+    de_ver = "/sesiones/{sid}/verificaciones/{vid}/foto"
+    ruta_v = f"/sesiones/{sid}/verificaciones/{vid}/foto"
+    fv = uuid.uuid4()
+    check("put", de_ver, put(ruta_v, _multipart(fv, _jpeg()), contador))  # 403
+    check("put", de_ver, put(ruta_v, _multipart(fv, _jpeg())))  # 201
+    check("put", de_ver, put(ruta_v, _multipart(fv, _jpeg())))  # 200
+    check("put", de_ver, put(ruta_v, _multipart(uuid.uuid4(), _jpeg())))  # 409 foto_existente
+    check("put", de_ver, put(ruta_v, _multipart(None, None)))  # 400
+    check("put", de_ver, client.put(ruta_v, data={}, content_type=mp))  # 401
+    otra = f"/sesiones/{sid}/verificaciones/{uuid.uuid4()}/foto"
+    check("put", de_ver, put(otra, _multipart(uuid.uuid4(), _jpeg())))  # 404
+    # Otra verificación sin foto para los errores de la imagen.
+    vid2 = str(uuid.uuid4())
+    otra_v = client.post(
+        f"/sesiones/{sid}/verificaciones",
+        json={
+            "id": vid2,
+            "activo_id": activo(),
+            "ubicacion_encontrada_id": sala,
+            "estado_fisico": "ok",
+        },
+        headers=admin,
+    )
+    assert otra_v.status_code in (200, 201), otra_v.get_json()
+    ruta_v2 = f"/sesiones/{sid}/verificaciones/{vid2}/foto"
+    check("put", de_ver, put(ruta_v2, _multipart(uuid.uuid4(), b"GIF89a")))  # 415
+    check("put", de_ver, put(ruta_v2, _multipart(uuid.uuid4(), _jpeg()[:200])))  # 422
+    check("put", de_ver, put(ruta_v2, _multipart(uuid.uuid4(), b"0" * (11 * 1024 * 1024))))
+
+    # Fotos desactivadas: 503 en cada operación.
+    monkeypatch.setitem(contrato_app.extensions, ALMACEN_KEY, None)
+    check("put", principal, put(f"/activos/{a}/foto", _multipart(uuid.uuid4(), _jpeg())))
+    check("delete", principal, client.delete(f"/activos/{a}/foto", headers=admin))
+    check("put", de_ver, put(ruta_v, _multipart(uuid.uuid4(), _jpeg())))
+    check("get", ver, client.get(f"/fotos/{creada['foto']['id']}", headers=admin))
+
+
 LIMITED = [
     ("post", "/auth/login", {"email": ADMIN_A.email, "password": PASSWORD}, {}),
     ("post", "/auth/refresh", None, CSRF),
@@ -1026,6 +1180,15 @@ def backend_error_codes() -> set[str]:
     codes |= {error.code for error in conteo_service.ERRORES}
     codes |= {error.code for error in conteo_verificaciones.ERRORES}
     codes |= {error.code for error in conteo_cierre.ERRORES}
+    codes |= {error.code for error in fotos_service.ERRORES}
+    codes |= {
+        error.code
+        for error in (
+            fotos_imagen.ImagenDemasiadoGrande,
+            fotos_imagen.TipoNoAdmitido,
+            fotos_imagen.ImagenInvalida,
+        )
+    }
     return codes | _policy_codes()
 
 

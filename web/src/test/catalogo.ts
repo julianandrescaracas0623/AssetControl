@@ -491,6 +491,7 @@ export function crearCatalogo(
           verificado_por: { id: '00000000-0000-4000-8000-00000000000b', nombre: rol === 'admin' ? 'Ana Torres' : 'Luis Pérez' },
           ocurrido_en: (b.ocurrido_en as string | null | undefined) ?? null,
           recibido_en: '2026-11-14T15:44:00+00:00',
+          foto_id: null,
           seq: verificaciones.length + 1,
           precio_al_contar: a.precio_compra,
         }

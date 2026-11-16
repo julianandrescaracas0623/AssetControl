@@ -385,6 +385,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/activos/{id}/foto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Crear o cambiar la foto principal (admin y contador; spec 012)
+         * @description multipart/form-data con foto_id (UUID del cliente: reintentar con el mismo no duplica) y archivo (JPEG, PNG o WebP, hasta 10 MB). El servidor la vuelve a codificar en JPEG sin metadatos (lado ≤ 1600 px y miniatura de 320). Si ya había una principal, queda retirada y su imagen se borra (evento foto_cambiada).
+         */
+        put: operations["subirFotoActivo"];
+        post?: never;
+        /** Quitar la foto principal (admin y contador; su imagen se borra) */
+        delete: operations["quitarFotoActivo"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sesiones/{sid}/verificaciones/{vid}/foto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Foto opcional de una verificación (quien verificó o un admin; sesión abierta) */
+        put: operations["subirFotoVerificacion"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fotos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** La imagen de una foto vigente del tenant (JPEG; privada) */
+        get: operations["verFoto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sesiones": {
         parameters: {
             query?: never;
@@ -691,7 +746,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta" | "fotos_no_disponibles" | "sin_foto" | "foto_id_en_uso" | "foto_existente" | "imagen_demasiado_grande" | "tipo_no_admitido" | "imagen_invalida";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -847,6 +902,25 @@ export interface components {
             /** Format: date-time */
             creado_en: string;
             precio_compra?: components["schemas"]["Precio"];
+            /** @description Foto principal vigente; solo en la ficha y en por-codigo (spec 012). */
+            foto?: components["schemas"]["Foto"] | null;
+        };
+        Foto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            creada_en: string;
+            ancho: number;
+            alto: number;
+        };
+        FotoRespuesta: {
+            foto: components["schemas"]["Foto"];
+        };
+        SubirFotoBody: {
+            /** Format: uuid */
+            foto_id: string;
+            /** @description Archivo de imagen (binario). */
+            archivo: string;
         };
         UbicacionDeActivo: {
             /** Format: uuid */
@@ -990,6 +1064,11 @@ export interface components {
             /** Format: date-time */
             recibido_en: string;
             seq: number;
+            /**
+             * Format: uuid
+             * @description Foto opcional de esta verificación (spec 012).
+             */
+            foto_id: string | null;
             precio_al_contar?: components["schemas"]["Precio"];
         };
         /** @enum {string} */
@@ -1253,7 +1332,7 @@ export interface components {
             }[];
         };
         /** @enum {string} */
-        TipoEvento: "creado" | "importado" | "verificado" | "ubicacion_cambiada" | "precio_cambiado" | "estado_cambiado" | "categoria_cambiada" | "datos_cambiados" | "dado_de_baja" | "discrepancia_descartada";
+        TipoEvento: "creado" | "importado" | "verificado" | "ubicacion_cambiada" | "precio_cambiado" | "estado_cambiado" | "categoria_cambiada" | "datos_cambiados" | "dado_de_baja" | "discrepancia_descartada" | "foto_agregada" | "foto_cambiada" | "foto_retirada";
         EventoActivo: {
             seq: number;
             tipo: components["schemas"]["TipoEvento"];
@@ -1266,6 +1345,11 @@ export interface components {
             };
             /** @description Contenido por tipo (docs/03, spec 005); sin precios para el contador. */
             datos: Record<string, never>;
+            /**
+             * Format: uuid
+             * @description Foto de la verificación del evento, si la tiene (spec 012).
+             */
+            foto_id?: string;
         };
         Historial: {
             eventos: components["schemas"]["EventoActivo"][];
@@ -1469,6 +1553,51 @@ export interface components {
             headers: {
                 /** @description Segundos sugeridos antes de reintentar. */
                 "Retry-After": number;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description La foto guardada (201 nueva; 200 si ya existía con ese foto_id). */
+        FotoGuardada: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["FotoRespuesta"];
+            };
+        };
+        /** @description La foto o el cuerpo superan el límite. */
+        FotoDemasiadoGrande: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description El archivo no es JPEG, PNG ni WebP (se mira el contenido). */
+        FotoTipoNoAdmitido: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description La imagen está dañada o es demasiado grande en píxeles. */
+        FotoInvalida: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description El almacenamiento de fotos no está configurado. */
+        FotosNoDisponibles: {
+            headers: {
                 [name: string]: unknown;
             };
             content: {
@@ -2301,6 +2430,150 @@ export interface operations {
             412: components["responses"]["VersionDesactualizada"];
             413: components["responses"]["CuerpoDemasiadoGrande"];
             428: components["responses"]["FaltaVersion"];
+        };
+    };
+    subirFotoActivo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["SubirFotoBody"];
+            };
+        };
+        responses: {
+            200: components["responses"]["FotoGuardada"];
+            201: components["responses"]["FotoGuardada"];
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description Activo dado de baja o foto_id ya usado en otro activo. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["FotoDemasiadoGrande"];
+            415: components["responses"]["FotoTipoNoAdmitido"];
+            422: components["responses"]["FotoInvalida"];
+            503: components["responses"]["FotosNoDisponibles"];
+        };
+    };
+    quitarFotoActivo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Foto quitada (evento foto_retirada). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NoAutenticado"];
+            /** @description El activo no existe o no tiene foto. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            503: components["responses"]["FotosNoDisponibles"];
+        };
+    };
+    subirFotoVerificacion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sid: string;
+                vid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["SubirFotoBody"];
+            };
+        };
+        responses: {
+            200: components["responses"]["FotoGuardada"];
+            201: components["responses"]["FotoGuardada"];
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description Sesión cerrada, la verificación ya tiene foto o foto_id usado en otra. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["FotoDemasiadoGrande"];
+            415: components["responses"]["FotoTipoNoAdmitido"];
+            422: components["responses"]["FotoInvalida"];
+            503: components["responses"]["FotosNoDisponibles"];
+        };
+    };
+    verFoto: {
+        parameters: {
+            query?: {
+                tamano?: "completa" | "mini";
+            };
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La imagen. Una foto nunca cambia (cambiarla crea otra con otro id). */
+            200: {
+                headers: {
+                    "Cache-Control": "private, max-age=86400";
+                    "X-Content-Type-Options": "nosniff";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            /** @description No existe, es de otro tenant o se retiró. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            503: components["responses"]["FotosNoDisponibles"];
         };
     };
     listarSesiones: {

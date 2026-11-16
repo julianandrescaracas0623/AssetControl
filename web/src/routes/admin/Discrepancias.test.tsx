@@ -28,6 +28,7 @@ function verificacion(id: string, activo: { id: string; codigo: string; nombre: 
     verificado_por: { id: '00000000-0000-4000-8000-00000000000b', nombre: 'Luis Pérez' },
     ocurrido_en: null,
     recibido_en: '2026-11-14T15:44:00+00:00',
+    foto_id: null,
     seq: 1,
     precio_al_contar: '1.00',
   }

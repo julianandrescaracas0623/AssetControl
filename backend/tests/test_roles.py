@@ -456,6 +456,11 @@ PROTECTED_ENDPOINTS = {
     "inicio.ver_indicadores": frozenset({"admin", "contador"}),
     "inicio.ver_actividad": frozenset({"admin", "contador"}),
     "inicio.ver_evolucion": frozenset({"admin"}),
+    # Spec 012 (Q1 B): los dos roles suben, cambian, quitan y ven fotos.
+    "fotos.subir_principal": frozenset({"admin", "contador"}),
+    "fotos.quitar_principal": frozenset({"admin", "contador"}),
+    "fotos.subir_de_verificacion": frozenset({"admin", "contador"}),
+    "fotos.ver": frozenset({"admin", "contador"}),
 }
 
 

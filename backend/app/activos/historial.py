@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.activos.models import Activo, ActivoEvento
 from app.activos.service import ErrorActivo, obtener
 from app.auth.models import Membresia, Usuario
+from app.fotos.models import Foto
 
 POR_PAGINA = 50
 MAX_SEQ = 2**63 - 1
@@ -75,14 +76,35 @@ def _pagina(
     return filas, (filas[-1].seq if hay_mas else None), nombres
 
 
-def _evento(f: ActivoEvento, nombres: dict[uuid.UUID, str], con_precio: bool) -> dict[str, object]:
-    return {
+def por_verificacion(session: Session, ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
+    """``verificacion_id → foto_id`` vigente (spec 012) para los eventos de una página."""
+    if not ids:
+        return {}
+    filas = session.execute(
+        select(Foto.verificacion_id, Foto.id).where(
+            Foto.verificacion_id.in_(ids), Foto.retirada_en.is_(None)
+        )
+    )
+    return {verificacion: str(foto) for verificacion, foto in filas}
+
+
+def _evento(
+    f: ActivoEvento,
+    nombres: dict[uuid.UUID, str],
+    con_precio: bool,
+    fotos: dict[uuid.UUID, str] | None = None,
+) -> dict[str, object]:
+    evento: dict[str, object] = {
         "seq": f.seq,
         "tipo": f.tipo,
         "ocurrido_en": f.ocurrido_en.isoformat(),
         "autor": {"id": str(f.usuario_id), "nombre": nombres.get(f.usuario_id, "")},
         "datos": f.datos if con_precio else _sin_precio(f.datos),
     }
+    # Spec 012 (R7): la foto de la verificación, si la tiene.
+    if fotos and f.verificacion_id in fotos:
+        evento["foto_id"] = fotos[f.verificacion_id]
+    return evento
 
 
 def leer(session: Session, activo_id: uuid.UUID, *, antes_de: object, con_precio: bool) -> Pagina:
@@ -95,7 +117,10 @@ def leer(session: Session, activo_id: uuid.UUID, *, antes_de: object, con_precio
         con_precio=con_precio,
         por_pagina=POR_PAGINA,
     )
-    return Pagina(eventos=[_evento(f, nombres, con_precio) for f in filas], siguiente=siguiente)
+    fotos = por_verificacion(session, {f.verificacion_id for f in filas if f.verificacion_id})
+    return Pagina(
+        eventos=[_evento(f, nombres, con_precio, fotos) for f in filas], siguiente=siguiente
+    )
 
 
 def leer_tenant(session: Session, *, antes_de: object, con_precio: bool, por_pagina: int) -> Pagina:

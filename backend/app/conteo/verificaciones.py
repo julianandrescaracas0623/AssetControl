@@ -30,6 +30,7 @@ from app.activos.service import _ruta
 from app.catalogo.models import Ubicacion
 from app.conteo.models import SesionConteo, Verificacion
 from app.conteo.service import ErrorConteo, NoEncontrado, _autor
+from app.fotos.models import Foto
 from app.nombres import normalize_display_name
 
 UNIQUE_VIOLATION = "23505"
@@ -89,7 +90,13 @@ def vista(session: Session, v: Verificacion, *, con_precio: bool) -> dict[str, o
         "ocurrido_en": v.ocurrido_en.astimezone(UTC).isoformat() if v.ocurrido_en else None,
         "recibido_en": v.recibido_en.astimezone(UTC).isoformat(),
         "seq": v.seq,
+        # Spec 012 (R6, R7): la foto opcional de esta verificación.
+        "foto_id": session.scalar(
+            select(Foto.id).where(Foto.verificacion_id == v.id, Foto.retirada_en.is_(None))
+        ),
     }
+    if datos["foto_id"] is not None:
+        datos["foto_id"] = str(datos["foto_id"])
     if con_precio:
         datos["precio_al_contar"] = str(v.precio_al_contar)
     return datos

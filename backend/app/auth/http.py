@@ -14,6 +14,7 @@ Las pruebas por ruta se escriben en T6/T8/T9, cuando existan las rutas.
 """
 
 import io
+import re
 from urllib.parse import urlsplit
 
 from flask import Flask, abort, has_request_context, request
@@ -31,6 +32,10 @@ SMALL_BODY_PATH_PREFIXES: tuple[str, ...] = (
     "/sesiones",
 )
 AUTH_MAX_BODY_BYTES = 4096
+# Spec 012: las subidas de fotos (multipart) admiten la imagen de 10 MB y el formulario.
+_UUID = "[0-9a-fA-F-]{36}"
+FOTO_PATH = re.compile(rf"/activos/{_UUID}/foto|/sesiones/{_UUID}/verificaciones/{_UUID}/foto")
+FOTO_MAX_BODY_BYTES = 10 * 1024 * 1024 + 256 * 1024
 REFRESH_COOKIE_SECURE_NAME = "__Secure-refresh"
 REFRESH_COOKIE_DEVELOPMENT_NAME = "refresh"
 # Q14: cabecera personalizada obligatoria en /auth/refresh y /auth/logout. Un sitio
@@ -48,7 +53,11 @@ def is_auth_path(path: str) -> bool:
 
 
 def is_small_body_path(path: str) -> bool:
-    return _under(path, SMALL_BODY_PATH_PREFIXES)
+    return _under(path, SMALL_BODY_PATH_PREFIXES) and not is_photo_path(path)
+
+
+def is_photo_path(path: str) -> bool:
+    return FOTO_PATH.fullmatch(path) is not None
 
 
 def refresh_cookie_options(config: Config) -> dict[str, object]:
@@ -96,18 +105,22 @@ def is_same_site_request() -> bool:
 def register_auth_http_policy(app: Flask) -> None:
     @app.before_request
     def _limit_auth_body() -> None:
-        if not is_small_body_path(request.path):
+        if is_photo_path(request.path):
+            limit = FOTO_MAX_BODY_BYTES
+        elif is_small_body_path(request.path):
+            limit = AUTH_MAX_BODY_BYTES
+        else:
             return
-        request.max_content_length = AUTH_MAX_BODY_BYTES
+        request.max_content_length = limit
         if request.content_length is not None:
-            if request.content_length > AUTH_MAX_BODY_BYTES:
+            if request.content_length > limit:
                 abort(413)
             return
         if request.environ.get("wsgi.input_terminated"):
             # Sin Content-Length (p. ej. chunked) Werkzeug truncaría en silencio al
             # límite: se lee hasta un byte más y se responde 413 si lo supera.
-            body = request.environ["wsgi.input"].read(AUTH_MAX_BODY_BYTES + 1)
-            if len(body) > AUTH_MAX_BODY_BYTES:
+            body = request.environ["wsgi.input"].read(limit + 1)
+            if len(body) > limit:
                 abort(413)
             request.environ["wsgi.input"] = io.BytesIO(body)
 

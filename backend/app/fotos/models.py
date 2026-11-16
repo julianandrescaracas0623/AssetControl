@@ -29,5 +29,8 @@ class Foto(TenantScoped, Base):
     creada_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=FetchedValue()
     )
-    retirada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    retirada_por: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    # Sin INSERT de estas columnas (solo UPDATE al retirar): no se envían al insertar.
+    retirada_en: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=FetchedValue()
+    )
+    retirada_por: Mapped[uuid.UUID | None] = mapped_column(Uuid, server_default=FetchedValue())
