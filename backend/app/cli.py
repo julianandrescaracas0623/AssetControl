@@ -36,7 +36,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
-from app import roles
+from app import conexiones, roles
 from app.auth.credentials import new_token, token_key
 from app.config import (
     InvalidDatabaseUrlError,
@@ -198,8 +198,29 @@ def preparar_roles_command() -> None:
     )
 
 
+@click.command("revisar-conexiones")
+def revisar_conexiones_command() -> None:
+    """Prueba cada conexión de base del entorno y dice si está bien (sin mostrar valores)."""
+    filas = conexiones.revisar()
+    click.echo(f"Migraciones del repo: {conexiones.revision_del_repo()}")
+    for f in filas:
+        if not f.configurada:
+            click.echo(f"  ·  {f.variable}: no configurada")
+            continue
+        marca = "OK " if f.ok else "MAL"
+        detalle = (
+            f"rol {f.rol}, base {f.base}, TLS {'sí' if f.tls else 'no'}, migración {f.revision}"
+            if f.rol
+            else ""
+        )
+        click.echo(f"  {marca} {f.variable}: {f.motivo}" + (f" ({detalle})" if detalle else ""))
+    if any(f.configurada and not f.ok for f in filas):
+        raise SystemExit(1)
+
+
 def register_cli(app: Flask) -> None:
     """Registra los comandos del operador en ``flask``."""
     app.cli.add_command(create_tenant_command)
     app.cli.add_command(purge_rate_limit_command)
     app.cli.add_command(preparar_roles_command)
+    app.cli.add_command(revisar_conexiones_command)
