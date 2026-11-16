@@ -58,6 +58,7 @@ from app.activos import models as activos_models  # noqa: F401 - registra activo
 from app.auth import models
 from app.catalogo import models as catalogo_models  # noqa: F401 - registra ubicacion y categoria
 from app.conteo import models as conteo_models  # noqa: F401 - registra las tablas del conteo
+from app.empresa import models as empresa_models  # noqa: F401 - registra las tablas de 0014
 from app.fotos import models as fotos_models  # noqa: F401 - registra la tabla foto
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -81,6 +82,10 @@ TENANT_TABLES = frozenset(
         "sesion_desglose",
         "sesion_no_encontrado",
         "foto",
+        "empresa",
+        "empresa_logo",
+        "sesion_empresa",
+        "sesion_detalle",
     }
 )
 
@@ -194,6 +199,34 @@ EXPECTED_POLICIES = {
         ISOLATION_EXPR,
         ISOLATION_EXPR,
     ),
+    ("empresa", "tenant_isolation"): (
+        "PERMISSIVE",
+        "ALL",
+        "{app}",
+        ISOLATION_EXPR,
+        ISOLATION_EXPR,
+    ),
+    ("empresa_logo", "tenant_isolation"): (
+        "PERMISSIVE",
+        "ALL",
+        "{app}",
+        ISOLATION_EXPR,
+        ISOLATION_EXPR,
+    ),
+    ("sesion_empresa", "tenant_isolation"): (
+        "PERMISSIVE",
+        "ALL",
+        "{app}",
+        ISOLATION_EXPR,
+        ISOLATION_EXPR,
+    ),
+    ("sesion_detalle", "tenant_isolation"): (
+        "PERMISSIVE",
+        "ALL",
+        "{app}",
+        ISOLATION_EXPR,
+        ISOLATION_EXPR,
+    ),
     # limite_tasa (T10, docs/03 cambio 6): una política por comando TO la aplicación, sin
     # filtro de tenant (no lo hay antes del login); su defensa es el privilegio mínimo y
     # el HMAC de la clave.
@@ -299,6 +332,30 @@ FOTO_INSERT = {
     "subida_por",
 }
 FOTO_RETIRO = {"retirada_en", "retirada_por"}
+# Spec 013 (0014): empresa, sus logos y lo congelado al cierre.
+DATOS_EMPRESA = {"nombre", "direccion", "nit", "telefono", "correo", "logo_id"}
+EMPRESA_INSERT = {"tenant_id", *DATOS_EMPRESA, "actualizada_por"}
+EMPRESA_UPDATE = {*DATOS_EMPRESA, "actualizada_en", "actualizada_por"}
+LOGO_INSERT = {"id", "tenant_id", "clave", "bytes", "ancho", "alto", "subido_por"}
+SESION_EMPRESA_INSERT = {"tenant_id", "sesion_id", *DATOS_EMPRESA, "vigente"}
+DETALLE_INSERT = {
+    "tenant_id",
+    "sesion_id",
+    "activo_id",
+    "codigo",
+    "nombre",
+    "marca",
+    "serial",
+    "categoria_id",
+    "categoria_nombre",
+    "ubicacion_id",
+    "ubicacion_ruta",
+    "encontrada_ruta",
+    "estado_fisico",
+    "encontrado",
+    "en_reparacion",
+    "precio",
+}
 NO_ENCONTRADO_INSERT = {
     "tenant_id",
     "sesion_id",
@@ -430,6 +487,20 @@ EXPECTED_APP_COLUMNS = {
         "INSERT": FOTO_INSERT,
         "UPDATE": FOTO_RETIRO,
     },
+    "empresa": {
+        "SELECT": {*EMPRESA_INSERT, "actualizada_en"},
+        "INSERT": EMPRESA_INSERT,
+        "UPDATE": EMPRESA_UPDATE,
+    },
+    "empresa_logo": {"SELECT": {*LOGO_INSERT, "creado_en"}, "INSERT": LOGO_INSERT},
+    "sesion_empresa": {
+        "SELECT": {*SESION_EMPRESA_INSERT, "creado_en"},
+        "INSERT": SESION_EMPRESA_INSERT,
+    },
+    "sesion_detalle": {
+        "SELECT": {*DETALLE_INSERT, "id", "creado_en"},
+        "INSERT": DETALLE_INSERT,
+    },
     "verificacion": {
         "SELECT": {*VERIFICACION_INSERT, "recibido_en", "seq"},
         "INSERT": VERIFICACION_INSERT,
@@ -454,6 +525,10 @@ EXPECTED_APP_TABLE_PRIVILEGES = {
     "sesion_desglose": {"SELECT"},
     "sesion_no_encontrado": {"SELECT"},
     "foto": {"SELECT"},
+    "empresa": {"SELECT"},
+    "empresa_logo": {"SELECT"},
+    "sesion_empresa": {"SELECT"},
+    "sesion_detalle": {"SELECT"},
 }
 
 
@@ -621,6 +696,10 @@ EXPECTED_OWNER_COLUMNS = {
     "sesion_desglose": {},
     "sesion_no_encontrado": {},
     "foto": {},
+    "empresa": {},
+    "empresa_logo": {},
+    "sesion_empresa": {},
+    "sesion_detalle": {},
 }
 TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
 COLUMN_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "REFERENCES")

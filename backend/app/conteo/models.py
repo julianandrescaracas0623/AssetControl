@@ -119,3 +119,54 @@ class SesionNoEncontrado(TenantScoped, Base):
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=FetchedValue()
     )
+
+
+class SesionEmpresa(TenantScoped, Base):
+    """Datos de la empresa congelados al cierre (spec 013, R3); solo INSERT.
+
+    ``vigente`` no se escribe al cerrar (siempre ``false``): la usa el informe para las
+    sesiones cerradas antes de la 013, que no tienen copia (Q1 A).
+    """
+
+    __tablename__ = "sesion_empresa"
+    __mapper_args__ = {"eager_defaults": True}
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    sesion_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    nombre: Mapped[str] = mapped_column(Text)
+    direccion: Mapped[str | None] = mapped_column(Text)
+    nit: Mapped[str | None] = mapped_column(Text)
+    telefono: Mapped[str | None] = mapped_column(Text)
+    correo: Mapped[str | None] = mapped_column(Text)
+    logo_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    vigente: Mapped[bool] = mapped_column(Boolean, server_default=FetchedValue())
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=FetchedValue()
+    )
+
+
+class SesionDetalle(TenantScoped, Base):
+    """Una fila por activo del universo U congelada al cierre (spec 013, R4); solo INSERT."""
+
+    __tablename__ = "sesion_detalle"
+    __mapper_args__ = {"eager_defaults": True}
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, server_default=FetchedValue())
+    sesion_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    activo_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    codigo: Mapped[str] = mapped_column(Text)
+    nombre: Mapped[str] = mapped_column(Text)
+    marca: Mapped[str | None] = mapped_column(Text)
+    serial: Mapped[str | None] = mapped_column(Text)
+    categoria_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    categoria_nombre: Mapped[str] = mapped_column(Text)
+    ubicacion_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    ubicacion_ruta: Mapped[str] = mapped_column(Text)
+    encontrada_ruta: Mapped[str | None] = mapped_column(Text)
+    estado_fisico: Mapped[str | None] = mapped_column(Text)
+    encontrado: Mapped[bool] = mapped_column(Boolean)
+    en_reparacion: Mapped[bool] = mapped_column(Boolean)
+    precio: Mapped[Decimal] = mapped_column(Numeric(14, 2, asdecimal=True))
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=FetchedValue()
+    )
