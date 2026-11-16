@@ -1,6 +1,6 @@
 # 10 — Entorno local, paso a paso
 
-> **Spec 010c.** Para dejar AssetControl funcionando en tu PC con Windows desde cero, conectarte a la base y correr las pruebas. Cada paso dice qué escribir y qué deberías ver. Si algo no sale igual, mira la sección 13.
+> **Spec 010c.** Para dejar AssetControl funcionando en tu PC con Windows desde cero, conectarte a la base y correr las pruebas. Cada paso dice qué escribir y qué deberías ver. Si algo no sale igual, mira la sección 14.
 >
 > Todos los comandos son de **PowerShell**. Donde dice `<algo>`, reemplázalo completo (sin los `< >`).
 
@@ -26,6 +26,17 @@
 
 `.env` está en la raíz del proyecto (`C:\Users\VICTUS16\Proyectos\AssetControl\.env`). **Nunca se sube a GitHub** (el repo es público). Ábrelo con VS Code.
 
+Está ordenado en seis bloques comentados:
+
+1. **Base local (Docker):** el superusuario del contenedor.
+2. **App:** la conexión que usa Flask para **todo**, tanto el panel admin como la vista móvil del contador. No hay credenciales distintas para cada vista: las dos son la misma web y solo hablan con Flask; el navegador nunca se conecta a la base.
+3. **Migrador:** solo para `alembic` y `preparar-roles`.
+4. **Pruebas:** las bases de `pytest`.
+5. **Flask:** modo, clave de sesiones y opcionales.
+6. **Supabase (producción):** solo las lee `revisar-conexiones`; la app local nunca las usa. El panel web de Supabase se abre con tu cuenta y no va en `.env`.
+
+> Nunca pongas una contraseña dentro de un comentario (`# …`): las herramientas que muestran el archivo también muestran los comentarios.
+
 | Variable | Qué es | Valor en tu PC |
 |---|---|---|
 | `POSTGRES_USER` | Usuario **migrador** (dueño de la base) | p. ej. `assetcontrol_admin` |
@@ -50,9 +61,9 @@ Reglas que evitan el 90 % de los errores:
    cd C:\Users\VICTUS16\Proyectos\AssetControl\backend
    uv run python -c "import secrets; print(secrets.token_urlsafe(32))"
    ```
-3. Las contraseñas de `POSTGRES_PASSWORD` y `APP_DB_PASSWORD` se graban en la base **la primera vez** que Docker la crea. Si las cambias después en `.env`, la base no se entera (sección 13, «contraseña incorrecta»).
+3. Las contraseñas de `POSTGRES_PASSWORD` y `APP_DB_PASSWORD` se graban en la base **la primera vez** que Docker la crea. Si las cambias después en `.env`, la base no se entera (sección 14, «contraseña incorrecta»).
 
-> Tu `.env` ya quedó revisado (2026-11-15): las cuatro URL coinciden con los usuarios y contraseñas, usan `127.0.0.1` y tienen las opcionales. Hay una copia de antes en `.env.respaldo-2026-11-15`.
+> Tu `.env` ya quedó revisado y ordenado (2026-11-15): las cuatro URL locales coinciden con los usuarios y contraseñas y usan `127.0.0.1`. Las copias anteriores están en `.env.respaldo-2026-11-15` y `.env.respaldo-2026-11-15b`; **bórralas** cuando confirmes que todo funciona, porque la segunda tiene la contraseña de Supabase en un comentario.
 
 ## 3. Encender la base
 
@@ -203,6 +214,10 @@ Las pruebas crean y usan su **propia base** (`assetcontrol_e2e`), su propia API 
    - `SUPABASE_MIGRATION_DATABASE_URL` = la cadena con el usuario `postgres.<ref>`.
    - `SUPABASE_DATABASE_URL` = la misma con el usuario `assetcontrol_app.<ref>` y la contraseña de la app de producción (existe después de `preparar-roles`, `docs/09-despliegue.md` §4).
 5. Comprueba: `uv run --env-file ../.env flask --app app revisar-conexiones` → las líneas `SUPABASE_…` deben decir `OK` y `TLS sí`.
+
+> **Ojo:** la dirección `https://<ref>.supabase.co` (*Project URL*) **no** es una conexión a la base; es la API web de Supabase y AssetControl no la usa. Las dos variables `SUPABASE_…` empiezan por `postgresql+psycopg://`.
+>
+> Mientras el proyecto de Supabase no esté migrado, `revisar-conexiones` dirá `MAL … base sin migrar` en `SUPABASE_MIGRATION_DATABASE_URL`: es lo esperado. Las migraciones de producción se aplican con el flujo `migrar.yml` (`docs/09-despliegue.md`).
 
 > Las variables `SUPABASE_…` solo las usa `revisar-conexiones`. La app local **siempre** usa `DATABASE_URL` (tu Docker): así nunca escribes en producción por error.
 
