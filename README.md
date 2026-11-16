@@ -24,6 +24,8 @@ Fase: definición de arquitectura y alcance del MVP. Fundación técnica en curs
 | [docs/04-metodologia.md](docs/04-metodologia.md) | Estructura del repo, ramas, ADR, definición de terminado, fases |
 | [docs/05-preguntas-abiertas.md](docs/05-preguntas-abiertas.md) | Decisiones pendientes |
 | [docs/06-importacion-excel.md](docs/06-importacion-excel.md) | Análisis del Excel actual y plan de importación |
+| [docs/09-despliegue.md](docs/09-despliegue.md) | Producción: imagen, Supabase, migrar, respaldos |
+| [docs/10-entorno-local.md](docs/10-entorno-local.md) | **Empieza aquí:** entorno local paso a paso, conexiones, pruebas y e2e |
 | [docs/adr/](docs/adr/) | Decisiones de arquitectura registradas |
 | [Orquestacion/](Orquestacion/README.md) | Método de trabajo: roles, agentes, compuertas, plan y arneses de Claude Code y Cursor |
 | [specs/](specs/001-fundacion-tecnica/spec.md) | Specs SDD de cada entrega (la primera: fundación técnica) |
