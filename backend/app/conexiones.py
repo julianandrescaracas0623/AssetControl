@@ -75,9 +75,12 @@ def _revisar_una(
             (tls,) = conn.execute(
                 "select coalesce((select ssl from pg_stat_ssl where pid = pg_backend_pid()), false)"
             ).fetchone()  # type: ignore[misc]
+            # has_table_privilege con el nombre en texto falla (42P01) si la tabla no
+            # existe; con el oid de to_regclass devuelve null y no rompe.
             (existe, legible) = conn.execute(
                 "select to_regclass('public.alembic_version') is not null, "
-                "coalesce(has_table_privilege('public.alembic_version', 'SELECT'), false)"
+                "coalesce(has_table_privilege("
+                "to_regclass('public.alembic_version'), 'SELECT'), false)"
             ).fetchone()  # type: ignore[misc]
             # El rol de la app no lee alembic_version (no le hace falta): la revisión la
             # informa la línea del migrador de la misma base.

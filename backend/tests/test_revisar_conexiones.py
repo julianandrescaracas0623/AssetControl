@@ -57,3 +57,28 @@ def test_cli_never_prints_urls_or_passwords(monkeypatch):
     assert "Migraciones del repo" in salida
     for secreto in (*claves, "localhost", "127.0.0.1"):
         assert secreto not in salida
+
+
+def test_test_database_without_alembic_table_is_ok():
+    # La base de pruebas nunca se migra (cada prueba crea la suya): no tiene
+    # alembic_version y la revisión no debe fallar por eso (sqlstate 42P01).
+    sin_migrar = {
+        n: read_database_url(n).set(database="postgres").render_as_string(hide_password=False)
+        for n in ("TEST_DATABASE_URL", "TEST_MIGRATION_DATABASE_URL")
+    }
+    filas = {f.variable: f for f in conexiones.revisar(sin_migrar)}
+    for nombre in sin_migrar:
+        assert filas[nombre].ok, filas[nombre].motivo
+        assert filas[nombre].revision == "—"
+
+
+def test_unmigrated_database_is_reported_not_crashing():
+    url = read_database_url("TEST_MIGRATION_DATABASE_URL").set(database="postgres")
+    texto = url.render_as_string(hide_password=False)
+    (fila,) = [
+        f
+        for f in conexiones.revisar({"MIGRATION_DATABASE_URL": texto})
+        if f.variable == "MIGRATION_DATABASE_URL"
+    ]
+    assert fila.ok is False
+    assert fila.motivo == "base sin migrar"
