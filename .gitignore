@@ -26,6 +26,11 @@ venv/
 # Node / web
 node_modules/
 dist/
+# Pruebas e2e (spec 010c): informes, rastros y el token del tenant de e2e.
+web/playwright-report/
+web/test-results/
+web/e2e/.estado/
+web/e2e/__pycache__/
 build/
 .vite/
 coverage/
