@@ -1,6 +1,6 @@
 # Plan 013 — Informe con los datos de la empresa y nuevo diseño de exportación
 
-> **Estado:** Propuesto (G1 pendiente). Escrito con Q1 A y Q2 A.
+> **Estado:** Aprobado (G1–G3, 2026-11-16) con Q1 A y sin firmas (Q2).
 
 ## 1. Enfoque
 
@@ -32,7 +32,7 @@ Primero los datos (empresa, copia al cierre y detalle por activo), después el c
 
 - `exportar.Documento` suma `empresa` (con los bytes del logo leídos del almacenamiento, o nada) y `detalle` por categoría.
 - **Excel (T4):** maqueta v3 en código: `_encabezado(ws)` común (logo con `insert_image` desde bytes, empresa, sesión, «Informe congelado»), hoja «Resumen», hojas por categoría (`_nombre_hoja`: quita `[]:*?/\`, recorta a 31, numera repetidos y evita «Resumen» y «No encontrados»), «No encontrados». `write_string` para todo texto; números desde `Decimal`.
-- **PDF (T5):** estilo A: `ConPaginas` con pie y encabezado reducido; tabla de cabecera con logo (`ImageReader` desde bytes); tarjetas; tablas; nota; firmas con `KeepTogether`.
+- **PDF (T5):** estilo A: `ConPaginas` con pie y encabezado reducido; tabla de cabecera con logo (`ImageReader` desde bytes); tarjetas; tablas; nota (sin firmas, G1).
 - Pruebas con `openpyxl` y `pypdf` (A3) y con la sesión anterior a la 013 (Q1 A).
 
 ## 6. Web (T6–T7)
