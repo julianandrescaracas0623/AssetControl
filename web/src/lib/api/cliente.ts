@@ -194,6 +194,52 @@ export async function descargar(ruta: string, token: string, porDefecto: string)
 }
 
 export type FormatoInforme = 'excel' | 'pdf'
+export type Foto = Esquemas['Foto']
+export type TamanoFoto = 'completa' | 'mini'
+/** Las subidas de fotos tienen más plazo que el resto (redes lentas en el teléfono). */
+export const TIEMPO_SUBIDA_MS = 60_000
+
+/**
+ * Envía una foto (spec 012): `PUT` multipart con `foto_id` y `archivo`, o `DELETE` sin
+ * cuerpo. Mismo token y errores que `pedir`; sin `Content-Type` propio (el navegador
+ * pone el de multipart con su separador).
+ */
+export async function enviarFoto(
+  metodo: 'PUT' | 'DELETE',
+  ruta: string,
+  token: string,
+  foto?: { id: string; archivo: Blob },
+): Promise<{ foto: Foto } | undefined> {
+  let body: FormData | undefined
+  if (foto) {
+    body = new FormData()
+    body.append('foto_id', foto.id)
+    body.append('archivo', foto.archivo, 'foto.jpg')
+  }
+  const plazo = new AbortController()
+  const reloj = setTimeout(() => plazo.abort(), TIEMPO_SUBIDA_MS)
+  try {
+    let respuesta: Response
+    try {
+      respuesta = await fetch(`${API_BASE}${ruta}`, {
+        method: metodo,
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        body,
+        credentials: 'same-origin',
+        signal: plazo.signal,
+      })
+    } catch {
+      throw new ErrorApi(0, 'sin_conexion', MENSAJE_SIN_CONEXION)
+    }
+    if (!respuesta.ok) throw await aError(respuesta)
+    if (respuesta.status === 204) return undefined
+    return (await respuesta.json()) as { foto: Foto }
+  } finally {
+    clearTimeout(reloj)
+  }
+}
+
+const enRuta = (valor: string) => encodeURIComponent(valor)
 
 export const api = {
   login: (cuerpo: Esquemas['LoginBody']) => pedir('post', '/auth/login', { cuerpo }),
@@ -266,4 +312,20 @@ export const api = {
   // Spec 009: el informe congelado como archivo (solo admin).
   exportarInforme: (token: string, sesionId: string, formato: FormatoInforme) =>
     descargar(`/sesiones/${encodeURIComponent(sesionId)}/informe/${formato}`, token, formato === 'excel' ? 'informe.xlsx' : 'informe.pdf'),
+  // Spec 012: fotos (ambos roles). La imagen se pide con el token y se muestra como blob:.
+  subirFotoActivo: async (token: string, activoId: string, foto: { id: string; archivo: Blob }) =>
+    (await enviarFoto('PUT', `/activos/${enRuta(activoId)}/foto`, token, foto))!.foto,
+  quitarFotoActivo: async (token: string, activoId: string) => {
+    await enviarFoto('DELETE', `/activos/${enRuta(activoId)}/foto`, token)
+  },
+  subirFotoVerificacion: async (
+    token: string,
+    sesionId: string,
+    verificacionId: string,
+    foto: { id: string; archivo: Blob },
+  ) =>
+    (await enviarFoto('PUT', `/sesiones/${enRuta(sesionId)}/verificaciones/${enRuta(verificacionId)}/foto`, token, foto))!
+      .foto,
+  verFoto: (token: string, fotoId: string, tamano: TamanoFoto) =>
+    descargar(`/fotos/${enRuta(fotoId)}?tamano=${tamano}`, token, 'foto.jpg'),
 }

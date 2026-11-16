@@ -1,0 +1,150 @@
+import { Camera, ImageOff, LoaderCircle, RotateCcw, X } from 'lucide-react'
+import { useId, useRef, useState } from 'react'
+
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { Skeleton } from '@/components/ui/skeleton'
+import { type EstadoSubida, useImagenFoto, useUrlDeBlob } from '@/lib/fotos'
+import { cn } from '@/lib/utils'
+
+// Foto opcional (spec 012, T6; R1, R7). «Tomar foto» usa el selector del sistema con la
+// cámara trasera (`capture="environment"`): en el teléfono abre la cámara nativa sin
+// pedir permisos a la página; en el PC abre el selector de archivos.
+
+export function CampoFoto({
+  archivo,
+  onElegir,
+  estado = 'sin_foto',
+  error,
+  onReintentar,
+  etiqueta = 'Foto del activo (opcional)',
+  ayuda = 'Ayuda a reconocerlo al contar. Se guarda sin la ubicación del teléfono.',
+  deshabilitado = false,
+}: {
+  archivo: Blob | null
+  onElegir: (archivo: File | null) => void
+  estado?: EstadoSubida
+  error?: string | null
+  onReintentar?: () => void
+  etiqueta?: string
+  ayuda?: string
+  deshabilitado?: boolean
+}) {
+  const entrada = useRef<HTMLInputElement>(null)
+  const idAyuda = useId()
+  const previa = useUrlDeBlob(archivo)
+  const ocupado = deshabilitado || estado === 'subiendo'
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">{etiqueta}</p>
+      <input
+        ref={entrada}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+        data-testid="entrada-foto"
+        onChange={(evento) => {
+          onElegir(evento.target.files?.[0] ?? null)
+          evento.target.value = ''
+        }}
+      />
+      {previa ? (
+        <div className="flex items-start gap-3">
+          <img src={previa} alt="Vista previa de la foto" className="size-24 rounded-md border object-cover" />
+          <div className="flex flex-col gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={ocupado} onClick={() => entrada.current?.click()}>
+              <Camera aria-hidden="true" /> Cambiar foto
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={ocupado} onClick={() => onElegir(null)}>
+              <X aria-hidden="true" /> Quitar foto
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={ocupado}
+          aria-describedby={idAyuda}
+          onClick={() => entrada.current?.click()}
+        >
+          <Camera aria-hidden="true" /> Tomar foto
+        </Button>
+      )}
+      <p id={idAyuda} className="text-xs text-muted-foreground">
+        {ayuda}
+      </p>
+      {estado === 'subiendo' && (
+        <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> Subiendo la foto…
+        </p>
+      )}
+      {estado === 'subida' && (
+        <p role="status" className="text-sm text-success">
+          Foto guardada.
+        </p>
+      )}
+      {estado === 'error' && (
+        <div role="alert" className="space-y-2 text-sm text-destructive">
+          <p>La foto no se subió. {error}</p>
+          {onReintentar && (
+            <Button type="button" size="sm" variant="outline" onClick={onReintentar}>
+              <RotateCcw aria-hidden="true" /> Reintentar
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Miniatura de una foto guardada; al tocarla se abre la imagen completa. */
+export function FotoGuardada({
+  fotoId,
+  descripcion,
+  className,
+}: {
+  fotoId: string
+  descripcion: string
+  className?: string
+}) {
+  const mini = useImagenFoto(fotoId, 'mini')
+  const [abierta, setAbierta] = useState(false)
+  const completa = useImagenFoto(abierta ? fotoId : null, 'completa')
+
+  if (mini.error) {
+    return (
+      <div className={cn('flex size-24 items-center justify-center rounded-md border text-muted-foreground', className)}>
+        <ImageOff className="size-5" aria-label="No se pudo cargar la foto" />
+      </div>
+    )
+  }
+  if (!mini.url) return <Skeleton className={cn('size-24 rounded-md', className)} aria-label="Cargando foto" />
+  return (
+    <>
+      <button
+        type="button"
+        className={cn('overflow-hidden rounded-md border focus-visible:outline-2 focus-visible:outline-ring', className)}
+        onClick={() => setAbierta(true)}
+        aria-label={`Ver la foto de ${descripcion}`}
+      >
+        <img src={mini.url} alt="" className="size-24 object-cover" />
+      </button>
+      <Dialog open={abierta} onOpenChange={setAbierta}>
+        <DialogContent className="max-w-3xl">
+          <DialogTitle>Foto de {descripcion}</DialogTitle>
+          <DialogDescription className="sr-only">Imagen completa de la foto.</DialogDescription>
+          {completa.url ? (
+            <img src={completa.url} alt={`Foto de ${descripcion}`} className="max-h-[75vh] w-full rounded-md object-contain" />
+          ) : (
+            <Skeleton className="h-64 w-full" aria-label="Cargando foto" />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}

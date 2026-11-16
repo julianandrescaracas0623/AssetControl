@@ -47,6 +47,14 @@ export function crearCatalogo(
   const centavos = (texto: string) => Math.round(Number(texto) * 100)
   const dinero = (c: number) => `${Math.trunc(c / 100)}.${String(c % 100).padStart(2, '0')}`
   const informes = new Map<string, Informe>()
+  // Spec 012: foto principal por activo y fotos guardadas (id → bytes).
+  const fotos = new Map<string, Uint8Array>()
+  const principales = new Map<string, { id: string; creada_en: string; ancho: number; alto: number }>()
+  const conFoto = (a: Activo) => ({ ...sinPrecio(a), foto: principales.get(a.id) ?? null })
+  const fotoId = (init: RequestInit) => {
+    const form = init.body instanceof FormData ? init.body : null
+    return { id: String(form?.get('foto_id') ?? ''), archivo: form?.get('archivo') }
+  }
 
   /** Universo U del cierre (R4 de docs/03): la misma regla que el servidor, en pequeño. */
   function calcularInforme(sesion: SesionConteo): Informe {
@@ -277,7 +285,7 @@ export function crearCatalogo(
     if (ruta0 === '/api/activos/por-codigo' && metodo === 'GET') {
       const codigo = (q.get('codigo') ?? '').trim().toUpperCase()
       const a = activos.find((x) => x.codigo === codigo)
-      return a ? json(200, { activo: sinPrecio(a) }) : errorApi(404, 'no_encontrado', 'El recurso no existe.')
+      return a ? json(200, { activo: conFoto(a) }) : errorApi(404, 'no_encontrado', 'El recurso no existe.')
     }
     if (ruta0 === '/api/activos/sugerencias' && metodo === 'GET') {
       const campo = q.get('campo') as 'nombre' | 'marca' | 'modelo' | 'subtipo'
@@ -306,7 +314,51 @@ export function crearCatalogo(
     const act = ruta0.match(/^\/api\/activos\/([0-9a-f-]{36})$/)
     if (act && metodo === 'GET') {
       const a = activos.find((x) => x.id === act[1])
-      return a ? json(200, { activo: sinPrecio(a) }) : errorApi(404, 'no_encontrado', 'El recurso no existe.')
+      return a ? json(200, { activo: conFoto(a) }) : errorApi(404, 'no_encontrado', 'El recurso no existe.')
+    }
+    // Spec 012: fotos (ambos roles).
+    const fot = ruta0.match(/^\/api\/activos\/([0-9a-f-]{36})\/foto$/)
+    if (fot && (metodo === 'PUT' || metodo === 'DELETE')) {
+      const a = activos.find((x) => x.id === fot[1])
+      if (!a) return errorApi(404, 'no_encontrado', 'El recurso no existe.')
+      const anterior = principales.get(a.id)
+      if (metodo === 'DELETE') {
+        if (!anterior) return errorApi(404, 'sin_foto', 'No hay foto.')
+        principales.delete(a.id)
+        fotos.delete(anterior.id)
+        eventos.unshift({ seq: eventos.length + 100, tipo: 'foto_retirada', datos: { foto_id: anterior.id }, activo: a.id })
+        return new Response(null, { status: 204 })
+      }
+      const { id } = fotoId(init)
+      if (anterior?.id === id) return json(200, { foto: anterior })
+      const foto = { id, creada_en: '2026-11-15T12:00:00+00:00', ancho: 1600, alto: 1200 }
+      principales.set(a.id, foto)
+      fotos.set(id, new Uint8Array([0xff, 0xd8, 0xff]))
+      if (anterior) fotos.delete(anterior.id)
+      eventos.unshift({
+        seq: eventos.length + 100,
+        tipo: anterior ? 'foto_cambiada' : 'foto_agregada',
+        datos: anterior ? { antes: anterior.id, despues: id } : { foto_id: id },
+        activo: a.id,
+      })
+      return json(201, { foto })
+    }
+    const fotv = ruta0.match(/^\/api\/sesiones\/([0-9a-f-]{36})\/verificaciones\/([0-9a-f-]{36})\/foto$/)
+    if (fotv && metodo === 'PUT') {
+      const v = verificaciones.find((x) => x.id === fotv[2])
+      if (!v) return errorApi(404, 'no_encontrado', 'La verificación no existe.')
+      const { id } = fotoId(init)
+      if (v.foto_id === id) return json(200, { foto: { id, creada_en: '2026-11-15T12:00:00+00:00', ancho: 1600, alto: 1200 } })
+      if (v.foto_id) return errorApi(409, 'foto_existente', 'Esta verificación ya tiene foto.')
+      v.foto_id = id
+      fotos.set(id, new Uint8Array([0xff, 0xd8, 0xff]))
+      return json(201, { foto: { id, creada_en: '2026-11-15T12:00:00+00:00', ancho: 1600, alto: 1200 } })
+    }
+    const ver = ruta0.match(/^\/api\/fotos\/([0-9a-f-]{36})$/)
+    if (ver && metodo === 'GET') {
+      const bytes = fotos.get(ver[1])
+      if (!bytes) return errorApi(404, 'sin_foto', 'No hay foto.')
+      return new Response(new Blob([bytes as BlobPart], { type: 'image/jpeg' }), { status: 200, headers: { 'Content-Type': 'image/jpeg' } })
     }
     // Spec 006: sesiones y verificaciones.
     if (ruta0 === '/api/sesiones' && metodo === 'GET') return json(200, { sesiones })
@@ -635,6 +687,8 @@ export function crearCatalogo(
     fallar(clave: string, respuesta: () => Response) {
       fallos.set(clave, respuesta)
     },
+    fotos,
+    principales,
     sesiones,
     verificaciones,
     eventos,

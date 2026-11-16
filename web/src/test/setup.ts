@@ -20,3 +20,8 @@ globalThis.ResizeObserver ??= class {
   unobserve() {}
   disconnect() {}
 }
+
+// jsdom no trae URL.createObjectURL (las fotos se muestran como blob:, spec 012).
+let siguienteBlob = 0
+URL.createObjectURL ??= () => `blob:prueba/${++siguienteBlob}`
+URL.revokeObjectURL ??= () => {}
