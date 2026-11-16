@@ -82,3 +82,17 @@ def test_unmigrated_database_is_reported_not_crashing():
     ]
     assert fila.ok is False
     assert fila.motivo == "base sin migrar"
+
+
+def test_tls_is_read_from_the_client_side_connection():
+    # Detrás del pooler de Supabase, pg_stat_ssl ve la conexión pooler→base (sin
+    # TLS) aunque la nuestra vaya cifrada: el TLS se lee del lado del cliente.
+    base = read_database_url("TEST_DATABASE_URL")
+    filas = {}
+    for modo in ("require", "disable"):
+        texto = base.update_query_dict({"sslmode": modo}).render_as_string(hide_password=False)
+        (filas[modo],) = [
+            f for f in conexiones.revisar({"DATABASE_URL": texto}) if f.variable == "DATABASE_URL"
+        ]
+    assert filas["require"].tls is True
+    assert filas["disable"].tls is False

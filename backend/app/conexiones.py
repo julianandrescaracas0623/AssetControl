@@ -72,9 +72,9 @@ def _revisar_una(
                 "select current_user, current_database(), rolsuper, rolbypassrls "
                 "from pg_roles where rolname = current_user"
             ).fetchone()  # type: ignore[misc]
-            (tls,) = conn.execute(
-                "select coalesce((select ssl from pg_stat_ssl where pid = pg_backend_pid()), false)"
-            ).fetchone()  # type: ignore[misc]
+            # TLS del lado del cliente: detrás de un pooler (Supabase) pg_stat_ssl ve la
+            # conexión pooler→base, no la nuestra.
+            tls = conn.pgconn.ssl_in_use
             # has_table_privilege con el nombre en texto falla (42P01) si la tabla no
             # existe; con el oid de to_regclass devuelve null y no rompe.
             (existe, legible) = conn.execute(
