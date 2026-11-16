@@ -58,6 +58,7 @@ from app.activos import models as activos_models  # noqa: F401 - registra activo
 from app.auth import models
 from app.catalogo import models as catalogo_models  # noqa: F401 - registra ubicacion y categoria
 from app.conteo import models as conteo_models  # noqa: F401 - registra las tablas del conteo
+from app.fotos import models as fotos_models  # noqa: F401 - registra la tabla foto
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
@@ -79,6 +80,7 @@ TENANT_TABLES = frozenset(
         "verificacion",
         "sesion_desglose",
         "sesion_no_encontrado",
+        "foto",
     }
 )
 
@@ -185,6 +187,13 @@ EXPECTED_POLICIES = {
         ISOLATION_EXPR,
         ISOLATION_EXPR,
     ),
+    ("foto", "tenant_isolation"): (
+        "PERMISSIVE",
+        "ALL",
+        "{app}",
+        ISOLATION_EXPR,
+        ISOLATION_EXPR,
+    ),
     # limite_tasa (T10, docs/03 cambio 6): una política por comando TO la aplicación, sin
     # filtro de tenant (no lo hay antes del login); su defensa es el privilegio mínimo y
     # el HMAC de la clave.
@@ -277,6 +286,19 @@ DESGLOSE_INSERT = {
     "unidades_no_encontrado",
     "unidades_registrado",
 }
+# Spec 012 (0013): la app inserta la foto y solo marca su retiro.
+FOTO_INSERT = {
+    "id",
+    "tenant_id",
+    "activo_id",
+    "verificacion_id",
+    "clave",
+    "bytes",
+    "ancho",
+    "alto",
+    "subida_por",
+}
+FOTO_RETIRO = {"retirada_en", "retirada_por"}
 NO_ENCONTRADO_INSERT = {
     "tenant_id",
     "sesion_id",
@@ -403,6 +425,11 @@ EXPECTED_APP_COLUMNS = {
         "SELECT": {*NO_ENCONTRADO_INSERT, "id", "creado_en"},
         "INSERT": NO_ENCONTRADO_INSERT,
     },
+    "foto": {
+        "SELECT": {*FOTO_INSERT, *FOTO_RETIRO, "creada_en"},
+        "INSERT": FOTO_INSERT,
+        "UPDATE": FOTO_RETIRO,
+    },
     "verificacion": {
         "SELECT": {*VERIFICACION_INSERT, "recibido_en", "seq"},
         "INSERT": VERIFICACION_INSERT,
@@ -426,6 +453,7 @@ EXPECTED_APP_TABLE_PRIVILEGES = {
     "verificacion": {"SELECT"},
     "sesion_desglose": {"SELECT"},
     "sesion_no_encontrado": {"SELECT"},
+    "foto": {"SELECT"},
 }
 
 
@@ -592,6 +620,7 @@ EXPECTED_OWNER_COLUMNS = {
     "verificacion": {},
     "sesion_desglose": {},
     "sesion_no_encontrado": {},
+    "foto": {},
 }
 TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
 COLUMN_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "REFERENCES")
@@ -1262,9 +1291,11 @@ def test_public_functions_are_a_closed_list(conn):
             "where n.nspname = 'public' order by 1"
         )
     ).all()
+    # Spec 012 (0013): la que impide tocar una foto ya retirada.
     assert functions == [
         "activo_ubicacion_valida",
         "conteo_cerrado_requerido",
+        "foto_retirada_es_final",
         "sesion_conteo_inmutable",
     ]
 

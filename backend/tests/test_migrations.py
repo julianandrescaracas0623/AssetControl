@@ -48,6 +48,7 @@ CONTEO = "0009_sesiones_y_verificacion"
 DISCREPANCIAS = "0010_discrepancias"
 CIERRE = "0011_cierre_e_informe"
 SUPABASE_FUNCIONES = "0012_funciones_sin_supabase"
+FOTOS = "0013_fotos"
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
 MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
@@ -57,6 +58,7 @@ CATALOG_TABLES = ["categoria", "ubicacion"]
 ASSET_TABLES = ["activo", "activo_evento"]
 COUNT_TABLES = ["sesion_conteo", "verificacion"]
 CLOSE_TABLES = ["sesion_desglose", "sesion_no_encontrado"]
+PHOTO_TABLES = ["foto"]
 
 APP_URL = "postgresql+psycopg://assetcontrol_app:valor-secreto-app@db.invalid:5432/assetcontrol"
 MIGRATOR_URL = "postgresql+psycopg://postgres:valor-secreto-migr@db.invalid:5432/assetcontrol"
@@ -194,8 +196,9 @@ def test_revision_chain():
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == [SUPABASE_FUNCIONES]
+    assert script.get_heads() == [FOTOS]
     assert [r.revision for r in revisions] == [
+        FOTOS,
         SUPABASE_FUNCIONES,
         CIERRE,
         DISCREPANCIAS,
@@ -209,18 +212,19 @@ def test_revision_chain():
         ACCESO,
         BASELINE,
     ]
-    assert revisions[0].down_revision == CIERRE
-    assert revisions[1].down_revision == DISCREPANCIAS
-    assert revisions[2].down_revision == CONTEO
-    assert revisions[3].down_revision == CAMBIOS
-    assert revisions[4].down_revision == ACTIVOS
-    assert revisions[5].down_revision == CATALOGO
-    assert revisions[6].down_revision == LIMITE_TASA
-    assert revisions[7].down_revision == FUNCIONES
-    assert revisions[8].down_revision == POLITICAS
-    assert revisions[9].down_revision == ACCESO
-    assert revisions[10].down_revision == BASELINE
-    assert revisions[11].down_revision is None
+    assert revisions[0].down_revision == SUPABASE_FUNCIONES
+    assert revisions[1].down_revision == CIERRE
+    assert revisions[2].down_revision == DISCREPANCIAS
+    assert revisions[3].down_revision == CONTEO
+    assert revisions[4].down_revision == CAMBIOS
+    assert revisions[5].down_revision == ACTIVOS
+    assert revisions[6].down_revision == CATALOGO
+    assert revisions[7].down_revision == LIMITE_TASA
+    assert revisions[8].down_revision == FUNCIONES
+    assert revisions[9].down_revision == POLITICAS
+    assert revisions[10].down_revision == ACCESO
+    assert revisions[11].down_revision == BASELINE
+    assert revisions[12].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -341,6 +345,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
             *ASSET_TABLES,
             *COUNT_TABLES,
             *CLOSE_TABLES,
+            *PHOTO_TABLES,
         ]
     )
 
@@ -348,7 +353,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [SUPABASE_FUNCIONES])
+    assert _public_state(migrate_env) == (with_auth, [FOTOS])
     assert _schema_exists(migrate_env, "acceso")
 
     command.downgrade(config, "base")
@@ -357,7 +362,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [SUPABASE_FUNCIONES])
+    assert _public_state(migrate_env) == (with_auth, [FOTOS])
     assert _schema_exists(migrate_env, "acceso")
 
 
@@ -579,6 +584,43 @@ def test_0011_up_down_up_touches_only_the_close_tables_and_functions(migrate_env
 
     command.upgrade(config, CIERRE)
     assert _public_state(migrate_env) == (sorted([*before, *CLOSE_TABLES]), [CIERRE])
+
+
+def test_0013_up_down_up_touches_only_the_photo_table_function_and_event_types(migrate_env):
+    # Spec 012, T3: 0013 crea foto (RLS, privilegios mínimos), su disparador y los tipos de
+    # evento de foto; el downgrade deja todo como en 0012.
+    config = alembic_config()
+    before = sorted(
+        [
+            "alembic_version",
+            "limite_tasa",
+            *AUTH_TABLES,
+            *CATALOG_TABLES,
+            *ASSET_TABLES,
+            *COUNT_TABLES,
+            *CLOSE_TABLES,
+        ]
+    )
+    command.upgrade(config, SUPABASE_FUNCIONES)
+    owner_before = _owner_state(migrate_env)
+    check_before = _event_type_check(migrate_env)
+    funciones_before = _public_functions(migrate_env)
+
+    command.upgrade(config, FOTOS)
+    assert _public_state(migrate_env) == (sorted([*before, *PHOTO_TABLES]), [FOTOS])
+    assert _policy_names(migrate_env, "foto") == ["tenant_isolation"]
+    assert _public_functions(migrate_env) == sorted([*funciones_before, "foto_retirada_es_final"])
+    assert all(t in _event_type_check(migrate_env) for t in ("foto_agregada", "foto_cambiada"))
+    assert "foto_retirada" in _event_type_check(migrate_env)
+    assert _owner_state(migrate_env) == owner_before
+
+    command.downgrade(config, SUPABASE_FUNCIONES)
+    assert _public_state(migrate_env) == (before, [SUPABASE_FUNCIONES])
+    assert _public_functions(migrate_env) == funciones_before
+    assert _event_type_check(migrate_env) == check_before
+
+    command.upgrade(config, FOTOS)
+    assert _public_state(migrate_env) == (sorted([*before, *PHOTO_TABLES]), [FOTOS])
 
 
 def _activo_update_columns(url: URL) -> list[str]:
