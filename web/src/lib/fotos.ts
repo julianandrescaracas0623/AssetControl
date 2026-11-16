@@ -116,11 +116,13 @@ export function useFotoPendiente() {
   const [estado, setEstado] = useState<EstadoSubida>('sin_foto')
   const [error, setError] = useState<string | null>(null)
 
-  async function elegir(nuevo: File | null) {
+  async function elegir(nuevo: File | null): Promise<Blob | null> {
     id.current = crypto.randomUUID()
     setError(null)
     setEstado('sin_foto')
-    setArchivo(nuevo ? await reducir(nuevo) : null)
+    const listo = nuevo ? await reducir(nuevo) : null
+    setArchivo(listo)
+    return listo
   }
 
   /** Sube la foto elegida con `subir` (el destino lo decide quien llama). */

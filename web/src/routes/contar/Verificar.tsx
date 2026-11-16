@@ -1,8 +1,10 @@
-import { Archive, ArrowLeftRight, Check, History, Info, Loader2, Lock, MapPin, Plus, RefreshCw, ScanBarcode, SearchX, TriangleAlert } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Archive, ArrowLeftRight, Camera, Check, History, Info, Loader2, Lock, MapPin, Plus, RefreshCw, ScanBarcode, SearchX, TriangleAlert } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import { AssetCard } from '@/components/app/AssetCard'
+import { EstadoFoto } from '@/components/app/CampoFoto'
+import { FotoActivo } from '@/components/app/FotoActivo'
 import { CountShell } from '@/components/app/CountShell'
 import { LocationPicker } from '@/components/app/LocationPicker'
 import type { EstadoRed } from '@/components/app/NetworkStatus'
@@ -15,10 +17,11 @@ import { Progress } from '@/components/ui/progress'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { type Activo, aTarjeta, normalizarCodigo, useActivoPorCodigo } from '@/lib/activos'
-import { mensajeDeError, type Ubicacion } from '@/lib/api/cliente'
+import { api, mensajeDeError, type Ubicacion } from '@/lib/api/cliente'
 import { opcionesDeSelector, rutaDe } from '@/lib/catalogo'
 import { useCabeceraConteo, useConfirmarVerificacion, useSalaDeTrabajo } from '@/lib/conteo'
 import { formatEntero } from '@/lib/format'
+import { type Subir, useFotoPendiente } from '@/lib/fotos'
 import { useRol } from '@/lib/sesion'
 import { porcentaje, type SesionConteo, useDetalleSesion, useSesionAbierta, useUltimaVerificacion, type Verificacion } from '@/lib/sesiones'
 import { cn } from '@/lib/utils'
@@ -134,10 +137,17 @@ function Guardado({ verificacion, sesion }: { verificacion: Verificacion; sesion
   const detalle = useDetalleSesion(sesion.id)
   const fila = detalle.data?.avance.por_ubicacion.find((f) => f.ubicacion.id === verificacion.ubicacion_encontrada.id)
   const navegar = useNavigate()
+  // Spec 012 (R6): una foto opcional de esta verificación. Tocar el botón detiene la
+  // vuelta automática a la cámara hasta que la persona termine.
+  const [quedarse, setQuedarse] = useState(false)
+  const pendiente = useFotoPendiente()
+  const entrada = useRef<HTMLInputElement>(null)
+  const subir: Subir = (t, f) => api.subirFotoVerificacion(t, sesion.id, verificacion.id, f)
   useEffect(() => {
+    if (quedarse) return
     const reloj = setTimeout(() => navegar('/contar/escanear'), 1500)
     return () => clearTimeout(reloj)
-  }, [navegar])
+  }, [navegar, quedarse])
   const otra = verificacion.ubicacion_encontrada.id !== verificacion.ubicacion_esperada.id
   return (
     <>
@@ -181,7 +191,47 @@ function Guardado({ verificacion, sesion }: { verificacion: Verificacion; sesion
           <Progress value={porcentaje(fila.verificados, fila.total)} aria-label={`Avance en ${fila.ubicacion.ruta}`} className="w-24" />
         </div>
       )}
-      <p className="text-center text-sm text-muted-foreground">La cámara vuelve sola en un momento…</p>
+      <input
+        ref={entrada}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+        data-testid="entrada-foto-verificacion"
+        onChange={async (evento) => {
+          const archivo = evento.target.files?.[0] ?? null
+          evento.target.value = ''
+          if (!archivo) return
+          const listo = await pendiente.elegir(archivo)
+          void pendiente.enviar(subir, listo)
+        }}
+      />
+      {pendiente.estado === 'sin_foto' || pendiente.estado === 'error' ? (
+        <Button
+          variant="outline"
+          className="min-h-12"
+          onClick={() => {
+            setQuedarse(true)
+            entrada.current?.click()
+          }}
+        >
+          <Camera className="size-5" aria-hidden="true" />
+          {pendiente.estado === 'error' ? 'Tomar otra foto' : 'Agregar foto (opcional)'}
+        </Button>
+      ) : null}
+      <EstadoFoto estado={pendiente.estado} error={pendiente.error} onReintentar={() => void pendiente.enviar(subir)} />
+      {quedarse ? (
+        <Button asChild className="min-h-12 font-semibold">
+          <Link to="/contar/escanear">
+            <ScanBarcode className="size-5" />
+            Escanear otro
+          </Link>
+        </Button>
+      ) : (
+        <p className="text-center text-sm text-muted-foreground">La cámara vuelve sola en un momento…</p>
+      )}
     </>
   )
 }
@@ -335,6 +385,7 @@ function Verificando({ activo, sesion }: { activo: Activo; sesion: SesionConteo 
       }
     >
       <AssetCard activo={aTarjeta(activo)} rol={rol} titulo="h1" />
+      <FotoActivo activo={activo} editable={!deBaja} />
       {deBaja ? (
         <Alert variant="warning">
           <Archive />
@@ -420,6 +471,7 @@ function SoloConsulta({ activo }: { activo: Activo }) {
       }
     >
       <AssetCard activo={aTarjeta(activo)} rol={rol} titulo="h1" />
+      <FotoActivo activo={activo} editable={activo.estado !== 'dado_de_baja'} />
       <Alert variant="info">
         <Info />
         <AlertTitle>No hay una sesión abierta</AlertTitle>

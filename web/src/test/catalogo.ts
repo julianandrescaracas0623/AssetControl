@@ -39,7 +39,7 @@ export function crearCatalogo(
     return sala ? `${sala.nombre} › ${u.nombre}` : u.nombre
   }
   const fallos = new Map<string, () => Response>()
-  const eventos: { seq: number; tipo: string; datos: Record<string, unknown>; activo: string }[] = []
+  const eventos: { seq: number; tipo: string; datos: Record<string, unknown>; activo: string; foto_id?: string }[] = []
   let siguiente = 1
   const nuevoId = () => `00000000-0000-4000-8000-${String(siguiente++).padStart(12, '0')}`
   const cuerpo = (init: RequestInit) => JSON.parse(String(init.body ?? '{}')) as Record<string, unknown>
@@ -607,12 +607,13 @@ export function crearCatalogo(
         { seq: 1, tipo: 'creado', datos: { codigo: a.codigo, nombre: a.nombre, precio_compra: a.precio_compra }, activo: a.id },
       ]
         .filter((e) => rol === 'admin' || e.tipo !== 'precio_cambiado')
-        .map(({ seq, tipo, datos }) => ({
+        .map(({ seq, tipo, datos, ...resto }) => ({
           seq,
           tipo,
           ocurrido_en: '2026-11-14T15:30:00+00:00',
           autor: { id: '00000000-0000-4000-8000-00000000000a', nombre: 'Ana Torres' },
           datos: rol === 'admin' ? datos : Object.fromEntries(Object.entries(datos).filter(([k]) => !k.includes('precio'))),
+          ...('foto_id' in resto && resto.foto_id ? { foto_id: resto.foto_id } : {}),
         }))
       return json(200, { eventos: propios, siguiente: null })
     }

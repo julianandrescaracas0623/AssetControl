@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, ArrowLeftRight, Check, CircleDollarSign, FileInput, MapPin, Pencil, Plus, Tag, Wrench, X } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowLeftRight, Camera, Check, CircleDollarSign, FileInput, MapPin, Pencil, Plus, Tag, Wrench, X } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 import { type EventoActivo, etiquetaMotivo } from '@/lib/cambiosActivo'
@@ -95,6 +95,13 @@ export function vista(evento: Pick<EventoActivo, 'tipo' | 'datos'>): Vista {
       const nota = d.nota ? ` · «${String(d.nota)}»` : ''
       return { icono: Archive, tono: 'peligro', titulo: 'Dado de baja', detalle: `${etiquetaMotivo(d.motivo)}${nota}` }
     }
+    // Spec 012: la imagen anterior se borra al cambiar o quitar (Q2 B); queda el registro.
+    case 'foto_agregada':
+      return { icono: Camera, tono: 'neutro', titulo: 'Foto agregada' }
+    case 'foto_cambiada':
+      return { icono: Camera, tono: 'neutro', titulo: 'Foto cambiada', detalle: 'La foto anterior se borró.' }
+    case 'foto_retirada':
+      return { icono: Camera, tono: 'neutro', titulo: 'Foto quitada', detalle: 'La imagen se borró.' }
     default:
       return { icono: Pencil, tono: 'neutro', titulo: 'Cambio' }
   }

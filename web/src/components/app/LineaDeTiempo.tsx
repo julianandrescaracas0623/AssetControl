@@ -1,5 +1,6 @@
 import { CircleAlert, Loader2, RefreshCw } from 'lucide-react'
 
+import { FotoGuardada } from '@/components/app/CampoFoto'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -28,6 +29,9 @@ export function LineaDeTiempo({ eventos, className }: { eventos: EventoActivo[];
             <div className="min-w-0 flex-1">
               <p className="font-semibold">{v.titulo}</p>
               {v.detalle && <p className="text-sm break-words">{v.detalle}</p>}
+              {evento.foto_id && (
+                <FotoGuardada fotoId={evento.foto_id} descripcion={`la verificación del ${fechaHora.format(new Date(evento.ocurrido_en))}`} className="my-1.5" />
+              )}
               <p className="text-sm text-muted-foreground">
                 {evento.autor.nombre || 'Usuario'} ·{' '}
                 <time className="tabular-nums" dateTime={evento.ocurrido_en}>
