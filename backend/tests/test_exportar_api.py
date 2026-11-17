@@ -410,13 +410,19 @@ def test_pdf_has_exactly_the_figures_of_the_report(client):
     alto, ancho = float(lector.pages[0].mediabox.height), float(lector.pages[0].mediabox.width)
     assert (round(ancho), round(alto)) == (792, 612)  # Carta horizontal (Q3).
     lineas = lineas_pdf(response)
-    assert "Informe · Conteo nov 2026" in lineas
-    assert any("Fecha de corte 30/11/2026" in li and "Informe congelado" in li for li in lineas)
+    assert contiene_seguidas(lineas, ["INFORME DE INVENTARIO DE ACTIVOS", "Conteo nov 2026"])
+    assert contiene_seguidas(lineas, ["Fecha de corte", "Cerrada", "Cerró", "Moneda", "Estado"])
+    i = lineas.index("Estado")
+    assert lineas[i + 1] == "30/11/2026"
+    assert lineas[i + 3 : i + 6] == [ADMIN_A.nombre, "COP", "Informe congelado"]
     t = informe["totales"]
     cop = exportar.formato_cop
-    assert contiene_seguidas(
-        lineas, [cop(Decimal(t[k])) for k in ("encontrado", "no_encontrado", "registrado")]
-    )
+    for rotulo, clave in (
+        ("Encontrado", "encontrado"),
+        ("No encontrado", "no_encontrado"),
+        ("Total registrado", "registrado"),
+    ):
+        assert contiene_seguidas(lineas, [rotulo, cop(Decimal(t[clave]))]), rotulo
     assert "50 % de las unidades encontradas." in lineas
     for dimension in ("categorias", "ubicaciones"):
         for fila in esperado_desglose(informe, dimension):
@@ -430,7 +436,46 @@ def test_pdf_has_exactly_the_figures_of_the_report(client):
         esperadas.append(cop(Decimal(n["precio"])))
         assert contiene_seguidas(lineas, esperadas), esperadas
     assert contiene_seguidas(lineas, ["2 activos no encontrados", cop(Decimal(t["no_encontrado"]))])
-    assert lineas[-1] == "Página 1 de 1"
+    assert any(li.endswith("Página 1 de 1") for li in lineas)
+    assert not {"Elaboró", "Revisó", "Aprobó"} & set(lineas)  # sin firmas (G1)
+
+
+def test_pdf_carries_the_frozen_company_logo_and_footer(client):
+    datos = {
+        "nombre": "Clínica Ejemplo S.A.S.",
+        "direccion": "Calle 10 # 5-20",
+        "nit": "890903938-8",
+    }
+    assert client.put("/empresa", json=datos, headers=ADMIN).status_code == 200
+    subida = client.put(
+        "/empresa/logo",
+        data={"logo_id": str(uuid.uuid4()), "archivo": (io.BytesIO(_png()), "l.png")},
+        headers=ADMIN,
+        content_type="multipart/form-data",
+    )
+    assert subida.status_code == 201
+    _, sesion, _, _ = cerrada(client)
+    response = pdf(client, sesion)
+    lineas = lineas_pdf(response)
+    assert lineas[0] == "Clínica Ejemplo S.A.S."
+    assert "NIT 890.903.938-8 · Calle 10 # 5-20" in lineas
+    pie = "Clínica Ejemplo S.A.S. · Conteo nov 2026 · Informe congelado al cierre"
+    assert any(li.startswith(pie) for li in lineas)
+    pagina = PdfReader(io.BytesIO(response.data)).pages[0]
+    assert len(pagina.images) == 1
+    # Después del cierre la empresa cambia: el PDF sigue con lo congelado.
+    client.put("/empresa", json={**datos, "nombre": "Otra S.A.S."}, headers=ADMIN)
+    assert lineas_pdf(pdf(client, sesion)) == lineas
+
+
+def test_pdf_of_a_session_closed_before_013_labels_the_current_company(client, exp_db):
+    _, sesion, _, _ = cerrada(client)
+    with exp_db.migrator.begin() as conn:
+        conn.execute(text("delete from sesion_detalle"))
+        conn.execute(text("delete from sesion_empresa"))
+    lineas = lineas_pdf(pdf(client, sesion))
+    texto = " ".join(lineas)
+    assert exportar.EMPRESA_VIGENTE in texto
 
 
 def test_pdf_download_headers(client):
@@ -448,7 +493,8 @@ def test_pdf_of_an_empty_session_has_zeros(client):
     sesion = c.abrir()
     assert client.post(f"/sesiones/{sesion}/cerrar", headers=ADMIN).status_code == 200
     lineas = lineas_pdf(pdf(client, sesion))
-    assert contiene_seguidas(lineas, ["$ 0,00", "$ 0,00", "$ 0,00"])
+    for rotulo in ("Encontrado", "No encontrado", "Total registrado"):
+        assert contiene_seguidas(lineas, [rotulo, "$ 0,00"]), rotulo
     assert contiene_seguidas(lineas, ["0 activos no encontrados", "$ 0,00"])
 
 

@@ -608,15 +608,23 @@ def _cabe_en_winansi(caracter: str) -> bool:
 
 
 def a_pdf(doc: Documento) -> bytes:
-    """Informe en Carta horizontal: metadatos, tres cifras, desglose y no encontrados."""
+    """Informe en Carta horizontal, estilo A «Corporativo» (spec 013, R6; sin firmas, G1).
+
+    Encabezado con el logo y los datos de la empresa congelados, fila de corte y cierre,
+    tarjetas de las tres cifras, desglose por categoría y por ubicación, no encontrados y
+    la nota de cómo se calculó. Pie con empresa, sesión y «Página X de Y»; desde la página
+    2, un encabezado reducido.
+    """
     from xml.sax.saxutils import escape
 
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import landscape, letter
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.units import mm
+    from reportlab.lib.utils import ImageReader
     from reportlab.pdfgen import canvas as rl_canvas
     from reportlab.platypus import (
+        Image,
         KeepTogether,
         LongTable,
         Paragraph,
@@ -626,17 +634,30 @@ def a_pdf(doc: Documento) -> bytes:
         TableStyle,
     )
 
-    tinta, gris, linea, fondo = (
+    tinta, gris, linea, fondo, acento = (
         colors.HexColor("#18181B"),
         colors.HexColor("#52525B"),
-        colors.HexColor("#D4D4D8"),
+        colors.HexColor("#E4E4E7"),
         colors.HexColor("#F4F4F5"),
+        colors.HexColor("#0E7490"),
     )
+    verde, rojo = colors.HexColor("#15803D"), colors.HexColor("#B91C1C")
     base = ParagraphStyle("base", fontName="Helvetica", fontSize=9, leading=11, textColor=tinta)
     estilos = {
-        "titulo": ParagraphStyle(
-            "titulo", parent=base, fontName="Helvetica-Bold", fontSize=16, leading=20
+        "empresa": ParagraphStyle(
+            "empresa", parent=base, fontName="Helvetica-Bold", fontSize=13, leading=16
         ),
+        "contacto": ParagraphStyle(
+            "contacto", parent=base, fontSize=8.5, leading=11.5, textColor=gris
+        ),
+        "antetitulo": ParagraphStyle(
+            "antetitulo", parent=base, fontSize=8, leading=10, textColor=gris, alignment=2
+        ),
+        "titulo": ParagraphStyle(
+            "titulo", parent=base, fontName="Helvetica-Bold", fontSize=15, leading=18, alignment=2
+        ),
+        "rotulo": ParagraphStyle("rotulo", parent=base, fontSize=8, leading=10, textColor=gris),
+        "dato": ParagraphStyle("dato", parent=base, fontName="Helvetica-Bold"),
         "meta": ParagraphStyle("meta", parent=base, textColor=gris),
         "seccion": ParagraphStyle(
             "seccion",
@@ -645,10 +666,11 @@ def a_pdf(doc: Documento) -> bytes:
             fontSize=11,
             leading=14,
             spaceBefore=10,
-            spaceAfter=4,
+            spaceAfter=5,
         ),
         "celda": base,
         "nota": ParagraphStyle("nota", parent=base, fontSize=8, leading=10, textColor=gris),
+        "aviso": ParagraphStyle("aviso", parent=base, fontSize=8.5, leading=11, textColor=rojo),
     }
 
     def p(texto: str, estilo: str = "celda") -> Paragraph:
@@ -658,19 +680,21 @@ def a_pdf(doc: Documento) -> bytes:
         t = LongTable(filas, colWidths=anchos, repeatRows=1, hAlign="LEFT")
         estilo = [
             ("FONT", (0, 0), (-1, -1), "Helvetica", 8.5),
-            ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 8.5),
-            ("BACKGROUND", (0, 0), (-1, 0), fondo),
-            ("LINEBELOW", (0, 0), (-1, 0), 0.6, linea),
-            ("LINEBELOW", (0, 1), (-1, -1), 0.3, linea),
+            ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 8),
+            ("TEXTCOLOR", (0, 0), (-1, 0), gris),
+            ("LINEBELOW", (0, 0), (-1, 0), 0.8, acento),
+            ("LINEBELOW", (0, 1), (-1, -1), 0.4, linea),
             ("ALIGN", (numericas.start, 0), (numericas.stop - 1, -1), "RIGHT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("TOPPADDING", (0, 0), (-1, -1), 3),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
         ]
+        ultima = len(filas) - (1 if total else 0)
+        for i in range(2, ultima, 2):
+            estilo.append(("BACKGROUND", (0, i), (-1, i), fondo))
         if total:
             estilo += [
                 ("FONT", (0, -1), (-1, -1), "Helvetica-Bold", 8.5),
-                ("BACKGROUND", (0, -1), (-1, -1), fondo),
                 ("LINEABOVE", (0, -1), (-1, -1), 0.8, tinta),
             ]
         t.setStyle(TableStyle(estilo))
@@ -693,40 +717,105 @@ def a_pdf(doc: Documento) -> bytes:
             )
         return tabla(
             cuerpo,
-            [62 * mm, 32 * mm, 12 * mm, 32 * mm, 12 * mm, 34 * mm, 12 * mm, 22 * mm],
+            [66 * mm, 32 * mm, 12 * mm, 32 * mm, 12 * mm, 34 * mm, 12 * mm, 24 * mm],
             range(1, 8),
             True,
         )
 
+    e = doc.empresa
     t = doc.totales
-    cifras = Table(
-        [
-            ["Encontrado", "No encontrado", "Total registrado"],
-            [formato_cop(c.valor) for c in (t.encontrado, t.no_encontrado, t.registrado)],
-            [_unidades(c.unidades) for c in (t.encontrado, t.no_encontrado, t.registrado)],
-        ],
-        colWidths=[72 * mm] * 3,
-        hAlign="LEFT",
-    )
-    cifras.setStyle(
+
+    # Encabezado: logo, empresa y título.
+    datos_empresa = [p(e.nombre, "empresa")]
+    if e.contacto:
+        datos_empresa.append(p(e.contacto, "contacto"))
+    titulo = [p("INFORME DE INVENTARIO DE ACTIVOS", "antetitulo"), p(doc.sesion, "titulo")]
+    celdas: list = [datos_empresa, titulo]
+    anchos = [140 * mm, 110 * mm]
+    if e.logo:
+        lector = ImageReader(io.BytesIO(e.logo))
+        ancho_px, alto_px = lector.getSize()
+        alto = 18 * mm
+        ancho = min(40 * mm, alto * ancho_px / alto_px)
+        alto = ancho * alto_px / ancho_px
+        celdas.insert(0, Image(io.BytesIO(e.logo), width=ancho, height=alto))
+        anchos = [ancho + 5 * mm, 140 * mm - ancho - 5 * mm, 110 * mm]
+    cabecera = Table([celdas], colWidths=anchos, hAlign="LEFT")
+    cabecera.setStyle(
         TableStyle(
             [
-                ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 9),
-                ("TEXTCOLOR", (0, 0), (0, 0), colors.HexColor("#15803D")),
-                ("TEXTCOLOR", (1, 0), (1, 0), colors.HexColor("#B91C1C")),
-                ("TEXTCOLOR", (2, 0), (2, 0), gris),
-                ("FONT", (0, 1), (-1, 1), "Helvetica-Bold", 15),
-                ("FONT", (0, 2), (-1, 2), "Helvetica", 8.5),
-                ("TEXTCOLOR", (0, 2), (-1, 2), gris),
-                ("BOX", (0, 0), (-1, -1), 0.6, linea),
-                ("LINEBEFORE", (1, 0), (-1, -1), 0.6, linea),
-                ("BACKGROUND", (0, 0), (-1, -1), fondo),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 1), (-1, 1), 6),
-                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LINEBELOW", (0, 0), (-1, -1), 2, acento),
+                ("LEFTPADDING", (0, 0), (0, 0), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
             ]
         )
     )
+
+    meta = Table(
+        [
+            [p(r, "rotulo") for r in ("Fecha de corte", "Cerrada", "Cerró", "Moneda", "Estado")],
+            [
+                p(doc.corte, "dato"),
+                p(doc.cerrada_en, "dato"),
+                p(doc.cerrada_por, "dato"),
+                p("COP", "dato"),
+                p("Informe congelado", "dato"),
+            ],
+        ],
+        colWidths=[40 * mm, 52 * mm, 62 * mm, 30 * mm, 46 * mm],
+        hAlign="LEFT",
+    )
+    meta.setStyle(
+        TableStyle([("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)])
+    )
+
+    def tarjeta(rotulo: str, cifra: Cifra, detalle: str, color) -> Table:
+        tarjeta = Table(
+            [
+                [Paragraph(f"<b>{rotulo}</b>", ParagraphStyle("t", parent=base, textColor=color))],
+                [
+                    Paragraph(
+                        f"<b>{formato_cop(cifra.valor)}</b>",
+                        ParagraphStyle("v", parent=base, fontSize=16, leading=20),
+                    )
+                ],
+                [p(detalle, "nota")],
+            ],
+            colWidths=[79 * mm],
+        )
+        tarjeta.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 0.6, linea),
+                    ("LINEABOVE", (0, 0), (-1, 0), 3, color),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (0, 0), 6),
+                    ("BOTTOMPADDING", (0, -1), (-1, -1), 6),
+                ]
+            )
+        )
+        return tarjeta
+
+    tarjetas = Table(
+        [
+            [
+                tarjeta("Encontrado", t.encontrado, _unidades(t.encontrado.unidades), verde),
+                tarjeta(
+                    "No encontrado", t.no_encontrado, _unidades(t.no_encontrado.unidades), rojo
+                ),
+                tarjeta(
+                    "Total registrado",
+                    t.registrado,
+                    f"{_unidades(t.registrado.unidades)} · {t.porcentaje} encontradas",
+                    acento,
+                ),
+            ]
+        ],
+        colWidths=[83 * mm] * 3,
+        hAlign="LEFT",
+    )
+    tarjetas.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0)]))
 
     lista: list[list] = [
         ["Código", "Activo", "Categoría", "Ubicación esperada", "Nota al cierre", "Precio"]
@@ -753,20 +842,16 @@ def a_pdf(doc: Documento) -> bytes:
         ]
     )
     tabla_lista = tabla(
-        lista, [30 * mm, 66 * mm, 40 * mm, 56 * mm, 24 * mm, 32 * mm], range(5, 6), True
+        lista, [30 * mm, 70 * mm, 40 * mm, 60 * mm, 24 * mm, 32 * mm], range(5, 6), True
     )
     tabla_lista.setStyle(TableStyle([("SPAN", (0, -1), (4, -1))]))
 
-    meta = (
-        f"Fecha de corte <b>{escape(doc.corte)}</b> · Cerrada <b>{escape(doc.cerrada_en)}</b> · "
-        f"Por <b>{escape(_latin(doc.cerrada_por))}</b> · Valores en COP · <b>Informe congelado</b>"
-    )
-    historia = [
-        p(f"Informe · {doc.sesion}", "titulo"),
-        Spacer(0, 2 * mm),
-        Paragraph(meta, estilos["meta"]),
-        Spacer(0, 5 * mm),
-        cifras,
+    historia: list = [cabecera, Spacer(0, 3 * mm), meta]
+    if e.vigente:
+        historia += [Spacer(0, 2 * mm), p(EMPRESA_VIGENTE, "aviso")]
+    historia += [
+        Spacer(0, 4 * mm),
+        tarjetas,
         Spacer(0, 2 * mm),
         p(f"{t.porcentaje} de las unidades encontradas.", "meta"),
         KeepTogether(
@@ -781,10 +866,12 @@ def a_pdf(doc: Documento) -> bytes:
         p(NOTA, "nota"),
     ]
 
-    pie = _latin(f"Informe congelado al cierre · {doc.sesion}")
+    pie = _latin(f"{e.nombre} · {doc.sesion} · Informe congelado al cierre ({doc.cerrada_en})")
+    reducido_izquierda = _latin(e.nombre)
+    reducido_derecha = _latin(f"Informe de inventario · {doc.sesion} · corte {doc.corte}")
 
     class ConPaginas(rl_canvas.Canvas):
-        """Pie con «página N de M»: guarda las páginas y las numera al final."""
+        """Pie con «Página N de M» y encabezado reducido desde la página 2."""
 
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
@@ -796,14 +883,24 @@ def a_pdf(doc: Documento) -> bytes:
 
         def save(self):
             total = len(self._paginas)
+            ancho, alto = self._pagesize
             for estado in self._paginas:
                 self.__dict__.update(estado)
+                self.setStrokeColor(linea)
+                self.line(15 * mm, 12 * mm, ancho - 15 * mm, 12 * mm)
                 self.setFont("Helvetica", 7.5)
                 self.setFillColor(gris)
-                self.drawString(15 * mm, 9 * mm, pie)
+                self.drawString(15 * mm, 8 * mm, pie)
                 self.drawRightString(
-                    self._pagesize[0] - 15 * mm, 9 * mm, f"Página {self._pageNumber} de {total}"
+                    ancho - 15 * mm, 8 * mm, f"AssetControl · Página {self._pageNumber} de {total}"
                 )
+                if self._pageNumber > 1:
+                    self.setFont("Helvetica-Bold", 8)
+                    self.setFillColor(tinta)
+                    self.drawString(15 * mm, alto - 10 * mm, reducido_izquierda)
+                    self.setFont("Helvetica", 8)
+                    self.setFillColor(gris)
+                    self.drawRightString(ancho - 15 * mm, alto - 10 * mm, reducido_derecha)
                 super().showPage()
             super().save()
 
@@ -813,10 +910,10 @@ def a_pdf(doc: Documento) -> bytes:
         pagesize=landscape(letter),
         leftMargin=15 * mm,
         rightMargin=15 * mm,
-        topMargin=14 * mm,
-        bottomMargin=16 * mm,
+        topMargin=15 * mm,
+        bottomMargin=17 * mm,
         title=_latin(f"Informe · {doc.sesion}"),
-        author="AssetControl",
+        author=_latin(e.nombre) or "AssetControl",
         subject="Informe congelado",
     )
     plantilla.build(historia, canvasmaker=ConPaginas)

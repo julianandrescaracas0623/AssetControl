@@ -216,9 +216,12 @@ def test_long_pdf_numbers_pages_and_repeats_the_header():
     assert paginas >= 3
     for numero, pagina in enumerate(lector.pages, start=1):
         texto = pagina.extract_text()
-        assert texto.rstrip().endswith(f"Página {numero} de {paginas}")
+        assert f"AssetControl · Página {numero} de {paginas}" in texto
+        if 1 < numero < paginas:
+            assert "Código" in texto  # encabezado de la tabla repetido
         if numero > 1:
-            assert "Código" in texto  # encabezado repetido
+            # Encabezado reducido de la empresa y la sesión (spec 013, R6).
+            assert "Informe de inventario · Conteo nov 2026 · corte 30/11/2026" in texto
 
 
 @pytest.mark.parametrize(
