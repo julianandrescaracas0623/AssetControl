@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, House } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 
@@ -35,11 +35,21 @@ export function CountShell({
       <header className="sticky top-0 z-10 border-b bg-background">
         <div className="mx-auto flex h-14 w-full max-w-[480px] items-center gap-1 px-1.5">
           {volver ? (
-            <Button asChild variant="ghost" size="icon" className="size-11">
-              <Link to={volver} aria-label="Volver">
-                <ArrowLeft className="size-5" />
-              </Link>
-            </Button>
+            <>
+              <Button asChild variant="ghost" size="icon" className="size-11 shrink-0">
+                <Link to={volver} aria-label="Volver">
+                  <ArrowLeft className="size-5" />
+                </Link>
+              </Button>
+              {/* Atajo al inicio del conteo cuando «Volver» lleva a otra pantalla. */}
+              {volver !== '/contar' && (
+                <Button asChild variant="ghost" size="icon" className="size-11 shrink-0">
+                  <Link to="/contar" aria-label="Inicio del conteo">
+                    <House className="size-5" />
+                  </Link>
+                </Button>
+              )}
+            </>
           ) : (
             (menu ?? <span className="size-11 shrink-0" aria-hidden="true" />)
           )}

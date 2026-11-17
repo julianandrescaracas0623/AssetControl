@@ -84,13 +84,29 @@ export function entradaDeRuta(pathname: string): { grupo: AdminNavGrupo; item: A
   return mejor && { ...mejor, exacta: false }
 }
 
-/** Migas de pan de una ruta de administración. */
-export function migasDeRuta(pathname: string): string[] {
+export interface Miga {
+  texto: string
+  /** Ruta a la que lleva; sin ella, la miga no es enlace (grupo o pantalla actual). */
+  ruta?: string
+}
+
+/**
+ * Migas de pan de una ruta de administración. Cada nivel con pantalla propia es un
+ * enlace (la sección, la sesión del informe); el grupo y la pantalla actual no.
+ */
+export function migasDeRuta(pathname: string): Miga[] {
   const entrada = entradaDeRuta(pathname)
-  if (!entrada) return ['Administración']
-  if (entrada.exacta) return [entrada.grupo.titulo, entrada.item.titulo]
-  const ultimo = decodeURIComponent(pathname.split('/').filter(Boolean).at(-1) ?? '')
+  if (!entrada) return [{ texto: 'Administración' }]
+  if (entrada.exacta) return [{ texto: entrada.grupo.titulo }, { texto: entrada.item.titulo }]
+  const partes = pathname.split('/').filter(Boolean)
+  const ultimo = decodeURIComponent(partes.at(-1) ?? '')
   // Un id interno (uuid) no dice nada a la persona: la miga nombra la pantalla.
-  const esId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ultimo)
-  return [entrada.grupo.titulo, entrada.item.titulo, ultimo === 'informe' ? 'Informe' : esId ? 'Detalle' : ultimo]
+  const esId = (texto: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(texto)
+  const migas: Miga[] = [{ texto: entrada.grupo.titulo }, { texto: entrada.item.titulo, ruta: entrada.item.ruta }]
+  if (ultimo === 'informe' && partes.length >= 4) {
+    migas.push({ texto: 'Sesión', ruta: `/${partes.slice(0, -1).join('/')}` }, { texto: 'Informe' })
+  } else {
+    migas.push({ texto: esId(ultimo) ? 'Detalle' : ultimo })
+  }
+  return migas
 }

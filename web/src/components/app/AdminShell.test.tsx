@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
@@ -52,9 +52,15 @@ describe('AdminShell en computador', () => {
   })
 
   it('en una pantalla de detalle marca la sección y arma las migas', async () => {
-    renderAt('/admin/sesiones/conteo-may-2026/informe')
+    renderAt('/admin/sesiones/00000000-0000-4000-8000-0000000000e1/informe')
     const migas = await screen.findByRole('navigation', { name: 'Migas de pan' })
-    expect(migas.textContent).toBe('ConteoSesionesInforme')
+    expect(migas.textContent).toBe('ConteoSesionesSesiónInforme')
+    // Cada nivel con pantalla propia es un enlace; el grupo y la pantalla actual no.
+    expect(within(migas).getByRole('link', { name: 'Sesiones' }).getAttribute('href')).toBe('/admin/sesiones')
+    expect(within(migas).getByRole('link', { name: 'Sesión' }).getAttribute('href')).toBe(
+      '/admin/sesiones/00000000-0000-4000-8000-0000000000e1',
+    )
+    expect(within(migas).queryByRole('link', { name: 'Conteo' })).toBeNull()
     const nav = screen.getByRole('navigation', { name: 'Navegación principal' })
     expect(within(nav).getByRole('link', { name: 'Sesiones' }).getAttribute('data-active')).toBe('true')
   })
@@ -93,5 +99,28 @@ describe('AdminShell en celular', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar u ocultar el menú' }))
     const menu = await screen.findByRole('dialog', { name: 'Menú de navegación' })
     expect(within(menu).getByRole('link', { name: 'Registrar activo' })).toBeTruthy()
+  })
+})
+
+describe('AdminShell en teléfono (navegación)', () => {
+  beforeEach(() => simularAncho({ movil: true }))
+
+  it('al elegir un módulo del menú lleva a esa pantalla y cierra el menú', async () => {
+    renderAt('/admin')
+    await screen.findByRole('heading', { level: 1, name: 'Resumen' })
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar u ocultar el menú' }))
+    const nav = await screen.findByRole('navigation', { name: 'Navegación principal' })
+    fireEvent.click(within(nav).getByRole('link', { name: 'Valor actual' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Valor actual' })).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Navegación principal' })).toBeNull())
+  })
+
+  it('fuera del Inicio hay un botón para volver al Inicio', async () => {
+    renderAt('/admin/valor')
+    const inicio = await screen.findByRole('link', { name: 'Ir al inicio' })
+    expect(inicio.getAttribute('href')).toBe('/admin')
+    fireEvent.click(inicio)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Resumen' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Ir al inicio' })).toBeNull()
   })
 })

@@ -56,3 +56,26 @@ describe('CountShell', () => {
     expect(screen.getByRole('main').classList.contains('max-w-[480px]')).toBe(true)
   })
 })
+
+describe('CountShell: atajo al inicio del conteo', () => {
+  function con(volver: string) {
+    render(
+      <MemoryRouter>
+        <CountShell titulo="Unidad odontológica" volver={volver} estadoRed="en_linea">
+          <p>Contenido</p>
+        </CountShell>
+      </MemoryRouter>,
+    )
+  }
+
+  it('si «Volver» lleva a otra pantalla, también ofrece el inicio del conteo', () => {
+    con('/contar/escanear')
+    expect(screen.getByRole('link', { name: 'Volver' }).getAttribute('href')).toBe('/contar/escanear')
+    expect(screen.getByRole('link', { name: 'Inicio del conteo' }).getAttribute('href')).toBe('/contar')
+  })
+
+  it('si «Volver» ya lleva al inicio, no repite el atajo', () => {
+    con('/contar')
+    expect(screen.queryByRole('link', { name: 'Inicio del conteo' })).toBeNull()
+  })
+})

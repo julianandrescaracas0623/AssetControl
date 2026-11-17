@@ -1,4 +1,4 @@
-import { ChevronsUpDown, LogOut, ScanBarcode, Search } from 'lucide-react'
+import { ChevronsUpDown, House, LogOut, ScanBarcode, Search } from 'lucide-react'
 import { Fragment, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 
@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   Breadcrumb,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
@@ -38,6 +39,7 @@ import {
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -55,13 +57,18 @@ function BarraLateral() {
   const { pathname } = useLocation()
   const activa = entradaDeRuta(pathname)?.item.ruta
   const clinica = useSesion().sesion?.tenant.nombre ?? ''
+  // En el teléfono el menú es un panel encima de la pantalla: al elegir, se cierra.
+  const { isMobile, setOpenMobile } = useSidebar()
+  const alElegir = () => {
+    if (isMobile) setOpenMobile(false)
+  }
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg" tooltip="AssetControl">
-              <Link to="/admin">
+              <Link to="/admin" onClick={alElegir}>
                 <Logo />
                 <span className="truncate text-[15px] font-semibold tracking-tight">AssetControl</span>
               </Link>
@@ -84,7 +91,7 @@ function BarraLateral() {
                         tooltip={item.titulo}
                         className="max-md:h-11 data-[active=true]:bg-background data-[active=true]:font-semibold data-[active=true]:shadow-[0_0_0_1px_var(--sidebar-border)]"
                       >
-                        <NavLink to={item.ruta} end>
+                        <NavLink to={item.ruta} end onClick={alElegir}>
                           <item.icono />
                           <span>{item.titulo}</span>
                         </NavLink>
@@ -101,7 +108,7 @@ function BarraLateral() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Ir a contar" variant="outline" className="max-md:h-11">
-              <Link to="/contar">
+              <Link to="/contar" onClick={alElegir}>
                 <ScanBarcode />
                 <span>Ir a contar</span>
               </Link>
@@ -134,9 +141,17 @@ function Migas() {
         {migas.map((miga, i) => {
           const ultima = i === migas.length - 1
           return (
-            <Fragment key={miga}>
+            <Fragment key={`${i}-${miga.texto}`}>
               <BreadcrumbItem className={ultima ? 'min-w-0' : 'hidden md:inline-flex'}>
-                {ultima ? <BreadcrumbPage className="truncate">{miga}</BreadcrumbPage> : <span>{miga}</span>}
+                {ultima ? (
+                  <BreadcrumbPage className="truncate">{miga.texto}</BreadcrumbPage>
+                ) : miga.ruta ? (
+                  <BreadcrumbLink asChild>
+                    <Link to={miga.ruta}>{miga.texto}</Link>
+                  </BreadcrumbLink>
+                ) : (
+                  <span>{miga.texto}</span>
+                )}
               </BreadcrumbItem>
               {!ultima && <BreadcrumbSeparator className="hidden md:block" />}
             </Fragment>
@@ -233,6 +248,13 @@ export default function AdminShell() {
         <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-2 md:px-6">
           <SidebarTrigger className="size-11 md:size-8" aria-label="Mostrar u ocultar el menú" />
           <div className="hidden h-5 w-px bg-border md:block" aria-hidden="true" />
+          {pathname !== '/admin' && (
+            <Button asChild variant="ghost" size="icon" className="size-11 shrink-0 md:hidden">
+              <Link to="/admin" aria-label="Ir al inicio">
+                <House />
+              </Link>
+            </Button>
+          )}
           <Migas />
           <div className="flex-1" />
           <BotonBuscar onAbrir={() => setBuscando(true)} />
