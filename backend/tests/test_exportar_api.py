@@ -28,11 +28,13 @@ from acceso_db import (
 )
 from flask import Flask
 from openpyxl import load_workbook
+from PIL import Image
 from pypdf import PdfReader
 from sqlalchemy import text
 from test_cierre_api import Clinica
 
 from app.conteo import exportar
+from app.fotos.almacen import EXTENSION_KEY, CarpetaLocal
 
 ADMIN = bearer(ADMIN_A, TENANT_A)
 CONTADOR = bearer(CONTADOR_A, TENANT_A, rol="contador")
@@ -47,8 +49,9 @@ def exp_db(database_residue_guard) -> Iterator[AccesoDb]:
 
 
 @pytest.fixture(scope="module")
-def exp_app(exp_db) -> Iterator[Flask]:
+def exp_app(exp_db, tmp_path_factory) -> Iterator[Flask]:
     flask_app = make_app(exp_db)
+    flask_app.extensions[EXTENSION_KEY] = CarpetaLocal(tmp_path_factory.mktemp("almacen"))
     yield flask_app
     dispose(flask_app)
 
@@ -65,6 +68,9 @@ def tenant_limpio(exp_db) -> Iterator[None]:
         for sql in (
             "delete from sesion_detalle",
             "delete from sesion_empresa",
+            "update empresa set logo_id = null",
+            "delete from empresa",
+            "delete from empresa_logo",
             "delete from sesion_no_encontrado",
             "delete from sesion_desglose",
             "delete from activo_evento",
@@ -117,14 +123,21 @@ def dinero(valor) -> Decimal:
     return Decimal(str(valor)).quantize(CENTAVO)
 
 
-def filas_desglose(hoja) -> list[list]:
-    """Filas de datos de una hoja de desglose, con el dinero como Decimal."""
-    filas = []
-    for fila in hoja.iter_rows(min_row=2, values_only=True):
-        if fila[0] is None:
+def filas_desglose(hoja, titulo: str) -> list[list]:
+    """Filas de la tabla «titulo» de la hoja Resumen (después de su cabecera, hasta Total)."""
+    filas, dentro = [], False
+    for fila in hoja.iter_rows(values_only=True):
+        if fila[0] == titulo:
+            dentro = None  # la siguiente es la cabecera
             continue
-        e, ue, n, un, r, ur, pct = fila[1:8]
-        filas.append([fila[0], dinero(e), ue, dinero(n), un, dinero(r), ur, pct])
+        if dentro is None:
+            dentro = True
+            continue
+        if dentro:
+            e, ue, n, un, r, ur, pct = fila[1:8]
+            filas.append([fila[0], dinero(e), ue, dinero(n), un, dinero(r), ur, pct])
+            if fila[0] == "Total":
+                break
     return filas
 
 
@@ -153,37 +166,57 @@ def libro(response):
     return load_workbook(io.BytesIO(response.data))
 
 
-# --- Excel (T2) ----------------------------------------------------------------------------
+def activos_de_hoja(hoja) -> tuple[list[tuple], tuple]:
+    """Filas de activos de una hoja de categoría (bajo la cabecera «Código») y su total."""
+    filas, dentro = [], False
+    for fila in hoja.iter_rows(values_only=True):
+        if fila[0] == "Código":
+            dentro = True
+            continue
+        if dentro:
+            if isinstance(fila[1], str) and fila[1].startswith("Total "):
+                return filas, fila
+            filas.append(fila)
+    raise AssertionError("la hoja no tiene fila de total")
 
 
-def test_excel_has_exactly_the_figures_of_the_report(client):
+def codigo(client, activo_id) -> str:
+    return client.get(f"/activos/{activo_id}", headers=ADMIN).get_json()["activo"]["codigo"]
+
+
+def _png() -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGBA", (300, 100), (14, 116, 144, 255)).save(buffer, "PNG")
+    return buffer.getvalue()
+
+
+# --- Excel (spec 009 T2; spec 013 T4: libro v3) ---------------------------------------------
+
+
+def test_excel_has_a_summary_one_sheet_per_category_and_the_missing(client):
     _, sesion, informe, _ = cerrada(client)
     response = excel(client, sesion)
     assert response.status_code == 200
     assert response.mimetype == XLSX
     wb = libro(response)
-    assert wb.sheetnames == ["Informe", "Por categoría", "Por ubicación", "No encontrados"]
+    assert wb.sheetnames == ["Resumen", "Biomédicos", "Mobiliario", "No encontrados"]
 
-    portada = {fila[0]: fila[1:] for fila in wb["Informe"].iter_rows(values_only=True) if fila[0]}
-    assert portada["Sesión"][0] == "Conteo nov 2026"
-    assert portada["Fecha de corte"][0] == "30/11/2026"
-    assert portada["Estado"][0] == "Informe congelado"
+    resumen = wb["Resumen"]
     t = informe["totales"]
-    for rotulo, clave in (
-        ("Encontrado", "encontrado"),
-        ("No encontrado", "no_encontrado"),
-        ("Total registrado", "registrado"),
-    ):
-        valor, unidades = portada[rotulo][:2]
-        assert dinero(valor) == Decimal(t[clave]), rotulo
-        assert unidades == t[f"unidades_{clave}"], rotulo
-    assert portada["% de unidades encontradas"][0] == "50 %"
+    fila_cifras = exportar.FILA_TABLA + 1  # openpyxl cuenta desde 1
+    for col, clave in ((2, "encontrado"), (4, "no_encontrado"), (6, "registrado")):
+        assert dinero(resumen.cell(row=fila_cifras, column=col).value) == Decimal(t[clave])
+        unidades = resumen.cell(row=fila_cifras + 1, column=col).value
+        assert unidades.startswith(f"{t[f'unidades_{clave}']} unidad")
+    textos = [c for fila in resumen.iter_rows(values_only=True) for c in fila if c]
+    assert "50 % de las unidades encontradas." in textos
+    assert filas_desglose(resumen, "Por categoría") == esperado_desglose(informe, "categorias")
+    assert filas_desglose(resumen, "Por ubicación") == esperado_desglose(informe, "ubicaciones")
 
-    assert filas_desglose(wb["Por categoría"]) == esperado_desglose(informe, "categorias")
-    assert filas_desglose(wb["Por ubicación"]) == esperado_desglose(informe, "ubicaciones")
-
-    lista = [f for f in wb["No encontrados"].iter_rows(min_row=2, values_only=True) if f[0]]
-    *items, total = lista
+    lista = [
+        f for f in wb["No encontrados"].iter_rows(min_row=exportar.FILA_TABLA + 1, values_only=True)
+    ]
+    *items, total = [f for f in lista if f[0]]
     assert [(f[0], f[1], f[2], f[3], f[4], dinero(f[5])) for f in items] == [
         (
             n["codigo"],
@@ -199,27 +232,79 @@ def test_excel_has_exactly_the_figures_of_the_report(client):
     assert total[0] == "2 activos no encontrados"
 
 
+def test_each_category_sheet_lists_its_assets_and_its_frozen_total(client):
+    c, sesion, informe, ids = cerrada(client)
+    wb = libro(excel(client, sesion))
+    desglose = {f["etiqueta"]: f for f in informe["desglose"]["categorias"]}
+    esperado = {
+        "Biomédicos": {ids["autoclave"]: "Encontrado", ids["formula"]: "No encontrado"},
+        "Mobiliario": {ids["lampara"]: "Encontrado", ids["silla"]: "No encontrado"},
+    }
+    for categoria, activos in esperado.items():
+        filas, total = activos_de_hoja(wb[categoria])
+        assert {f[0]: f[7] for f in filas} == {codigo(client, i): r for i, r in activos.items()}
+        # Encontrados primero; el total y las unidades son los del desglose congelado.
+        assert [f[7] for f in filas] == ["Encontrado", "No encontrado"]
+        assert sum(dinero(f[8]) for f in filas) == Decimal(desglose[categoria]["total_registrado"])
+        assert dinero(total[8]) == Decimal(desglose[categoria]["total_registrado"])
+        assert total[1] == f"Total {categoria}" and total[7] == "2 activos"
+    filas, _ = activos_de_hoja(wb["Mobiliario"])
+    lampara = next(f for f in filas if f[1] == "Lámpara")
+    # Esperada en la bodega y encontrada en el box: las dos rutas y su estado.
+    assert (lampara[4], lampara[5], lampara[6]) == ("Bodega", "Consultorios › Box 1", "Ok")
+    silla = next(f for f in filas if f[1] == "Silla")
+    assert (silla[5], silla[6], silla[7]) == (None, "En reparación", "No encontrado")
+
+
 def test_excel_money_is_a_number_with_cop_format_and_no_formulas(client):
     _, sesion, _, _ = cerrada(client)
     response = excel(client, sesion)
-    hoja = libro(response)["Por categoría"]
-    celda = hoja.cell(row=2, column=2)
-    assert isinstance(celda.value, (int, float))
-    assert "#,##0.00" in celda.number_format
+    filas, _ = activos_de_hoja(libro(response)["Biomédicos"])
+    hoja = libro(response)["Biomédicos"]
+    celda = next(c for fila in hoja.iter_rows() for c in fila if c.value == filas[0][0])
+    precio = hoja.cell(row=celda.row, column=9)
+    assert isinstance(precio.value, (int, float))
+    assert "#,##0.00" in precio.number_format
     with zipfile.ZipFile(io.BytesIO(response.data)) as z:
-        for nombre in z.namelist():
-            if nombre.startswith("xl/worksheets/"):
-                assert "<f>" not in z.read(nombre).decode(), nombre
-        # El número se escribe desde el Decimal exacto, no desde un float redondeado.
         hojas = "".join(z.read(n).decode() for n in z.namelist() if n.startswith("xl/worksheets/"))
+        assert "<f>" not in hojas
+        # El número se escribe desde el Decimal exacto, no desde un float redondeado.
         assert "<v>1390000.50</v>" in hojas
 
 
 def test_excel_text_that_looks_like_a_formula_stays_text(client):
     _, sesion, _, _ = cerrada(client)
-    hoja = libro(excel(client, sesion))["No encontrados"]
-    celda = next(c for fila in hoja.iter_rows(min_row=2) for c in fila if c.value == "=1+1")
-    assert celda.data_type == "s"
+    wb = libro(excel(client, sesion))
+    for nombre in ("Biomédicos", "No encontrados"):
+        celda = next(c for fila in wb[nombre].iter_rows() for c in fila if c.value == "=1+1")
+        assert celda.data_type == "s", nombre
+
+
+def test_every_sheet_carries_the_frozen_company_and_its_logo(client):
+    datos = {
+        "nombre": "Clínica & Ejemplo S.A.S.",
+        "direccion": "Calle 10 # 5-20, Cartago",
+        "nit": "890903938-8",
+    }
+    respuesta = client.put("/empresa", json=datos, headers=ADMIN)
+    assert respuesta.status_code == 200, respuesta.get_json()
+    subida = client.put(
+        "/empresa/logo",
+        data={"logo_id": str(uuid.uuid4()), "archivo": (io.BytesIO(_png()), "l.png")},
+        headers=ADMIN,
+        content_type="multipart/form-data",
+    )
+    assert subida.status_code == 201, subida.get_json()
+    _, sesion, _, _ = cerrada(client)
+    wb = libro(excel(client, sesion))
+    for hoja in wb.worksheets:
+        assert hoja["B1"].value == "Clínica & Ejemplo S.A.S.", hoja.title
+        assert hoja["B2"].value == "NIT 890.903.938-8 · Calle 10 # 5-20, Cartago", hoja.title
+        assert "«Conteo nov 2026» · corte 30/11/2026" in hoja["B3"].value
+        assert hoja["B4"].value == "Informe congelado al cierre · valores en COP"
+        assert len(hoja._images) == 1, hoja.title
+        assert hoja.page_setup.orientation == "landscape"
+        assert hoja.HeaderFooter.oddFooter.right.text == "Página &P de &N"
 
 
 def test_excel_download_headers(client):
@@ -233,27 +318,46 @@ def test_excel_download_headers(client):
     assert response.headers["X-Content-Type-Options"] == "nosniff"
 
 
-def test_excel_of_an_empty_session_has_zeros(client):
+def test_excel_of_an_empty_session_has_zeros_and_no_category_sheets(client):
     c = ClinicaExp(client)
     sesion = c.abrir()
     assert client.post(f"/sesiones/{sesion}/cerrar", headers=ADMIN).status_code == 200
     wb = libro(excel(client, sesion))
-    portada = {f[0]: f[1:] for f in wb["Informe"].iter_rows(values_only=True) if f[0]}
-    assert dinero(portada["Total registrado"][0]) == Decimal("0.00")
-    assert portada["Total registrado"][1] == 0
-    assert filas_desglose(wb["Por categoría"]) == [
+    assert wb.sheetnames == ["Resumen", "No encontrados"]
+    assert filas_desglose(wb["Resumen"], "Por categoría") == [
         ["Total", Decimal("0.00"), 0, Decimal("0.00"), 0, Decimal("0.00"), 0, "0 %"]
     ]
+    assert all(h._images == [] for h in wb.worksheets)
+
+
+def test_session_closed_before_013_has_no_category_sheets_and_says_so(client, exp_db):
+    _, sesion, _, _ = cerrada(client)
+    with exp_db.migrator.begin() as conn:
+        conn.execute(text("delete from sesion_detalle"))
+        conn.execute(text("delete from sesion_empresa"))
+    wb = libro(excel(client, sesion))
+    assert wb.sheetnames == ["Resumen", "No encontrados"]
+    textos = [c for fila in wb["Resumen"].iter_rows(values_only=True) for c in fila if c]
+    assert exportar.SIN_DETALLE in textos
+    assert exportar.EMPRESA_VIGENTE in wb["Resumen"]["B4"].value
 
 
 def test_excel_reads_the_frozen_report_after_later_changes(client):
     c, sesion, _, ids = cerrada(client)
-    antes = [list(h.iter_rows(values_only=True)) for h in libro(excel(client, sesion)).worksheets]
+
+    def contenido():
+        return [
+            list(h.iter_rows(values_only=True)) for h in libro(excel(client, sesion)).worksheets
+        ]
+
+    antes = contenido()
     c.precio(ids["autoclave"], "1.00")
     c.mover(ids["silla"], c.box)
     client.patch(f"/categorias/{c.bio}", json={"nombre": "Equipos"}, headers=ADMIN)
-    despues = [list(h.iter_rows(values_only=True)) for h in libro(excel(client, sesion)).worksheets]
-    assert despues == antes
+    client.put(
+        "/empresa", json={"nombre": "Nombre nuevo", "direccion": "Otra dirección"}, headers=ADMIN
+    )
+    assert contenido() == antes
 
 
 def test_excel_errors_roles_and_tenant(client):

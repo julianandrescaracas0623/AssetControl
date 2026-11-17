@@ -63,6 +63,16 @@ INFORME = {
         "cerrada_por": {"id": "00000000-0000-4000-8000-00000000000a", "nombre": "Ana Torres"},
         "cerrada_en": "2026-11-14T22:58:00+00:00",
     },
+    "empresa": {
+        "nombre": "Clínica Dental Ejemplo S.A.S.",
+        "direccion": "Calle 10 # 5-20, Cartago",
+        "nit": "890.903.938-8",
+        "telefono": None,
+        "correo": None,
+        "logo": None,
+        "vigente": False,
+    },
+    "detalle_disponible": True,
     "totales": {
         "encontrado": "1390000.50",
         "no_encontrado": "389900.00",
@@ -209,3 +219,28 @@ def test_long_pdf_numbers_pages_and_repeats_the_header():
         assert texto.rstrip().endswith(f"Página {numero} de {paginas}")
         if numero > 1:
             assert "Código" in texto  # encabezado repetido
+
+
+@pytest.mark.parametrize(
+    ("categorias", "hojas"),
+    [
+        (["Biomédicos", "CPU"], ["Biomédicos", "CPU"]),
+        (["Equipos / Rayos X: [sala]*?"], ["Equipos Rayos X sala"]),
+        (["x" * 40], ["x" * 31]),
+        (["Resumen", "No encontrados"], ["Resumen (2)", "No encontrados (2)"]),
+        (["Sillas", "SILLAS", "sillas"], ["Sillas", "SILLAS (2)", "sillas (3)"]),
+        (["y" * 35, "y" * 33], ["y" * 31, "y" * 27 + " (2)"]),
+        (["'Citada'", "///"], ["Citada", "Categoría"]),
+    ],
+)
+def test_sheet_names_are_valid_and_unique(categorias, hojas):
+    nombres = exportar.nombres_de_hoja(categorias)
+    assert nombres == hojas
+    for nombre in nombres:
+        assert len(nombre) <= 31 and not set(nombre) & set("[]:*?/\\")
+
+
+def test_company_contact_line_has_only_what_exists():
+    empresa = exportar.documento(INFORME).empresa
+    assert empresa.contacto == "NIT 890.903.938-8 · Calle 10 # 5-20, Cartago"
+    assert exportar.Empresa(nombre="X").contacto == ""

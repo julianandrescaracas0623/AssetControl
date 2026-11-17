@@ -8,12 +8,14 @@ tenant es ``404``. Cuerpos JSON de 4 KB como máximo (``app.auth.http``).
 import uuid
 from urllib.parse import quote
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request
 from flask.typing import ResponseReturnValue
 
 from app.auth.decorators import current_session, current_user, require_auth, require_role
 from app.conteo import cierre, discrepancias, exportar, service, verificaciones
+from app.empresa import service as empresa_service
 from app.errors import error_response
+from app.fotos.almacen import EXTENSION_KEY
 
 bp = Blueprint("sesiones", __name__, url_prefix="/sesiones")
 
@@ -199,12 +201,27 @@ def _archivo(contenido: bytes, mimetype: str, nombre: str) -> Response:
     return respuesta
 
 
+def _logo(session, empresa: dict) -> bytes | None:
+    """Bytes del logo congelado; si no hay o no se puede leer, el archivo sale sin logo."""
+    logo = empresa.get("logo")
+    if not logo:
+        return None
+    try:
+        return empresa_service.leer_logo(
+            session, current_app.extensions.get(EXTENSION_KEY), uuid.UUID(logo["id"])
+        )
+    except empresa_service.ErrorEmpresa:
+        return None
+
+
 def _documento(session, id: uuid.UUID) -> tuple[exportar.Documento, str]:  # noqa: A002
-    informe = cierre.informe(session, service.obtener(session, id))
+    sesion_db = service.obtener(session, id)
+    informe = cierre.informe(session, sesion_db)
     sesion = informe["sesion"]
-    return exportar.documento(informe), exportar.nombre_base(
-        sesion["nombre"], sesion["fecha_corte"]
+    doc = exportar.documento(
+        informe, cierre.detalle(session, sesion_db), _logo(session, informe["empresa"])
     )
+    return doc, exportar.nombre_base(sesion["nombre"], sesion["fecha_corte"])
 
 
 @bp.get("/<uuid:id>/informe/excel")
