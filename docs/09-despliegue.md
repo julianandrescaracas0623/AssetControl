@@ -48,7 +48,7 @@ uv run python -c "import secrets; print(secrets.token_urlsafe(32))"   # APP_DB_P
 
    Si la contraseña lleva `@ : / ? # %`, codifícala (por ejemplo `@` → `%40`).
 
-4. **Fotos (spec 012).** En *Storage*, crea un bucket **privado** llamado `fotos` (sin acceso público ni políticas para `anon` o `authenticated`: solo Flask entra, con llaves S3). En *Storage → Settings → S3 Connection* activa la conexión S3, copia el **endpoint** (`https://<ref>.storage.supabase.co/storage/v1/s3`) y la **región**, y crea un par de **llaves de acceso S3** (se muestran una sola vez: guárdalas en tu gestor de contraseñas). El plan Free trae 1 GB: unas 3.000 fotos (cada una ~300 KB con su miniatura; las cambiadas o quitadas se borran). El uso se ve en *Storage → Usage*.
+4. **Fotos (spec 012).** En *Storage*, crea un bucket **privado** llamado `fotos` (sin acceso público ni políticas para `anon` o `authenticated`: solo Flask entra, con llaves S3). En *Storage → Settings → S3 Connection* activa la conexión S3, copia el **endpoint** (`https://<ref>.storage.supabase.co/storage/v1/s3`) y la **región**, y crea un par de **llaves de acceso S3** (se muestran una sola vez: guárdalas en tu gestor de contraseñas). El plan Free trae 1 GB: unas 3.000 fotos (cada una ~300 KB con su miniatura; las cambiadas o quitadas se borran). El uso se ve en *Storage → Usage*. El mismo bucket guarda los **logos de la empresa** (spec 013, PNG de pocos KB): no se borran porque los informes cerrados los usan.
 
 **Riesgos aceptados del plan Free (G1):**
 

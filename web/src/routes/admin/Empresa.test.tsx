@@ -61,6 +61,8 @@ describe('/admin/empresa', () => {
     expect(campo(/Dirección/).value).toBe('')
     expect((screen.getByRole('button', { name: 'Subir logo' }) as HTMLButtonElement).disabled).toBe(true)
     expect(screen.getByText(/Guarda primero el nombre y la dirección/)).toBeTruthy()
+    // Pantalla con datos reales: sin la banda de maqueta.
+    expect(screen.queryByText('Datos ficticios')).toBeNull()
   })
 
   it('valida antes de enviar y guarda el NIT normalizado', async () => {

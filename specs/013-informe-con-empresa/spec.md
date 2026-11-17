@@ -1,6 +1,6 @@
 # Spec 013 — Informe con los datos de la empresa y nuevo diseño de exportación
 
-> **Estado:** Aprobada (G1–G3, 2026-11-16): Q1 **A**; Q2: **sin firmas** (decisión del humano, ver «Decisiones de G1»). Decisiones previas del humano (2026-11-15/16): los datos de la empresa salen **congelados al cierre**; PDF **estilo A «Corporativo»** (sin firmas, G1); Excel **v3** (Resumen, una hoja por categoría con el detalle de cada activo, No encontrados); campos de empresa: nombre, dirección, NIT opcional, teléfono y correo opcionales, logo opcional. Maquetas aprobadas en `maquetas/`. Depende de 008 (cierre), 009 (exportación) y 012 (almacenamiento). Plan en `plan.md`, tareas en `tasks.md`.
+> **Estado:** Implementada (T1–T8, 2026-11-17). Aprobada (G1–G3, 2026-11-16): Q1 **A**; Q2: **sin firmas** (decisión del humano, ver «Decisiones de G1»). Decisiones previas del humano (2026-11-15/16): los datos de la empresa salen **congelados al cierre**; PDF **estilo A «Corporativo»** (sin firmas, G1); Excel **v3** (Resumen, una hoja por categoría con el detalle de cada activo, No encontrados); campos de empresa: nombre, dirección, NIT opcional, teléfono y correo opcionales, logo opcional. Maquetas aprobadas en `maquetas/`. Depende de 008 (cierre), 009 (exportación) y 012 (almacenamiento). Plan en `plan.md`, tareas en `tasks.md`.
 
 ## Problema
 

@@ -204,7 +204,7 @@ function MenuUsuario() {
 }
 
 // Pantallas que ya muestran datos reales de la API: sin la banda de maqueta.
-const RUTAS_CON_DATOS_REALES = new Set(['/admin/usuarios', '/admin/ubicaciones', '/admin/categorias', '/admin/sesiones', '/admin/discrepancias', '/admin/valor'])
+const RUTAS_CON_DATOS_REALES = new Set(['/admin/usuarios', '/admin/ubicaciones', '/admin/categorias', '/admin/sesiones', '/admin/discrepancias', '/admin/valor', '/admin/empresa'])
 const conDatosReales = (ruta: string) =>
   ruta === '/admin' || RUTAS_CON_DATOS_REALES.has(ruta) || ruta.startsWith('/admin/activos') || /^\/admin\/sesiones\/[^/]+(\/informe)?$/.test(ruta)
 

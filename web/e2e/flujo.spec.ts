@@ -70,6 +70,17 @@ test('un conteo completo: invitar, verificar en el teléfono, cerrar, informe, e
     await expect(telefono.getByText('Foto guardada.')).toBeVisible()
   })
 
+  await test.step('el admin completa los datos y el logo de la empresa (spec 013)', async () => {
+    await admin.goto('/admin/empresa')
+    await admin.getByRole('textbox', { name: /Nombre o razón social/ }).fill('Clínica E2E S.A.S.')
+    await admin.getByRole('textbox', { name: /Dirección/ }).fill('Calle 1 # 2-3, Cartago')
+    await admin.getByRole('textbox', { name: /NIT/ }).fill('890903938-8')
+    await admin.getByRole('button', { name: 'Guardar datos' }).click()
+    await expect(admin.getByRole('textbox', { name: /NIT/ })).toHaveValue('890.903.938-8')
+    await admin.getByTestId('entrada-logo').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: FOTO })
+    await expect(admin.getByRole('img', { name: 'Logo de Clínica E2E S.A.S.' })).toBeVisible()
+  })
+
   await test.step('el admin cierra con el aviso y llega al informe', async () => {
     await admin.goto(`/admin/sesiones/${sesion.id}`)
     await admin.getByRole('button', { name: 'Cerrar sesión' }).click()
@@ -81,6 +92,14 @@ test('un conteo completo: invitar, verificar en el teléfono, cerrar, informe, e
     expect(cifras).toContain('Encontrado$ 1.390.000,50')
     expect(cifras).toContain('No encontrado$ 2.389.900,00')
     expect(cifras).toContain('Total registrado$ 3.779.900,50')
+    await expect(admin.getByText('Clínica E2E S.A.S.', { exact: true })).toBeVisible()
+    const informe = await llamar<{ empresa: { nombre: string; nit: string; logo: object | null; vigente: boolean }; detalle_disponible: boolean }>(
+      'GET',
+      `/sesiones/${sesion.id}/informe`,
+    )
+    expect(informe.empresa).toMatchObject({ nombre: 'Clínica E2E S.A.S.', nit: '890.903.938-8', vigente: false })
+    expect(informe.empresa.logo).not.toBeNull()
+    expect(informe.detalle_disponible).toBe(true)
   })
 
   await test.step('exportar Excel y PDF descarga los archivos del servidor', async () => {
