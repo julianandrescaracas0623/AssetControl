@@ -69,8 +69,9 @@ def _rgb(img: Image.Image) -> Image.Image:
     return img.convert("RGB")
 
 
-def procesar(datos: bytes) -> Procesada:
-    if len(datos) > MAX_BYTES:
+def _abrir(datos: bytes, max_bytes: int) -> Image.Image:
+    """Decodifica con los mismos controles para fotos y logos; aplica la orientación."""
+    if len(datos) > max_bytes:
         raise ImagenDemasiadoGrande()
     try:
         with warnings.catch_warnings():
@@ -82,14 +83,48 @@ def procesar(datos: bytes) -> Procesada:
             if ancho * alto > MAX_PIXELES:
                 raise ImagenInvalida()
             original.load()
-            girada = ImageOps.exif_transpose(original)
-            img = _rgb(girada)
+            return ImageOps.exif_transpose(original)
     except ErrorImagen:
         raise
     except UnidentifiedImageError:
         raise TipoNoAdmitido() from None
     except (OSError, ValueError, SyntaxError, Image.DecompressionBombError, Warning):
         raise ImagenInvalida() from None
+
+
+def procesar(datos: bytes) -> Procesada:
+    img = _rgb(_abrir(datos, MAX_BYTES))
     completa, reducida = _jpeg(img, LADO_COMPLETA)
     mini, _ = _jpeg(img, LADO_MINI)
     return Procesada(completa=completa, mini=mini, ancho=reducida.width, alto=reducida.height)
+
+
+# Spec 013 (R2): el logo de la empresa, en PNG con transparencia, ≤ 600 px y sin metadatos.
+LOGO_MAX_BYTES = 2 * 1024 * 1024
+LADO_LOGO = 600
+
+
+class LogoDemasiadoGrande(ImagenDemasiadoGrande):
+    message = "El logo pesa más de 2 MB."
+
+
+@dataclass(frozen=True)
+class Logo:
+    png: bytes
+    ancho: int
+    alto: int
+
+
+def procesar_logo(datos: bytes) -> Logo:
+    try:
+        img = _abrir(datos, LOGO_MAX_BYTES)
+    except ImagenDemasiadoGrande:
+        raise LogoDemasiadoGrande() from None
+    img = img.convert("RGBA")
+    img.thumbnail((LADO_LOGO, LADO_LOGO), Image.Resampling.LANCZOS)
+    buffer = io.BytesIO()
+    # Una imagen nueva sin ``info``: PNG no copia textos, EXIF ni perfil de color.
+    limpia = Image.new("RGBA", img.size)
+    limpia.paste(img)
+    limpia.save(buffer, "PNG", optimize=True)
+    return Logo(png=buffer.getvalue(), ancho=limpia.width, alto=limpia.height)

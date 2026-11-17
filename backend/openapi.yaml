@@ -22,6 +22,7 @@ tags:
   - name: invitaciones
   - name: catalogo
   - name: activos
+  - name: empresa
 
 paths:
   /health:
@@ -1374,6 +1375,137 @@ paths:
         "403":
           $ref: "#/components/responses/Prohibido"
 
+  /empresa:
+    get:
+      tags: [empresa]
+      operationId: verEmpresa
+      summary: Datos de la empresa (solo admin; spec 013)
+      description: >-
+        Sin datos guardados: el nombre del tenant, el resto en null y completa false.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/EmpresaActual"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+    put:
+      tags: [empresa]
+      operationId: guardarEmpresa
+      summary: Guardar los datos de la empresa (solo admin)
+      description: >-
+        Nombre y dirección obligatorios. NIT opcional: si trae dígito de verificación debe
+        ser el de la DIAN; se guarda como 890.903.938-8. Vacío o null borra un opcional.
+        Si un campo no es válido, el error lo nombra en campo.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GuardarEmpresaBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/EmpresaActual"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /empresa/logo:
+    put:
+      tags: [empresa]
+      operationId: subirLogo
+      summary: Cambiar el logo de la empresa (solo admin)
+      description: >-
+        multipart/form-data con logo_id (UUID del cliente) y archivo (PNG, JPEG o WebP,
+        hasta 2 MB). Se guarda en PNG ≤ 600 px con transparencia y sin metadatos. El logo
+        anterior no se borra: los informes congelados lo siguen usando.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/SubirLogoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/LogoGuardado"
+        "201":
+          $ref: "#/components/responses/LogoGuardado"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "409":
+          description: Faltan los datos de la empresa o el logo_id ya se usó.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [empresa_sin_datos, logo_id_en_uso]
+        "413":
+          $ref: "#/components/responses/FotoDemasiadoGrande"
+        "415":
+          $ref: "#/components/responses/FotoTipoNoAdmitido"
+        "422":
+          $ref: "#/components/responses/FotoInvalida"
+        "503":
+          $ref: "#/components/responses/FotosNoDisponibles"
+    delete:
+      tags: [empresa]
+      operationId: quitarLogo
+      summary: Quitar el logo de la empresa (solo admin; el archivo se conserva)
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: La empresa queda sin logo.
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/SinLogo"
+
+  /empresa/logo/{id}:
+    get:
+      tags: [empresa]
+      operationId: verLogo
+      summary: El PNG de un logo del tenant, vigente o de un informe congelado (solo admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: El logo. Un logo nunca cambia (cambiarlo crea otro con otro id).
+          headers:
+            Cache-Control:
+              required: true
+              schema: { type: string, enum: ["private, max-age=86400"] }
+            X-Content-Type-Options:
+              required: true
+              schema: { type: string, enum: [nosniff] }
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/SinLogo"
+        "503":
+          $ref: "#/components/responses/FotosNoDisponibles"
+
   /valor-actual:
     get:
       tags: [activos]
@@ -1557,6 +1689,22 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
       x-codigos: [fotos_no_disponibles]
+    EmpresaActual:
+      description: Los datos de la empresa.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/EmpresaRespuesta" }
+    LogoGuardado:
+      description: El logo guardado (201 nuevo; 200 si ya era el vigente con ese logo_id).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/LogoRespuesta" }
+    SinLogo:
+      description: No hay logo (o es de otro tenant).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [sin_logo]
 
   schemas:
     ErrorCode:
@@ -1600,6 +1748,9 @@ components:
         - fotos_no_disponibles
         - sin_foto
         - foto_id_en_uso
+        - empresa_sin_datos
+        - sin_logo
+        - logo_id_en_uso
         - foto_existente
         - imagen_demasiado_grande
         - tipo_no_admitido
@@ -1617,6 +1768,9 @@ components:
             code: { $ref: "#/components/schemas/ErrorCode" }
             message: { type: string, description: Texto en español para mostrar. }
             request_id: { type: string, format: uuid }
+            campo:
+              type: string
+              description: Campo del cuerpo que no es válido, cuando el error es de uno solo.
 
     Rol:
       type: string
@@ -1873,6 +2027,61 @@ components:
       properties:
         foto_id: { type: string, format: uuid }
         archivo: { type: string, description: "Archivo de imagen (binario)." }
+    Empresa:
+      type: object
+      required: [nombre, direccion, nit, telefono, correo, logo, completa]
+      additionalProperties: false
+      properties:
+        nombre: { type: string }
+        direccion: { type: [string, "null"] }
+        nit: { type: [string, "null"], description: "Con puntos y, si lo tiene, -dígito." }
+        telefono: { type: [string, "null"] }
+        correo: { type: [string, "null"] }
+        logo:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [id]
+              additionalProperties: false
+              properties:
+                id: { type: string, format: uuid }
+        completa: { type: boolean, description: "false hasta guardar nombre y dirección." }
+    EmpresaRespuesta:
+      type: object
+      required: [empresa]
+      additionalProperties: false
+      properties:
+        empresa: { $ref: "#/components/schemas/Empresa" }
+    GuardarEmpresaBody:
+      type: object
+      required: [nombre, direccion]
+      additionalProperties: false
+      properties:
+        nombre: { type: string }
+        direccion: { type: string }
+        nit: { type: [string, "null"] }
+        telefono: { type: [string, "null"] }
+        correo: { type: [string, "null"] }
+    SubirLogoBody:
+      type: object
+      required: [logo_id, archivo]
+      additionalProperties: false
+      properties:
+        logo_id: { type: string, format: uuid }
+        archivo: { type: string, description: "Archivo de imagen (binario)." }
+    LogoRespuesta:
+      type: object
+      required: [logo]
+      additionalProperties: false
+      properties:
+        logo:
+          type: object
+          required: [id, ancho, alto]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            ancho: { type: integer }
+            alto: { type: integer }
     UbicacionDeActivo:
       type: object
       required: [id, nombre, ruta]

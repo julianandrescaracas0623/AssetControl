@@ -52,6 +52,7 @@ from app.config import RateLimits
 from app.conteo import cierre as conteo_cierre
 from app.conteo import service as conteo_service
 from app.conteo import verificaciones as conteo_verificaciones
+from app.empresa import service as empresa_service
 from app.fotos import imagen as fotos_imagen
 from app.fotos import service as fotos_service
 from app.fotos.almacen import EXTENSION_KEY as ALMACEN_KEY
@@ -1107,6 +1108,81 @@ def test_fotos_responses(client, contrato_app, contrato_db, monkeypatch):
     check("get", ver, client.get(f"/fotos/{creada['foto']['id']}", headers=admin))
 
 
+def test_empresa_responses(client, contrato_app, monkeypatch):
+    """Spec 013: datos de la empresa y logo (solo admin)."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    admin = bearer(ADMIN_A, TENANT_A)
+    contador = bearer(CONTADOR_A, TENANT_A, rol="contador")
+    mp = "multipart/form-data"
+    datos = {"nombre": "Empresa contrato", "direccion": "Calle 1 # 2-3", "nit": "890903938-8"}
+
+    def png() -> bytes:
+        buffer = BytesIO()
+        Image.new("RGBA", (60, 20), (1, 2, 3, 255)).save(buffer, "PNG")
+        return buffer.getvalue()
+
+    def logo(logo_id=None, archivo=None, headers=admin):
+        form: dict = {}
+        if logo_id is not None:
+            form["logo_id"] = str(logo_id)
+        if archivo is not None:
+            form["archivo"] = (BytesIO(archivo), "logo.png")
+        return client.put("/empresa/logo", data=form, headers=headers, content_type=mp)
+
+    ruta, ruta_logo, ver = "/empresa", "/empresa/logo", "/empresa/logo/{id}"
+    check("get", ruta, client.get(ruta, headers=admin))
+    check("get", ruta, client.get(ruta))
+    check("get", ruta, client.get(ruta, headers=contador))
+    # Antes de guardar los datos, el logo no se puede subir.
+    sin_datos = check("put", ruta_logo, logo(uuid.uuid4(), png()))
+    assert sin_datos is None or sin_datos["error"]["code"] in ("empresa_sin_datos",)
+    check("put", ruta, client.put(ruta, json=datos, headers=admin))
+    invalido = check("put", ruta, client.put(ruta, json={**datos, "nit": "1-2"}, headers=admin))
+    assert invalido["error"]["campo"] == "nit"
+    check("put", ruta, client.put(ruta, json=datos))
+    check("put", ruta, client.put(ruta, json=datos, headers=contador))
+    grande = b'{"nombre": "' + b"x" * 5000 + b'"}'
+    check(
+        "put",
+        ruta,
+        client.put(ruta, data=grande, headers={**admin, "Content-Type": "application/json"}),
+    )
+
+    logo_id = uuid.uuid4()
+    check("put", ruta_logo, logo(logo_id, png()))  # 201
+    check("put", ruta_logo, logo(logo_id, png()))  # 200
+    check("put", ruta_logo, logo(None, png()))  # 400
+    check("put", ruta_logo, client.put(ruta_logo, data={}, content_type=mp))  # 401
+    check("put", ruta_logo, logo(uuid.uuid4(), png(), headers=contador))  # 403
+    check("put", ruta_logo, logo(uuid.uuid4(), b"GIF89a"))  # 415
+    roto = BytesIO()
+    Image.effect_noise((300, 300), 60).save(roto, "PNG")
+    check("put", ruta_logo, logo(uuid.uuid4(), roto.getvalue()[:2000]))  # 422
+    check("put", ruta_logo, logo(uuid.uuid4(), b"0" * (3 * 1024 * 1024)))  # 413
+
+    check("get", ver, client.get(f"/empresa/logo/{logo_id}", headers=admin))
+    check("get", ver, client.get(f"/empresa/logo/{logo_id}"))
+    check("get", ver, client.get(f"/empresa/logo/{logo_id}", headers=contador))
+    check("get", ver, client.get(f"/empresa/logo/{uuid.uuid4()}", headers=admin))
+
+    check("delete", ruta_logo, client.delete(ruta_logo, headers=admin))  # 204
+    check("delete", ruta_logo, client.delete(ruta_logo, headers=admin))  # 404
+    check("delete", ruta_logo, client.delete(ruta_logo))  # 401
+    check("delete", ruta_logo, client.delete(ruta_logo, headers=contador))  # 403
+
+    monkeypatch.setitem(contrato_app.extensions, ALMACEN_KEY, None)
+    check("put", ruta_logo, logo(uuid.uuid4(), png()))  # 503
+    check("get", ver, client.get(f"/empresa/logo/{logo_id}", headers=admin))  # 503
+    # Un logo_id ya usado (409) se prueba con el almacenamiento de vuelta.
+    monkeypatch.undo()
+    otro = uuid.uuid4()
+    check("put", ruta_logo, logo(otro, png()))
+    check("put", ruta_logo, logo(logo_id, png()))  # 409 logo_id_en_uso
+
+
 LIMITED = [
     ("post", "/auth/login", {"email": ADMIN_A.email, "password": PASSWORD}, {}),
     ("post", "/auth/refresh", None, CSRF),
@@ -1181,6 +1257,7 @@ def backend_error_codes() -> set[str]:
     codes |= {error.code for error in conteo_verificaciones.ERRORES}
     codes |= {error.code for error in conteo_cierre.ERRORES}
     codes |= {error.code for error in fotos_service.ERRORES}
+    codes |= {error.code for error in empresa_service.ERRORES}
     codes |= {
         error.code
         for error in (

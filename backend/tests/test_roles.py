@@ -461,6 +461,12 @@ PROTECTED_ENDPOINTS = {
     "fotos.quitar_principal": frozenset({"admin", "contador"}),
     "fotos.subir_de_verificacion": frozenset({"admin", "contador"}),
     "fotos.ver": frozenset({"admin", "contador"}),
+    # Spec 013 (R9): la empresa y su logo, solo el admin.
+    "empresa.ver": frozenset({"admin"}),
+    "empresa.guardar": frozenset({"admin"}),
+    "empresa.subir_logo": frozenset({"admin"}),
+    "empresa.quitar_logo": frozenset({"admin"}),
+    "empresa.ver_logo": frozenset({"admin"}),
 }
 
 

@@ -20,7 +20,8 @@ from pathlib import Path
 from typing import Any, Protocol
 
 _UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-_CLAVE = re.compile(rf"{_UUID}/{_UUID}(_mini)?\.jpg")
+# Fotos: ``.jpg`` y ``_mini.jpg``; logos de la empresa (spec 013): ``.png``.
+_CLAVE = re.compile(rf"{_UUID}/{_UUID}(_mini\.jpg|\.jpg|\.png)")
 TIPOS = ("carpeta", "s3")
 S3_VARS = ("S3_ENDPOINT_URL", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY")
 CARPETA_POR_DEFECTO = Path(__file__).resolve().parents[2] / ".almacen"
@@ -28,7 +29,7 @@ EXTENSION_KEY = "assetcontrol.almacen"
 
 
 class ClaveInvalida(ValueError):
-    """La clave no tiene la forma ``<uuid>/<uuid>[_mini].jpg``. No repite la clave."""
+    """La clave no tiene la forma ``<uuid>/<uuid>[_mini].jpg`` o ``.png``. No repite la clave."""
 
     def __init__(self) -> None:
         super().__init__("Clave de almacenamiento no válida.")

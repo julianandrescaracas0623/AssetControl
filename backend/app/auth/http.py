@@ -30,12 +30,16 @@ SMALL_BODY_PATH_PREFIXES: tuple[str, ...] = (
     "/categorias",
     "/activos",
     "/sesiones",
+    "/empresa",
 )
 AUTH_MAX_BODY_BYTES = 4096
 # Spec 012: las subidas de fotos (multipart) admiten la imagen de 10 MB y el formulario.
 _UUID = "[0-9a-fA-F-]{36}"
 FOTO_PATH = re.compile(rf"/activos/{_UUID}/foto|/sesiones/{_UUID}/verificaciones/{_UUID}/foto")
 FOTO_MAX_BODY_BYTES = 10 * 1024 * 1024 + 256 * 1024
+# Spec 013: el logo de la empresa (2 MB) y su formulario.
+LOGO_PATH = "/empresa/logo"
+LOGO_MAX_BODY_BYTES = 2 * 1024 * 1024 + 64 * 1024
 REFRESH_COOKIE_SECURE_NAME = "__Secure-refresh"
 REFRESH_COOKIE_DEVELOPMENT_NAME = "refresh"
 # Q14: cabecera personalizada obligatoria en /auth/refresh y /auth/logout. Un sitio
@@ -53,7 +57,7 @@ def is_auth_path(path: str) -> bool:
 
 
 def is_small_body_path(path: str) -> bool:
-    return _under(path, SMALL_BODY_PATH_PREFIXES) and not is_photo_path(path)
+    return _under(path, SMALL_BODY_PATH_PREFIXES) and not is_photo_path(path) and path != LOGO_PATH
 
 
 def is_photo_path(path: str) -> bool:
@@ -107,6 +111,8 @@ def register_auth_http_policy(app: Flask) -> None:
     def _limit_auth_body() -> None:
         if is_photo_path(request.path):
             limit = FOTO_MAX_BODY_BYTES
+        elif request.path == LOGO_PATH:
+            limit = LOGO_MAX_BODY_BYTES
         elif is_small_body_path(request.path):
             limit = AUTH_MAX_BODY_BYTES
         else:

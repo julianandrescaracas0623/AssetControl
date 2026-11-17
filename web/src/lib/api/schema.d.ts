@@ -718,6 +718,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/empresa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Datos de la empresa (solo admin; spec 013)
+         * @description Sin datos guardados: el nombre del tenant, el resto en null y completa false.
+         */
+        get: operations["verEmpresa"];
+        /**
+         * Guardar los datos de la empresa (solo admin)
+         * @description Nombre y dirección obligatorios. NIT opcional: si trae dígito de verificación debe ser el de la DIAN; se guarda como 890.903.938-8. Vacío o null borra un opcional. Si un campo no es válido, el error lo nombra en campo.
+         */
+        put: operations["guardarEmpresa"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/empresa/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Cambiar el logo de la empresa (solo admin)
+         * @description multipart/form-data con logo_id (UUID del cliente) y archivo (PNG, JPEG o WebP, hasta 2 MB). Se guarda en PNG ≤ 600 px con transparencia y sin metadatos. El logo anterior no se borra: los informes congelados lo siguen usando.
+         */
+        put: operations["subirLogo"];
+        post?: never;
+        /** Quitar el logo de la empresa (solo admin; el archivo se conserva) */
+        delete: operations["quitarLogo"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/empresa/logo/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** El PNG de un logo del tenant, vigente o de un informe congelado (solo admin) */
+        get: operations["verLogo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/valor-actual": {
         parameters: {
             query?: never;
@@ -746,7 +808,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta" | "fotos_no_disponibles" | "sin_foto" | "foto_id_en_uso" | "foto_existente" | "imagen_demasiado_grande" | "tipo_no_admitido" | "imagen_invalida";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta" | "fotos_no_disponibles" | "sin_foto" | "foto_id_en_uso" | "empresa_sin_datos" | "sin_logo" | "logo_id_en_uso" | "foto_existente" | "imagen_demasiado_grande" | "tipo_no_admitido" | "imagen_invalida";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -754,6 +816,8 @@ export interface components {
                 message: string;
                 /** Format: uuid */
                 request_id: string;
+                /** @description Campo del cuerpo que no es válido, cuando el error es de uno solo. */
+                campo?: string;
             };
         };
         /** @enum {string} */
@@ -921,6 +985,44 @@ export interface components {
             foto_id: string;
             /** @description Archivo de imagen (binario). */
             archivo: string;
+        };
+        Empresa: {
+            nombre: string;
+            direccion: string | null;
+            /** @description Con puntos y, si lo tiene, -dígito. */
+            nit: string | null;
+            telefono: string | null;
+            correo: string | null;
+            logo: null | {
+                /** Format: uuid */
+                id: string;
+            };
+            /** @description false hasta guardar nombre y dirección. */
+            completa: boolean;
+        };
+        EmpresaRespuesta: {
+            empresa: components["schemas"]["Empresa"];
+        };
+        GuardarEmpresaBody: {
+            nombre: string;
+            direccion: string;
+            nit?: string | null;
+            telefono?: string | null;
+            correo?: string | null;
+        };
+        SubirLogoBody: {
+            /** Format: uuid */
+            logo_id: string;
+            /** @description Archivo de imagen (binario). */
+            archivo: string;
+        };
+        LogoRespuesta: {
+            logo: {
+                /** Format: uuid */
+                id: string;
+                ancho: number;
+                alto: number;
+            };
         };
         UbicacionDeActivo: {
             /** Format: uuid */
@@ -1597,6 +1699,33 @@ export interface components {
         };
         /** @description El almacenamiento de fotos no está configurado. */
         FotosNoDisponibles: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Los datos de la empresa. */
+        EmpresaActual: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["EmpresaRespuesta"];
+            };
+        };
+        /** @description El logo guardado (201 nuevo; 200 si ya era el vigente con ese logo_id). */
+        LogoGuardado: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["LogoRespuesta"];
+            };
+        };
+        /** @description No hay logo (o es de otro tenant). */
+        SinLogo: {
             headers: {
                 [name: string]: unknown;
             };
@@ -3092,6 +3221,123 @@ export interface operations {
             };
             401: components["responses"]["NoAutenticado"];
             403: components["responses"]["Prohibido"];
+        };
+    };
+    verEmpresa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["EmpresaActual"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+        };
+    };
+    guardarEmpresa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuardarEmpresaBody"];
+            };
+        };
+        responses: {
+            200: components["responses"]["EmpresaActual"];
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    subirLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["SubirLogoBody"];
+            };
+        };
+        responses: {
+            200: components["responses"]["LogoGuardado"];
+            201: components["responses"]["LogoGuardado"];
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            /** @description Faltan los datos de la empresa o el logo_id ya se usó. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["FotoDemasiadoGrande"];
+            415: components["responses"]["FotoTipoNoAdmitido"];
+            422: components["responses"]["FotoInvalida"];
+            503: components["responses"]["FotosNoDisponibles"];
+        };
+    };
+    quitarLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La empresa queda sin logo. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["SinLogo"];
+        };
+    };
+    verLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Un id de otro tenant responde 404, igual que uno inexistente. */
+                id: components["parameters"]["Id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description El logo. Un logo nunca cambia (cambiarlo crea otro con otro id). */
+            200: {
+                headers: {
+                    "Cache-Control": "private, max-age=86400";
+                    "X-Content-Type-Options": "nosniff";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["SinLogo"];
+            503: components["responses"]["FotosNoDisponibles"];
         };
     };
     valorActual: {

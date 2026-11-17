@@ -17,6 +17,7 @@ from app.cli import register_cli
 from app.config import CONFIG_EXTENSION_KEY, Config, load_config
 from app.conteo.routes import bp as sesiones_bp
 from app.db import init_db
+from app.empresa.routes import bp as empresa_bp
 from app.errors import register_error_handlers
 from app.fotos import almacen as fotos_almacen
 from app.fotos.routes import bp as fotos_bp
@@ -69,6 +70,7 @@ def create_app(config: Config | None = None) -> Flask:
     app.register_blueprint(sesiones_bp)
     app.register_blueprint(valor_bp)
     app.register_blueprint(inicio_bp)
+    app.register_blueprint(empresa_bp)
     app.register_blueprint(fotos_bp)
     register_cli(app)
     if config.environment == "production" and not config.trusted_proxy_hops:
