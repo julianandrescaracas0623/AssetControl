@@ -16,10 +16,12 @@
 .EXAMPLE
   .\scripts\dev.ps1            # todo, y deja la web corriendo (Ctrl + C para salir)
   .\scripts\dev.ps1 -SinWeb    # solo base, migraciones y API
+  .\scripts\dev.ps1 -Movil     # además, la web con HTTPS en tu red Wi-Fi para abrirla en el teléfono
   .\scripts\dev.ps1 -Parar     # apaga la base y la API (los datos se conservan)
 #>
 param(
   [switch]$SinWeb,
+  [switch]$Movil,
   [switch]$Parar
 )
 
@@ -127,6 +129,19 @@ try {
     if ($LASTEXITCODE -ne 0) { Falla 'npm ci falló.' }
   }
   Bien 'Dependencias de la web listas.'
+  if ($Movil) {
+    # La cámara del teléfono solo funciona con HTTPS: Vite usa un certificado de desarrollo
+    # y se abre a la red local (spec 004, T10). Solo desarrollo.
+    $env:VITE_HTTPS = '1'
+    $ips = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+      Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and $_.PrefixOrigin -ne 'WellKnown' } |
+      Select-Object -ExpandProperty IPAddress
+    Write-Host "`nEn el teléfono (mismo Wi-Fi), abre: " -ForegroundColor Green -NoNewline
+    Write-Host (($ips | ForEach-Object { "https://$($_):5173" }) -join '  o  ') -ForegroundColor Green
+    Write-Host 'Acepta el aviso del certificado. Si Windows pregunta por el firewall, permite «Redes privadas».' -ForegroundColor Green
+  } else {
+    Remove-Item Env:VITE_HTTPS -ErrorAction SilentlyContinue
+  }
   Write-Host "`nAbre http://localhost:5173 (Ctrl + C aquí para apagar la web; la base y la API siguen: .\scripts\dev.ps1 -Parar)." -ForegroundColor Green
   npm run dev
 } finally {

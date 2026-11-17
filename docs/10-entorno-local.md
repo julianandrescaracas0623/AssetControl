@@ -157,7 +157,7 @@ La primera vez, abre `http://localhost:5173/invitacion#<lo que copiaste en el pa
 >
 > **Atajo en el teléfono:** abre la app en el teléfono (ver abajo) → Chrome: menú ⋮ → *Agregar a la pantalla principal* (o *Instalar app*); iPhone: Safari → Compartir → *Agregar a inicio*. Queda el ícono de AssetControl y abre directo en Conteo, sin barra del navegador. Necesita conexión: no funciona sin internet.
 >
-> **Probar la cámara en el teléfono:** la cámara solo funciona con HTTPS. En vez de `npm run dev`, usa `$env:VITE_HTTPS = "1"; npm run dev`, abre en el teléfono (misma red Wi-Fi) la dirección `https://<IP de tu PC>:5173` que muestra Vite y acepta el aviso del certificado de desarrollo.
+> **Usar la app en el teléfono (con cámara):** la cámara solo funciona con HTTPS. Enciende con `.\scripts\dev.ps1 -Movil` (o, a mano, `$env:VITE_HTTPS = "1"; npm run dev`), abre en el teléfono, con el mismo Wi-Fi, la dirección `https://<IP de tu PC>:5173` que muestra el script y acepta el aviso del certificado de desarrollo. Si Windows pregunta por el firewall, permite **Redes privadas**. Para invitar a un contador que va a entrar desde el teléfono, crea la invitación con la app abierta en `https://<IP de tu PC>:5173` (el enlace usa la dirección desde la que lo creas; con `localhost` no abre en el teléfono).
 
 ## 9. Conectarte a la base con un cliente gráfico
 
