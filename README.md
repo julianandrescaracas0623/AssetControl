@@ -42,7 +42,13 @@ La justificación está en [ADR-001](docs/adr/ADR-001-stack.md) y [ADR-002](docs
 
 ## Arranque rápido
 
-Requisitos: Git, Docker y Node 24 (`^24.15.0`, fijado en `web/package.json`). Desde la raíz, en bash o Git Bash:
+Requisitos: Git, Docker, uv y Node 24 (`^24.15.0`, fijado en `web/package.json`). En Windows, con el `.env` listo, un solo comando enciende todo en desarrollo (base, migraciones, API y web; guía en `docs/10-entorno-local.md` §8):
+
+```powershell
+.\scripts\dev.ps1
+```
+
+O a mano, desde la raíz, en bash o Git Bash:
 
 ```sh
 sh scripts/setup-hooks.sh                      # hooks de Git (una vez por clon)

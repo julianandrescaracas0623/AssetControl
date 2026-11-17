@@ -125,14 +125,31 @@ Copia la línea que empieza por `/invitacion#…`. La usarás en el paso 8 (venc
 
 ## 8. Encender la app
 
+**Con un solo comando** (recomendado). Abre Docker Desktop, espera a que diga *Engine running* y en PowerShell:
+
 ```powershell
 cd C:\Users\VICTUS16\Proyectos\AssetControl
+.\scripts\dev.ps1
+```
+
+El script hace todo en orden y se detiene en el primer problema con un mensaje claro: revisa Docker, uv, Node 24 y el `.env`; enciende la base y espera a que esté sana; instala las dependencias (`uv sync`); aplica las migraciones pendientes; revisa las conexiones; construye y enciende la API y espera a que responda; instala las dependencias de la web si cambiaron y abre Vite. Cuando diga *ready*, abre `http://localhost:5173`.
+
+- `.\scripts\dev.ps1 -SinWeb`: solo base, migraciones y API.
+- `.\scripts\dev.ps1 -Parar`: apaga la base y la API (los datos se conservan).
+- Si Windows dice que no puede ejecutar scripts, una sola vez: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+**A mano**, si prefieres:
+
+```powershell
+cd C:\Users\VICTUS16\Proyectos\AssetControl
+docker compose up -d db
+cd backend; uv sync; uv run --env-file ../.env alembic upgrade head; cd ..
 docker compose up -d --build api
 cd web
 npm run dev
 ```
 
-Abre `http://localhost:5173/invitacion#<lo que copiaste>` → crea tu cuenta → llegas al **Resumen**. Para dejar de usarla: `Ctrl + C` en la ventana de `npm run dev` y `docker compose stop`.
+La primera vez, abre `http://localhost:5173/invitacion#<lo que copiaste en el paso 7>` → crea tu cuenta → llegas al **Resumen**. Para dejar de usarla: `Ctrl + C` en la ventana de `npm run dev` y `.\scripts\dev.ps1 -Parar` (o `docker compose stop`).
 
 > **Fotos (spec 012):** en tu PC se guardan en `backend\.almacen\` (ignorada por git; no hace falta configurar nada). Para empezar de cero, borra esa carpeta junto con la base.
 >
@@ -244,6 +261,9 @@ En el chat te dejé la tarjeta del conector **Supabase**. Pulsa *Connect*, inici
 | `no se pudo conectar (¿Docker apagado…?)` | Docker Desktop o el contenedor apagados | Abre Docker Desktop y `docker compose up -d db` |
 | `port is already allocated` (5432) | Otro PostgreSQL usa el puerto | Detén el otro servicio, o cambia el puerto en `docker-compose.yml` y en las URL |
 | `migraciones atrasadas` | Hay migraciones nuevas | Sección 5 |
+| La web dice «No se pudo conectar» (en la consola, `/api/…` responde 502) | La web (Vite) está encendida pero la API no | `.\scripts\dev.ps1 -SinWeb`; si la API no arranca, el script muestra sus últimos mensajes (o `docker compose logs api --tail 50`) |
+| `.\scripts\dev.ps1 no se puede cargar … ejecución de scripts` | PowerShell bloquea scripts locales | Una sola vez: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
+| Carpetas vacías `AssetControl;C` o `AssetControl;R` junto al proyecto | Un comando recibió una lista de rutas separada por `;` (típico de Docker en Git Bash con `-v "$(pwd):…"`) | Bórralas; usa PowerShell o `docker compose`, que arma las rutas bien |
 | `imports` en rojo | Intérprete o TypeScript de VS Code | Sección 10 |
 | `npm run e2e`: `Executable doesn't exist` | Falta el Chromium de Playwright | `npx playwright install chromium` |
 | `npm run e2e`: puerto 5011 o 5174 ocupado | Quedó un servidor de una corrida anterior | Cierra esa ventana o reinicia la terminal |
