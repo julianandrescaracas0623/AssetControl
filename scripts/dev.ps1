@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Enciende AssetControl en modo desarrollo en tu PC, paso a paso, y dice qué falla.
 
