@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  Building2,
   ClipboardCheck,
   House,
   MapPin,
@@ -46,7 +47,13 @@ export const ADMIN_NAV: AdminNavGrupo[] = [
     ],
   },
   { titulo: 'Finanzas', items: [{ titulo: 'Valor actual', ruta: '/admin/valor', icono: TrendingUp, llega: 'la spec 008' }] },
-  { titulo: 'Ajustes', items: [{ titulo: 'Usuarios', ruta: '/admin/usuarios', icono: Users, llega: 'invitar en la spec 002b; lista de usuarios en una spec posterior' }] },
+  {
+    titulo: 'Ajustes',
+    items: [
+      { titulo: 'Usuarios', ruta: '/admin/usuarios', icono: Users, llega: 'invitar en la spec 002b; lista de usuarios en una spec posterior' },
+      { titulo: 'Empresa', ruta: '/admin/empresa', icono: Building2, llega: 'la spec 013' },
+    ],
+  },
 ]
 
 export function buscarEnNav(pathname: string): { grupo: AdminNavGrupo; item: AdminNavItem } | undefined {

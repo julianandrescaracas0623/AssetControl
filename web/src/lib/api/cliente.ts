@@ -47,7 +47,7 @@ export function mensajeDeError(error: unknown): string {
   return MENSAJE_INESPERADO
 }
 
-type Metodo = 'get' | 'post' | 'patch'
+type Metodo = 'get' | 'post' | 'patch' | 'put'
 type Ruta = keyof paths
 /** Métodos que el contrato declara para `R` (los ausentes son `never`). */
 type MetodoDe<R extends Ruta> = {
@@ -200,21 +200,21 @@ export type TamanoFoto = 'completa' | 'mini'
 export const TIEMPO_SUBIDA_MS = 60_000
 
 /**
- * Envía una foto (spec 012): `PUT` multipart con `foto_id` y `archivo`, o `DELETE` sin
- * cuerpo. Mismo token y errores que `pedir`; sin `Content-Type` propio (el navegador
- * pone el de multipart con su separador).
+ * `PUT` multipart (fotos de la spec 012 y logo de la 013) o `DELETE` sin cuerpo. Mismo
+ * token y errores que `pedir`; sin `Content-Type` propio (el navegador pone el de
+ * multipart con su separador). Las subidas tienen más plazo (redes lentas).
  */
-export async function enviarFoto(
+async function enviarMultipart<T>(
   metodo: 'PUT' | 'DELETE',
   ruta: string,
   token: string,
-  foto?: { id: string; archivo: Blob },
-): Promise<{ foto: Foto } | undefined> {
+  campos?: { id: [string, string]; archivo: Blob; nombre: string },
+): Promise<T | undefined> {
   let body: FormData | undefined
-  if (foto) {
+  if (campos) {
     body = new FormData()
-    body.append('foto_id', foto.id)
-    body.append('archivo', foto.archivo, 'foto.jpg')
+    body.append(campos.id[0], campos.id[1])
+    body.append('archivo', campos.archivo, campos.nombre)
   }
   const plazo = new AbortController()
   const reloj = setTimeout(() => plazo.abort(), TIEMPO_SUBIDA_MS)
@@ -233,11 +233,26 @@ export async function enviarFoto(
     }
     if (!respuesta.ok) throw await aError(respuesta)
     if (respuesta.status === 204) return undefined
-    return (await respuesta.json()) as { foto: Foto }
+    return (await respuesta.json()) as T
   } finally {
     clearTimeout(reloj)
   }
 }
+
+/** Envía una foto (spec 012): `PUT` con `foto_id` y `archivo`, o `DELETE` sin cuerpo. */
+export function enviarFoto(
+  metodo: 'PUT' | 'DELETE',
+  ruta: string,
+  token: string,
+  foto?: { id: string; archivo: Blob },
+): Promise<{ foto: Foto } | undefined> {
+  return enviarMultipart(metodo, ruta, token, foto && { id: ['foto_id', foto.id], archivo: foto.archivo, nombre: 'foto.jpg' })
+}
+
+export type Empresa = Esquemas['Empresa']
+export type EmpresaDelInforme = Esquemas['EmpresaDelInforme']
+export type GuardarEmpresa = Esquemas['GuardarEmpresaBody']
+export type LogoGuardado = Esquemas['LogoRespuesta']['logo']
 
 const enRuta = (valor: string) => encodeURIComponent(valor)
 
@@ -328,4 +343,17 @@ export const api = {
       .foto,
   verFoto: (token: string, fotoId: string, tamano: TamanoFoto) =>
     descargar(`/fotos/${enRuta(fotoId)}?tamano=${tamano}`, token, 'foto.jpg'),
+  // Spec 013: datos de la empresa y su logo (solo admin).
+  empresa: (token: string) => pedir('get', '/empresa', { token }),
+  guardarEmpresa: (token: string, cuerpo: GuardarEmpresa) => pedir('put', '/empresa', { token, cuerpo }),
+  subirLogo: async (token: string, logo: { id: string; archivo: Blob }) =>
+    (await enviarMultipart<{ logo: LogoGuardado }>('PUT', '/empresa/logo', token, {
+      id: ['logo_id', logo.id],
+      archivo: logo.archivo,
+      nombre: 'logo.png',
+    }))!.logo,
+  quitarLogo: async (token: string) => {
+    await enviarMultipart('DELETE', '/empresa/logo', token)
+  },
+  verLogo: (token: string, logoId: string) => descargar(`/empresa/logo/${enRuta(logoId)}`, token, 'logo.png'),
 }
