@@ -6,7 +6,7 @@ import { routes } from '@/router'
 import { catalogoDemo, sesionDe } from '@/test/catalogo'
 import { simularAncho } from '@/test/matchMedia'
 import { fechaCorte } from '@/lib/sesiones'
-import { errorApi, simularSesion } from '@/test/sesion'
+import { errorApi, json, type Manejador, simularSesion } from '@/test/sesion'
 
 // Spec 008, T5: /admin/sesiones/:id/informe real (R7; CU-INF-01). La pantalla lee lo
 // congelado: las cifras salen del servidor y no cambian con los datos actuales.
@@ -184,3 +184,45 @@ describe('Exportar el informe (spec 009, T4)', () => {
   })
 })
 
+
+describe('Informe con la empresa (spec 013, T7)', () => {
+  function conEmpresa(catalogo: ReturnType<typeof catalogoDemo>, empresa: object | null, vigente = false): Manejador {
+    return (url, init) => {
+      if (url === '/api/empresa') return empresa ? json(200, { empresa }) : undefined
+      const base = catalogo.manejador(url, init)
+      if (!base || !url.endsWith('/informe')) return base
+      return Promise.resolve(base).then(async (respuesta) => {
+        const informe = await respuesta!.json()
+        return json(200, { ...informe, empresa: { ...informe.empresa, vigente }, detalle_disponible: !vigente })
+      })
+    }
+  }
+
+  function abrirCon(manejador: Manejador) {
+    simularAncho({ movil: false })
+    simularSesion('admin', manejador)
+    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: [INFORME] })} />)
+  }
+
+  const EMPRESA = { nombre: 'Clínica de prueba', direccion: null, nit: null, telefono: null, correo: null, logo: null }
+
+  it('nombra la empresa congelada y avisa si la empresa no está completa', async () => {
+    abrirCon(conEmpresa(cerrado(), { ...EMPRESA, completa: false }))
+    expect(await screen.findByText('Completa los datos de tu empresa')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Ir a Empresa' }).getAttribute('href')).toBe('/admin/empresa')
+    expect(screen.getByText('Clínica de prueba', { selector: 'b' })).toBeTruthy()
+    expect(screen.queryByText(/Sesión cerrada antes de guardar/)).toBeNull()
+  })
+
+  it('sin aviso cuando la empresa está completa', async () => {
+    abrirCon(conEmpresa(cerrado(), { ...EMPRESA, direccion: 'Calle 1', completa: true }))
+    await screen.findByRole('heading', { level: 1, name: 'Informe · Conteo nov 2026' })
+    await waitFor(() => expect(screen.queryByText('Completa los datos de tu empresa')).toBeNull())
+  })
+
+  it('rotula la sesión cerrada antes de guardar la empresa y el detalle', async () => {
+    abrirCon(conEmpresa(cerrado(), { ...EMPRESA, direccion: 'Calle 1', completa: true }, true))
+    expect(await screen.findByText('Sesión cerrada antes de guardar los datos de la empresa')).toBeTruthy()
+    expect(screen.getByText(/el Excel no trae una hoja por categoría/)).toBeTruthy()
+  })
+})

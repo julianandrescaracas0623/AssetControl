@@ -1,4 +1,4 @@
-import { CircleAlert, ClipboardList, Download, Loader2, Lock, RefreshCw, Wrench } from 'lucide-react'
+import { Building2, CircleAlert, ClipboardList, Download, History, Loader2, Lock, RefreshCw, Wrench } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
 
@@ -16,6 +16,7 @@ import { formatCOP, formatEntero } from '@/lib/format'
 import type { FormatoInforme } from '@/lib/api/cliente'
 import { type FilaDesglose, type Informe as InformeSesion, type NoEncontrado, useExportarInforme, useInforme } from '@/lib/informe'
 import { fechaCorte, porcentaje } from '@/lib/sesiones'
+import { useEmpresa } from '@/lib/empresa'
 
 // Informe de una sesión cerrada (spec 008, T5; docs/08 §7.5, CU-INF-01; R7 de la spec):
 // tres cifras, desglose y no encontrados congelados al cierre, con los nombres de ese
@@ -195,6 +196,39 @@ function Exportar({ id }: { id: string }) {
   )
 }
 
+// Spec 013 (R8, R10): aviso si la empresa no está completa (sus datos salen en los
+// próximos informes) y rótulo de las sesiones cerradas antes de guardar la empresa y el
+// detalle (Q1 A: los archivos usan los datos vigentes y no traen hojas por categoría).
+function AvisosEmpresa({ informe }: { informe: InformeSesion }) {
+  const empresa = useEmpresa()
+  return (
+    <>
+      {informe.empresa.vigente && (
+        <Alert>
+          <History />
+          <AlertTitle>Sesión cerrada antes de guardar los datos de la empresa</AlertTitle>
+          <AlertDescription>
+            El Excel y el PDF usan los datos de la empresa de hoy y el Excel no trae una hoja por categoría: esta sesión no
+            guardó el detalle por activo.
+          </AlertDescription>
+        </Alert>
+      )}
+      {empresa.data && !empresa.data.completa && (
+        <Alert>
+          <Building2 />
+          <AlertTitle>Completa los datos de tu empresa</AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            Saldrán en los próximos informes que cierres.
+            <Link to="/admin/empresa" className="font-medium text-brand-strong underline underline-offset-4">
+              Ir a Empresa
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
+    </>
+  )
+}
+
 export default function Informe() {
   const { id = '' } = useParams()
   const consulta = useInforme(id)
@@ -277,6 +311,9 @@ export default function Informe() {
                 Por <b className="font-medium text-foreground">{sesion.cerrada_por.nombre}</b>
               </span>
             )}
+            <span>
+              Empresa <b className="font-medium text-foreground">{consulta.data.empresa.nombre}</b>
+            </span>
             <span>Valores en COP</span>
           </span>
         }
@@ -289,6 +326,7 @@ export default function Informe() {
           </>
         }
       />
+      <AvisosEmpresa informe={consulta.data} />
       <Contenido informe={consulta.data} />
     </div>
   )
