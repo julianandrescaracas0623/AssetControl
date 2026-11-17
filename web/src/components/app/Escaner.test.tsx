@@ -52,4 +52,18 @@ describe('Escaner', () => {
     await screen.findByRole('alert')
     expect(crear).toHaveBeenCalledTimes(2)
   })
+
+  it('al salir mientras se pide el permiso, avisa que ya no quiere la cámara y no muestra error', async () => {
+    let señal: AbortSignal | undefined
+    const crear = vi.fn((_video: HTMLVideoElement, _alLeer: (t: string) => void, s: AbortSignal) => {
+      señal = s
+      return new Promise<never>((_, rechazar) => {
+        s.addEventListener('abort', () => rechazar(Object.assign(new Error('x'), { name: 'AbortError' })))
+      })
+    })
+    const { unmount } = render(<Escaner onLectura={vi.fn()} crearLector={crear} />)
+    expect(señal?.aborted).toBe(false)
+    unmount()
+    expect(señal?.aborted).toBe(true)
+  })
 })

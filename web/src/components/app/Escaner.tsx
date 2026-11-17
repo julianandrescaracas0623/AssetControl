@@ -47,13 +47,14 @@ export function Escaner({
   useEffect(() => {
     let cancelado = false
     let activo: Lector | null = null
+    const corte = new AbortController()
     crearLector(video.current!, (texto) => {
       const ahora = Date.now()
       if (ultima.current && ultima.current.texto === texto && ahora - ultima.current.en < ANTIRREBOTE_MS) return
       ultima.current = { texto, en: ahora }
       navigator.vibrate?.(40)
       alLeer.current(texto)
-    })
+    }, corte.signal)
       .then((creado) => {
         if (cancelado) {
           creado.detener()
@@ -69,6 +70,7 @@ export function Escaner({
       })
     return () => {
       cancelado = true
+      corte.abort()
       activo?.detener()
     }
   }, [crearLector, intento])
