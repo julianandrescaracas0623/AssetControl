@@ -55,6 +55,8 @@ def tenant_limpio(evo_db) -> Iterator[None]:
     yield
     with evo_db.migrator.begin() as conn:
         for sql in (
+            "delete from sesion_detalle",
+            "delete from sesion_empresa",
             "delete from sesion_no_encontrado",
             "delete from sesion_desglose",
             "delete from activo_evento",

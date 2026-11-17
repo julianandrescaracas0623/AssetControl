@@ -97,6 +97,17 @@ export function crearCatalogo(
     const ue = filas.filter((f) => f.encontrado).length
     return {
       sesion: { ...sesion },
+      // Spec 013: datos de la empresa congelados al cierre (la API simulada no los edita).
+      empresa: {
+        nombre: 'Clínica de prueba',
+        direccion: null,
+        nit: null,
+        telefono: null,
+        correo: null,
+        logo: null,
+        vigente: false,
+      },
+      detalle_disponible: true,
       totales: {
         encontrado: dinero(suma(true)),
         no_encontrado: dinero(suma(false)),

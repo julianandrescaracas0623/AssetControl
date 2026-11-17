@@ -63,6 +63,8 @@ def tenant_limpio(exp_db) -> Iterator[None]:
     yield
     with exp_db.migrator.begin() as conn:
         for sql in (
+            "delete from sesion_detalle",
+            "delete from sesion_empresa",
             "delete from sesion_no_encontrado",
             "delete from sesion_desglose",
             "delete from activo_evento",

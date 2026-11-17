@@ -2046,6 +2046,28 @@ components:
               properties:
                 id: { type: string, format: uuid }
         completa: { type: boolean, description: "false hasta guardar nombre y dirección." }
+    EmpresaDelInforme:
+      type: object
+      description: >-
+        Datos de la empresa congelados al cerrar (spec 013). vigente true: la sesión se
+        cerró antes de guardarlos y se muestran los de hoy.
+      required: [nombre, direccion, nit, telefono, correo, logo, vigente]
+      additionalProperties: false
+      properties:
+        nombre: { type: string }
+        direccion: { type: [string, "null"] }
+        nit: { type: [string, "null"] }
+        telefono: { type: [string, "null"] }
+        correo: { type: [string, "null"] }
+        logo:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [id]
+              additionalProperties: false
+              properties:
+                id: { type: string, format: uuid }
+        vigente: { type: boolean }
     EmpresaRespuesta:
       type: object
       required: [empresa]
@@ -2473,10 +2495,16 @@ components:
         en_reparacion: { type: boolean }
     Informe:
       type: object
-      required: [sesion, totales, desglose, no_encontrados]
+      required: [sesion, empresa, detalle_disponible, totales, desglose, no_encontrados]
       additionalProperties: false
       properties:
         sesion: { $ref: "#/components/schemas/SesionConteo" }
+        empresa: { $ref: "#/components/schemas/EmpresaDelInforme" }
+        detalle_disponible:
+          type: boolean
+          description: >-
+            false en sesiones cerradas antes de la spec 013: no guardaron el detalle por
+            activo ni la copia de la empresa.
         totales: { $ref: "#/components/schemas/Cifras" }
         desglose:
           type: object

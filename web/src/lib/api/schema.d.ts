@@ -1000,6 +1000,19 @@ export interface components {
             /** @description false hasta guardar nombre y dirección. */
             completa: boolean;
         };
+        /** @description Datos de la empresa congelados al cerrar (spec 013). vigente true: la sesión se cerró antes de guardarlos y se muestran los de hoy. */
+        EmpresaDelInforme: {
+            nombre: string;
+            direccion: string | null;
+            nit: string | null;
+            telefono: string | null;
+            correo: string | null;
+            logo: null | {
+                /** Format: uuid */
+                id: string;
+            };
+            vigente: boolean;
+        };
         EmpresaRespuesta: {
             empresa: components["schemas"]["Empresa"];
         };
@@ -1304,6 +1317,9 @@ export interface components {
         };
         Informe: {
             sesion: components["schemas"]["SesionConteo"];
+            empresa: components["schemas"]["EmpresaDelInforme"];
+            /** @description false en sesiones cerradas antes de la spec 013: no guardaron el detalle por activo ni la copia de la empresa. */
+            detalle_disponible: boolean;
             totales: components["schemas"]["Cifras"];
             desglose: {
                 categorias: components["schemas"]["FilaDesglose"][];

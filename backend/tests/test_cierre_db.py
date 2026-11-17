@@ -258,6 +258,8 @@ def test_references_of_another_tenant_fail(db, base, campo):
         "delete from sesion_desglose",
         "truncate sesion_desglose",
         "update sesion_no_encontrado set precio = 0",
+        "delete from sesion_detalle",
+        "delete from sesion_empresa",
         "delete from sesion_no_encontrado",
         "truncate sesion_no_encontrado",
         "delete from sesion_conteo",

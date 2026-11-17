@@ -26,10 +26,19 @@ from sqlalchemy import and_, case, exists, func, literal, select, union_all
 from sqlalchemy.orm import Session, aliased
 
 from app.activos.models import Activo
+from app.auth.models import Tenant
 from app.catalogo.models import Categoria, Ubicacion
 from app.conteo import service
-from app.conteo.models import SesionConteo, SesionDesglose, SesionNoEncontrado, Verificacion
+from app.conteo.models import (
+    SesionConteo,
+    SesionDesglose,
+    SesionDetalle,
+    SesionEmpresa,
+    SesionNoEncontrado,
+    Verificacion,
+)
 from app.conteo.verificaciones import bloquear_sesion
+from app.empresa.models import Empresa
 
 CERO = Decimal("0.00")
 SEPARADOR_RUTA = " › "
@@ -59,6 +68,21 @@ class FilaU:
     codigo: str
     nombre: str
     en_reparacion: bool
+    # Spec 013 (R4): para el detalle congelado. De la verificación vigente si se encontró.
+    marca: str | None = None
+    serial: str | None = None
+    encontrada_ruta: str | None = None
+    estado_fisico: str | None = None
+
+
+def _ruta(lugar, padre):
+    return case(
+        (
+            and_(lugar.tipo == "box", padre.nombre.is_not(None)),
+            padre.nombre + SEPARADOR_RUTA + lugar.nombre,
+        ),
+        else_=lugar.nombre,
+    )
 
 
 def universo(session: Session, sesion_id: uuid.UUID) -> list[FilaU]:
@@ -72,6 +96,8 @@ def universo(session: Session, sesion_id: uuid.UUID) -> list[FilaU]:
             Verificacion.precio_al_contar,
             Verificacion.categoria_al_contar,
             Verificacion.ubicacion_esperada_id,
+            Verificacion.ubicacion_encontrada_id,
+            Verificacion.estado_fisico,
             orden.label("orden"),
         )
         .where(Verificacion.sesion_id == sesion_id)
@@ -83,6 +109,8 @@ def universo(session: Session, sesion_id: uuid.UUID) -> list[FilaU]:
         vigentes.c.precio_al_contar.label("precio"),
         vigentes.c.categoria_al_contar.label("categoria_id"),
         vigentes.c.ubicacion_esperada_id.label("ubicacion_id"),
+        vigentes.c.ubicacion_encontrada_id.label("encontrada_id"),
+        vigentes.c.estado_fisico.label("estado_fisico"),
     ).where(vigentes.c.orden == 1)
     no_encontrados = select(
         Activo.id.label("activo_id"),
@@ -90,6 +118,8 @@ def universo(session: Session, sesion_id: uuid.UUID) -> list[FilaU]:
         Activo.precio_compra.label("precio"),
         Activo.categoria_id.label("categoria_id"),
         Activo.ubicacion_id.label("ubicacion_id"),
+        literal(None, type_=Verificacion.ubicacion_encontrada_id.type).label("encontrada_id"),
+        literal(None, type_=Verificacion.estado_fisico.type).label("estado_fisico"),
     ).where(
         Activo.estado.in_(service.ESTADOS_QUE_CUENTAN),
         ~exists().where(
@@ -99,13 +129,8 @@ def universo(session: Session, sesion_id: uuid.UUID) -> list[FilaU]:
     u = union_all(encontrados, no_encontrados).subquery()
     lugar = aliased(Ubicacion)
     padre = aliased(Ubicacion)
-    ruta = case(
-        (
-            and_(lugar.tipo == "box", padre.nombre.is_not(None)),
-            padre.nombre + SEPARADOR_RUTA + lugar.nombre,
-        ),
-        else_=lugar.nombre,
-    )
+    hallado = aliased(Ubicacion)
+    hallado_padre = aliased(Ubicacion)
     filas = session.execute(
         select(
             u.c.activo_id,
@@ -114,15 +139,21 @@ def universo(session: Session, sesion_id: uuid.UUID) -> list[FilaU]:
             u.c.categoria_id,
             Categoria.nombre,
             u.c.ubicacion_id,
-            ruta,
+            _ruta(lugar, padre),
             Activo.codigo,
             Activo.nombre,
             Activo.estado,
+            Activo.marca,
+            Activo.serial,
+            case((hallado.id.is_not(None), _ruta(hallado, hallado_padre)), else_=None),
+            u.c.estado_fisico,
         )
         .join(Activo, Activo.id == u.c.activo_id)
         .join(Categoria, Categoria.id == u.c.categoria_id)
         .join(lugar, lugar.id == u.c.ubicacion_id)
         .outerjoin(padre, padre.id == lugar.padre_id)
+        .outerjoin(hallado, hallado.id == u.c.encontrada_id)
+        .outerjoin(hallado_padre, hallado_padre.id == hallado.padre_id)
         .order_by(u.c.activo_id)
     ).all()
     return [
@@ -137,6 +168,10 @@ def universo(session: Session, sesion_id: uuid.UUID) -> list[FilaU]:
             codigo=f[7],
             nombre=f[8],
             en_reparacion=(not f[1]) and f[9] == "en_reparacion",
+            marca=f[10],
+            serial=f[11],
+            encontrada_ruta=f[12],
+            estado_fisico=f[13],
         )
         for f in filas
     ]
@@ -169,6 +204,7 @@ class Cifras:
 
 @dataclass
 class Agregado:
+    filas: list[FilaU] = field(default_factory=list)
     total: Cifras = field(default_factory=Cifras)
     por_categoria: dict[uuid.UUID, Cifras] = field(default_factory=dict)
     por_ubicacion: dict[uuid.UUID, Cifras] = field(default_factory=dict)
@@ -177,7 +213,7 @@ class Agregado:
 
 def agregar(filas: list[FilaU]) -> Agregado:
     """Las tres cifras, el desglose y la lista, todo de la misma lista U (``Decimal``)."""
-    agregado = Agregado()
+    agregado = Agregado(filas=list(filas))
     for fila in filas:
         agregado.total.sumar(fila)
         agregado.por_categoria.setdefault(fila.categoria_id, Cifras(fila.categoria_nombre)).sumar(
@@ -251,9 +287,45 @@ def cerrar(session: Session, sesion_id: uuid.UUID, usuario_id: uuid.UUID) -> Ses
                 en_reparacion=fila.en_reparacion,
             )
         )
+    # Spec 013 (R4): una fila por activo de U, de la misma lista que el desglose.
+    for fila in agregado.filas:
+        session.add(
+            SesionDetalle(
+                sesion_id=sesion.id,
+                activo_id=fila.activo_id,
+                codigo=fila.codigo,
+                nombre=fila.nombre,
+                marca=fila.marca,
+                serial=fila.serial,
+                categoria_id=fila.categoria_id,
+                categoria_nombre=fila.categoria_nombre,
+                ubicacion_id=fila.ubicacion_id,
+                ubicacion_ruta=fila.ubicacion_ruta,
+                encontrada_ruta=fila.encontrada_ruta,
+                estado_fisico=fila.estado_fisico,
+                encontrado=fila.encontrado,
+                en_reparacion=fila.en_reparacion,
+                precio=fila.precio,
+            )
+        )
+    session.add(_copia_empresa(session, sesion))
     session.flush()
     session.refresh(sesion)
     return sesion
+
+
+CAMPOS_EMPRESA = ("nombre", "direccion", "nit", "telefono", "correo", "logo_id")
+
+
+def _copia_empresa(session: Session, sesion: SesionConteo) -> SesionEmpresa:
+    """R3: la empresa vigente al cerrar; sin datos guardados, el nombre del tenant."""
+    empresa = session.scalars(select(Empresa)).one_or_none()
+    if empresa is None:
+        nombre = session.scalar(select(Tenant.nombre).where(Tenant.id == sesion.tenant_id))
+        return SesionEmpresa(sesion_id=sesion.id, nombre=nombre)
+    return SesionEmpresa(
+        sesion_id=sesion.id, **{campo: getattr(empresa, campo) for campo in CAMPOS_EMPRESA}
+    )
 
 
 # --- Informe (solo lectura; R7) -----------------------------------------------------------
@@ -294,6 +366,8 @@ def informe(session: Session, sesion: SesionConteo) -> dict[str, object]:
     ).all()
     return {
         "sesion": service.vista(session, sesion),
+        "empresa": empresa_del_informe(session, sesion),
+        "detalle_disponible": _tiene_detalle(session, sesion),
         "totales": {
             "encontrado": _dinero(sesion.total_encontrado),
             "no_encontrado": _dinero(sesion.total_no_encontrado),
@@ -320,3 +394,46 @@ def informe(session: Session, sesion: SesionConteo) -> dict[str, object]:
             for f in faltantes
         ],
     }
+
+
+def empresa_del_informe(session: Session, sesion: SesionConteo) -> dict[str, object]:
+    """La copia del cierre (R3) o, si la sesión se cerró antes de la 013, la vigente
+    rotulada con ``vigente: true`` (Q1 A)."""
+    copia = session.get(SesionEmpresa, (sesion.tenant_id, sesion.id))
+    fuente: SesionEmpresa | Empresa | None = copia
+    if fuente is None:
+        fuente = session.scalars(select(Empresa)).one_or_none()
+    if fuente is None:
+        nombre = session.scalar(select(Tenant.nombre).where(Tenant.id == sesion.tenant_id))
+        datos = dict.fromkeys(CAMPOS_EMPRESA)
+        datos["nombre"] = nombre
+    else:
+        datos = {campo: getattr(fuente, campo) for campo in CAMPOS_EMPRESA}
+    logo_id = datos.pop("logo_id")
+    return {
+        **datos,
+        "logo": {"id": str(logo_id)} if logo_id else None,
+        "vigente": copia is None,
+    }
+
+
+def _tiene_detalle(session: Session, sesion: SesionConteo) -> bool:
+    """Las sesiones cerradas desde la 013 tienen la copia de la empresa y su detalle."""
+    return session.get(SesionEmpresa, (sesion.tenant_id, sesion.id)) is not None
+
+
+def detalle(session: Session, sesion: SesionConteo) -> list[SesionDetalle]:
+    """El detalle congelado (R4), por categoría, encontrados primero y código."""
+    if sesion.estado != "cerrada":
+        raise SesionAbierta()
+    return list(
+        session.scalars(
+            select(SesionDetalle)
+            .where(SesionDetalle.sesion_id == sesion.id)
+            .order_by(
+                func.lower(SesionDetalle.categoria_nombre),
+                SesionDetalle.encontrado.desc(),
+                SesionDetalle.codigo,
+            )
+        ).all()
+    )
