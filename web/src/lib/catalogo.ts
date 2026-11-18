@@ -74,6 +74,13 @@ export function useCargarSugeridas() {
   })
 }
 
+// --- Búsqueda en el cliente (spec 015, T6) ------------------------------------------
+
+/** Texto comparable: sin tildes ni mayúsculas y con los espacios colapsados. */
+export function normalizarBusqueda(texto: string): string {
+  return texto.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim().split(/\s+/).filter(Boolean).join(' ')
+}
+
 // --- Árbol y rutas ------------------------------------------------------------------
 
 export interface Nodo {
