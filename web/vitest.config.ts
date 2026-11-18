@@ -16,5 +16,8 @@ export default defineConfig({
     setupFiles: ['src/test/setup.ts'],
     restoreMocks: true,
     unstubGlobals: true,
+    // Bajo carga, las pruebas largas (varias esperas encadenadas de hasta 3 s,
+    // ver asyncUtilTimeout en src/test/setup.ts) superan los 5 s por defecto.
+    testTimeout: 15000,
   },
 })
