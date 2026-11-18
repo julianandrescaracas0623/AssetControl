@@ -6,10 +6,17 @@ mismos de la web (``web/src/lib/format.ts`` y ``porcentaje`` de ``lib/sesiones.t
 """
 
 import copy
+import html
 import io
+import re
+import warnings
+import zipfile
+from datetime import date, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
+from openpyxl import load_workbook
 from pypdf import PdfReader
 
 from app.conteo import exportar
@@ -49,6 +56,25 @@ def test_cop_format_rejects_more_than_two_decimals():
 )
 def test_percentage_matches_the_web(encontradas, registradas, salida):
     assert exportar.porcentaje(encontradas, registradas) == salida
+
+
+@pytest.mark.parametrize(
+    ("encontradas", "registradas", "fraccion"),
+    [
+        (0, 0, "0"),
+        (1, 2, "0.5"),
+        (1, 3, "0.333"),
+        (2, 3, "0.667"),
+        (3, 3, "1"),
+        (1, 8, "0.125"),
+    ],
+)
+def test_found_fraction_is_the_same_rounding_as_the_percentage(encontradas, registradas, fraccion):
+    """El % del Excel (spec 015, T5) es un número con formato ``0.0 %``: la misma cifra
+    redondeada a la décima que el texto de la web, como ``Decimal`` exacto."""
+    valor = exportar.fraccion_encontrada(encontradas, registradas)
+    assert isinstance(valor, Decimal)
+    assert valor == Decimal(fraccion)
 
 
 INFORME = {
@@ -231,16 +257,149 @@ def test_long_pdf_numbers_pages_and_repeats_the_header():
         (["Equipos / Rayos X: [sala]*?"], ["Equipos Rayos X sala"]),
         (["x" * 40], ["x" * 31]),
         (["Resumen", "No encontrados"], ["Resumen (2)", "No encontrados (2)"]),
+        (["Todos los activos"], ["Todos los activos (2)"]),
         (["Sillas", "SILLAS", "sillas"], ["Sillas", "SILLAS (2)", "sillas (3)"]),
         (["y" * 35, "y" * 33], ["y" * 31, "y" * 27 + " (2)"]),
         (["'Citada'", "///"], ["Citada", "Categoría"]),
+        # Excel mide en unidades UTF-16: cada emoji ocupa dos (spec 015, T5, M2).
+        (["Equipos " + "😀" * 16], ["Equipos " + "😀" * 11]),
+        (["😀" * 20 + "x", "😀" * 20 + "y"], ["😀" * 15, "😀" * 13 + " (2)"]),
+        (["a" * 30 + "😀"], ["a" * 30]),  # no parte el par sustituto
+        (["a" * 29 + "😀"], ["a" * 29 + "😀"]),  # 31 unidades: cabe
+        (["History", "history"], ["History (2)", "history (3)"]),
+        (["a" * 30 + "'b"], ["a" * 30]),  # tras el corte tampoco termina en comilla
     ],
 )
 def test_sheet_names_are_valid_and_unique(categorias, hojas):
     nombres = exportar.nombres_de_hoja(categorias)
     assert nombres == hojas
     for nombre in nombres:
-        assert len(nombre) <= 31 and not set(nombre) & set("[]:*?/\\")
+        assert len(nombre.encode("utf-16-le")) // 2 <= 31
+        assert not set(nombre) & set("[]:*?/\\")
+        assert not nombre.startswith("'") and not nombre.endswith("'")
+
+
+def test_sheet_names_with_emoji_are_accepted_by_the_writer():
+    """Las 16+ emoji de una categoría no tumban el libro (antes: ``InvalidWorksheetName``)."""
+    informe = copy.deepcopy(INFORME)
+    informe["desglose"]["categorias"][0]["etiqueta"] = "Equipos " + "😀" * 16
+    detalle = [_detalle(categoria_id=informe["desglose"]["categorias"][0]["id"])]
+    detalle[0].categoria_nombre = informe["desglose"]["categorias"][0]["etiqueta"]
+    wb = load_workbook(io.BytesIO(exportar.a_excel(exportar.documento(informe, detalle))))
+    assert "Equipos " + "😀" * 11 in wb.sheetnames
+
+
+def test_print_header_text_is_cut_before_escaping_and_never_splits_a_double_ampersand():
+    # 79 letras y un «&»: duplicado ocuparía 81; se corta antes del «&&», no en medio.
+    assert exportar._cabecera_impresion("a" * 79 + "&b") == "a" * 79
+    assert exportar._cabecera_impresion("a" * 78 + "&b") == "a" * 78 + "&&"
+    assert exportar._cabecera_impresion("A&B") == "A&&B"
+    # Imágenes (``&G``, ``&[Picture]``) y fuentes (``&"``) no llegan como código.
+    assert exportar._cabecera_impresion('M&G &[Picture] &"Arial" &&G') == 'MG [Picture] "Arial" G'
+    # El tope se mide en UTF-16 y no parte un emoji.
+    assert exportar._cabecera_impresion("😀" * 50) == "😀" * 40
+    assert exportar._cabecera_impresion("a" + "😀" * 50) == "a" + "😀" * 39
+
+
+HOSTIL = '=HYPERLINK("http://evil","x")'
+EMPRESA_HOSTIL = '&A&P&"Arial,Bold"&K FF0000&Z'
+SESION_HOSTIL = "2026 &D inventario"
+
+
+def _detalle(**cambios):
+    fila = {
+        "codigo": "000124",
+        "nombre": "Autoclave",
+        "marca": None,
+        "serial": None,
+        "categoria_id": INFORME["desglose"]["categorias"][0]["id"],
+        "categoria_nombre": "Electrónica",
+        "ubicacion_ruta": "Consultorio 1 › Box 2",
+        "encontrada_ruta": "Consultorio 1 › Box 2",
+        "estado_fisico": "ok",
+        "encontrado": True,
+        "en_reparacion": False,
+        "precio": "1390000.50",
+    }
+    return SimpleNamespace(**{**fila, **cambios})
+
+
+def comprobar_libro_seguro(contenido: bytes, empresa: str, sesion: str) -> None:
+    """Todo texto es texto (``s``), sin fórmulas ni hipervínculos en el zip, y el
+    encabezado de impresión con cada ``&`` del usuario neutralizado y el tamaño aparte."""
+    wb = load_workbook(io.BytesIO(contenido))
+    for hoja in wb.worksheets:
+        for fila in hoja.iter_rows():
+            for celda in fila:
+                if isinstance(celda.value, str):
+                    assert celda.data_type == "s", (hoja.title, celda.coordinate)
+        assert not hoja._hyperlinks, hoja.title
+    resumen = wb["Resumen"]
+    for ref in ("B1", "B2", "B3"):
+        assert resumen[ref].data_type == "s", ref
+    assert resumen["B1"].value == empresa
+    assert f"«{sesion}»" in resumen["B3"].value
+    esperado = (
+        f"&L&8 {exportar._cabecera_impresion(empresa)}&R&8 {exportar._cabecera_impresion(sesion)}"
+    )
+    with zipfile.ZipFile(io.BytesIO(contenido)) as z:
+        xml = "".join(z.read(n).decode() for n in z.namelist() if n.endswith((".xml", ".rels")))
+        assert "<f>" not in xml and "<f " not in xml
+        assert "<xm:f>" not in xml
+        assert "<hyperlink" not in xml and "relationships/hyperlink" not in xml
+        hojas = [n for n in z.namelist() if n.startswith("xl/worksheets/sheet")]
+        for nombre in hojas:
+            cabeceras = re.findall(r"<oddHeader>(.*?)</oddHeader>", z.read(nombre).decode())
+            assert [html.unescape(c) for c in cabeceras] == [esperado], nombre
+    assert not re.search(r"&8\d", esperado)
+
+
+def test_hostile_text_stays_text_in_every_sheet_and_in_the_print_header():
+    informe = copy.deepcopy(INFORME)
+    informe["empresa"]["nombre"] = EMPRESA_HOSTIL
+    informe["sesion"]["nombre"] = SESION_HOSTIL
+    categoria = informe["desglose"]["categorias"][0]
+    categoria["etiqueta"] = HOSTIL
+    informe["desglose"]["ubicaciones"][0]["etiqueta"] = HOSTIL
+    informe["no_encontrados"][0].update(
+        codigo=HOSTIL,
+        nombre=HOSTIL,
+        categoria={"id": categoria["id"], "nombre": HOSTIL},
+        ubicacion={"id": "x", "ruta": HOSTIL},
+    )
+    detalle = [
+        _detalle(
+            codigo=HOSTIL,
+            nombre=HOSTIL,
+            marca=HOSTIL,
+            serial=HOSTIL,
+            categoria_nombre=HOSTIL,
+            ubicacion_ruta=HOSTIL,
+            encontrada_ruta="Otra",
+        )
+    ]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # XlsxWriter avisa (con el texto) si descarta algo
+        contenido = exportar.a_excel(exportar.documento(informe, detalle))
+    comprobar_libro_seguro(contenido, EMPRESA_HOSTIL, SESION_HOSTIL)
+    wb = load_workbook(io.BytesIO(contenido))
+    assert wb.sheetnames == [
+        "Resumen",
+        "Todos los activos",
+        '=HYPERLINK("http evil","x")',
+        "No encontrados",
+    ]
+    for nombre in ("Todos los activos", '=HYPERLINK("http evil","x")', "No encontrados"):
+        valores = [c.value for fila in wb[nombre].iter_rows() for c in fila]
+        assert valores.count(HOSTIL) >= 4, nombre
+
+
+def test_document_keeps_the_real_cut_and_close_dates_for_the_spreadsheet():
+    """Fechas reales (no texto) para las celdas de fecha del Resumen; cierre en hora de Colombia."""
+    doc = exportar.documento(INFORME)
+    assert doc.fecha_corte == date(2026, 11, 30)
+    assert doc.momento_cierre == datetime(2026, 11, 14, 17, 58)
+    assert doc.momento_cierre.tzinfo is None  # Excel no guarda zona horaria
 
 
 def test_company_contact_line_has_only_what_exists():
