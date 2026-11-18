@@ -36,9 +36,12 @@ export function vigenteDe(error: unknown): Activo | null {
   return (error.cuerpo as { activo?: Activo } | undefined)?.activo ?? null
 }
 
+// Fusiona en vez de reemplazar (spec 015, R4): un campo que la respuesta no trae (p. ej.
+// `foto`) nunca borra lo que la ficha ya conocía; lo que sí trae (incluso `null`) manda.
 function guardarEnCache(cliente: QueryClient, activo: Activo) {
-  cliente.setQueryData([...CLAVE_ACTIVOS, 'codigo', activo.codigo], activo)
-  cliente.setQueryData([...CLAVE_ACTIVOS, 'id', activo.id], activo)
+  const fusionar = (previo: Activo | undefined): Activo => (previo ? { ...previo, ...activo } : activo)
+  cliente.setQueryData<Activo>([...CLAVE_ACTIVOS, 'codigo', activo.codigo], fusionar)
+  cliente.setQueryData<Activo>([...CLAVE_ACTIVOS, 'id', activo.id], fusionar)
   void cliente.invalidateQueries({ queryKey: [...CLAVE_ACTIVOS, 'buscar'] })
   void cliente.invalidateQueries({ queryKey: [...CLAVE_ACTIVOS, 'historial', activo.id] })
 }

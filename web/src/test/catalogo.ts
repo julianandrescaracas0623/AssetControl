@@ -572,7 +572,7 @@ export function crearCatalogo(
       if (Number(version) !== a.row_version) {
         return json(412, {
           error: { code: 'version_desactualizada', message: 'Alguien cambió este activo.', request_id: 'r' },
-          activo: { ...a },
+          activo: { ...a, foto: principales.get(a.id) ?? null },
         })
       }
       const b = cuerpo(init)
@@ -607,7 +607,8 @@ export function crearCatalogo(
         a.estado = 'dado_de_baja'
       }
       a.row_version += 1
-      return json(200, { activo: { ...a } }, { ETag: `"${a.row_version}"` })
+      // Spec 015 (R4): la escritura (y el 412) traen la ficha con su foto, como el servidor.
+      return json(200, { activo: { ...a, foto: principales.get(a.id) ?? null } }, { ETag: `"${a.row_version}"` })
     }
     const his = ruta0.match(/^\/api\/activos\/([0-9a-f-]{36})\/historial$/)
     if (his && metodo === 'GET') {

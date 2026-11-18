@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -156,5 +156,92 @@ describe('foto en la ficha', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Quitar foto' }).at(-1)!)
     expect(await screen.findByText('Las fotos no están disponibles en este momento.')).toBeTruthy()
     expect(subidas(f, 'DELETE')).toHaveLength(1)
+  })
+})
+
+// Spec 015, T1 (R4, A3): guardar un cambio no borra la foto de la ficha. La caché fusiona
+// la respuesta en vez de reemplazarla: aunque una respuesta no traiga `foto` (como hacía
+// el servidor antes de la 015), la ficha sigue mostrando la que ya conocía.
+describe('la foto sigue tras guardar un cambio (spec 015, T1)', () => {
+  const SILLA = '00000000-0000-4000-8000-0000000000d2'
+  const esEscritura = (url: string, init: RequestInit) =>
+    url.startsWith(`/api/activos/${SILLA}`) &&
+    !url.endsWith('/foto') &&
+    (init.method === 'PATCH' || (init.method === 'POST' && /\/(mover|estado|baja)$/.test(url)))
+
+  /** Ficha de la silla con foto; las escrituras responden sin `foto`. */
+  async function fichaConFoto() {
+    const catalogo = catalogoDemo('admin')
+    const sinFoto: typeof catalogo.manejador = (url, init) => {
+      const original = catalogo.manejador(url, init)
+      if (!original || !esEscritura(url, init)) return original
+      return Promise.resolve(original).then(async (respuesta) => {
+        const cuerpo = (await respuesta.json()) as { activo?: Record<string, unknown> }
+        if (cuerpo.activo) delete cuerpo.activo.foto
+        return new Response(JSON.stringify(cuerpo), { status: respuesta.status, headers: respuesta.headers })
+      })
+    }
+    simularAncho({ movil: false })
+    simularSesion('admin', sinFoto)
+    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/admin/activos/000123'] })} />)
+    fireEvent.change(await screen.findByTestId('entrada-foto-activo'), { target: { files: [foto()] } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Guardar foto' }))
+    await screen.findByRole('button', { name: 'Ver la foto de Silla ergonómica' })
+    return catalogo
+  }
+
+  it('al guardar la edición', async () => {
+    await fichaConFoto()
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    const panel = await screen.findByRole('dialog', { name: 'Editar activo' })
+    fireEvent.change(within(panel).getByLabelText(/Nombre/), { target: { value: 'Silla gris' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(await screen.findByRole('heading', { level: 1, name: 'Silla gris' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ver la foto de Silla gris' })).toBeTruthy()
+    expect(screen.queryByText('Sin foto')).toBeNull()
+  })
+
+  it('al mover', async () => {
+    await fichaConFoto()
+    fireEvent.click(screen.getByRole('button', { name: 'Mover' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Mover activo' })
+    fireEvent.click(within(dialogo).getByRole('combobox'))
+    fireEvent.click(await screen.findByRole('option', { name: /Administración/ }))
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Mover' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(await screen.findByText('Administración', { selector: 'dd' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ver la foto de Silla ergonómica' })).toBeTruthy()
+    expect(screen.queryByText('Sin foto')).toBeNull()
+  })
+
+  it('al cambiar el estado', async () => {
+    await fichaConFoto()
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar a reparación' }))
+    expect(await screen.findByRole('button', { name: 'Volver a activo' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ver la foto de Silla ergonómica' })).toBeTruthy()
+    expect(screen.queryByText('Sin foto')).toBeNull()
+  })
+
+  it('al dar de baja', async () => {
+    await fichaConFoto()
+    fireEvent.click(screen.getByRole('button', { name: 'Dar de baja' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Dar de baja' })
+    fireEvent.keyDown(within(dialogo).getByRole('combobox', { name: /Motivo/ }), { key: 'Enter' })
+    fireEvent.click(await screen.findByRole('option', { name: 'Perdido' }))
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Dar de baja' }))
+    expect(await screen.findByText('Dado de baja: perdido')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ver la foto de Silla ergonómica' })).toBeTruthy()
+    expect(screen.queryByText('Sin foto')).toBeNull()
+  })
+
+  it('ante un 412 muestra el vigente sin perder la foto', async () => {
+    const catalogo = await fichaConFoto()
+    catalogo.cambiarPorOtro(SILLA, { nombre: 'Silla renombrada' })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar a reparación' }))
+    expect(await screen.findByText(/Alguien cambió este activo/)).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Silla renombrada' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ver la foto de Silla renombrada' })).toBeTruthy()
+    expect(screen.queryByText('Sin foto')).toBeNull()
   })
 })

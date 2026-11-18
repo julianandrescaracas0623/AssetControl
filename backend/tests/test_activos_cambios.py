@@ -7,8 +7,11 @@ Sobre una base temporal con dos tenants (A y B) y un catálogo creado por la API
   (``precio_cambiado``, ``categoria_cambiada``, ``datos_cambiados``) con antes/después
   y autor, en la misma transacción; ``row_version`` sube una vez; sin cambios no hay
   evento ni versión nueva; ``codigo`` nunca cambia; solo el admin; dado de baja ``409``.
+- Spec 015, T1 (R4, A3): ``PATCH``, ``mover``, ``estado``, ``baja`` y el ``412`` devuelven
+  la ficha con ``foto`` (misma forma que ``GET /activos/{id}``).
 """
 
+import io
 import uuid
 from collections.abc import Iterator
 
@@ -26,7 +29,10 @@ from acceso_db import (
     temporary_acceso_db,
 )
 from flask import Flask
+from PIL import Image
 from sqlalchemy import text
+
+from app.fotos.almacen import EXTENSION_KEY, CarpetaLocal
 
 ADMIN = bearer(ADMIN_A, TENANT_A)
 CONTADOR = bearer(CONTADOR_A, TENANT_A, rol="contador")
@@ -39,8 +45,10 @@ def cam_db(database_residue_guard) -> Iterator[AccesoDb]:
 
 
 @pytest.fixture(scope="module")
-def cam_app(cam_db) -> Iterator[Flask]:
+def cam_app(cam_db, tmp_path_factory) -> Iterator[Flask]:
     flask_app = make_app(cam_db)
+    # Almacén en carpeta temporal: la spec 015 (R4) prueba que las escrituras traen la foto.
+    flask_app.extensions[EXTENSION_KEY] = CarpetaLocal(tmp_path_factory.mktemp("almacen"))
     yield flask_app
     dispose(flask_app)
 
@@ -551,3 +559,128 @@ def test_stale_version_on_actions_is_412(client, cat):
         response = accion(client, activo["id"], nombre, body)
         assert response.status_code == 412, nombre
         assert response.get_json()["activo"]["row_version"] == 2
+
+
+# --- Spec 015, T1: las escrituras traen la foto (R4, A3) -----------------------------------
+
+
+def con_foto(client, cat) -> tuple[dict, dict]:
+    """Un activo con foto principal; devuelve el activo vigente y su foto."""
+    activo = nuevo(client, cat)
+    buffer = io.BytesIO()
+    Image.new("RGB", (64, 48), (10, 120, 200)).save(buffer, "JPEG")
+    subida = client.put(
+        f"/activos/{activo['id']}/foto",
+        data={"foto_id": str(uuid.uuid4()), "archivo": (io.BytesIO(buffer.getvalue()), "a.jpg")},
+        headers=ADMIN,
+        content_type="multipart/form-data",
+    )
+    assert subida.status_code == 201, subida.get_json()
+    ficha = client.get(f"/activos/{activo['id']}", headers=ADMIN).get_json()["activo"]
+    assert ficha["foto"] is not None
+    return ficha, ficha["foto"]
+
+
+@pytest.mark.parametrize(
+    ("nombre", "body"),
+    [
+        ("editar", lambda cat: {"nombre": "Autoclave renombrada"}),
+        ("mover", lambda cat: {"ubicacion_id": cat["otra_sala"]}),
+        ("estado", lambda cat: {"estado": "en_reparacion"}),
+        ("baja", lambda cat: {"motivo": "perdido"}),
+    ],
+)
+def test_every_write_returns_the_card_with_its_photo(client, cat, nombre, body):
+    activo, foto = con_foto(client, cat)
+    v = activo["row_version"]
+    if nombre == "editar":
+        response = editar(client, activo["id"], body(cat), v=v)
+    else:
+        response = accion(client, activo["id"], nombre, body(cat), v=v)
+
+    assert response.status_code == 200, response.get_json()
+    escrito = response.get_json()["activo"]
+    assert escrito["foto"] == foto
+    assert escrito["precio_compra"] == "14200000.00"
+    ficha = client.get(f"/activos/{activo['id']}", headers=ADMIN).get_json()["activo"]
+    assert escrito == ficha
+    assert response.headers["ETag"] == f'"{ficha["row_version"]}"'
+
+
+def test_a_write_without_photo_returns_foto_null(client, cat):
+    activo = nuevo(client, cat)
+    response = editar(client, activo["id"], {"nombre": "Sin foto"})
+    assert response.status_code == 200
+    assert response.get_json()["activo"]["foto"] is None
+
+
+def test_stale_version_412_also_carries_the_photo(client, cat):
+    activo, foto = con_foto(client, cat)
+    v = activo["row_version"]
+    assert editar(client, activo["id"], {"nombre": "Ya cambió"}, v=v).status_code == 200
+
+    respuestas = [editar(client, activo["id"], {"nombre": "Tarde"}, v=v)]
+    respuestas += [
+        accion(client, activo["id"], nombre, body, v=v)
+        for nombre, body in (
+            ("mover", {"ubicacion_id": cat["otra_sala"]}),
+            ("estado", {"estado": "en_reparacion"}),
+            ("baja", {"motivo": "perdido"}),
+        )
+    ]
+    for response in respuestas:
+        assert response.status_code == 412
+        vigente = response.get_json()["activo"]
+        assert vigente["foto"] == foto
+        assert vigente["row_version"] == v + 1
+        assert vigente["precio_compra"] == "14200000.00"
+
+
+def escrituras(client, activo_id, cat, *, v, headers):
+    """PATCH, mover, estado y baja con la misma versión y el mismo rol."""
+    respuestas = {"editar": editar(client, activo_id, {"nombre": "Ajeno"}, v=v, headers=headers)}
+    for nombre, body in (
+        ("mover", {"ubicacion_id": cat["otra_sala"]}),
+        ("estado", {"estado": "en_reparacion"}),
+        ("baja", {"motivo": "perdido"}),
+    ):
+        respuestas[nombre] = accion(client, activo_id, nombre, body, v=v, headers=headers)
+    return respuestas
+
+
+def test_another_tenant_never_sees_the_card_nor_its_photo(client, cat):
+    activo, foto = con_foto(client, cat)
+    v = activo["row_version"]
+    assert editar(client, activo["id"], {"nombre": "Ya cambió"}, v=v).status_code == 200
+
+    for version_enviada in (v + 1, v):  # la real y una vieja
+        respuestas = escrituras(client, activo["id"], cat, v=version_enviada, headers=ADMIN_OTRO)
+        for nombre, response in respuestas.items():
+            assert response.status_code == 404, (nombre, version_enviada)
+            cuerpo = response.get_json()
+            assert "activo" not in cuerpo, nombre
+            assert "foto" not in cuerpo, nombre
+
+    ficha = client.get(f"/activos/{activo['id']}", headers=ADMIN).get_json()["activo"]
+    assert ficha["foto"] == foto
+    assert ficha["row_version"] == v + 1
+    assert ficha["nombre"] == "Ya cambió"
+
+
+def test_a_counter_with_a_stale_version_gets_403_without_the_card(client, cat):
+    activo, _ = con_foto(client, cat)
+    v = activo["row_version"]
+    assert editar(client, activo["id"], {"nombre": "Ya cambió"}, v=v).status_code == 200
+
+    for nombre, response in escrituras(client, activo["id"], cat, v=v, headers=CONTADOR).items():
+        assert response.status_code == 403, nombre
+        assert "activo" not in response.get_json(), nombre
+
+
+def test_the_counter_reads_the_photo_but_never_the_price(client, cat):
+    activo, foto = con_foto(client, cat)
+    response = client.get(f"/activos/{activo['id']}", headers=CONTADOR)
+    assert response.status_code == 200
+    ficha = response.get_json()["activo"]
+    assert ficha["foto"] == foto
+    assert "precio_compra" not in ficha

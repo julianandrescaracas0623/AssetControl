@@ -966,7 +966,7 @@ export interface components {
             /** Format: date-time */
             creado_en: string;
             precio_compra?: components["schemas"]["Precio"];
-            /** @description Foto principal vigente; solo en la ficha y en por-codigo (spec 012). */
+            /** @description Foto principal vigente (spec 012); viene en la ficha, en por-codigo y en la respuesta de editar, mover, estado, baja y su 412 (spec 015, R4). No viene en la búsqueda ni en el alta. */
             foto?: components["schemas"]["Foto"] | null;
         };
         Foto: {
@@ -1626,7 +1626,7 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description La versión no coincide; no se guardó nada. Trae el activo vigente. */
+        /** @description La versión no coincide; no se guardó nada. Trae el activo vigente con su foto. */
         VersionDesactualizada: {
             headers: {
                 [name: string]: unknown;
@@ -1635,7 +1635,7 @@ export interface components {
                 "application/json": components["schemas"]["VersionDesactualizada"];
             };
         };
-        /** @description Guardado (o sin cambios); el activo con precio y su versión. */
+        /** @description Guardado (o sin cambios); el activo con precio, foto y su versión. */
         ActivoCambiado: {
             headers: {
                 /** @description La versión nueva entre comillas, para el próximo If-Match. */

@@ -28,8 +28,11 @@ def _error(exc: service.ErrorActivo) -> ResponseReturnValue:
     if isinstance(exc, service.CodigoExistente | cambios.VersionDesactualizada):
         activo = exc.activo
         if isinstance(activo, Activo):
-            # Solo el admin escribe sobre activos existentes: el vigente va con precio.
-            activo = service.vista(current_session(), activo, con_precio=True)
+            # Solo el admin escribe sobre activos existentes: el vigente va con precio y
+            # con su foto, igual que la ficha (spec 015, R4). ``con_precio=True`` es válido
+            # porque solo ``VersionDesactualizada`` trae un ``Activo`` y solo sale de rutas
+            # ``@require_role("admin")``; ``CodigoExistente`` ya trae un dict sin precio.
+            activo = _ficha(activo, con_precio=True)
         cuerpo = {
             "error": {"code": exc.code, "message": exc.message, "request_id": current_request_id()},
             "activo": activo,
@@ -38,18 +41,24 @@ def _error(exc: service.ErrorActivo) -> ResponseReturnValue:
     return error_response(exc.status, exc.code, exc.message)
 
 
-def _con_foto(activo: Activo) -> dict[str, object]:
-    """La ficha con su foto principal vigente (spec 012, R7) o ``null``."""
+def _ficha(activo: Activo, *, con_precio: bool) -> dict[str, object]:
+    """Única forma de la ficha: el activo con su foto principal vigente (spec 012, R7) o
+    ``null``. La usan las lecturas, las escrituras y el ``412`` (spec 015, R4)."""
     session = current_session()
-    datos = service.vista(session, activo, con_precio=_es_admin())
+    datos = service.vista(session, activo, con_precio=con_precio)
     foto = fotos_service.principal(session, activo.id)
     datos["foto"] = fotos_service.vista(foto) if foto else None
     return datos
 
 
+def _con_foto(activo: Activo) -> dict[str, object]:
+    """La ficha para quien lee: con precio solo si es admin (P13)."""
+    return _ficha(activo, con_precio=_es_admin())
+
+
 def _con_version(activo: Activo) -> ResponseReturnValue:
-    """Respuesta de una escritura del admin: el activo con precio y su ``ETag``."""
-    vista = service.vista(current_session(), activo, con_precio=True)
+    """Respuesta de una escritura del admin: la ficha con precio y foto, y su ``ETag``."""
+    vista = _ficha(activo, con_precio=True)
     return jsonify(activo=vista), 200, {"ETag": f'"{activo.row_version}"'}
 
 
