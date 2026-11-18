@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router'
 
+import { esUuid, type InformeDeOrigen } from '@/components/app/admin-nav'
 import { api, type Archivo, type Esquemas, type FormatoInforme } from '@/lib/api/cliente'
 import { CLAVE_SESIONES } from '@/lib/sesiones'
 import { useApiAutenticada } from '@/lib/sesion'
@@ -27,6 +29,20 @@ export function useInforme(id: string | undefined) {
     staleTime: Infinity,
     queryFn: () => conToken((t) => api.informeSesion(t, id!)),
   })
+}
+
+/**
+ * Informe desde el que se llegó a «Valor actual» (spec 015, R7): `?sesion=<uuid>`. Un
+ * valor que no es UUID se ignora sin pedir nada; si la sesión no existe o sigue abierta
+ * (el servidor responde error, filtrado por tenant), también se ignora. Solo devuelve
+ * algo cuando hay un informe al que volver.
+ */
+export function useInformeDeOrigen(activo = true): InformeDeOrigen | undefined {
+  const [params] = useSearchParams()
+  const sesion = params.get('sesion')
+  const id = activo && esUuid(sesion) ? sesion : undefined
+  const consulta = useInforme(id)
+  return id && consulta.isSuccess ? { id, nombre: consulta.data.sesion.nombre } : undefined
 }
 
 export function useCerrarSesion(id: string) {

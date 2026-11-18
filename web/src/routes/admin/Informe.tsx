@@ -320,7 +320,8 @@ export default function Informe() {
         acciones={
           <>
             <Button asChild variant="ghost">
-              <Link to="/admin/valor">Ver valor actual</Link>
+              {/* Spec 015 (R7): Valor ofrece volver a este informe. */}
+              <Link to={{ pathname: '/admin/valor', search: `?sesion=${encodeURIComponent(id)}` }}>Ver valor actual</Link>
             </Button>
             <Exportar id={id} />
           </>

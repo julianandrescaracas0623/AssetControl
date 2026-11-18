@@ -101,6 +101,12 @@ describe('Informe de sesión (spec 008, T5)', () => {
     expect(cifras).toContain('Encontrado$ 1.390.000,00')
   })
 
+  it('«Ver valor actual» lleva la sesión para poder volver al informe (spec 015, T3)', async () => {
+    abrir(INFORME, cerrado())
+    const enlace = await screen.findByRole('link', { name: 'Ver valor actual' })
+    expect(enlace.getAttribute('href')).toBe(`/admin/valor?sesion=${SESION}`)
+  })
+
   it('una sesión abierta aún no tiene informe y lleva a la sesión', async () => {
     abrir(INFORME, catalogoDemo('admin', { sesiones: [sesionDe()] }))
     expect(await screen.findByText('Esta sesión sigue abierta')).toBeTruthy()

@@ -90,23 +90,44 @@ export interface Miga {
   ruta?: string
 }
 
+/** ¿Es un UUID? Valida ids que llegan en la URL antes de usarlos en una ruta. */
+export const esUuid = (texto: string | null | undefined): texto is string =>
+  typeof texto === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(texto)
+
+/** Ruta interna del informe de una sesión. */
+export const rutaInforme = (sesionId: string) => `/admin/sesiones/${sesionId}/informe`
+
+/** Informe desde el que se llegó (spec 015, R7): ya validado y existente. */
+export interface InformeDeOrigen {
+  id: string
+  nombre: string
+}
+
 /**
  * Migas de pan de una ruta de administración. Cada nivel con pantalla propia es un
  * enlace (la sección, la sesión del informe); el grupo y la pantalla actual no.
+ * Si a «Valor actual» se llegó desde un informe, las migas cuelgan de ese informe.
  */
-export function migasDeRuta(pathname: string): Miga[] {
+export function migasDeRuta(pathname: string, origen?: InformeDeOrigen): Miga[] {
   const entrada = entradaDeRuta(pathname)
   if (!entrada) return [{ texto: 'Administración' }]
+  if (entrada.exacta && entrada.item.ruta === '/admin/valor' && origen && esUuid(origen.id)) {
+    return [
+      { texto: 'Conteo' },
+      { texto: 'Sesiones', ruta: '/admin/sesiones' },
+      { texto: `Informe de ${origen.nombre}`, ruta: rutaInforme(origen.id) },
+      { texto: entrada.item.titulo },
+    ]
+  }
   if (entrada.exacta) return [{ texto: entrada.grupo.titulo }, { texto: entrada.item.titulo }]
   const partes = pathname.split('/').filter(Boolean)
   const ultimo = decodeURIComponent(partes.at(-1) ?? '')
-  // Un id interno (uuid) no dice nada a la persona: la miga nombra la pantalla.
-  const esId = (texto: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(texto)
   const migas: Miga[] = [{ texto: entrada.grupo.titulo }, { texto: entrada.item.titulo, ruta: entrada.item.ruta }]
   if (ultimo === 'informe' && partes.length >= 4) {
     migas.push({ texto: 'Sesión', ruta: `/${partes.slice(0, -1).join('/')}` }, { texto: 'Informe' })
   } else {
-    migas.push({ texto: esId(ultimo) ? 'Detalle' : ultimo })
+    // Un id interno (uuid) no dice nada a la persona: la miga nombra la pantalla.
+    migas.push({ texto: esUuid(ultimo) ? 'Detalle' : ultimo })
   }
   return migas
 }

@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { useInformeDeOrigen } from '@/lib/informe'
 import { etiquetaRol, iniciales, useCerrarSesion, useSesion } from '@/lib/sesion'
 
 // App shell de administración (docs/08 §4.1, spec 001b T4): barra lateral
@@ -134,7 +135,9 @@ function BarraLateral() {
 
 function Migas() {
   const { pathname } = useLocation()
-  const migas = migasDeRuta(pathname)
+  // Spec 015 (R7): en «Valor actual» abierto desde un informe, las migas llevan a él.
+  const origen = useInformeDeOrigen(pathname.replace(/\/+$/, '') === '/admin/valor')
+  const migas = migasDeRuta(pathname, origen)
   return (
     <Breadcrumb aria-label="Migas de pan" className="min-w-0">
       <BreadcrumbList className="flex-nowrap">

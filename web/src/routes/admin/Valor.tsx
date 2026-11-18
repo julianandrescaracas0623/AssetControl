@@ -1,7 +1,8 @@
-import { CircleAlert, Package, RefreshCw, Wrench } from 'lucide-react'
+import { ArrowLeft, CircleAlert, Package, RefreshCw, Wrench } from 'lucide-react'
 import { useId } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 
+import { rutaInforme } from '@/components/app/admin-nav'
 import { EncabezadoPagina } from '@/components/app/ConEstado'
 import { EmptyState } from '@/components/app/EmptyState'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -12,7 +13,7 @@ import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, Table
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { formatCOP, formatEntero, formatUnidades } from '@/lib/format'
-import { type FilaValor, type ValorEnVivo, useValorActual } from '@/lib/informe'
+import { type FilaValor, type ValorEnVivo, useInformeDeOrigen, useValorActual } from '@/lib/informe'
 
 // Valor actual del inventario (spec 008, T6; R8 de la spec, R7 de docs/03; CU-INF-02):
 // suma en vivo de los activos vigentes (activos y en reparación; los dados de baja no).
@@ -83,10 +84,40 @@ function Tabla({ filas, rotulo, valor }: { filas: FilaValor[]; rotulo: string; v
   )
 }
 
+// Spec 015 (R7): si se llegó desde un informe (?sesion=<uuid> válido de una sesión
+// cerrada), se vuelve a ese informe; si no, a la pantalla anterior o al Inicio. Solo
+// rutas internas: el id se valida como UUID antes de armar la ruta.
+function Volver() {
+  const origen = useInformeDeOrigen()
+  const navigate = useNavigate()
+  const { key } = useLocation()
+  const clase = 'self-start max-w-full max-md:min-h-11 -ml-2.5'
+  if (origen) {
+    return (
+      <Button asChild variant="ghost" size="sm" className={clase}>
+        <Link to={rutaInforme(origen.id)}>
+          <ArrowLeft aria-hidden="true" />
+          {/* Un nombre largo se recorta en el teléfono; el nombre accesible queda completo. */}
+          <span className="truncate">{`Volver al informe de ${origen.nombre}`}</span>
+        </Link>
+      </Button>
+    )
+  }
+  // En la primera pantalla de la pestaña no hay a dónde regresar: va al Inicio.
+  const volver = () => (key === 'default' ? navigate('/admin') : navigate(-1))
+  return (
+    <Button variant="ghost" size="sm" className={clase} onClick={() => void volver()}>
+      <ArrowLeft aria-hidden="true" />
+      Volver
+    </Button>
+  )
+}
+
 export default function Valor() {
   const consulta = useValorActual()
   return (
     <div className="flex max-w-4xl flex-col gap-6">
+      <Volver />
       <EncabezadoPagina
         titulo="Valor actual"
         descripcion={
