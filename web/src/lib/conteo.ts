@@ -10,6 +10,16 @@ import { type CuerpoVerificacion, useSesionAbierta, useVerificar, type Verificac
 // contando. Se recuerda en la pestaña (sessionStorage, con respaldo en memoria si el
 // navegador no lo deja) y es la ubicación encontrada preseleccionada al verificar.
 
+/**
+ * Spec 015, T9 (R10; Q8 = A): a dónde lleva «Contar» desde la sesión abierta. En escritorio
+ * (≥ 1024 px y puntero fino, `useEsEscritorio`), al espacio de dos paneles; en teléfono y
+ * tableta táctil, al inicio del conteo de siempre (sala de trabajo y escanear). Las dos
+ * rutas son fijas: no llevan parámetros (la sesión que se cuenta es la abierta del tenant).
+ */
+export function rutaParaContar(escritorio: boolean): '/contar/escanear' | '/contar' {
+  return escritorio ? '/contar/escanear' : '/contar'
+}
+
 const CLAVE = 'assetcontrol.sala-de-trabajo'
 let enMemoria: string | null = null
 const oyentes = new Set<() => void>()

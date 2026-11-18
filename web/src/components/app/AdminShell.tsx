@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { useEsEscritorio } from '@/hooks/use-escritorio'
 import { useInformeDeOrigen } from '@/lib/informe'
 import { etiquetaRol, iniciales, useCerrarSesion, useSesion } from '@/lib/sesion'
 
@@ -60,6 +61,9 @@ function BarraLateral() {
   const clinica = useSesion().sesion?.tenant.nombre ?? ''
   // En el teléfono el menú es un panel encima de la pantalla: al elegir, se cierra.
   const { isMobile, setOpenMobile } = useSidebar()
+  // Spec 015, T9 (R10; Q8 = A): en escritorio no hay atajo suelto a contar; se entra
+  // desde la sesión abierta. En teléfono y tableta táctil se conserva.
+  const escritorio = useEsEscritorio()
   const alElegir = () => {
     if (isMobile) setOpenMobile(false)
   }
@@ -107,14 +111,16 @@ function BarraLateral() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Ir a contar" variant="outline" className="max-md:h-11">
-              <Link to="/contar" onClick={alElegir}>
-                <ScanBarcode />
-                <span>Ir a contar</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {!escritorio && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Ir a contar" variant="outline" className="max-md:h-11">
+                <Link to="/contar" onClick={alElegir}>
+                  <ScanBarcode />
+                  <span>Ir a contar</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <div className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-xs group-data-[collapsible=icon]:hidden">
               <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-soft text-[10px] font-semibold text-brand-strong">
@@ -183,6 +189,7 @@ function BotonBuscar({ onAbrir }: { onAbrir: () => void }) {
 function MenuUsuario() {
   const { sesion } = useSesion()
   const cerrarSesion = useCerrarSesion()
+  const escritorio = useEsEscritorio()
   if (!sesion) return null
   const { nombre, email } = sesion.usuario
   const rol = etiquetaRol(sesion.rol)
@@ -205,13 +212,17 @@ function MenuUsuario() {
           <span className="text-xs font-normal text-muted-foreground">Rol: {rol}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/contar">
-            <ScanBarcode />
-            Ir a contar
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
+        {!escritorio && (
+          <>
+            <DropdownMenuItem asChild>
+              <Link to="/contar">
+                <ScanBarcode />
+                Ir a contar
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem onSelect={cerrarSesion}>
           <LogOut />
           Cerrar sesión

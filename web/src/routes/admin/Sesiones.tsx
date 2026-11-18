@@ -1,4 +1,4 @@
-import { ArrowLeftRight, ChevronRight, CircleAlert, ClipboardList, FileText, Loader2, Lock, Plus, RefreshCw } from 'lucide-react'
+import { ArrowLeftRight, ChevronRight, CircleAlert, ClipboardList, FileText, Loader2, Lock, Plus, RefreshCw, ScanBarcode } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -14,7 +14,9 @@ import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useEsEscritorio } from '@/hooks/use-escritorio'
 import { ErrorApi, mensajeDeError } from '@/lib/api/cliente'
+import { rutaParaContar } from '@/lib/conteo'
 import { useDiscrepancias, usePendientes } from '@/lib/discrepancias'
 import { formatEntero } from '@/lib/format'
 import { useCerrarSesion } from '@/lib/informe'
@@ -22,7 +24,8 @@ import { fechaCorte, hoyISO, nombreSugerido, pendientes, porcentaje, type Avance
 
 // Sesiones de conteo (spec 006, T5; CU-SES-01, 02; Q1): el admin abre una sesión (una
 // abierta por clínica) y ve su avance. Spec 008 (T4; R10, Q2): la cierra con un aviso de
-// lo que falta y las cerradas llevan a su informe congelado.
+// lo que falta y las cerradas llevan a su informe congelado. Spec 015 (T9; R10, Q8 = A):
+// la entrada al conteo del admin es «Contar» en la sesión abierta (la única del tenant).
 
 const fecha = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' })
 
@@ -64,7 +67,7 @@ function AbrirSesion({ abierto, onAbierto }: { abierto: boolean; onAbierto: (v: 
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Abrir sesión de conteo</DialogTitle>
-          <DialogDescription>Solo puede haber una abierta. El personal podrá verificar activos desde el teléfono.</DialogDescription>
+          <DialogDescription>Solo puede haber una abierta. El personal podrá verificar activos desde el teléfono o el escritorio.</DialogDescription>
         </DialogHeader>
         <form
           noValidate
@@ -103,19 +106,36 @@ function AbrirSesion({ abierto, onAbierto }: { abierto: boolean; onAbierto: (v: 
 
 function TarjetaAbierta({ sesion }: { sesion: SesionConteo }) {
   const detalle = useDetalleSesion(sesion.id)
+  const contar = rutaParaContar(useEsEscritorio())
   const avance = detalle.data?.avance
   const pct = avance ? porcentaje(avance.verificados, avance.total) : 0
   return (
-    <Link to={`/admin/sesiones/${sesion.id}`} className="flex flex-col gap-3 rounded-xl border p-4 transition-colors hover:bg-muted/50">
-      <span className="flex flex-wrap items-center justify-between gap-2">
+    <div className="flex flex-col gap-3 rounded-xl border p-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <span className="flex min-w-0 flex-col">
-          <span className="font-semibold break-words">{sesion.nombre}</span>
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold break-words">{sesion.nombre}</span>
+            <Badge variant="brand">Abierta</Badge>
+          </span>
           <span className="text-sm text-muted-foreground">
             Corte {fechaCorte(sesion.fecha_corte)} · abrió {sesion.abierta_por.nombre}
           </span>
         </span>
-        <Badge variant="brand">Abierta</Badge>
-      </span>
+        <span className="flex shrink-0 gap-2 [&_[data-slot=button]]:max-md:min-h-11 [&_[data-slot=button]]:max-md:flex-1">
+          <Button asChild variant="outline">
+            <Link to={`/admin/sesiones/${sesion.id}`}>
+              Ver avance
+              <ChevronRight />
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link to={contar}>
+              <ScanBarcode />
+              Contar
+            </Link>
+          </Button>
+        </span>
+      </div>
       {avance ? (
         <>
           <Progress value={pct} aria-label="Avance del conteo" className="h-2" />
@@ -123,13 +143,36 @@ function TarjetaAbierta({ sesion }: { sesion: SesionConteo }) {
             <span className="tabular-nums">
               <b className="font-semibold">{formatEntero(avance.verificados)}</b> de {formatEntero(avance.total)} verificados · {pct.toLocaleString('es-CO')} %
             </span>
-            <span className="font-medium">{pendientes(avance.pendientes)} ›</span>
+            <span className="font-medium">{pendientes(avance.pendientes)}</span>
           </span>
         </>
       ) : (
         <Skeleton className="h-8" />
       )}
-    </Link>
+    </div>
+  )
+}
+
+// Sin sesión abierta no hay conteo (006): se explica y se ofrece abrirla (maqueta t9-sin-sesion).
+function SinSesionAbierta({ onAbrir }: { onAbrir: () => void }) {
+  return (
+    <section aria-labelledby="titulo-sin-abierta" className="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5 md:flex-row md:items-center">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted" aria-hidden="true">
+        <ScanBarcode className="size-5" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <h2 id="titulo-sin-abierta" className="font-semibold">
+          No hay una sesión abierta
+        </h2>
+        <span className="text-sm text-muted-foreground">
+          Para contar, abre una sesión: el botón «Contar» aparece aquí y en su detalle. Sin una sesión abierta no se puede contar; solo se pueden consultar y registrar activos.
+        </span>
+      </span>
+      <Button variant="outline" className="max-md:min-h-11" onClick={onAbrir}>
+        <Plus />
+        Abrir sesión
+      </Button>
+    </section>
   )
 }
 
@@ -181,13 +224,15 @@ export default function Sesiones() {
         />
       ) : (
         <>
-          {abierta && (
+          {abierta ? (
             <section aria-labelledby="titulo-abierta" className="flex flex-col gap-2">
               <h2 id="titulo-abierta" className="text-sm font-medium text-muted-foreground">
                 En curso
               </h2>
               <TarjetaAbierta sesion={abierta} />
             </section>
+          ) : (
+            <SinSesionAbierta onAbrir={() => setAbriendo(true)} />
           )}
           {cerradas.length > 0 && (
             <section aria-labelledby="titulo-cerradas" className="flex flex-col gap-2">
@@ -410,6 +455,7 @@ function SesionCerrada({ sesion }: { sesion: SesionConteo }) {
 
 export function DetalleSesion({ id }: { id: string }) {
   const consulta = useDetalleSesion(id)
+  const contar = rutaParaContar(useEsEscritorio())
   if (consulta.isPending) {
     return (
       <div role="status" aria-label="Cargando la sesión" className="flex flex-col gap-3">
@@ -442,13 +488,27 @@ export function DetalleSesion({ id }: { id: string }) {
   }
   const { sesion, avance } = consulta.data
   const abierta = sesion.estado === 'abierta'
+  // En teléfono, «Contar esta sesión» va arriba y a lo ancho (maqueta t9-sesion-detalle).
   return (
     <div className="flex max-w-4xl flex-col gap-6">
       <EncabezadoPagina
         titulo={sesion.nombre}
         insignia={abierta ? <Badge variant="brand">Abierta</Badge> : <Badge variant="outline">Cerrada</Badge>}
         descripcion={`Corte ${fechaCorte(sesion.fecha_corte)} · abrió ${sesion.abierta_por.nombre} el ${fecha.format(new Date(sesion.abierta_en))}`}
-        acciones={abierta && <CerrarSesion sesion={sesion} pendientesN={avance.pendientes} />}
+        claseAcciones={abierta ? 'max-sm:w-full max-sm:flex-col-reverse' : undefined}
+        acciones={
+          abierta && (
+            <>
+              <CerrarSesion sesion={sesion} pendientesN={avance.pendientes} />
+              <Button asChild>
+                <Link to={contar}>
+                  <ScanBarcode />
+                  Contar esta sesión
+                </Link>
+              </Button>
+            </>
+          )
+        }
       />
       {abierta ? (
         <AvanceEnVivo sesion={sesion} avance={avance} />

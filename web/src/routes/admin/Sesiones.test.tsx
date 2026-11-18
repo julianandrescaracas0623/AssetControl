@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { routes } from '@/router'
 import { catalogoDemo, sesionDe } from '@/test/catalogo'
-import { simularAncho } from '@/test/matchMedia'
+import { simularAncho, simularEscritorio } from '@/test/matchMedia'
 import { errorApi, simularSesion } from '@/test/sesion'
 
 // Spec 006, T5: /admin/sesiones con datos reales (abrir, lista, avance por ubicación).
@@ -191,5 +191,75 @@ describe('Cerrar una sesión (spec 008, T4)', () => {
     expect(within(cerradas).getByRole('link', { name: 'Ver informe de Conteo nov 2026' }).getAttribute('href')).toBe(
       `/admin/sesiones/${SESION}/informe`,
     )
+  })
+})
+
+// Spec 015, T9 (R10; Q8 = A; maquetas t9-*): el admin entra a contar desde la sesión
+// abierta. En escritorio (≥ 1024 px y puntero fino) va al espacio de dos paneles con
+// «Volver a la sesión»; en teléfono, al inicio del conteo de siempre.
+describe('Contar dentro de la sesión (spec 015, T9)', () => {
+  function abrirEn(path: string, ancho: 'escritorio' | 'telefono', catalogo = catalogoDemo('admin', { sesiones: [sesionDe()] })) {
+    if (ancho === 'escritorio') simularEscritorio()
+    else simularAncho({ movil: true })
+    simularSesion('admin', catalogo.manejador)
+    const router = createMemoryRouter(routes, { initialEntries: [path] })
+    render(<RouterProvider router={router} />)
+    return { router }
+  }
+
+  it('la tarjeta «En curso» trae «Ver avance» y «Contar» (escritorio) y deja de ser un enlace entero', async () => {
+    abrirEn('/admin/sesiones', 'escritorio')
+    const enCurso = await screen.findByRole('region', { name: 'En curso' })
+    expect(within(enCurso).getByRole('link', { name: 'Ver avance' }).getAttribute('href')).toBe(`/admin/sesiones/${SESION}`)
+    expect(within(enCurso).getByRole('link', { name: 'Contar' }).getAttribute('href')).toBe('/contar/escanear')
+    expect(within(enCurso).getAllByRole('link')).toHaveLength(2)
+  })
+
+  it('en teléfono «Contar» de la tarjeta lleva al inicio del conteo', async () => {
+    abrirEn('/admin/sesiones', 'telefono')
+    const enCurso = await screen.findByRole('region', { name: 'En curso' })
+    expect(within(enCurso).getByRole('link', { name: 'Contar' }).getAttribute('href')).toBe('/contar')
+  })
+
+  it('el detalle de la abierta ofrece «Contar esta sesión» y el conteo vuelve a la sesión', async () => {
+    const { router } = abrirEn(`/admin/sesiones/${SESION}`, 'escritorio')
+    const contar = await screen.findByRole('link', { name: 'Contar esta sesión' })
+    expect(contar.getAttribute('href')).toBe('/contar/escanear')
+    expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeTruthy()
+    fireEvent.click(contar)
+    await waitFor(() => expect(router.state.location.pathname).toBe('/contar/escanear'))
+    const volver = await screen.findByRole('link', { name: 'Volver a la sesión' })
+    expect(volver.getAttribute('href')).toBe(`/admin/sesiones/${SESION}`)
+    expect(screen.queryByRole('link', { name: 'Inicio del conteo' })).toBeNull()
+    fireEvent.click(volver)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Conteo nov 2026' })).toBeTruthy()
+    expect(router.state.location.pathname).toBe(`/admin/sesiones/${SESION}`)
+  })
+
+  it('en teléfono «Contar esta sesión» también está y lleva al inicio del conteo', async () => {
+    abrirEn(`/admin/sesiones/${SESION}`, 'telefono')
+    expect((await screen.findByRole('link', { name: 'Contar esta sesión' })).getAttribute('href')).toBe('/contar')
+  })
+
+  it('una sesión cerrada no ofrece contar', async () => {
+    const catalogo = catalogoDemo('admin', { sesiones: [sesionDe()] })
+    catalogo.cerrarSesion(SESION)
+    abrirEn(`/admin/sesiones/${SESION}`, 'escritorio', catalogo)
+    await screen.findByRole('region', { name: 'Sesión cerrada' })
+    expect(screen.queryByRole('link', { name: /Contar/ })).toBeNull()
+  })
+
+  it('sin sesión abierta lo explica, no hay «Contar» y ofrece abrirla', async () => {
+    const catalogo = catalogoDemo('admin', { sesiones: [sesionDe({ estado: 'cerrada', cerrada_en: '2026-11-14T16:00:00+00:00' })] })
+    abrirEn('/admin/sesiones', 'escritorio', catalogo)
+    const aviso = await screen.findByRole('region', { name: 'No hay una sesión abierta' })
+    expect(within(aviso).getByText(/el botón «Contar» aparece aquí y en su detalle/)).toBeTruthy()
+    // Vale para escritorio y teléfono: sin sesión el alta (spec 004) sigue disponible.
+    expect(within(aviso).getByText(/Sin una sesión abierta no se puede contar; solo se pueden consultar y registrar activos\./)).toBeTruthy()
+    expect(within(aviso).queryByText(/en el teléfono/)).toBeNull()
+    expect(screen.queryByRole('link', { name: /Contar/ })).toBeNull()
+    fireEvent.click(within(aviso).getByRole('button', { name: 'Abrir sesión' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Abrir sesión de conteo' })
+    expect(within(dialogo).getByText('Solo puede haber una abierta. El personal podrá verificar activos desde el teléfono o el escritorio.')).toBeTruthy()
   })
 })

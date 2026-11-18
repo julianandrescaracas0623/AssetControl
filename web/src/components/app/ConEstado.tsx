@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import type { EstadoSimulado } from '@/lib/simulacion'
+import { cn } from '@/lib/utils'
 
 // Estados de cada pantalla (docs/08 §8, R13): cargando, vacío con acción,
 // error con reintentar y éxito. En las maquetas el estado sale de ?estado=.
@@ -68,11 +69,14 @@ export function EncabezadoPagina({
   descripcion,
   acciones,
   insignia,
+  claseAcciones,
 }: {
   titulo: string
   descripcion?: ReactNode
   acciones?: ReactNode
   insignia?: ReactNode
+  /** Clases extra del contenedor de acciones (p. ej., apilarlas a lo ancho en teléfono). */
+  claseAcciones?: string
 }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
@@ -83,7 +87,7 @@ export function EncabezadoPagina({
         </div>
         {descripcion && <div className="text-sm text-muted-foreground">{descripcion}</div>}
       </div>
-      {acciones && <div className="flex flex-wrap gap-2 [&_[data-slot=button]]:max-md:min-h-11">{acciones}</div>}
+      {acciones && <div className={cn('flex flex-wrap gap-2 [&_[data-slot=button]]:max-md:min-h-11', claseAcciones)}>{acciones}</div>}
     </div>
   )
 }

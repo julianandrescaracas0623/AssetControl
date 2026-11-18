@@ -789,3 +789,29 @@ describe('cola de la sala y precios', () => {
     expect(screen.getByRole('link', { name: /Crear activo con este código/ }).getAttribute('href')).toBe('/contar/nuevo?codigo=ZZ-999')
   })
 })
+
+// Spec 015, T9 (R10; Q8 = A): el admin entra a contar desde la sesión abierta y la
+// cabecera le ofrece «Volver a la sesión» (la abierta de la clínica). El contador, que no
+// entra a /admin, conserva el acceso al inicio del conteo.
+describe('cabecera: volver a la sesión (spec 015, T9)', () => {
+  it('el admin con sesión abierta ve «Volver a la sesión» hacia su detalle', async () => {
+    abrir('/contar/escanear', { rol: 'admin' })
+    const volver = await screen.findByRole('link', { name: 'Volver a la sesión' })
+    expect(volver.getAttribute('href')).toBe(`/admin/sesiones/${SESION}`)
+    expect(screen.queryByRole('link', { name: 'Inicio del conteo' })).toBeNull()
+  })
+
+  it('el contador no ve «Volver a la sesión» y conserva el inicio del conteo', async () => {
+    abrir()
+    expect((await screen.findByRole('link', { name: 'Inicio del conteo' })).getAttribute('href')).toBe('/contar')
+    await screen.findByText('Conteo nov 2026')
+    expect(screen.queryByRole('link', { name: 'Volver a la sesión' })).toBeNull()
+  })
+
+  it('sin sesión abierta el admin no ve «Volver a la sesión»', async () => {
+    abrir('/contar/escanear', { rol: 'admin', conSesion: false })
+    await screen.findByText('Sin sesión abierta')
+    expect(screen.queryByRole('link', { name: 'Volver a la sesión' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Inicio del conteo' }).getAttribute('href')).toBe('/contar')
+  })
+})

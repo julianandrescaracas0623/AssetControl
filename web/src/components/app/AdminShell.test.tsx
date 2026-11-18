@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { routes } from '@/router'
 import { simularSesion } from '@/test/sesion'
-import { simularAncho } from '@/test/matchMedia'
+import { simularAncho, simularEscritorio } from '@/test/matchMedia'
 
 // Spec 001b, T4: AdminShell (R4, R5, R6; A4). Sin @testing-library/user-event
 // (no aprobada): fireEvent; los menús de Radix se abren con Enter.
@@ -122,5 +122,37 @@ describe('AdminShell en teléfono (navegación)', () => {
     fireEvent.click(inicio)
     expect(await screen.findByRole('heading', { level: 1, name: 'Resumen' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Ir al inicio' })).toBeNull()
+  })
+})
+
+// Spec 015, T9 (R10; Q8 = A): en escritorio (≥ 1024 px y puntero fino) no hay atajo suelto
+// «Ir a contar»: se entra desde la sesión abierta. En teléfono y tableta táctil, sí.
+describe('«Ir a contar» según el dispositivo (spec 015, T9)', () => {
+  it('en escritorio no está en la barra lateral ni en el menú de usuario', async () => {
+    simularEscritorio()
+    renderAt('/admin')
+    await screen.findByRole('navigation', { name: 'Navegación principal' })
+    expect(screen.queryByRole('link', { name: 'Ir a contar' })).toBeNull()
+    fireEvent.keyDown(screen.getByRole('button', { name: /Menú de usuario/ }), { key: 'Enter' })
+    expect(await screen.findByRole('menuitem', { name: 'Cerrar sesión' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Ir a contar' })).toBeNull()
+  })
+
+  it('en tableta táctil (ancha, sin puntero fino) se conserva en los dos menús', async () => {
+    simularAncho({ movil: false, escritorio: false })
+    renderAt('/admin')
+    await screen.findByRole('navigation', { name: 'Navegación principal' })
+    expect(screen.getByRole('link', { name: 'Ir a contar' }).getAttribute('href')).toBe('/contar')
+    fireEvent.keyDown(screen.getByRole('button', { name: /Menú de usuario/ }), { key: 'Enter' })
+    expect(await screen.findByRole('menuitem', { name: 'Ir a contar' })).toBeTruthy()
+  })
+
+  it('en teléfono el menú conserva «Ir a contar»', async () => {
+    simularAncho({ movil: true })
+    renderAt('/admin')
+    await screen.findByRole('heading', { level: 1, name: 'Resumen' })
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar u ocultar el menú' }))
+    const menu = await screen.findByRole('dialog', { name: 'Menú de navegación' })
+    expect(within(menu).getByRole('link', { name: 'Ir a contar' }).getAttribute('href')).toBe('/contar')
   })
 })

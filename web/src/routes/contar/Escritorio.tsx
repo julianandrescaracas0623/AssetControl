@@ -1,4 +1,4 @@
-import { Archive, ArrowLeftRight, Camera, Check, CircleCheck, History, Info, Loader2, Lock, MapPin, Plus, RefreshCw, ScanBarcode, SearchX, TriangleAlert, Usb } from 'lucide-react'
+import { Archive, ArrowLeft, ArrowLeftRight, Camera, Check, CircleCheck, History, Info, Loader2, Lock, MapPin, Plus, RefreshCw, ScanBarcode, SearchX, TriangleAlert, Usb } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, Outlet, useMatch, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -314,14 +314,27 @@ function CabeceraEscritorio({ sesion, cargando, red }: { sesion: SesionConteo | 
   const detalle = useDetalleSesion(sesion?.id)
   const avance = detalle.data?.avance
   const pct = avance ? porcentaje(avance.verificados, avance.total) : 0
+  // Spec 015, T9 (R10; Q8 = A; maqueta t9-conteo-admin-escritorio): el admin entra desde la
+  // sesión abierta y vuelve a ella. La sesión es la abierta del tenant (la del servidor),
+  // no un parámetro de la URL. El contador no entra a /admin: conserva el inicio del conteo.
+  const admin = useRol() === 'admin'
   return (
     <header className="sticky top-0 z-10 border-b bg-background">
       <div className="mx-auto flex h-16 w-full max-w-[1320px] items-center gap-4 px-6">
-        <Button asChild size="icon" className="size-9 shrink-0">
-          <Link to="/contar" aria-label="Inicio del conteo">
-            <ScanBarcode className="size-5" />
-          </Link>
-        </Button>
+        {admin && sesion ? (
+          <Button asChild variant="outline" className="shrink-0">
+            <Link to={`/admin/sesiones/${encodeURIComponent(sesion.id)}`}>
+              <ArrowLeft />
+              Volver a la sesión
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild size="icon" className="size-9 shrink-0">
+            <Link to="/contar" aria-label="Inicio del conteo">
+              <ScanBarcode className="size-5" />
+            </Link>
+          </Button>
+        )}
         <div className="flex min-w-0 flex-col">
           <p className="truncate text-[15px] leading-5 font-semibold">{sesion?.nombre ?? (cargando ? 'Conteo' : 'Sin sesión abierta')}</p>
           {sesion && <p className="truncate text-xs text-muted-foreground">Sesión abierta · corte {fechaCorte(sesion.fecha_corte)}</p>}
