@@ -34,10 +34,20 @@ import { cn } from '@/lib/utils'
 
 const hora = new Intl.DateTimeFormat('es-CO', { hour: 'numeric', minute: '2-digit' })
 
-function EstadoFisico({ valor, onValor }: { valor: 'ok' | 'danado'; onValor: (v: 'ok' | 'danado') => void }) {
+/** Tecla de un atajo (spec 015, T8). Decorativa: el nombre accesible lo da el texto. */
+export function Tecla({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <kbd aria-hidden="true" className={cn('rounded border bg-muted px-1.5 font-mono text-[11px] leading-5 font-normal text-muted-foreground', className)}>
+      {children}
+    </kbd>
+  )
+}
+
+// Spec 015, T8: el conteo de escritorio reutiliza estas piezas (con `atajos`, muestra la tecla).
+export function EstadoFisico({ valor, onValor, atajos = false }: { valor: 'ok' | 'danado'; onValor: (v: 'ok' | 'danado') => void; atajos?: boolean }) {
   const opciones = [
-    { id: 'ok' as const, texto: 'Ok', icono: Check },
-    { id: 'danado' as const, texto: 'Dañado', icono: TriangleAlert },
+    { id: 'ok' as const, texto: 'Ok', icono: Check, tecla: 'O' },
+    { id: 'danado' as const, texto: 'Dañado', icono: TriangleAlert, tecla: 'D' },
   ]
   return (
     <div className="flex flex-col gap-2">
@@ -45,7 +55,7 @@ function EstadoFisico({ valor, onValor }: { valor: 'ok' | 'danado'; onValor: (v:
         Estado físico
       </span>
       <div role="radiogroup" aria-labelledby="estado-fisico" className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-        {opciones.map(({ id, texto, icono: Icono }) => (
+        {opciones.map(({ id, texto, icono: Icono, tecla }) => (
           <button
             key={id}
             type="button"
@@ -60,6 +70,7 @@ function EstadoFisico({ valor, onValor }: { valor: 'ok' | 'danado'; onValor: (v:
           >
             <Icono className="size-4" aria-hidden="true" />
             {texto}
+            {atajos && <Tecla>{tecla}</Tecla>}
           </button>
         ))}
       </div>
@@ -67,7 +78,7 @@ function EstadoFisico({ valor, onValor }: { valor: 'ok' | 'danado'; onValor: (v:
   )
 }
 
-function OtraUbicacion({
+export function OtraUbicacion({
   abierto,
   onAbierto,
   esperada,
@@ -121,7 +132,7 @@ function OtraUbicacion({
   )
 }
 
-function AvisoYaVerificado({ verificacion }: { verificacion: Verificacion }) {
+export function AvisoYaVerificado({ verificacion }: { verificacion: Verificacion }) {
   return (
     <Alert variant="info">
       <Info />
@@ -230,7 +241,7 @@ function Guardado({ verificacion, sesion }: { verificacion: Verificacion; sesion
   )
 }
 
-function Mensaje({ tono, icono, titulo, children }: { tono: 'aviso' | 'peligro'; icono: React.ReactNode; titulo: string; children: React.ReactNode }) {
+export function Mensaje({ tono, icono, titulo, children }: { tono: 'aviso' | 'peligro'; icono: React.ReactNode; titulo: string; children: React.ReactNode }) {
   return (
     <div
       role="alert"

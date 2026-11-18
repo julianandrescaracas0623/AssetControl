@@ -72,7 +72,7 @@ export type ResultadoVerificar =
 /**
  * Confirmar una verificación con un `id` creado al abrir la pantalla y reutilizado en
  * cada reintento: reenviar nunca duplica (R2). Sin respuesta del servidor, o con un
- * error 5xx, queda "no confirmado" y se reintenta con el mismo `id` (CU-VER-06); con
+ * 408 o un 5xx, queda "no confirmado" y se reintenta con el mismo `id` (CU-VER-06); con
  * la sesión cerrada no hay reintento (CU-SES-04). Sin cola ni offline (ADR-002).
  */
 export function useConfirmarVerificacion(sesionId: string | undefined) {
@@ -80,30 +80,49 @@ export function useConfirmarVerificacion(sesionId: string | undefined) {
   const verificar = useVerificar(sesionId)
   const cliente = useQueryClient()
   const [resultado, setResultado] = useState<ResultadoVerificar>({ tipo: 'listo' })
+  // El cuerpo del primer envío (con su `ocurrido_en`): cada reintento lo reenvía íntegro,
+  // porque la primera pudo guardarse aunque no llegara la respuesta. Un intento es
+  // ambiguo sin respuesta, con 5xx o con 408 (el servidor pudo haberla procesado): queda
+  // "no confirmado" (solo Reintentar o Descartar, sin editar). El cuerpo solo se suelta
+  // con un 4xx si nunca hubo un intento ambiguo (el servidor no la guardó) para poder
+  // corregir y volver a enviar; tras uno ambiguo, un 4xx (429, 401, 403…) sigue en "no
+  // confirmado" con el mismo cuerpo. Los 409 `sesion_cerrada` y `activo_dado_de_baja`
+  // son definitivos: el servidor revisa el `id` antes y devolvería 200 si ya estaba.
+  const enviado = useRef<CuerpoVerificacion | null>(null)
+  const ambiguo = useRef(false)
 
   function confirmar(datos: Omit<CuerpoVerificacion, 'id' | 'ocurrido_en'>) {
+    enviado.current ??= { ...datos, id: id.current, ocurrido_en: new Date().toISOString() }
     setResultado({ tipo: 'enviando' })
-    verificar.mutate(
-      { ...datos, id: id.current, ocurrido_en: new Date().toISOString() },
-      {
-        onSuccess: ({ verificacion }) => setResultado({ tipo: 'guardado', verificacion }),
-        onError: (error) => {
-          if (!(error instanceof ErrorApi) || error.status === 0 || error.status >= 500) {
-            setResultado({ tipo: 'no_confirmado' })
-          } else if (error.code === 'sesion_cerrada') {
-            // Sin invalidar la sesión abierta aquí: la pantalla seguiría sin sesión y no
-            // mostraría el aviso. El Inicio la vuelve a pedir al abrirse.
-            setResultado({ tipo: 'sesion_cerrada' })
-          } else if (error.code === 'activo_dado_de_baja') {
-            void cliente.invalidateQueries({ queryKey: CLAVE_ACTIVOS })
-            setResultado({ tipo: 'dado_de_baja' })
-          } else {
-            setResultado({ tipo: 'error', mensaje: error.message })
-          }
-        },
+    verificar.mutate(enviado.current, {
+      onSuccess: ({ verificacion }) => {
+        ambiguo.current = false
+        setResultado({ tipo: 'guardado', verificacion })
       },
-    )
+      onError: (error) => {
+        if (!(error instanceof ErrorApi) || error.status === 0 || error.status === 408 || error.status >= 500) {
+          ambiguo.current = true
+          setResultado({ tipo: 'no_confirmado' })
+          return
+        }
+        if (!ambiguo.current) enviado.current = null
+        if (error.code === 'sesion_cerrada') {
+          // Sin invalidar la sesión abierta aquí: la pantalla seguiría sin sesión y no
+          // mostraría el aviso. El Inicio la vuelve a pedir al abrirse.
+          setResultado({ tipo: 'sesion_cerrada' })
+        } else if (error.code === 'activo_dado_de_baja') {
+          void cliente.invalidateQueries({ queryKey: CLAVE_ACTIVOS })
+          setResultado({ tipo: 'dado_de_baja' })
+        } else if (ambiguo.current) {
+          setResultado({ tipo: 'no_confirmado' })
+        } else {
+          setResultado({ tipo: 'error', mensaje: error.message })
+        }
+      },
+    })
   }
 
-  return { confirmar, resultado, descartar: () => setResultado({ tipo: 'listo' }) }
+  // Descartar no interrumpe un envío en curso (soltaría el candado de la pantalla).
+  const descartar = () => setResultado((r) => (r.tipo === 'enviando' ? r : { tipo: 'listo' }))
+  return { confirmar, resultado, descartar }
 }

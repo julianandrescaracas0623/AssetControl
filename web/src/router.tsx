@@ -18,6 +18,7 @@ import Usuarios from './routes/admin/Usuarios'
 import Valor from './routes/admin/Valor'
 import Alta from './routes/contar/Alta'
 import Escanear from './routes/contar/Escanear'
+import EspacioConteo from './routes/contar/Escritorio'
 import Escribir from './routes/contar/Escribir'
 import Historial from './routes/contar/Historial'
 import ContarInicio from './routes/contar/Inicio'
@@ -77,9 +78,16 @@ export const routes: RouteObject[] = [
                 path: '/contar',
                 children: [
                   { index: true, element: <ContarInicio /> },
-                  { path: 'escanear', element: <Escanear /> },
-                  { path: 'escribir', element: <Escribir /> },
-                  { path: 'activo/:codigo', element: <Verificar /> },
+                  // Spec 015, T8: en escritorio estas tres son un solo espacio de dos
+                  // paneles; en teléfono, las pantallas de siempre.
+                  {
+                    element: <EspacioConteo />,
+                    children: [
+                      { path: 'escanear', element: <Escanear /> },
+                      { path: 'escribir', element: <Escribir /> },
+                      { path: 'activo/:codigo', element: <Verificar /> },
+                    ],
+                  },
                   { path: 'activo/:codigo/historial', element: <Historial /> },
                   { path: 'nuevo', element: <Alta /> },
                   { path: 'pendientes', element: <Pendientes /> },
