@@ -1,6 +1,6 @@
-import { Archive, ArchiveRestore, CircleAlert, Download, Eye, MapPin, MoreHorizontal, Pencil, Plus, RefreshCw, Search, X } from 'lucide-react'
+import { Archive, ArchiveRestore, CircleAlert, Download, Eye, Loader2, MapPin, MoreHorizontal, Pencil, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
 import { EncabezadoPagina } from '@/components/app/ConEstado'
@@ -22,10 +22,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { type Activo, useBuscarActivos } from '@/lib/activos'
+import { type Activo, useBuscarActivos, useExportarActivos } from '@/lib/activos'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { rutaDe, useUbicaciones } from '@/lib/catalogo'
 import { formatCOP, formatEntero } from '@/lib/format'
+import { guardarArchivo } from '@/lib/informe'
 
 // Activos (docs/08 §4.3, §7.7; spec 004, T9): búsqueda por código, nombre o serial,
 // filtro por estado y paginación en el servidor (25 por página). Spec 005, T8: el menú
@@ -101,6 +102,29 @@ export default function Activos() {
     pagina,
   })
 
+  // Spec 015, T4 (R1): el archivo lleva los mismos filtros que la lista (sin la página);
+  // lo arma el servidor, que también decide quién puede exportar.
+  const exportar = useExportarActivos()
+  function exportarLista() {
+    exportar.mutate(
+      { q: q || undefined, estado: pestaña === 'todos' ? undefined : pestaña, ubicacion_id: ubicacion || undefined },
+      {
+        onSuccess: (archivo) => {
+          guardarArchivo(archivo)
+          toast.success(`Se descargó «${archivo.nombre}»`)
+        },
+        onError: (error) => toast.error(`No se pudo exportar: ${mensajeDeError(error)}`),
+      },
+    )
+  }
+
+  // Spec 015, T4 (R2): doble clic o Enter en la fila abre la ficha. Lo que nace en un
+  // enlace, un botón o el menú de acciones (que React propaga desde su portal) no
+  // navega desde aquí: ya tiene su propia acción.
+  const navigate = useNavigate()
+  const desdeControl = (destino: EventTarget) =>
+    destino instanceof Element && destino.closest('a, button, input, [role="menu"], [role="menuitem"]') !== null
+
   function filtrarUbicacion(id: string) {
     if (id) params.set('ubicacion', id)
     else params.delete('ubicacion')
@@ -121,9 +145,9 @@ export default function Activos() {
         descripcion={datos ? `${formatEntero(datos.total)} ${filtrando ? 'encontrados' : 'registrados'} · una fila por unidad física` : 'Una fila por unidad física'}
         acciones={
           <>
-            <Button variant="outline" onClick={() => toast('La exportación llega con la spec 009')}>
-              <Download />
-              Exportar
+            <Button variant="outline" disabled={exportar.isPending} aria-busy={exportar.isPending} onClick={exportarLista}>
+              {exportar.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Download aria-hidden="true" />}
+              {exportar.isPending ? 'Exportando…' : 'Exportar'}
             </Button>
             <Button asChild>
               <Link to="/admin/activos/nuevo">
@@ -267,7 +291,17 @@ export default function Activos() {
                   </TableHeader>
                   <TableBody>
                     {activos.map((a) => (
-                      <TableRow key={a.id}>
+                      <TableRow
+                        key={a.id}
+                        tabIndex={0}
+                        className="cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                        onDoubleClick={(e) => {
+                          if (!desdeControl(e.target)) void navigate(ficha(a))
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && e.target === e.currentTarget) void navigate(ficha(a))
+                        }}
+                      >
                         <TableCell className="pl-4 font-mono">{a.codigo}</TableCell>
                         <TableCell className="min-w-48 whitespace-normal">
                           <Link to={ficha(a)} className="font-medium hover:underline">{a.nombre}</Link>

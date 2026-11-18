@@ -553,7 +553,7 @@ def test_categorias_responses(client):
     check("post", sugeridas, client.post(sugeridas, headers=contador))
 
 
-def test_activos_responses(client, contrato_db):
+def test_activos_responses(client, contrato_db, monkeypatch):
     admin, contador = bearer(ADMIN_A, TENANT_A), bearer(CONTADOR_A, TENANT_A)
     sufijo = uuid.uuid4().hex[:6]
 
@@ -727,6 +727,20 @@ def test_activos_responses(client, contrato_db):
     )
     filtrada = client.get("/activos", query_string={"ubicacion_id": sala["id"]}, headers=admin)
     assert check("get", "/activos", filtrada)["total"] >= 1
+
+    # Spec 015, T4: exportar la lista (solo admin; tope de filas).
+    exportar = "/activos/exportar"
+    for params, headers in (
+        ({"q": "contrato"}, admin),
+        ({"estado": "otro"}, admin),
+        ({}, contador),
+        ({}, {}),
+    ):
+        check("get", exportar, client.get(exportar, query_string=params, headers=headers))
+    monkeypatch.setattr(activos_service, "MAX_FILAS_EXPORTACION", 0)
+    demasiado = check("get", exportar, client.get(exportar, headers=admin))
+    assert demasiado["error"]["code"] == "exportacion_demasiado_grande"
+    monkeypatch.undo()
 
     # D2 en el contrato de ubicaciones.
     patch = client.patch(f"/ubicaciones/{sala['id']}", json={"activa": False}, headers=admin)
@@ -1251,7 +1265,14 @@ def backend_error_codes() -> set[str]:
         invitaciones_routes.INVALID_INVITATION[0],
     }
     codes |= {error.code for error in catalogo_service.ERRORES}
-    codes |= {error.code for error in (*activos_service.ERRORES, activos_service.CodigoExistente)}
+    codes |= {
+        error.code
+        for error in (
+            *activos_service.ERRORES,
+            activos_service.CodigoExistente,
+            activos_service.ExportacionDemasiadoGrande,
+        )
+    }
     codes |= {error.code for error in activos_cambios.ERRORES}
     codes |= {error.code for error in conteo_service.ERRORES}
     codes |= {error.code for error in conteo_verificaciones.ERRORES}

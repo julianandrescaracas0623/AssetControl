@@ -8,10 +8,10 @@ Cuerpos JSON de 4 KB como máximo (``app.auth.http``).
 
 import uuid
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 from flask.typing import ResponseReturnValue
 
-from app.activos import cambios, historial, service
+from app.activos import cambios, exportar, historial, service
 from app.activos.models import Activo
 from app.auth.decorators import current_session, current_user, require_auth, require_role
 from app.errors import current_request_id, error_response
@@ -126,6 +126,31 @@ def buscar() -> ResponseReturnValue:
         pagina=pagina.pagina,
         por_pagina=pagina.por_pagina,
     )
+
+
+@bp.get("/exportar")
+@require_role("admin")
+def exportar_lista() -> ResponseReturnValue:
+    """La lista con los filtros vigentes, en Excel (spec 015, R1, R1a). Solo admin: el
+    archivo lleva precios. Nombre fijo, sin caché y sin adivinar el tipo."""
+    session = current_session()
+    try:
+        activos = service.buscar_todos(
+            session,
+            q=request.args.get("q"),
+            estado=request.args.get("estado"),
+            ubicacion_id=request.args.get("ubicacion_id"),
+        )
+    except service.ErrorActivo as exc:
+        return _error(exc)
+    nombre = exportar.nombre_archivo()
+    respuesta = Response(exportar.a_excel(session, activos), mimetype=exportar.XLSX)
+    respuesta.headers["Content-Disposition"] = (
+        f"attachment; filename=\"{nombre}\"; filename*=UTF-8''{nombre}"
+    )
+    respuesta.headers["Cache-Control"] = "no-store"
+    respuesta.headers["X-Content-Type-Options"] = "nosniff"
+    return respuesta
 
 
 @bp.get("/<uuid:id>/historial")

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import type { ActivoTarjeta } from '@/components/app/AssetCard'
-import { api, ErrorApi, type Esquemas } from '@/lib/api/cliente'
+import { api, ErrorApi, type Esquemas, type FiltrosExportacion } from '@/lib/api/cliente'
 import { useApiAutenticada } from '@/lib/sesion'
 
 // Activos desde la API (spec 004, T6): resolver por código, buscar, sugerir y dar de
@@ -101,6 +101,18 @@ export function useBuscarActivos(
     retry: false,
     placeholderData: (previo) => previo,
     queryFn: () => conToken((t) => api.buscarActivos(t, params)),
+  })
+}
+
+/**
+ * Exportar la lista (spec 015, T4): el servidor arma el Excel con los mismos filtros de
+ * la lista (sin página) y decide quién puede (solo admin). Devuelve el archivo; quien
+ * llama lo entrega con `guardarArchivo` (la misma descarga del informe, spec 009).
+ */
+export function useExportarActivos() {
+  const conToken = useApiAutenticada()
+  return useMutation({
+    mutationFn: (filtros: FiltrosExportacion) => conToken((t) => api.exportarActivos(t, filtros)),
   })
 }
 

@@ -304,6 +304,18 @@ export function crearCatalogo(
       const valores = [...new Set(activos.map((a) => a[campo]).filter((v): v is string => Boolean(v)))]
       return json(200, { valores: valores.filter((v) => v.toLowerCase().includes(texto)).slice(0, 8) })
     }
+    // Spec 015, T4: el servidor arma el Excel con los filtros; aquí basta un binario con nombre.
+    if (ruta0 === '/api/activos/exportar' && metodo === 'GET') {
+      if (rol !== 'admin') return errorApi(403, 'prohibido', 'No tienes permiso.')
+      const nombre = 'activos-20261118.xlsx'
+      return new Response('PK', {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="${nombre}"; filename*=UTF-8''${nombre}`,
+        },
+      })
+    }
     if (ruta0 === '/api/activos' && metodo === 'GET') {
       const texto = (q.get('q') ?? '').toLowerCase()
       const ubicacionId = q.get('ubicacion_id')

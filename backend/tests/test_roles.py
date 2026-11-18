@@ -433,6 +433,8 @@ PROTECTED_ENDPOINTS = {
     "activos.mover": frozenset({"admin"}),
     "activos.cambiar_estado": frozenset({"admin"}),
     "activos.dar_de_baja": frozenset({"admin"}),
+    # Spec 015 (T4): exportar la lista lleva precios: solo admin (R1a).
+    "activos.exportar_lista": frozenset({"admin"}),
     # Spec 006: ambos ven sesiones y avance; solo el admin abre (Q1).
     "sesiones.abrir": frozenset({"admin"}),
     "sesiones.listar": frozenset({"admin", "contador"}),

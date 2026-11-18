@@ -198,3 +198,36 @@ describe('nombreDeArchivo (spec 009)', () => {
     ['attachment', 'informe.pdf'],
   ])('%s → %s', (cabecera, esperado) => expect(nombreDeArchivo(cabecera, 'informe.pdf')).toBe(esperado))
 })
+
+describe('exportarActivos (spec 015, T4)', () => {
+  const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  const pedida = (f: ReturnType<typeof responder>) => peticion(f).url
+
+  it('manda solo los filtros con valor, en la consulta', async () => {
+    let f = responder(200, 'xlsx', XLSX)
+    await api.exportarActivos('jwt.sintetico', { estado: 'en_reparacion' })
+    expect(pedida(f)).toBe('/api/activos/exportar?estado=en_reparacion')
+    expect(peticion(f).headers.get('Authorization')).toBe('Bearer jwt.sintetico')
+
+    f = responder(200, 'xlsx', XLSX)
+    await api.exportarActivos('jwt.sintetico', { q: 'silla & mesa', estado: undefined, ubicacion_id: '' as never })
+    expect(pedida(f)).toBe('/api/activos/exportar?q=silla+%26+mesa')
+
+    f = responder(200, 'xlsx', XLSX)
+    await api.exportarActivos('jwt.sintetico', {})
+    expect(pedida(f)).toBe('/api/activos/exportar')
+  })
+
+  it('no depende de URLSearchParams.size (navegadores sin esa propiedad)', async () => {
+    const original = Object.getOwnPropertyDescriptor(URLSearchParams.prototype, 'size')
+    Object.defineProperty(URLSearchParams.prototype, 'size', { configurable: true, get: () => undefined })
+    try {
+      const f = responder(200, 'xlsx', XLSX)
+      await api.exportarActivos('jwt.sintetico', { q: 'silla', ubicacion_id: '00000000-0000-4000-8000-0000000000a4' })
+      expect(pedida(f)).toBe('/api/activos/exportar?q=silla&ubicacion_id=00000000-0000-4000-8000-0000000000a4')
+    } finally {
+      if (original) Object.defineProperty(URLSearchParams.prototype, 'size', original)
+      else delete (URLSearchParams.prototype as { size?: number }).size
+    }
+  })
+})

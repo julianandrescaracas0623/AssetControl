@@ -109,6 +109,19 @@ test('un conteo completo: invitar, verificar en el teléfono, cerrar, informe, e
     }
   })
 
+  await test.step('el admin exporta la lista filtrada y abre la ficha con doble clic (spec 015, T4)', async () => {
+    await admin.goto('/admin/activos')
+    await admin.getByRole('searchbox', { name: 'Buscar activos' }).fill('autoclave')
+    await expect(admin.getByRole('row')).toHaveCount(2)
+    const [descarga] = await Promise.all([admin.waitForEvent('download'), admin.getByRole('button', { name: 'Exportar' }).click()])
+    expect(descarga.suggestedFilename()).toMatch(/^activos-\d{8}\.xlsx$/)
+    await expect(admin.getByText(/^Se descargó «activos-\d{8}\.xlsx»$/)).toBeVisible()
+    await admin.getByRole('row', { name: /E2E-0001/ }).getByRole('cell', { name: 'Biomédicos' }).dblclick()
+    await expect(admin.getByRole('heading', { level: 1, name: 'Autoclave E2E' })).toBeVisible()
+    // El contador no exporta (403 del servidor, no solo un botón escondido).
+    expect((await api(telefono)('GET', '/activos/exportar')).status).toBe(403)
+  })
+
   await test.step('el Inicio del admin muestra el último informe y el valor actual por separado', async () => {
     await admin.goto('/admin')
     await expect(admin.getByRole('link', { name: /Activos hoy/ })).toContainText('3')

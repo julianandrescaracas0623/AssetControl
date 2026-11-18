@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -382,26 +382,13 @@ class Pagina:
     por_pagina: int
 
 
-def buscar(
-    session: Session,
-    *,
-    q: object,
-    estado: object,
-    pagina: object,
-    con_precio: bool,
-    ubicacion_id: object = None,
-) -> Pagina:
+def _filtro(q: object, estado: object, ubicacion_id: object) -> Select[tuple[Activo]]:
+    """Consulta de la lista (sin orden ni página): la comparten la búsqueda y la
+    exportación (spec 015, R1), para que el archivo traiga lo mismo que la pantalla."""
     texto = _consulta_texto(q)
     if estado is not None and estado not in ESTADOS:
         raise ErrorActivo()
     ubicacion = _uuid(ubicacion_id) if ubicacion_id is not None else None
-    try:
-        numero = int(pagina) if pagina is not None else 1
-    except (TypeError, ValueError):
-        raise ErrorActivo() from None
-    if numero < 1 or numero > 10_000:
-        raise ErrorActivo()
-
     filtro = select(Activo)
     if texto:
         patron = _patron(texto)
@@ -416,18 +403,72 @@ def buscar(
         filtro = filtro.where(Activo.estado == estado)
     if ubicacion is not None:
         filtro = filtro.where(Activo.ubicacion_id == ubicacion)
+    return filtro
+
+
+def _orden(filtro: Select[tuple[Activo]]) -> Select[tuple[Activo]]:
+    """Lo más reciente primero; el ``id`` desempata (mismo orden en lista y archivo)."""
+    return filtro.order_by(Activo.creado_en.desc(), Activo.id)
+
+
+def buscar(
+    session: Session,
+    *,
+    q: object,
+    estado: object,
+    pagina: object,
+    con_precio: bool,
+    ubicacion_id: object = None,
+) -> Pagina:
+    filtro = _filtro(q, estado, ubicacion_id)
+    try:
+        numero = int(pagina) if pagina is not None else 1
+    except (TypeError, ValueError):
+        raise ErrorActivo() from None
+    if numero < 1 or numero > 10_000:
+        raise ErrorActivo()
+
     total = session.scalar(select(func.count()).select_from(filtro.subquery()))
-    filas = session.scalars(
-        filtro.order_by(Activo.creado_en.desc(), Activo.id)
-        .limit(POR_PAGINA)
-        .offset((numero - 1) * POR_PAGINA)
-    )
+    filas = session.scalars(_orden(filtro).limit(POR_PAGINA).offset((numero - 1) * POR_PAGINA))
     return Pagina(
         activos=[vista(session, a, con_precio=con_precio) for a in filas],
         total=int(total or 0),
         pagina=numero,
         por_pagina=POR_PAGINA,
     )
+
+
+# --- Exportación (spec 015, T4; R1, R1a; Q4 = B) ----------------------------------------
+
+# Tope técnico de filas de un archivo (Q4, decidido por el humano): holgado respecto de
+# los ~2 000 activos esperados (P6); más filas piden filtrar.
+MAX_FILAS_EXPORTACION = 5_000
+
+
+class ExportacionDemasiadoGrande(ErrorActivo):
+    status = 413
+    code = "exportacion_demasiado_grande"
+
+    def __init__(self, tope: int) -> None:
+        cifra = f"{tope:,}".replace(",", ".")  # separador de miles es-CO
+        super().__init__(
+            f"Hay más de {cifra} activos para exportar. Filtra por búsqueda, estado o ubicación."
+        )
+
+
+def buscar_todos(
+    session: Session, *, q: object, estado: object, ubicacion_id: object = None
+) -> list[Activo]:
+    """Todos los activos de la lista con esos filtros, en su orden, sin paginar.
+
+    Pide una fila más que el tope: si llega, el archivo sería demasiado grande (``413``)
+    y no se carga el resto.
+    """
+    tope = MAX_FILAS_EXPORTACION
+    filas = list(session.scalars(_orden(_filtro(q, estado, ubicacion_id)).limit(tope + 1)))
+    if len(filas) > tope:
+        raise ExportacionDemasiadoGrande(tope)
+    return filas
 
 
 def sugerencias(session: Session, *, campo: object, q: object) -> list[str]:

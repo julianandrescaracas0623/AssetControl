@@ -262,6 +262,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/activos/exportar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * La lista de activos con los filtros vigentes, en Excel (solo admin)
+         * @description Spec 015 (R1, R1a; Q2–Q4). Mismos filtros, filas y orden que GET /activos, sin paginar. Una hoja «Activos» con código, nombre, categoría, ubicación (ruta), estado, serial, marca, modelo, subtipo, fecha de compra, precio de compra (número COP) y fecha de registro; sin fila de total; ningún texto es fórmula. Con cero resultados trae solo el encabezado. Nombre fijo activos-AAAAMMDD.xlsx.
+         */
+        get: operations["exportarActivos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/activos/sugerencias": {
         parameters: {
             query?: never;
@@ -808,7 +828,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta" | "fotos_no_disponibles" | "sin_foto" | "foto_id_en_uso" | "empresa_sin_datos" | "sin_logo" | "logo_id_en_uso" | "foto_existente" | "imagen_demasiado_grande" | "tipo_no_admitido" | "imagen_invalida";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta" | "fotos_no_disponibles" | "sin_foto" | "foto_id_en_uso" | "empresa_sin_datos" | "sin_logo" | "logo_id_en_uso" | "foto_existente" | "imagen_demasiado_grande" | "tipo_no_admitido" | "imagen_invalida" | "exportacion_demasiado_grande";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2311,6 +2331,46 @@ export interface operations {
                 };
             };
             413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    exportarActivos: {
+        parameters: {
+            query?: {
+                q?: string;
+                estado?: components["schemas"]["EstadoActivo"];
+                /** @description Solo los activos de esa ubicación exacta. */
+                ubicacion_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Archivo de la lista (adjunto). */
+            200: {
+                headers: {
+                    /** @description attachment con filename ASCII fijo y filename* UTF-8. */
+                    "Content-Disposition": string;
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            /** @description Más filas que el tope técnico (5.000, Q4); hay que filtrar por búsqueda, estado o ubicación. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     sugerenciasActivos: {

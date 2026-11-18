@@ -1,11 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { routes } from '@/router'
 import { activoDe, catalogoDemo, crearCatalogo } from '@/test/catalogo'
 import { simularAncho } from '@/test/matchMedia'
-import { simularSesion } from '@/test/sesion'
+import { errorApi, simularSesion } from '@/test/sesion'
 
 // Spec 004, T9 (R10, Q6): lista y ficha de activos con datos reales, solo lectura.
 
@@ -111,6 +111,159 @@ describe('/admin/activos', () => {
     fireEvent.click(await screen.findByRole('option', { name: /Administración/ }))
     await waitFor(() => expect(filas()).toHaveLength(1))
     expect(filas()[0].textContent).toContain('Impresora multifuncional')
+  })
+})
+
+describe('Exportar la lista (spec 015, T4)', () => {
+  function capturarDescargas() {
+    const descargas: { nombre: string; tipo: string }[] = []
+    const blobs = new Map<string, Blob>()
+    let n = 0
+    vi.stubGlobal('URL', Object.assign(URL, {
+      createObjectURL: (blob: Blob) => {
+        const url = `blob:prueba/${n++}`
+        blobs.set(url, blob)
+        return url
+      },
+      revokeObjectURL: vi.fn(),
+    }))
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      descargas.push({ nombre: this.download, tipo: blobs.get(this.href)?.type ?? '' })
+    })
+    return descargas
+  }
+
+  const exportaciones = (f: ReturnType<typeof simularSesion>) =>
+    f.mock.calls.map(([url]) => String(url)).filter((url) => url.startsWith('/api/activos/exportar'))
+
+  afterEach(() => vi.restoreAllMocks())
+
+  it('descarga el Excel del servidor con su nombre y con token', async () => {
+    const descargas = capturarDescargas()
+    const { f } = abrir('/admin/activos')
+    await waitFor(() => expect(filas()).toHaveLength(2))
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar' }))
+    await waitFor(() => expect(descargas).toEqual([{ nombre: 'activos-20261118.xlsx', tipo: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }]))
+    expect(await screen.findByText('Se descargó «activos-20261118.xlsx»')).toBeTruthy()
+    expect(screen.queryByText(/llega con la spec/)).toBeNull()
+    const llamada = f.mock.calls.find(([url]) => String(url).startsWith('/api/activos/exportar'))!
+    expect(llamada[0]).toBe('/api/activos/exportar')
+    expect(new Headers(llamada[1]?.headers).get('Authorization')).toBe('Bearer jwt.admin')
+  })
+
+  it('manda los filtros vigentes (búsqueda, estado y ubicación), no la página', async () => {
+    capturarDescargas()
+    const { f } = abrir('/admin/activos?ubicacion=00000000-0000-4000-8000-0000000000a4')
+    await waitFor(() => expect(filas()).toHaveLength(1))
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar activos' }), { target: { value: ' silla ' } })
+    await waitFor(() => expect(pedidas(f, 'q=silla')).toHaveLength(1))
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Activos' }), { button: 0 })
+    await waitFor(() => expect(pedidas(f, 'estado=activo')).toHaveLength(1))
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar' }))
+    await waitFor(() => expect(exportaciones(f)).toHaveLength(1))
+    const url = new URL(exportaciones(f)[0], 'http://x')
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      q: 'silla',
+      estado: 'activo',
+      ubicacion_id: '00000000-0000-4000-8000-0000000000a4',
+    })
+  })
+
+  it('desde la página 2 tampoco manda la página (useExportarActivos)', async () => {
+    capturarDescargas()
+    const base = catalogoDemo('admin')
+    const extra = Array.from({ length: 30 }, (_, i) =>
+      activoDe(
+        { id: `00000000-0000-4000-8000-0000000020${String(i).padStart(2, '0')}`, codigo: `P-${i}`, nombre: `Archivador ${i}` },
+        { categoria: base.categorias[1], ubicacion: base.ubicaciones[1] },
+      ),
+    )
+    const catalogo = crearCatalogo({ ubicaciones: base.ubicaciones, categorias: base.categorias, activos: [...base.activos, ...extra] })
+    const { f } = abrir('/admin/activos', catalogo)
+    await waitFor(() => expect(filas()).toHaveLength(25))
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente ›' }))
+    await waitFor(() => expect(filas()).toHaveLength(7))
+    expect(pedidas(f, 'pagina=2').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar' }))
+    await waitFor(() => expect(exportaciones(f)).toHaveLength(1))
+    expect(exportaciones(f)[0]).toBe('/api/activos/exportar')
+  })
+
+  it('mientras exporta dice «Exportando…» y no deja pedir otra vez', async () => {
+    capturarDescargas()
+    const catalogo = catalogoDemo('admin')
+    let soltar: () => void = () => {}
+    const manejador = catalogo.manejador
+    catalogo.manejador = (url, init) =>
+      url.startsWith('/api/activos/exportar') ? new Promise<Response>((r) => (soltar = () => r(manejador(url, init) as Response))) : manejador(url, init)
+    const { f } = abrir('/admin/activos', catalogo)
+    await waitFor(() => expect(filas()).toHaveLength(2))
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar' }))
+    const boton = await screen.findByRole('button', { name: 'Exportando…' })
+    expect((boton as HTMLButtonElement).disabled).toBe(true)
+    expect(boton.getAttribute('aria-busy')).toBe('true')
+    fireEvent.click(boton)
+    expect(exportaciones(f)).toHaveLength(1)
+    soltar()
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Exportar' }) as HTMLButtonElement).disabled).toBe(false))
+  })
+
+  it('si el servidor lo rechaza explica por qué y no descarga nada', async () => {
+    const descargas = capturarDescargas()
+    const catalogo = catalogoDemo('admin')
+    const mensaje = 'Hay más de 5.000 activos para exportar. Filtra por búsqueda, estado o ubicación.'
+    catalogo.fallar('GET /api/activos/exportar', () => errorApi(413, 'exportacion_demasiado_grande', mensaje))
+    abrir('/admin/activos', catalogo)
+    await waitFor(() => expect(filas()).toHaveLength(2))
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar' }))
+    expect(await screen.findByText(`No se pudo exportar: ${mensaje}`)).toBeTruthy()
+    expect(descargas).toEqual([])
+  })
+})
+
+describe('Abrir la ficha desde la fila (spec 015, T4; R2)', () => {
+  const fila = (codigo: string) => filas().find((f) => f.textContent?.includes(codigo))!
+
+  it('doble clic en la fila abre la ficha', async () => {
+    const { router } = abrir('/admin/activos')
+    await waitFor(() => expect(filas()).toHaveLength(2))
+    fireEvent.doubleClick(within(fila('000123')).getByText('Consultorio 1 › Box 2'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/admin/activos/000123'))
+  })
+
+  it('Enter con la fila enfocada abre la ficha; otras teclas no', async () => {
+    const { router } = abrir('/admin/activos')
+    await waitFor(() => expect(filas()).toHaveLength(2))
+    const silla = fila('000123')
+    expect(silla.tabIndex).toBe(0)
+    silla.focus()
+    fireEvent.keyDown(silla, { key: ' ' })
+    expect(router.state.location.pathname).toBe('/admin/activos')
+    fireEvent.keyDown(silla, { key: 'Enter' })
+    await waitFor(() => expect(router.state.location.pathname).toBe('/admin/activos/000123'))
+  })
+
+  it('doble clic o Enter en el menú de acciones no navega desde la fila', async () => {
+    const { router } = abrir('/admin/activos')
+    await waitFor(() => expect(filas()).toHaveLength(2))
+    const menu = screen.getByRole('button', { name: 'Acciones de Silla ergonómica (000123)' })
+    fireEvent.doubleClick(menu)
+    fireEvent.keyDown(menu, { key: 'Enter' })
+    expect(await screen.findByRole('menu')).toBeTruthy()
+    expect(router.state.location.pathname).toBe('/admin/activos')
+  })
+
+  it('el enlace del nombre sigue abriendo la ficha y su doble clic no navega dos veces', async () => {
+    const { router } = abrir('/admin/activos')
+    await waitFor(() => expect(filas()).toHaveLength(2))
+    const enlace = within(fila('000123')).getByRole('link', { name: 'Silla ergonómica' })
+    expect(enlace.getAttribute('href')).toBe('/admin/activos/000123')
+    const antes = router.state.historyAction
+    fireEvent.doubleClick(enlace)
+    expect(router.state.location.pathname).toBe('/admin/activos')
+    expect(router.state.historyAction).toBe(antes)
+    fireEvent.click(enlace)
+    await waitFor(() => expect(router.state.location.pathname).toBe('/admin/activos/000123'))
   })
 })
 

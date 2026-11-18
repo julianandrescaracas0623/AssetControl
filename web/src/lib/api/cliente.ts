@@ -194,6 +194,8 @@ export async function descargar(ruta: string, token: string, porDefecto: string)
 }
 
 export type FormatoInforme = 'excel' | 'pdf'
+/** Filtros de `GET /activos/exportar` (los mismos de la lista, sin página). */
+export type FiltrosExportacion = NonNullable<Operacion<'/activos/exportar', 'get'>['parameters']['query']>
 export type Foto = Esquemas['Foto']
 export type TamanoFoto = 'completa' | 'mini'
 /** Las subidas de fotos tienen más plazo que el resto (redes lentas en el teléfono). */
@@ -327,6 +329,17 @@ export const api = {
   // Spec 009: el informe congelado como archivo (solo admin).
   exportarInforme: (token: string, sesionId: string, formato: FormatoInforme) =>
     descargar(`/sesiones/${encodeURIComponent(sesionId)}/informe/${formato}`, token, formato === 'excel' ? 'informe.xlsx' : 'informe.pdf'),
+  // Spec 015, T4: la lista de activos con los filtros vigentes, en Excel (solo admin).
+  exportarActivos: (token: string, consulta: FiltrosExportacion) => {
+    const busqueda = new URLSearchParams()
+    for (const [clave, valor] of Object.entries(consulta)) {
+      if (valor !== undefined && valor !== '') busqueda.set(clave, valor)
+    }
+    // Sin `URLSearchParams.size`: no existe en navegadores viejos y saldría sin filtros.
+    const texto = busqueda.toString()
+    const sufijo = texto ? `?${texto}` : ''
+    return descargar(`/activos/exportar${sufijo}`, token, 'activos.xlsx')
+  },
   // Spec 012: fotos (ambos roles). La imagen se pide con el token y se muestra como blob:.
   subirFotoActivo: async (token: string, activoId: string, foto: { id: string; archivo: Blob }) =>
     (await enviarFoto('PUT', `/activos/${enRuta(activoId)}/foto`, token, foto))!.foto,

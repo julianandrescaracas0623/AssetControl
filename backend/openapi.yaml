@@ -498,6 +498,56 @@ paths:
         "413":
           $ref: "#/components/responses/CuerpoDemasiadoGrande"
 
+  /activos/exportar:
+    get:
+      tags: [activos]
+      operationId: exportarActivos
+      summary: La lista de activos con los filtros vigentes, en Excel (solo admin)
+      description: >-
+        Spec 015 (R1, R1a; Q2–Q4). Mismos filtros, filas y orden que GET /activos, sin
+        paginar. Una hoja «Activos» con código, nombre, categoría, ubicación (ruta),
+        estado, serial, marca, modelo, subtipo, fecha de compra, precio de compra (número
+        COP) y fecha de registro; sin fila de total; ningún texto es fórmula. Con cero
+        resultados trae solo el encabezado. Nombre fijo activos-AAAAMMDD.xlsx.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 120 } }
+        - { name: estado, in: query, required: false, schema: { $ref: "#/components/schemas/EstadoActivo" } }
+        - name: ubicacion_id
+          in: query
+          required: false
+          description: Solo los activos de esa ubicación exacta.
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Archivo de la lista (adjunto).
+          headers:
+            Content-Disposition:
+              required: true
+              description: attachment con filename ASCII fijo y filename* UTF-8.
+              schema: { type: string }
+            Cache-Control:
+              required: true
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          description: >-
+            Más filas que el tope técnico (5.000, Q4); hay que filtrar por búsqueda,
+            estado o ubicación.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [exportacion_demasiado_grande]
+
   /activos/sugerencias:
     get:
       tags: [activos]
@@ -1755,6 +1805,7 @@ components:
         - imagen_demasiado_grande
         - tipo_no_admitido
         - imagen_invalida
+        - exportacion_demasiado_grande
     Error:
       type: object
       required: [error]
