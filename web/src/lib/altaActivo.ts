@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useRef, useState } from 'react'
+import { type KeyboardEvent, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { type Activo, aPrecioCanonico, CLAVE_ACTIVOS, type CuerpoAlta, normalizarCodigo, precioParaCampo, useCrearActivo } from '@/lib/activos'
@@ -18,6 +18,10 @@ import { useApiAutenticada } from '@/lib/sesion'
 //   pantalla de «Activo creado», su estado se ve ahí con «Reintentar»; si el formulario
 //   sigue con otro activo («Guardar y registrar otro», varias unidades), sube en segundo
 //   plano y avisa con un mensaje (también con «Reintentar», mismo `id`).
+// - Spec 015, T10 (Q9 = A): «Guardar y registrar otro» (`registrarOtro`) conserva los datos
+//   «de sala» (categoría, ubicación, marca, modelo y subtipo) y borra código, nombre,
+//   precio, serial, fecha y foto: el precio nunca se arrastra. `ubicacionPorDefecto` (la
+//   sala de trabajo del conteo) llena la ubicación mientras no se elija otra.
 
 export type CampoAlta =
   | 'codigo'
@@ -32,6 +36,9 @@ export type CampoAlta =
   | 'fecha'
 export type ErroresAlta = Partial<Record<CampoAlta | 'confirmado', string>>
 export type ActivoResumen = { id: string; codigo: string; nombre: string }
+
+/** Lo que conserva «Guardar y registrar otro» (Q9 = A). */
+export const CONSERVA_REGISTRAR_OTRO = ['categoria', 'ubicacion', 'marca', 'modelo', 'subtipo'] as const satisfies readonly CampoAlta[]
 
 const VACIO: Record<CampoAlta, string> = {
   codigo: '',
@@ -52,29 +59,44 @@ export function useAltaActivo({
   rol,
   codigoInicial = '',
   ubicacionInicial = '',
+  ubicacionPorDefecto,
 }: {
   rol: Rol
   codigoInicial?: string
   ubicacionInicial?: string
+  /** Ubicación sugerida (la sala de trabajo) mientras no se elija una. */
+  ubicacionPorDefecto?: string
 }) {
   const crear = useCrearActivo()
   const foto = useFotoPendiente()
   const conToken = useApiAutenticada()
   const cliente = useQueryClient()
   const id = useRef(crypto.randomUUID())
-  const [campos, setCampos] = useState({ ...VACIO, codigo: codigoInicial, ubicacion: ubicacionInicial })
+  const [crudos, setCampos] = useState({ ...VACIO, codigo: codigoInicial, ubicacion: ubicacionInicial })
+  const campos = crudos.ubicacion || !ubicacionPorDefecto ? crudos : { ...crudos, ubicacion: ubicacionPorDefecto }
+  // Campos que conservó «registrar otro» (se resaltan hasta que se cambian) y una ronda que
+  // sube cada vez que el formulario queda listo para el siguiente sticker (para el foco).
+  // Se guardan los candidatos; se resaltan solo los que tienen valor en el estado actual
+  // (los callbacks de guardado corren tras la respuesta y no leen `campos` del clic).
+  const [candidatos, setConservados] = useState<ReadonlySet<CampoAlta>>(new Set())
+  const conservados: ReadonlySet<CampoAlta> = new Set([...candidatos].filter((c) => campos[c]))
+  const [ronda, setRonda] = useState(0)
   const [confirmado, setConfirmado] = useState(false)
   const [copiado, setCopiado] = useState<Activo | null>(null)
   const [errores, setErrores] = useState<ErroresAlta>({})
   const [creado, setCreado] = useState<Activo | null>(null)
   const [existente, setExistente] = useState<ActivoResumen | null>(null)
   const [errorGeneral, setErrorGeneral] = useState<{ mensaje: string; reintentable: boolean } | null>(null)
+  // Guarda síncrona: `isPending` llega en el siguiente render; esto evita un segundo envío
+  // en el mismo instante (Enter sostenido, envío implícito del formulario).
+  const enVuelo = useRef(false)
 
   const duplicando = copiado !== null && rol === 'contador'
 
   function cambiar(campo: CampoAlta, valor: string) {
     setCampos((actual) => ({ ...actual, [campo]: valor }))
     if (campo === 'codigo') setExistente(null)
+    if (candidatos.has(campo)) setConservados((actual) => new Set([...actual].filter((c) => c !== campo)))
   }
 
   function copiar(activo: Activo) {
@@ -83,11 +105,12 @@ export function useAltaActivo({
       ...actual,
       nombre: activo.nombre,
       categoria: activo.categoria.id,
-      ubicacion: actual.ubicacion || activo.ubicacion.id,
+      ubicacion: actual.ubicacion || ubicacionPorDefecto || activo.ubicacion.id,
       marca: activo.marca ?? '',
       modelo: activo.modelo ?? '',
       subtipo: activo.subtipo ?? '',
-      precio: activo.precio_compra ? precioParaCampo(activo.precio_compra) : '',
+      // Defensa en dos capas: el contador nunca carga el precio, aunque llegara.
+      precio: rol === 'admin' && activo.precio_compra ? precioParaCampo(activo.precio_compra) : '',
     }))
   }
 
@@ -139,12 +162,17 @@ export function useAltaActivo({
     confirmarCodigo = true,
     alCrear,
   }: { confirmarCodigo?: boolean; alCrear?: (activo: Activo) => void } = {}) {
+    if (enVuelo.current) return
     const { errores: e, cuerpo } = validar(confirmarCodigo)
     setErrores(e)
     setErrorGeneral(null)
     if (!cuerpo) return
     const archivo = foto.archivo
+    enVuelo.current = true
     crear.mutate(cuerpo, {
+      onSettled: () => {
+        enVuelo.current = false
+      },
       onSuccess: ({ activo }) => {
         if (alCrear) {
           alCrear(activo)
@@ -200,7 +228,9 @@ export function useAltaActivo({
   function otro({ conservarUbicacion = true }: { conservarUbicacion?: boolean } = {}) {
     id.current = crypto.randomUUID()
     foto.limpiar()
-    setCampos((actual) => ({ ...VACIO, ubicacion: conservarUbicacion ? actual.ubicacion : '' }))
+    setCampos((actual) => ({ ...VACIO, ubicacion: conservarUbicacion ? actual.ubicacion || ubicacionPorDefecto || '' : '' }))
+    setConservados(new Set())
+    setRonda((r) => r + 1)
     setConfirmado(false)
     setCopiado(null)
     setErrores({})
@@ -210,11 +240,37 @@ export function useAltaActivo({
     crear.reset()
   }
 
+  /**
+   * «Guardar y registrar otro» (Q9 = A): nuevo `id`; conserva categoría, ubicación, marca,
+   * modelo y subtipo; borra código, nombre, precio, serial, fecha, foto y la copia. Lo
+   * conservado sale del estado actual (se llama tras la respuesta del servidor).
+   */
+  function registrarOtro() {
+    id.current = crypto.randomUUID()
+    foto.limpiar()
+    setCampos((actual) => {
+      const siguientes = { ...VACIO }
+      for (const c of CONSERVA_REGISTRAR_OTRO) siguientes[c] = actual[c]
+      siguientes.ubicacion ||= ubicacionPorDefecto ?? ''
+      return siguientes
+    })
+    setConservados(new Set(CONSERVA_REGISTRAR_OTRO))
+    setConfirmado(false)
+    setCopiado(null)
+    setErrores({})
+    setCreado(null)
+    setExistente(null)
+    setErrorGeneral(null)
+    setRonda((r) => r + 1)
+    crear.reset()
+  }
+
   /** Otra unidad igual: conserva los datos y limpia código y serial (nuevo `id`). */
   function siguienteUnidad() {
     id.current = crypto.randomUUID()
     foto.limpiar()
-    setCampos((actual) => ({ ...actual, codigo: '', serial: '' }))
+    setCampos((actual) => ({ ...actual, ubicacion: actual.ubicacion || ubicacionPorDefecto || '', codigo: '', serial: '' }))
+    setRonda((r) => r + 1)
     setConfirmado(false)
     setErrores({})
     setExistente(null)
@@ -226,6 +282,9 @@ export function useAltaActivo({
     foto,
     reintentarFoto,
     siguienteUnidad,
+    registrarOtro,
+    conservados,
+    ronda,
     campos,
     cambiar,
     confirmado,
@@ -242,4 +301,38 @@ export function useAltaActivo({
     errorGeneral,
     otro,
   }
+}
+
+export type AltaActivo = ReturnType<typeof useAltaActivo>
+
+/** Resalta un campo que conservó «Guardar y registrar otro» hasta que se cambia. */
+export const claseConservado = (alta: Pick<AltaActivo, 'conservados'>, campo: CampoAlta) => (alta.conservados.has(campo) ? 'border-brand-border bg-brand-soft' : undefined)
+
+// Spec 015, T10: teclas del formulario de alta (lo usan las dos pantallas).
+const NO_TEXTO = new Set(['button', 'checkbox', 'radio', 'submit', 'reset', 'file', 'range', 'color', 'image'])
+
+/**
+ * Teclas del formulario de alta. Solo actúa sobre lo que está dentro del formulario en el
+ * DOM: las listas y diálogos de los selectores (portales) quedan fuera.
+ */
+export function teclasDelAlta(
+  e: KeyboardEvent<HTMLFormElement>,
+  { guardar, guardarYOtro, ocupado }: { guardar: () => void; guardarYOtro: () => void; ocupado: boolean },
+) {
+  if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.altKey || e.shiftKey) return
+  if (e.repeat) {
+    // Tecla sostenida: no guarda y tampoco deja el envío implícito del formulario.
+    e.preventDefault()
+    return
+  }
+  const destino = e.target instanceof HTMLElement ? e.target : null
+  if (!destino || !e.currentTarget.contains(destino)) return
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault()
+    if (!ocupado) guardarYOtro()
+    return
+  }
+  if (!(destino instanceof HTMLInputElement) || NO_TEXTO.has(destino.type)) return
+  e.preventDefault()
+  if (!ocupado) guardar()
 }

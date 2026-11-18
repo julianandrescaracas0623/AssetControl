@@ -309,7 +309,7 @@ function ConteoEscritorio() {
 
 // --- Cabecera -------------------------------------------------------------------------
 
-function CabeceraEscritorio({ sesion, cargando, red }: { sesion: SesionConteo | null; cargando: boolean; red: EstadoRed }) {
+export function CabeceraEscritorio({ sesion, cargando, red }: { sesion: SesionConteo | null; cargando: boolean; red: EstadoRed }) {
   const { sala, elegir, ubicaciones } = useSalaDeTrabajo()
   const detalle = useDetalleSesion(sesion?.id)
   const avance = detalle.data?.avance

@@ -1,5 +1,5 @@
-import { Camera, ImageOff, LoaderCircle, RotateCcw, X } from 'lucide-react'
-import { useId, useRef, useState } from 'react'
+import { Camera, ImageOff, ImagePlus, LoaderCircle, RotateCcw, X } from 'lucide-react'
+import { type DragEvent, useId, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -9,7 +9,11 @@ import { cn } from '@/lib/utils'
 
 // Foto opcional (spec 012, T6; R1, R7). «Tomar foto» usa el selector del sistema con la
 // cámara trasera (`capture="environment"`): en el teléfono abre la cámara nativa sin
-// pedir permisos a la página; en el PC abre el selector de archivos.
+// pedir permisos a la página; en el PC abre el selector de archivos. Con `zona` (spec 015,
+// T10) el recuadro también acepta una imagen arrastrada desde el equipo, solo en los
+// formatos que acepta el servidor (JPEG, PNG y WebP; nunca SVG).
+
+const TIPOS_ARRASTRE = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 export function CampoFoto({
   archivo,
@@ -20,6 +24,7 @@ export function CampoFoto({
   etiqueta = 'Foto del activo (opcional)',
   ayuda = 'Ayuda a reconocerlo al contar. Se guarda sin la ubicación del teléfono.',
   deshabilitado = false,
+  zona = false,
 }: {
   archivo: Blob | null
   onElegir: (archivo: File | null) => void
@@ -29,14 +34,34 @@ export function CampoFoto({
   etiqueta?: string
   ayuda?: string
   deshabilitado?: boolean
+  /** Recuadro para arrastrar una foto o elegirla (escritorio). */
+  zona?: boolean
 }) {
   const entrada = useRef<HTMLInputElement>(null)
   const idAyuda = useId()
   const previa = useUrlDeBlob(archivo)
   const ocupado = deshabilitado || estado === 'subiendo'
+  const [encima, setEncima] = useState(false)
+
+  const arrastre = zona
+    ? {
+        onDragOver: (evento: DragEvent) => {
+          // Siempre: si no, el navegador abriría el archivo soltado y se saldría del formulario.
+          evento.preventDefault()
+          if (!ocupado) setEncima(true)
+        },
+        onDragLeave: () => setEncima(false),
+        onDrop: (evento: DragEvent) => {
+          evento.preventDefault()
+          setEncima(false)
+          const elegido = [...(evento.dataTransfer?.files ?? [])].find((f) => TIPOS_ARRASTRE.has(f.type))
+          if (!ocupado && elegido) onElegir(elegido)
+        },
+      }
+    : {}
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" {...arrastre}>
       <p className="text-sm font-medium">{etiqueta}</p>
       <input
         ref={entrada}
@@ -63,6 +88,28 @@ export function CampoFoto({
               <X aria-hidden="true" /> Quitar foto
             </Button>
           </div>
+        </div>
+      ) : zona ? (
+        <div
+          data-zona-foto=""
+          className={cn(
+            'flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-4 py-5 text-center text-sm',
+            encima && 'border-brand-border bg-brand-soft',
+          )}
+        >
+          <ImagePlus className="size-5 text-muted-foreground" aria-hidden="true" />
+          <span>
+            Arrastra una foto aquí o{' '}
+            <button
+              type="button"
+              disabled={ocupado}
+              aria-describedby={idAyuda}
+              className="text-brand-strong underline underline-offset-4 disabled:opacity-50"
+              onClick={() => entrada.current?.click()}
+            >
+              elígela
+            </button>
+          </span>
         </div>
       ) : (
         <Button
