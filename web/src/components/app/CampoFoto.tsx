@@ -131,17 +131,24 @@ export function EstadoFoto({
   )
 }
 
-/** Miniatura de una foto guardada; al tocarla se abre la imagen completa. */
+/**
+ * Miniatura de una foto guardada; al tocarla se abre la imagen completa. `vista="completa"`
+ * muestra la imagen completa en lugar de la miniatura (foto grande de la ficha, spec 015 T7).
+ */
 export function FotoGuardada({
   fotoId,
   descripcion,
   className,
+  imagenClassName,
+  vista = 'mini',
 }: {
   fotoId: string
   descripcion: string
   className?: string
+  imagenClassName?: string
+  vista?: 'mini' | 'completa'
 }) {
-  const mini = useImagenFoto(fotoId, 'mini')
+  const mini = useImagenFoto(fotoId, vista)
   const [abierta, setAbierta] = useState(false)
   const completa = useImagenFoto(abierta ? fotoId : null, 'completa')
 
@@ -161,7 +168,7 @@ export function FotoGuardada({
         onClick={() => setAbierta(true)}
         aria-label={`Ver la foto de ${descripcion}`}
       >
-        <img src={mini.url} alt="" className="size-24 object-cover" />
+        <img src={mini.url} alt="" className={cn('size-24 object-cover', imagenClassName)} />
       </button>
       <Dialog open={abierta} onOpenChange={setAbierta}>
         <DialogContent className="max-w-3xl">

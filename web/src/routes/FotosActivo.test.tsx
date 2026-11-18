@@ -217,7 +217,8 @@ describe('la foto sigue tras guardar un cambio (spec 015, T1)', () => {
 
   it('al cambiar el estado', async () => {
     await fichaConFoto()
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar a reparación' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Más acciones' }), { key: 'Enter' })
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Enviar a reparación…' }))
     const confirmar = await screen.findByRole('alertdialog', { name: '¿Enviar a reparación?' })
     fireEvent.click(within(confirmar).getByRole('button', { name: 'Sí, enviar a reparación' }))
     expect(await screen.findByRole('button', { name: 'Volver a activo' })).toBeTruthy()
@@ -227,7 +228,8 @@ describe('la foto sigue tras guardar un cambio (spec 015, T1)', () => {
 
   it('al dar de baja', async () => {
     await fichaConFoto()
-    fireEvent.click(screen.getByRole('button', { name: 'Dar de baja' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Más acciones' }), { key: 'Enter' })
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Dar de baja…' }))
     const dialogo = await screen.findByRole('dialog', { name: 'Dar de baja' })
     fireEvent.keyDown(within(dialogo).getByRole('combobox', { name: /Motivo/ }), { key: 'Enter' })
     fireEvent.click(await screen.findByRole('option', { name: 'Perdido' }))
@@ -240,7 +242,8 @@ describe('la foto sigue tras guardar un cambio (spec 015, T1)', () => {
   it('ante un 412 muestra el vigente sin perder la foto', async () => {
     const catalogo = await fichaConFoto()
     catalogo.cambiarPorOtro(SILLA, { nombre: 'Silla renombrada' })
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar a reparación' }))
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Más acciones' }), { key: 'Enter' })
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Enviar a reparación…' }))
     const confirmar = await screen.findByRole('alertdialog', { name: '¿Enviar a reparación?' })
     fireEvent.click(within(confirmar).getByRole('button', { name: 'Sí, enviar a reparación' }))
     expect(await screen.findByText(/Alguien cambió este activo/)).toBeTruthy()

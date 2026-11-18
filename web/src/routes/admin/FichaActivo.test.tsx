@@ -122,37 +122,38 @@ describe('editar (T5)', () => {
   })
 })
 
-describe('confirmar «Enviar a reparación» (015-T2, Q5 A)', () => {
+describe('confirmar «Enviar a reparación» (015-T2, Q5 A; en «Más» desde 015-T7)', () => {
   it('«No» cierra la confirmación sin llamar al servidor', async () => {
     const { f } = abrir()
-    fireEvent.click(await screen.findByRole('button', { name: 'Enviar a reparación' }))
+    await elegirEnMas('Enviar a reparación…')
     const confirmar = await screen.findByRole('alertdialog', { name: '¿Enviar a reparación?' })
     expect(confirmar.textContent).toContain('Sigue contando en el inventario')
     fireEvent.click(within(confirmar).getByRole('button', { name: 'No' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
     expect(cambios(f)).toHaveLength(0)
-    expect(screen.getByRole('button', { name: 'Enviar a reparación' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Volver a activo' })).toBeNull()
+    expect(within(await abrirMas()).getByRole('menuitem', { name: 'Enviar a reparación…' })).toBeTruthy()
   })
 
-  it('Escape también cancela sin llamar al servidor', async () => {
+  it('Escape también cancela sin llamar al servidor y el foco vuelve a «Más»', async () => {
     const { f } = abrir()
-    fireEvent.click(await screen.findByRole('button', { name: 'Enviar a reparación' }))
+    await elegirEnMas('Enviar a reparación…')
     const confirmar = await screen.findByRole('alertdialog', { name: '¿Enviar a reparación?' })
     fireEvent.keyDown(confirmar, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
     expect(cambios(f)).toHaveLength(0)
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Enviar a reparación' })))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Más acciones' })))
   })
 
   it('el foco inicial está en «No»', async () => {
     abrir()
-    fireEvent.click(await screen.findByRole('button', { name: 'Enviar a reparación' }))
+    await elegirEnMas('Enviar a reparación…')
     const confirmar = await screen.findByRole('alertdialog', { name: '¿Enviar a reparación?' })
     await waitFor(() => expect(document.activeElement).toBe(within(confirmar).getByRole('button', { name: 'No' })))
   })
 
-  it('tras «Sí» el foco vuelve al botón de reparación cuando termina de guardar', async () => {
-    // El servidor tarda: el diálogo se cierra con el botón deshabilitado (guardando).
+  it('tras «Sí» el foco espera en «Más» y pasa a «Volver a activo» cuando termina de guardar', async () => {
+    // El servidor tarda: el diálogo se cierra mientras guarda.
     const catalogo = catalogoDemo('admin')
     let soltar = () => {}
     const espera = new Promise<void>((r) => (soltar = r))
@@ -163,11 +164,11 @@ describe('confirmar «Enviar a reparación» (015-T2, Q5 A)', () => {
     abrir('/admin/activos/000123', { ...catalogo, manejador })
     await confirmarReparacion()
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
-    const boton = screen.getByRole('button', { name: 'Enviar a reparación' }) as HTMLButtonElement
-    expect(boton.disabled).toBe(true)
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Más acciones' })))
+    expect(screen.queryByRole('button', { name: 'Volver a activo' })).toBeNull()
     soltar()
-    expect(await screen.findByRole('button', { name: 'Volver a activo' })).toBe(boton)
-    await waitFor(() => expect(document.activeElement).toBe(boton))
+    const volver = await screen.findByRole('button', { name: 'Volver a activo' })
+    await waitFor(() => expect(document.activeElement).toBe(volver))
   })
 
   it('«Sí, enviar a reparación» llama al servidor; «Volver a activo» no pide confirmación', async () => {
@@ -177,13 +178,24 @@ describe('confirmar «Enviar a reparación» (015-T2, Q5 A)', () => {
     expect(cambios(f)).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Volver a activo' }))
     expect(screen.queryByRole('alertdialog')).toBeNull()
-    expect(await screen.findByRole('button', { name: 'Enviar a reparación' })).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Volver a activo' })).toBeNull())
     expect(cambios(f)).toHaveLength(2)
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Más acciones' })))
+    expect(within(await abrirMas()).getByRole('menuitem', { name: 'Enviar a reparación…' })).toBeTruthy()
   })
 })
 
+async function abrirMas() {
+  fireEvent.keyDown(await screen.findByRole('button', { name: 'Más acciones' }), { key: 'Enter' })
+  return screen.findByRole('menu')
+}
+
+async function elegirEnMas(nombre: string) {
+  fireEvent.click(within(await abrirMas()).getByRole('menuitem', { name: nombre }))
+}
+
 async function confirmarReparacion() {
-  fireEvent.click(await screen.findByRole('button', { name: 'Enviar a reparación' }))
+  await elegirEnMas('Enviar a reparación…')
   const confirmar = await screen.findByRole('alertdialog', { name: '¿Enviar a reparación?' })
   fireEvent.click(within(confirmar).getByRole('button', { name: 'Sí, enviar a reparación' }))
 }
@@ -217,14 +229,15 @@ describe('ciclo de vida (T6)', () => {
     expect(await screen.findByRole('button', { name: 'Volver a activo' })).toBeTruthy()
     expect(screen.getByText('En reparación')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Volver a activo' }))
-    expect(await screen.findByRole('button', { name: 'Enviar a reparación' })).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Volver a activo' })).toBeNull())
+    expect(screen.getByText('Activo', { selector: '[data-slot=badge]' })).toBeTruthy()
     const envios = cambios(f)
     expect(envios.map(([, init]) => new Headers(init?.headers).get('If-Match'))).toEqual(['"1"', '"2"'])
   })
 
   it('dar de baja exige motivo (y nota con «otro»), deja la ficha en solo lectura y se reactiva', async () => {
     const { f } = abrir()
-    fireEvent.click(await screen.findByRole('button', { name: 'Dar de baja' }))
+    await elegirEnMas('Dar de baja…')
     const dialogo = await screen.findByRole('dialog', { name: 'Dar de baja' })
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Dar de baja' }))
     expect(await within(dialogo).findByText('Elige un motivo', { selector: 'p' })).toBeTruthy()
@@ -240,6 +253,7 @@ describe('ciclo de vida (T6)', () => {
     expect(await screen.findByText('«No apareció en el conteo»')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Editar' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Mover' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Más acciones' })).toBeNull()
     expect(JSON.parse(String(cambios(f)[0][1]?.body))).toEqual({ motivo: 'perdido', nota: 'No apareció en el conteo' })
 
     fireEvent.click(screen.getByRole('button', { name: 'Reactivar' }))
@@ -252,10 +266,88 @@ describe('ciclo de vida (T6)', () => {
 
   it('si otra persona lo cambió, avisa y muestra el vigente', async () => {
     const { catalogo } = abrir()
-    await screen.findByRole('button', { name: 'Enviar a reparación' })
+    await screen.findByRole('button', { name: 'Más acciones' })
     catalogo.cambiarPorOtro(SILLA, { nombre: 'Silla renombrada' })
     await confirmarReparacion()
     expect(await screen.findByText(/Alguien cambió este activo/)).toBeTruthy()
     expect(await screen.findByRole('heading', { level: 1, name: 'Silla renombrada' })).toBeTruthy()
+  })
+})
+
+describe('disposición de la ficha (015-T7, R13)', () => {
+  it('encabezado con nombre, código, categoría, estado y acciones: «Editar» principal, «Mover» y «Más»', async () => {
+    abrir()
+    const titulo = await screen.findByRole('heading', { level: 1, name: 'Silla ergonómica' })
+    const encabezado = titulo.closest('header')!
+    expect(encabezado).toBeTruthy()
+    expect(within(encabezado).getByText('000123')).toBeTruthy()
+    expect(within(encabezado).getByText('Activo')).toBeTruthy()
+    const editar = within(encabezado).getByRole('button', { name: 'Editar' })
+    expect(editar.getAttribute('data-variant')).toBe('default')
+    expect(within(encabezado).getByRole('button', { name: 'Mover' }).getAttribute('data-variant')).toBe('outline')
+    expect(within(encabezado).getByRole('button', { name: 'Más acciones' })).toBeTruthy()
+    // Reparación y baja ya no son botones sueltos: viven en «Más».
+    expect(screen.queryByRole('button', { name: /Enviar a reparación/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Dar de baja/ })).toBeNull()
+    const menu = await abrirMas()
+    expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Enviar a reparación…', 'Dar de baja…'])
+    expect(within(menu).getByRole('menuitem', { name: 'Dar de baja…' }).getAttribute('data-variant')).toBe('destructive')
+  })
+
+  it('datos en tarjetas Identificación, Ubicación y Compra; foto antes de los datos y el historial al final', async () => {
+    abrir()
+    const identificacion = await screen.findByRole('region', { name: 'Identificación' })
+    const dato = (region: HTMLElement, etiqueta: string) =>
+      within(region).getByText(etiqueta, { selector: 'dt' }).nextElementSibling?.textContent
+    expect(dato(identificacion, 'Código')).toBe('000123')
+    expect(dato(identificacion, 'Marca')).toBe('Rimax')
+    for (const etiqueta of ['Serial', 'Categoría', 'Subtipo', 'Modelo']) {
+      expect(within(identificacion).getByText(etiqueta, { selector: 'dt' })).toBeTruthy()
+    }
+    const ubicacion = screen.getByRole('region', { name: 'Ubicación' })
+    expect(within(ubicacion).getByText('Sala o box', { selector: 'dt' })).toBeTruthy()
+    const compra = screen.getByRole('region', { name: 'Compra' })
+    expect(dato(compra, 'Precio de compra')).toBe('$ 389.900,00')
+    expect(within(compra).getByText('Fecha de compra', { selector: 'dt' })).toBeTruthy()
+    expect(within(compra).getByText('Registrado', { selector: 'dt' })).toBeTruthy()
+    const historial = screen.getByRole('region', { name: 'Historial' })
+    const foto = screen.getByRole('region', { name: 'Foto del activo' })
+    const antes = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(antes(foto, identificacion)).toBe(true)
+    expect(antes(identificacion, ubicacion)).toBe(true)
+    expect(antes(ubicacion, compra)).toBe(true)
+    expect(antes(compra, historial)).toBe(true)
+  })
+
+  it('en reparación, «Volver a activo» queda a la vista y «Más» solo ofrece la baja', async () => {
+    abrir()
+    await confirmarReparacion()
+    const volver = await screen.findByRole('button', { name: 'Volver a activo' })
+    expect(volver.closest('header')).toBeTruthy()
+    const menu = await abrirMas()
+    expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Dar de baja…'])
+  })
+
+  it('cancelar la baja devuelve el foco a «Más» sin llamar al servidor', async () => {
+    const { f } = abrir()
+    await elegirEnMas('Dar de baja…')
+    const dialogo = await screen.findByRole('dialog', { name: 'Dar de baja' })
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Cancelar' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(cambios(f)).toHaveLength(0)
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Más acciones' })))
+  })
+
+  it('Escape en el menú «Más» lo cierra sin elegir nada y devuelve el foco a «Más»', async () => {
+    const { f } = abrir()
+    const menu = await abrirMas()
+    // Con el menú abierto el foco está dentro del menú, no en «Más».
+    await waitFor(() => expect(menu.contains(document.activeElement)).toBe(true))
+    fireEvent.keyDown(menu, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(cambios(f)).toHaveLength(0)
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Más acciones' })))
   })
 })

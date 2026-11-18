@@ -142,7 +142,18 @@ function validarMotivo(motivo: string, nota: string): string | undefined {
   return undefined
 }
 
-export function DarDeBaja({ activo, abierto, onAbierto }: { activo: Activo; abierto: boolean; onAbierto: (v: boolean) => void }) {
+export function DarDeBaja({
+  activo,
+  abierto,
+  onAbierto,
+  onCloseAutoFocus,
+}: {
+  activo: Activo
+  abierto: boolean
+  onAbierto: (v: boolean) => void
+  /** Spec 015 (T7): se abre desde «Más»; la ficha devuelve el foco a ese botón. */
+  onCloseAutoFocus?: (evento: Event) => void
+}) {
   const baja = useDarDeBaja()
   const [motivo, setMotivo] = useState<MotivoBaja | ''>('')
   const [nota, setNota] = useState('')
@@ -173,7 +184,7 @@ export function DarDeBaja({ activo, abierto, onAbierto }: { activo: Activo; abie
         onAbierto(v)
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>Dar de baja</DialogTitle>
           <DialogDescription>

@@ -271,7 +271,8 @@ describe('ficha', () => {
   it('muestra los datos reales con precio para el admin', async () => {
     abrir('/admin/activos/000123')
     expect(await screen.findByRole('heading', { level: 1, name: 'Silla ergonómica' })).toBeTruthy()
-    expect(screen.getByText('Consultorio 1 › Box 2')).toBeTruthy()
+    // 015-T7: la ruta va en el encabezado y en la tarjeta «Ubicación».
+    expect(screen.getByText('Consultorio 1 › Box 2', { selector: 'dd' })).toBeTruthy()
     expect(screen.getByText('$ 389.900,00')).toBeTruthy()
     expect(screen.getByText('Rimax')).toBeTruthy()
   })
