@@ -44,6 +44,7 @@ describe('editar (T5)', () => {
     expect(init?.method).toBe('PATCH')
     expect(new Headers(init?.headers).get('If-Match')).toBe('"1"')
     expect(JSON.parse(String(init?.body))).toEqual({ precio_compra: '420000.00', marca: null })
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Editar' })))
   })
 
   it('sin cambios no llama a la API', async () => {
@@ -103,7 +104,89 @@ describe('editar (T5)', () => {
     abrir('/admin/activos/000123?accion=editar')
     expect(await screen.findByRole('dialog', { name: 'Editar activo' })).toBeTruthy()
   })
+
+  it('se abre como diálogo centrado, no como panel lateral (015-T2)', async () => {
+    abrir()
+    const panel = await abrirEdicion()
+    expect(panel.getAttribute('data-slot')).toBe('dialog-content')
+    expect(document.querySelector('[data-slot="sheet-content"]')).toBeNull()
+  })
+
+  it('Escape cierra el diálogo sin guardar (015-T2)', async () => {
+    const { f } = abrir()
+    const panel = await abrirEdicion()
+    fireEvent.keyDown(panel, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(cambios(f)).toHaveLength(0)
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Editar' })))
+  })
 })
+
+describe('confirmar «Enviar a reparación» (015-T2, Q5 A)', () => {
+  it('«No» cierra la confirmación sin llamar al servidor', async () => {
+    const { f } = abrir()
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar a reparación' }))
+    const confirmar = await screen.findByRole('alertdialog', { name: '¿Enviar a reparación?' })
+    expect(confirmar.textContent).toContain('Sigue contando en el inventario')
+    fireEvent.click(within(confirmar).getByRole('button', { name: 'No' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(cambios(f)).toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Enviar a reparación' })).toBeTruthy()
+  })
+
+  it('Escape también cancela sin llamar al servidor', async () => {
+    const { f } = abrir()
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar a reparación' }))
+    const confirmar = await screen.findByRole('alertdialog', { name: '¿Enviar a reparación?' })
+    fireEvent.keyDown(confirmar, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(cambios(f)).toHaveLength(0)
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Enviar a reparación' })))
+  })
+
+  it('el foco inicial está en «No»', async () => {
+    abrir()
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar a reparación' }))
+    const confirmar = await screen.findByRole('alertdialog', { name: '¿Enviar a reparación?' })
+    await waitFor(() => expect(document.activeElement).toBe(within(confirmar).getByRole('button', { name: 'No' })))
+  })
+
+  it('tras «Sí» el foco vuelve al botón de reparación cuando termina de guardar', async () => {
+    // El servidor tarda: el diálogo se cierra con el botón deshabilitado (guardando).
+    const catalogo = catalogoDemo('admin')
+    let soltar = () => {}
+    const espera = new Promise<void>((r) => (soltar = r))
+    const manejador: typeof catalogo.manejador = (url, init) =>
+      url === `/api/activos/${SILLA}/estado`
+        ? espera.then(async () => (await catalogo.manejador(url, init)) ?? new Response(null, { status: 500 }))
+        : catalogo.manejador(url, init)
+    abrir('/admin/activos/000123', { ...catalogo, manejador })
+    await confirmarReparacion()
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    const boton = screen.getByRole('button', { name: 'Enviar a reparación' }) as HTMLButtonElement
+    expect(boton.disabled).toBe(true)
+    soltar()
+    expect(await screen.findByRole('button', { name: 'Volver a activo' })).toBe(boton)
+    await waitFor(() => expect(document.activeElement).toBe(boton))
+  })
+
+  it('«Sí, enviar a reparación» llama al servidor; «Volver a activo» no pide confirmación', async () => {
+    const { f } = abrir()
+    await confirmarReparacion()
+    expect(await screen.findByRole('button', { name: 'Volver a activo' })).toBeTruthy()
+    expect(cambios(f)).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a activo' }))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(await screen.findByRole('button', { name: 'Enviar a reparación' })).toBeTruthy()
+    expect(cambios(f)).toHaveLength(2)
+  })
+})
+
+async function confirmarReparacion() {
+  fireEvent.click(await screen.findByRole('button', { name: 'Enviar a reparación' }))
+  const confirmar = await screen.findByRole('alertdialog', { name: '¿Enviar a reparación?' })
+  fireEvent.click(within(confirmar).getByRole('button', { name: 'Sí, enviar a reparación' }))
+}
 
 async function elegirEnSelect(nombre: RegExp | string, opcion: string) {
   const disparador = screen.getByRole('combobox', { name: nombre })
@@ -128,9 +211,9 @@ describe('ciclo de vida (T6)', () => {
     expect(JSON.parse(String(init?.body))).toEqual({ ubicacion_id: '00000000-0000-4000-8000-0000000000a2' })
   })
 
-  it('envía a reparación y vuelve a activo en un toque', async () => {
+  it('envía a reparación (con confirmación) y vuelve a activo en un toque', async () => {
     const { f } = abrir()
-    fireEvent.click(await screen.findByRole('button', { name: 'Enviar a reparación' }))
+    await confirmarReparacion()
     expect(await screen.findByRole('button', { name: 'Volver a activo' })).toBeTruthy()
     expect(screen.getByText('En reparación')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Volver a activo' }))
@@ -171,7 +254,7 @@ describe('ciclo de vida (T6)', () => {
     const { catalogo } = abrir()
     await screen.findByRole('button', { name: 'Enviar a reparación' })
     catalogo.cambiarPorOtro(SILLA, { nombre: 'Silla renombrada' })
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar a reparación' }))
+    await confirmarReparacion()
     expect(await screen.findByText(/Alguien cambió este activo/)).toBeTruthy()
     expect(await screen.findByRole('heading', { level: 1, name: 'Silla renombrada' })).toBeTruthy()
   })

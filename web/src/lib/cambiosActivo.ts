@@ -72,12 +72,16 @@ export function avisarErrorDeCambio(error: unknown) {
   else toast.error(mensajeDeError(error))
 }
 
-/** `activo` ↔ `en_reparacion` en un toque (se deshace igual de fácil). */
+/**
+ * `activo` ↔ `en_reparacion`. Spec 015 (T2, Q5 A): enviar a reparación pide confirmación
+ * (`requiereConfirmacion`); volver a activo sigue en un toque.
+ */
 export function useAlternarReparacion(activo: Activo) {
   const cambiar = useCambiarEstado()
   const destino = activo.estado === 'en_reparacion' ? 'activo' : 'en_reparacion'
   return {
     etiqueta: destino === 'activo' ? 'Volver a activo' : 'Enviar a reparación',
+    requiereConfirmacion: destino === 'en_reparacion',
     guardando: cambiar.isPending,
     alternar: () =>
       cambiar.mutate(

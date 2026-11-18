@@ -1,5 +1,5 @@
 import { Archive, ArchiveRestore, CircleAlert, MapPin, Pencil, RefreshCw, SearchX, Wrench } from 'lucide-react'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
 import { DarDeBaja, MoverActivo, Reactivar } from '@/components/app/AccionesActivo'
@@ -8,6 +8,16 @@ import { EditarActivo } from '@/components/app/EditarActivo'
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
 import { HistorialActivo } from '@/components/app/LineaDeTiempo'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -43,11 +53,28 @@ function AvisoDeBaja({ activo, onReactivar }: { activo: Activo; onReactivar: () 
   )
 }
 
-function Acciones({ activo, abrir }: { activo: Activo; abrir: (a: Accion) => void }) {
+/** Al cerrar un diálogo sin disparador de Radix, el foco vuelve al botón que lo abrió. */
+function devolverFoco(evento: Event, boton: HTMLButtonElement | null) {
+  if (!boton) return
+  evento.preventDefault()
+  boton.focus()
+}
+
+function Acciones({ activo, abrir, editarRef }: { activo: Activo; abrir: (a: Accion) => void; editarRef: RefObject<HTMLButtonElement | null> }) {
   const reparacion = useAlternarReparacion(activo)
+  const [confirmando, setConfirmando] = useState(false)
+  const reparacionRef = useRef<HTMLButtonElement>(null)
+  // Tras «Sí» el botón queda deshabilitado mientras guarda y no puede recibir el foco:
+  // se devuelve cuando termina (con éxito o error).
+  const enfocarAlTerminar = useRef(false)
+  useEffect(() => {
+    if (reparacion.guardando || !enfocarAlTerminar.current) return
+    enfocarAlTerminar.current = false
+    reparacionRef.current?.focus()
+  }, [reparacion.guardando])
   return (
     <div className="flex flex-wrap gap-2 [&_[data-slot=button]]:max-md:min-h-11">
-      <Button variant="outline" onClick={() => abrir('editar')}>
+      <Button ref={editarRef} variant="outline" onClick={() => abrir('editar')}>
         <Pencil />
         Editar
       </Button>
@@ -55,7 +82,12 @@ function Acciones({ activo, abrir }: { activo: Activo; abrir: (a: Accion) => voi
         <MapPin />
         Mover
       </Button>
-      <Button variant="outline" onClick={reparacion.alternar} disabled={reparacion.guardando}>
+      <Button
+        ref={reparacionRef}
+        variant="outline"
+        onClick={reparacion.requiereConfirmacion ? () => setConfirmando(true) : reparacion.alternar}
+        disabled={reparacion.guardando}
+      >
         <Wrench />
         {reparacion.etiqueta}
       </Button>
@@ -63,6 +95,26 @@ function Acciones({ activo, abrir }: { activo: Activo; abrir: (a: Accion) => voi
         <Archive />
         Dar de baja
       </Button>
+      {/* Spec 015 (T2, Q5 A): solo el envío a reparación se confirma. */}
+      <AlertDialog open={confirmando} onOpenChange={setConfirmando}>
+        <AlertDialogContent onCloseAutoFocus={(evento) => devolverFoco(evento, reparacionRef.current)}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Enviar a reparación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              «{activo.nombre}» quedará en reparación. Sigue contando en el inventario y lo puedes volver a activo cuando regrese.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="[&_button]:max-md:min-h-11">
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                enfocarAlTerminar.current = true
+                reparacion.alternar()
+              }}
+            >Sí, enviar a reparación</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -84,6 +136,7 @@ export default function FichaActivo() {
   const consulta = useActivoPorCodigo(codigo)
   const [params, setParams] = useSearchParams()
   const [accion, setAccion] = useState<Accion | null>(() => ACCIONES.find((a) => a === params.get('accion')) ?? null)
+  const editarRef = useRef<HTMLButtonElement>(null)
 
   function abrir(nueva: Accion | null) {
     setAccion(nueva)
@@ -147,7 +200,7 @@ export default function FichaActivo() {
             <EstadoActivoBadge estado={activo.estado} />
           </p>
         </div>
-        {!deBaja && <Acciones activo={activo} abrir={abrir} />}
+        {!deBaja && <Acciones activo={activo} abrir={abrir} editarRef={editarRef} />}
       </div>
       {deBaja && <AvisoDeBaja activo={activo} onReactivar={() => abrir('reactivar')} />}
       <FotoActivo activo={activo} editable={!deBaja} />
@@ -167,7 +220,7 @@ export default function FichaActivo() {
         </h2>
         <HistorialActivo activoId={activo.id} />
       </section>
-      <EditarActivo activo={activo} abierto={accion === 'editar' && !deBaja} onAbierto={(v) => abrir(v ? 'editar' : null)} />
+      <EditarActivo activo={activo} abierto={accion === 'editar' && !deBaja} onAbierto={(v) => abrir(v ? 'editar' : null)} onCloseAutoFocus={(evento) => devolverFoco(evento, editarRef.current)} />
       <MoverActivo activo={activo} abierto={accion === 'mover' && !deBaja} onAbierto={(v) => abrir(v ? 'mover' : null)} />
       <DarDeBaja activo={activo} abierto={accion === 'baja' && !deBaja} onAbierto={(v) => abrir(v ? 'baja' : null)} />
       <Reactivar activo={activo} abierto={accion === 'reactivar' && deBaja} onAbierto={(v) => abrir(v ? 'reactivar' : null)} />

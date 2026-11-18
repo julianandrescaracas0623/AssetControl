@@ -218,6 +218,8 @@ describe('la foto sigue tras guardar un cambio (spec 015, T1)', () => {
   it('al cambiar el estado', async () => {
     await fichaConFoto()
     fireEvent.click(screen.getByRole('button', { name: 'Enviar a reparación' }))
+    const confirmar = await screen.findByRole('alertdialog', { name: '¿Enviar a reparación?' })
+    fireEvent.click(within(confirmar).getByRole('button', { name: 'Sí, enviar a reparación' }))
     expect(await screen.findByRole('button', { name: 'Volver a activo' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Ver la foto de Silla ergonómica' })).toBeTruthy()
     expect(screen.queryByText('Sin foto')).toBeNull()
@@ -239,6 +241,8 @@ describe('la foto sigue tras guardar un cambio (spec 015, T1)', () => {
     const catalogo = await fichaConFoto()
     catalogo.cambiarPorOtro(SILLA, { nombre: 'Silla renombrada' })
     fireEvent.click(screen.getByRole('button', { name: 'Enviar a reparación' }))
+    const confirmar = await screen.findByRole('alertdialog', { name: '¿Enviar a reparación?' })
+    fireEvent.click(within(confirmar).getByRole('button', { name: 'Sí, enviar a reparación' }))
     expect(await screen.findByText(/Alguien cambió este activo/)).toBeTruthy()
     expect(await screen.findByRole('heading', { level: 1, name: 'Silla renombrada' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Ver la foto de Silla renombrada' })).toBeTruthy()
