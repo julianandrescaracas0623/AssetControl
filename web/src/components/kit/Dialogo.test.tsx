@@ -121,6 +121,51 @@ describe('Dialogo', () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Volver a activo' })))
   })
 
+  // Spec 016, T8 (Deuda T3 c): la forma lateral también devuelve el foco a `devolverFocoA`,
+  // y un `onCloseAutoFocus` propio que llama a preventDefault() manda sobre el kit.
+  it('lateral con devolverFocoA: al cerrar, el foco va al elemento pedido', async () => {
+    render(<Demo forma="lateral" conRef />)
+    abrir()
+    expect(screen.getByRole('dialog').getAttribute('data-forma')).toBe('lateral')
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Volver a activo' })))
+  })
+
+  it('onCloseAutoFocus con preventDefault() manda sobre el foco del kit', async () => {
+    const destino = { current: null as HTMLButtonElement | null }
+    function Propio() {
+      const [abierto, setAbierto] = useState(false)
+      return (
+        <>
+          <button type="button" onClick={() => setAbierto(true)}>
+            Editar
+          </button>
+          <button type="button" ref={(b) => void (destino.current = b)}>
+            Otro destino
+          </button>
+          <Dialogo
+            abierto={abierto}
+            onAbiertoChange={setAbierto}
+            forma="lateral"
+            titulo="Editar activo"
+            onCloseAutoFocus={(evento) => {
+              evento.preventDefault()
+              destino.current?.focus()
+            }}
+          >
+            <p>Cuerpo</p>
+          </Dialogo>
+        </>
+      )
+    }
+    render(<Propio />)
+    abrir()
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Otro destino' })))
+  })
+
   it('el pie agrupa las acciones; en teléfono ocupan el ancho', () => {
     simularAncho({ movil: true })
     render(<Demo />)

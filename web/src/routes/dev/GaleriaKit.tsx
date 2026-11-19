@@ -1,4 +1,4 @@
-import { Download, Eye, EyeOff, MoreHorizontal, Plus, ScanBarcode } from 'lucide-react'
+import { Archive, Download, Eye, EyeOff, ImageOff, MapPin, MoreHorizontal, Plus, ScanBarcode } from 'lucide-react'
 import { toast } from 'sonner'
 import { useMemo, useState, type ReactNode } from 'react'
 
@@ -15,6 +15,8 @@ import {
   Filtro,
   Insignia,
   ListaDatos,
+  MarcoImagen,
+  Menu,
   Notificaciones,
   Panel,
   Pestanas,
@@ -438,6 +440,62 @@ export function TablasKit({ Seccion }: SeccionProps) {
           Abrir la ficha de {abierto.nombre} ({abierto.codigo})
         </p>
       )}
+    </Seccion>
+  )
+}
+
+/** Imagen ficticia (SVG en línea, gris: sin colores literales, R1) de cualquier tamaño, para probar la caja de D13. */
+function imagenFicticia(ancho: number, alto: number, texto: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${alto}" viewBox="0 0 ${ancho} ${alto}"><rect width="100%" height="100%" fill="currentColor" fill-opacity="0.1"/><circle cx="${ancho / 2}" cy="${alto / 2}" r="${Math.min(ancho, alto) / 3}" fill="currentColor" fill-opacity="0.45"/><text x="50%" y="92%" font-family="sans-serif" font-size="${Math.max(6, Math.min(ancho, alto) / 10)}" text-anchor="middle" fill="currentColor">${texto}</text></svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
+const IMAGEN_ENORME = imagenFicticia(4000, 900, '4000 × 900')
+const IMAGEN_DIMINUTA = imagenFicticia(40, 30, '40×30')
+
+// Spec 016, T8 (D13, A7, A9): cajas de imagen de tamaño fijo y menú de acciones.
+export function ImagenesKit({ Seccion }: SeccionProps) {
+  const [abierta, setAbierta] = useState(false)
+  return (
+    <Seccion title="Imágenes y menús">
+      <p className="text-cuerpo text-muted-foreground">
+        <span className="font-mono">MarcoImagen</span>: la caja manda (D13). Foto de ficha 320 × 240 px (200 px de alto en teléfono, object-cover);
+        logo 160 × 64 px y logo de cabecera de 32 px de alto (object-contain). Una imagen enorme o diminuta no se deforma.
+      </p>
+      <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-start">
+        <MarcoImagen variante="foto" src={IMAGEN_ENORME} alt="" onAmpliar={() => setAbierta(true)} etiquetaAmpliar="Ver la foto enorme (ejemplo)" />
+        <MarcoImagen variante="foto" src={IMAGEN_DIMINUTA} alt="Foto diminuta (ejemplo)" />
+        <MarcoImagen
+          variante="foto"
+          alt=""
+          vacio={
+            <span className="flex flex-col items-center gap-2 text-cuerpo text-muted-foreground">
+              <ImageOff className="size-8" aria-hidden="true" />
+              <span>Sin foto</span>
+            </span>
+          }
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-4">
+        <MarcoImagen variante="logo" src={IMAGEN_ENORME} alt="Logo enorme (ejemplo)" />
+        <MarcoImagen variante="logo" src={IMAGEN_DIMINUTA} alt="Logo diminuto (ejemplo)" />
+        <MarcoImagen variante="logoCabecera" src={IMAGEN_ENORME} alt="Logo de cabecera (ejemplo)" />
+      </div>
+      <div className="flex flex-wrap items-center gap-separacion">
+        <Menu
+          rotulo="000457"
+          disparador={<Boton variante="fantasma" soloIcono icono={<MoreHorizontal />} aria-label="Acciones de Silla ergonómica (000457)" />}
+          opciones={[
+            { etiqueta: 'Ver ficha', icono: <Eye />, alElegir: () => toast('Ver ficha (ejemplo)') },
+            { etiqueta: 'Mover', icono: <MapPin />, alElegir: () => toast('Mover (ejemplo)') },
+            { etiqueta: 'Dar de baja', icono: <Archive />, peligro: true, separadorAntes: true, alElegir: () => toast('Dar de baja (ejemplo)') },
+          ]}
+        />
+        <span className="text-etiqueta font-normal text-muted-foreground">Menú ⋯ de la fila: Enter o flechas lo abren; Escape devuelve el foco.</span>
+      </div>
+      <Dialogo abierto={abierta} onAbiertoChange={setAbierta} titulo="Foto ampliada (ejemplo)" descripcion="Imagen completa, sin recortar." ancho="ancho">
+        <img src={IMAGEN_ENORME} alt="Foto enorme ampliada (ejemplo)" className="mx-auto block max-h-[70dvh] w-auto max-w-full rounded-lg object-contain" />
+      </Dialogo>
     </Seccion>
   )
 }

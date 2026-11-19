@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 // Spec 016, T3 (R9, P13): filas rótulo/valor de la ficha y de la verificación. El valor
 // llega ya formateado (el dinero, del servidor y con formatCOP). Un dato ausente
-// (null, false o valor undefined) no se pinta: el contador no recibe el precio y no ve
+// (null, false, o valor undefined, null o false) no se pinta: el contador no recibe el precio y no ve
 // ni su rótulo ni un hueco ni «•••».
 
 export type TipoDato = 'texto' | 'codigo' | 'cifra'
@@ -32,7 +32,7 @@ const VALOR: Record<TipoDato, string> = {
 
 export function ListaDatos({ datos, disposicion = 'filas', className }: ListaDatosProps) {
   const visibles = datos.flatMap((d) => {
-    if (!d || d.valor === undefined || d.valor === null) return []
+    if (!d || d.valor === undefined || d.valor === null || d.valor === false) return []
     if (d.valor === '') return d.siVacio === undefined ? [] : [{ ...d, valor: d.siVacio }]
     return [d]
   })

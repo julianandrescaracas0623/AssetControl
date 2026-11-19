@@ -110,4 +110,15 @@ describe('galería de componentes', () => {
     expect(within(tablas).getByRole('button', { name: /Categoría/ }).getAttribute('data-kit')).toBe('filtro')
     expect(within(tablas).getByRole('navigation', { name: /Paginación/ })).toBeTruthy()
   })
+
+  // Spec 016, T8 (A7, A9; D13): cajas de imagen de tamaño fijo y menú de acciones.
+  it('muestra MarcoImagen (foto, logo y logo de cabecera) y el Menu del kit', () => {
+    render(<Componentes />)
+    const imagenes = screen.getByRole('region', { name: 'Imágenes y menús' })
+    const variantes = Array.from(imagenes.querySelectorAll('[data-kit=marco-imagen]')).map((el) => el.getAttribute('data-variante'))
+    expect(variantes).toEqual(['foto', 'foto', 'foto', 'logo', 'logo', 'logoCabecera'])
+    expect(within(imagenes).getByRole('button', { name: 'Ver la foto enorme (ejemplo)' })).toBeTruthy()
+    expect(within(imagenes).getByText('Sin foto')).toBeTruthy()
+    expect(within(imagenes).getByRole('button', { name: 'Acciones de Silla ergonómica (000457)' })).toBeTruthy()
+  })
 })

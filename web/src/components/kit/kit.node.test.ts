@@ -13,10 +13,6 @@ const ROUTES = path.join(SRC, 'routes')
 
 /** Pantallas que todavía importan components/ui (rutas relativas a src/routes, con /). */
 const EXCEPCIONES: readonly string[] = [
-  // T8: activos
-  'admin/Activos.tsx',
-  'admin/FichaActivo.tsx',
-  'admin/RegistrarActivo.tsx',
   // T9: gestión
   'admin/Categorias.tsx',
   'admin/Discrepancias.tsx',

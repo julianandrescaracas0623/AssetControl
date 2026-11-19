@@ -11,6 +11,7 @@ import { Aviso, Boton, Dialogo, Insignia, ListaDatos, MarcaObligatorio, MarcoCam
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { type Activo, aPrecioCanonico, normalizarCodigo, useActivoPorCodigo } from '@/lib/activos'
 import type { Categoria, Rol, Ubicacion } from '@/lib/api/cliente'
 import { type AltaActivo, claseControlAlta } from '@/lib/altaActivo'
@@ -363,6 +364,23 @@ export function NotaRegistrarOtro() {
       </p>
       <p className="text-muted-foreground">{NOTA_REGISTRAR_OTRO}</p>
     </div>
+  )
+}
+
+/**
+ * «Varias unidades iguales» (alta del admin, 015-T10): al guardar conserva todo menos
+ * código y serial. Spec 016, T8: vive aquí (componente de dominio) para que la pantalla
+ * no importe components/ui.
+ */
+export function VariasUnidades({ activo, onCambio }: { activo: boolean; onCambio: (v: boolean) => void }) {
+  return (
+    <label className="flex min-h-control cursor-pointer items-start justify-between gap-3 border-t pt-3">
+      <span>
+        <span className="block text-cuerpo font-medium">Varias unidades iguales</span>
+        <span className="block text-etiqueta font-normal text-muted-foreground">Al guardar, conserva todo menos código y serial (también nombre y precio).</span>
+      </span>
+      <Switch checked={activo} onCheckedChange={onCambio} className="mt-0.5 shrink-0" />
+    </label>
   )
 }
 

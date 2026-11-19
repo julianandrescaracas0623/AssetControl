@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { createPortal } from 'react-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { simularAncho } from '@/test/matchMedia'
@@ -104,6 +105,21 @@ describe('TablaDatos: tabla', () => {
     expect(screen.getAllByRole('columnheader').at(-1)?.textContent).toBe('Acciones')
   })
 
+  // Spec 016, T8 (015-T4 R2): React propaga los eventos de un portal (el menú de la fila)
+  // hasta la fila; lo que nace fuera de su DOM no la abre.
+  it('un doble clic que viene de un portal (menú de la fila) no abre la fila', () => {
+    const abrir = vi.fn()
+    const portal = document.createElement('div')
+    document.body.appendChild(portal)
+    tabla({
+      onAbrirFila: abrir,
+      accionesFila: (f) => createPortal(<div role="menu"><a href="#ficha" role="menuitem">Ver ficha de {f.nombre}</a></div>, portal),
+    })
+    fireEvent.doubleClick(screen.getByRole('menuitem', { name: 'Ver ficha de Silla ergonómica' }))
+    expect(abrir).not.toHaveBeenCalled()
+    portal.remove()
+  })
+
   it('sin onAbrirFila la fila no es enfocable', () => {
     tabla()
     expect(screen.getAllByRole('row')[1].getAttribute('tabindex')).toBeNull()
@@ -177,6 +193,13 @@ describe('TablaDatos: barra de herramientas y paginación', () => {
     fireEvent.click(within(nav).getByRole('button', { name: /Siguiente/ }))
     expect(siguiente).toHaveBeenCalledOnce()
     expect(anterior).not.toHaveBeenCalled()
+  })
+
+  // Spec 016, T8: los nombres de la paginación son los que ya usaban Activos y Categorías.
+  it('los botones se llaman «‹ Anterior» y «Siguiente ›»', () => {
+    tabla({ paginacion: { desde: 26, hasta: 50, total: 60, onAnterior: vi.fn(), onSiguiente: vi.fn(), hayAnterior: true, haySiguiente: true } })
+    const nav = screen.getByRole('navigation', { name: 'Paginación de activos' })
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(['‹ Anterior', 'Siguiente ›'])
   })
 
   it('paginación ocupada: no deja pedir otra página mientras llega', () => {

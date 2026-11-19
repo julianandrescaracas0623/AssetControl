@@ -75,4 +75,21 @@ describe('Panel', () => {
     expect(screen.getByRole('button', { name: 'Más datos' }).getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByText('Visible')).toBeTruthy()
   })
+
+  // Spec 016, T8: formulario largo del admin en el teléfono («Registrar activo»): el pie
+  // con las acciones queda pegado abajo. `overflow-clip` recorta las esquinas sin crear un
+  // contenedor de desplazamiento (con overflow-hidden el pie no se pegaría).
+  it('pieFijo: el pie queda pegado abajo en teléfono y el panel no corta el sticky', () => {
+    render(
+      <Panel titulo="Registrar" pieFijo pie={<button type="button">Guardar</button>}>
+        <p>Campos</p>
+      </Panel>,
+    )
+    const pie = screen.getByRole('button', { name: 'Guardar' }).closest('[data-panel=pie]') as HTMLElement
+    expect(pie.className).toContain('max-md:sticky')
+    expect(pie.className).toContain('max-md:bottom-0')
+    const panel = screen.getByRole('region', { name: 'Registrar' })
+    expect(panel.className).toContain('overflow-clip')
+    expect(panel.className).not.toContain('overflow-hidden')
+  })
 })

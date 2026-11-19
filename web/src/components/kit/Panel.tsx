@@ -22,6 +22,11 @@ export type PanelProps = Omit<ComponentProps<'section'>, 'title'> & {
   relleno?: boolean
   plegable?: boolean
   abiertoInicial?: boolean
+  /**
+   * Pie pegado abajo en el teléfono (formularios largos del admin: las acciones a la mano).
+   * El panel recorta con overflow-clip, que no crea un contenedor de desplazamiento.
+   */
+  pieFijo?: boolean
 }
 
 export function Panel({
@@ -33,6 +38,7 @@ export function Panel({
   relleno = true,
   plegable = false,
   abiertoInicial = false,
+  pieFijo = false,
   className,
   children,
   ...props
@@ -87,14 +93,18 @@ export function Panel({
     </div>
   )
 
-  const clases = cn('flex min-w-0 flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-xs', className)
+  const clases = cn(
+    'flex min-w-0 flex-col rounded-xl border bg-card text-card-foreground shadow-xs',
+    pieFijo ? 'overflow-clip' : 'overflow-hidden',
+    className,
+  )
 
   if (titulo === undefined) {
     return (
       <div data-kit="panel" className={clases} {...(props as ComponentProps<'div'>)}>
         {encabezado}
         {cuerpo}
-        {pie && visible && <Pie>{pie}</Pie>}
+        {pie && visible && <Pie fijo={pieFijo}>{pie}</Pie>}
       </div>
     )
   }
@@ -103,14 +113,21 @@ export function Panel({
     <section data-kit="panel" aria-labelledby={tituloId} className={clases} {...props}>
       {encabezado}
       {cuerpo}
-      {pie && visible && <Pie>{pie}</Pie>}
+      {pie && visible && <Pie fijo={pieFijo}>{pie}</Pie>}
     </section>
   )
 }
 
-function Pie({ children }: { children: ReactNode }) {
+function Pie({ children, fijo }: { children: ReactNode; fijo: boolean }) {
   return (
-    <div data-panel="pie" className="flex flex-wrap items-center gap-separacion border-t bg-muted/40 px-4 py-3 md:px-5">
+    <div
+      data-panel="pie"
+      className={cn(
+        'flex flex-wrap items-center gap-separacion border-t bg-muted/40 px-4 py-3 md:px-5',
+        // Opaco al pegarse: el contenido pasa por debajo.
+        fijo && 'max-md:sticky max-md:bottom-0 max-md:z-20 max-md:bg-card max-md:pb-[calc(0.75rem+env(safe-area-inset-bottom))]',
+      )}
+    >
       {children}
     </div>
   )

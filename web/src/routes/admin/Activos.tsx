@@ -1,27 +1,11 @@
-import { Archive, ArchiveRestore, CircleAlert, Download, Eye, Loader2, MapPin, MoreHorizontal, Pencil, Plus, RefreshCw, Search, X } from 'lucide-react'
+import { Archive, ArchiveRestore, Download, Eye, MapPin, MoreHorizontal, Pencil, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
-import { EncabezadoPagina } from '@/components/app/ConEstado'
-import { EmptyState } from '@/components/app/EmptyState'
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
 import { LocationPicker } from '@/components/app/LocationPicker'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useIsMobile } from '@/hooks/use-mobile'
+import { Boton, type ColumnaTabla, EncabezadoPagina, Menu, type OpcionMenu, Pestanas, TablaDatos } from '@/components/kit'
 import { type Activo, useBuscarActivos, useExportarActivos } from '@/lib/activos'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { rutaDe, useUbicaciones } from '@/lib/catalogo'
@@ -32,44 +16,70 @@ import { guardarArchivo } from '@/lib/informe'
 // filtro por estado y paginación en el servidor (25 por página). Spec 005, T8: el menú
 // de cada fila abre la ficha con la acción (editar, mover, dar de baja o reactivar) y
 // la lista filtra por ubicación (`?ubicacion=`; llega desde el aviso "tiene activos").
+// Spec 016, T8 (R2, R5): presentación con el kit. Pestañas de estado subrayadas, la
+// TablaDatos con la búsqueda y el filtro de ubicación en su barra, menú ⋯ del kit y, por
+// debajo de md, una tarjeta por activo. El filtro de ubicación sigue siendo el
+// LocationPicker (con buscador): el Filtro del kit no busca y las salas pueden ser muchas
+// (Deuda T3 g). Mismas llamadas, mismos filtros (los aplica el servidor) y mismos textos.
 
 type Pestaña = 'todos' | Activo['estado']
 
+const PESTANAS: { valor: Pestaña; etiqueta: string }[] = [
+  { valor: 'todos', etiqueta: 'Todos' },
+  { valor: 'activo', etiqueta: 'Activos' },
+  { valor: 'en_reparacion', etiqueta: 'En reparación' },
+  { valor: 'dado_de_baja', etiqueta: 'Dados de baja' },
+]
+
 const ficha = (a: Activo) => `/admin/activos/${encodeURIComponent(a.codigo)}`
+
+function opcionesDe(activo: Activo): OpcionMenu[] {
+  const ver: OpcionMenu = { etiqueta: 'Ver ficha', icono: <Eye />, href: ficha(activo) }
+  if (activo.estado === 'dado_de_baja') {
+    return [ver, { etiqueta: 'Reactivar', icono: <ArchiveRestore />, href: `${ficha(activo)}?accion=reactivar` }]
+  }
+  return [
+    ver,
+    { etiqueta: 'Editar', icono: <Pencil />, href: `${ficha(activo)}?accion=editar` },
+    { etiqueta: 'Mover', icono: <MapPin />, href: `${ficha(activo)}?accion=mover` },
+    { etiqueta: 'Dar de baja', icono: <Archive />, href: `${ficha(activo)}?accion=baja`, peligro: true, separadorAntes: true },
+  ]
+}
 
 function AccionesFila({ activo }: { activo: Activo }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="max-md:size-11" aria-label={`Acciones de ${activo.nombre} (${activo.codigo})`}>
-          <MoreHorizontal />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="truncate text-xs font-normal text-muted-foreground">{activo.codigo}</DropdownMenuLabel>
-        <DropdownMenuItem asChild>
-          <Link to={ficha(activo)}><Eye />Ver ficha</Link>
-        </DropdownMenuItem>
-        {activo.estado === 'dado_de_baja' ? (
-          <DropdownMenuItem asChild>
-            <Link to={`${ficha(activo)}?accion=reactivar`}><ArchiveRestore />Reactivar</Link>
-          </DropdownMenuItem>
-        ) : (
-          <>
-            <DropdownMenuItem asChild>
-              <Link to={`${ficha(activo)}?accion=editar`}><Pencil />Editar</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to={`${ficha(activo)}?accion=mover`}><MapPin />Mover</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild variant="destructive">
-              <Link to={`${ficha(activo)}?accion=baja`}><Archive />Dar de baja</Link>
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Menu
+      rotulo={activo.codigo}
+      opciones={opcionesDe(activo)}
+      disparador={
+        <Boton
+          variante="fantasma"
+          soloIcono
+          icono={<MoreHorizontal />}
+          aria-label={`Acciones de ${activo.nombre} (${activo.codigo})`}
+          className="text-muted-foreground hover:text-foreground"
+        />
+      }
+    />
+  )
+}
+
+/** Tarjeta del teléfono: nombre (enlace a la ficha), código · categoría · ubicación, estado y precio. */
+function TarjetaActivo({ activo: a }: { activo: Activo }) {
+  return (
+    <Link
+      to={ficha(a)}
+      className="-m-1 flex min-w-0 flex-col gap-1.5 rounded-lg p-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+    >
+      <span className="text-cuerpo font-medium break-words">{a.nombre}</span>
+      <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-etiqueta font-normal text-muted-foreground">
+        <span className="font-mono text-foreground">{a.codigo}</span>· {a.categoria.nombre} · <span className="min-w-0 break-words">{a.ubicacion.ruta}</span>
+      </span>
+      <span className="flex flex-wrap items-center gap-2">
+        <EstadoActivoBadge estado={a.estado} />
+        {a.precio_compra && <span className="text-cuerpo font-medium tabular-nums">{formatCOP(a.precio_compra)}</span>}
+      </span>
+    </Link>
   )
 }
 
@@ -83,7 +93,6 @@ function useRetrasado(valor: string, ms = 300) {
 }
 
 export default function Activos() {
-  const movil = useIsMobile()
   const [params, setParams] = useSearchParams()
   // Spec 010: el Inicio enlaza a «en reparación» con ?estado=.
   const [pestaña, setPestaña] = useState<Pestaña>(() => {
@@ -119,11 +128,8 @@ export default function Activos() {
   }
 
   // Spec 015, T4 (R2): doble clic o Enter en la fila abre la ficha. Lo que nace en un
-  // enlace, un botón o el menú de acciones (que React propaga desde su portal) no
-  // navega desde aquí: ya tiene su propia acción.
+  // enlace, un botón o el menú de acciones (portal) no la abre: lo resuelve TablaDatos.
   const navigate = useNavigate()
-  const desdeControl = (destino: EventTarget) =>
-    destino instanceof Element && destino.closest('a, button, input, [role="menu"], [role="menuitem"]') !== null
 
   function filtrarUbicacion(id: string) {
     if (id) params.set('ubicacion', id)
@@ -131,210 +137,169 @@ export default function Activos() {
     setParams(params, { replace: true })
     setPagina(1)
   }
+  function limpiar() {
+    setTexto('')
+    setPestaña('todos')
+    filtrarUbicacion('')
+  }
+
   const datos = busqueda.data
   const activos = datos?.activos ?? []
   const desde = datos && datos.total > 0 ? (datos.pagina - 1) * datos.por_pagina + 1 : 0
   const hasta = datos ? desde + activos.length - (activos.length > 0 ? 1 : 0) : 0
   const hayMas = datos ? datos.pagina * datos.por_pagina < datos.total : false
   const filtrando = q !== '' || pestaña !== 'todos' || ubicacion !== ''
+  const rutaFiltro = rutaDe(ubicaciones.data ?? [], ubicacion)
+
+  const columnas: ColumnaTabla<Activo>[] = [
+    { id: 'codigo', encabezado: 'Código', tipo: 'codigo', celda: (a) => a.codigo },
+    {
+      id: 'nombre',
+      encabezado: 'Nombre',
+      principal: true,
+      clase: 'min-w-48 whitespace-normal',
+      celda: (a) => (
+        <Link
+          to={ficha(a)}
+          className="rounded-sm hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+        >
+          {a.nombre}
+        </Link>
+      ),
+    },
+    { id: 'categoria', encabezado: 'Categoría', celda: (a) => a.categoria.nombre },
+    { id: 'ubicacion', encabezado: 'Ubicación', clase: 'min-w-40 whitespace-normal text-muted-foreground', celda: (a) => a.ubicacion.ruta },
+    { id: 'estado', encabezado: 'Estado', celda: (a) => <EstadoActivoBadge estado={a.estado} /> },
+    { id: 'precio', encabezado: 'Precio de compra', tipo: 'cifra', celda: (a) => (a.precio_compra ? formatCOP(a.precio_compra) : '—') },
+  ]
+
+  const filtroUbicacion = ubicacion ? (
+    <Boton
+      variante="secundario"
+      icono={<MapPin />}
+      className="max-w-full border-brand-border bg-brand-soft hover:bg-brand-soft/70"
+      onClick={() => filtrarUbicacion('')}
+      aria-label={`Quitar el filtro de ubicación ${rutaFiltro}`}
+    >
+      <span className="truncate">{rutaFiltro || 'Ubicación'}</span>
+      <X aria-hidden="true" className="size-4 text-muted-foreground" />
+    </Boton>
+  ) : (
+    <div className="w-full md:w-60">
+      <LocationPicker
+        id="filtro-ubicacion"
+        ubicaciones={ubicaciones.data ?? []}
+        cargando={ubicaciones.isPending}
+        onChange={filtrarUbicacion}
+        etiqueta="Todas las ubicaciones"
+        nombre="Filtrar por ubicación"
+        className="h-control bg-card md:h-control"
+      />
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-6">
       <EncabezadoPagina
         titulo="Activos"
         descripcion={datos ? `${formatEntero(datos.total)} ${filtrando ? 'encontrados' : 'registrados'} · una fila por unidad física` : 'Una fila por unidad física'}
+        claseAcciones="max-sm:w-full max-sm:[&>*]:flex-1"
         acciones={
           <>
-            <Button variant="outline" disabled={exportar.isPending} aria-busy={exportar.isPending} onClick={exportarLista}>
-              {exportar.isPending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Download aria-hidden="true" />}
-              {exportar.isPending ? 'Exportando…' : 'Exportar'}
-            </Button>
-            <Button asChild>
+            <Boton variante="secundario" icono={<Download />} cargando={exportar.isPending} textoCargando="Exportando…" onClick={exportarLista}>
+              Exportar
+            </Boton>
+            <Boton asChild>
               <Link to="/admin/activos/nuevo">
-                <Plus />
+                <Plus aria-hidden="true" />
                 Registrar activo
               </Link>
-            </Button>
+            </Boton>
           </>
         }
       />
-      <Tabs
-        value={pestaña}
-        onValueChange={(v) => {
+      <Pestanas
+        etiqueta="Filtrar por estado"
+        pestanas={PESTANAS}
+        valor={pestaña}
+        onValorChange={(v) => {
           setPestaña(v as Pestaña)
           setPagina(1)
         }}
-        className="gap-0"
+        className="gap-4"
       >
-        <section className="min-w-0 rounded-xl border" aria-label="Lista de activos">
-          <div className="flex flex-col gap-3 border-b p-3 md:flex-row md:flex-wrap md:items-center md:justify-between">
-            <TabsList className="max-w-full overflow-x-auto">
-              <TabsTrigger value="todos">Todos</TabsTrigger>
-              <TabsTrigger value="activo">Activos</TabsTrigger>
-              <TabsTrigger value="en_reparacion">En reparación</TabsTrigger>
-              <TabsTrigger value="dado_de_baja">Dados de baja</TabsTrigger>
-            </TabsList>
-            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-            {ubicacion ? (
-              <Button variant="outline" className="max-w-full justify-between max-md:h-11" onClick={() => filtrarUbicacion('')} aria-label={`Quitar el filtro de ubicación ${rutaDe(ubicaciones.data ?? [], ubicacion)}`}>
-                <MapPin />
-                <span className="truncate">{rutaDe(ubicaciones.data ?? [], ubicacion) || 'Ubicación'}</span>
-                <X />
-              </Button>
-            ) : (
-              <div className="sm:w-56">
-                <LocationPicker
-                  id="filtro-ubicacion"
-                  ubicaciones={ubicaciones.data ?? []}
-                  cargando={ubicaciones.isPending}
-                  onChange={filtrarUbicacion}
-                  etiqueta="Todas las ubicaciones"
-                  nombre="Filtrar por ubicación"
-                />
-              </div>
-            )}
-            <div className="relative min-w-0 sm:w-72">
-              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              <Input
-                type="search"
-                aria-label="Buscar activos"
-                placeholder="Código, nombre o serial"
-                value={texto}
-                maxLength={120}
-                onChange={(e) => {
-                  setTexto(e.target.value)
-                  setPagina(1)
-                }}
-                className="pl-8 max-md:h-11"
-              />
-            </div>
-            </div>
-          </div>
-
-          <TabsContent value={pestaña} className="min-w-0">
-            {busqueda.isPending ? (
-              <div role="status" aria-label="Cargando activos" className="flex flex-col gap-2 p-4">
-                {Array.from({ length: 6 }, (_, i) => (
-                  <Skeleton key={i} className="h-10" />
-                ))}
-              </div>
-            ) : busqueda.isError ? (
-              <div className="p-4">
-                <Alert variant="destructive" className="items-start">
-                  <CircleAlert />
-                  <AlertTitle>No se pudieron cargar los activos</AlertTitle>
-                  <AlertDescription className="flex flex-col items-start gap-3">
-                    {mensajeDeError(busqueda.error)}
-                    <Button variant="outline" size="sm" className="max-md:min-h-11" onClick={() => void busqueda.refetch()}>
-                      <RefreshCw />
-                      Reintentar
-                    </Button>
-                  </AlertDescription>
-                </Alert>
-              </div>
-            ) : activos.length === 0 ? (
-              <div className="p-4">
-                {filtrando ? (
-                  <EmptyState
-                    titulo="Nada coincide"
-                    descripcion="Prueba con otro código, nombre, serial, estado o ubicación."
-                    accion={<Button variant="outline" onClick={() => { setTexto(''); setPestaña('todos'); filtrarUbicacion('') }}>Limpiar filtros</Button>}
-                  />
-                ) : (
-                  <EmptyState
-                    titulo="Aún no hay activos"
-                    descripcion="Escanea un sticker para crear el primero."
-                    accion={
-                      <>
-                        <Button asChild>
-                          <Link to="/admin/activos/nuevo">Registrar activo</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                          <Link to="/contar/escanear">Ir a escanear</Link>
-                        </Button>
-                      </>
-                    }
-                  />
-                )}
-              </div>
-            ) : movil ? (
-              <ul className="divide-y">
-                {activos.map((a) => (
-                  <li key={a.id} className="flex items-start gap-2 p-3">
-                    <Link to={ficha(a)} className="flex min-w-0 flex-1 flex-col gap-1.5">
-                      <span className="font-medium break-words">{a.nombre}</span>
-                      <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                        <span className="font-mono text-foreground">{a.codigo}</span>· {a.categoria.nombre} · <span className="truncate">{a.ubicacion.ruta}</span>
-                      </span>
-                      <span className="flex flex-wrap items-center gap-2">
-                        <EstadoActivoBadge estado={a.estado} />
-                        {a.precio_compra && <span className="text-sm font-medium tabular-nums">{formatCOP(a.precio_compra)}</span>}
-                      </span>
-                    </Link>
-                    <AccionesFila activo={a} />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="pl-4">Código</TableHead>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Categoría</TableHead>
-                      <TableHead>Ubicación</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead className="text-right">Precio de compra</TableHead>
-                      <TableHead className="w-12 pr-4"><span className="sr-only">Acciones</span></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {activos.map((a) => (
-                      <TableRow
-                        key={a.id}
-                        tabIndex={0}
-                        className="cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-                        onDoubleClick={(e) => {
-                          if (!desdeControl(e.target)) void navigate(ficha(a))
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && e.target === e.currentTarget) void navigate(ficha(a))
-                        }}
-                      >
-                        <TableCell className="pl-4 font-mono">{a.codigo}</TableCell>
-                        <TableCell className="min-w-48 whitespace-normal">
-                          <Link to={ficha(a)} className="font-medium hover:underline">{a.nombre}</Link>
-                        </TableCell>
-                        <TableCell>{a.categoria.nombre}</TableCell>
-                        <TableCell className="min-w-40 whitespace-normal text-muted-foreground">{a.ubicacion.ruta}</TableCell>
-                        <TableCell><EstadoActivoBadge estado={a.estado} /></TableCell>
-                        <TableCell className="text-right tabular-nums">{a.precio_compra ? formatCOP(a.precio_compra) : '—'}</TableCell>
-                        <TableCell className="pr-4"><AccionesFila activo={a} /></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </TabsContent>
-          {datos && datos.total > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm">
-              <span className="text-muted-foreground tabular-nums">
-                {formatEntero(desde)}–{formatEntero(hasta)} de {formatEntero(datos.total)}
-              </span>
-              <div className="flex gap-2 [&_[data-slot=button]]:max-md:min-h-11">
-                <Button variant="outline" size="sm" disabled={pagina <= 1 || busqueda.isFetching} onClick={() => setPagina((p) => p - 1)}>
-                  ‹ Anterior
-                </Button>
-                <Button variant="outline" size="sm" disabled={!hayMas || busqueda.isFetching} onClick={() => setPagina((p) => p + 1)}>
-                  Siguiente ›
-                </Button>
-              </div>
-            </div>
-          )}
-        </section>
-      </Tabs>
+        <TablaDatos<Activo>
+          etiqueta="Activos"
+          columnas={columnas}
+          filas={busqueda.isPending || busqueda.isError ? undefined : activos}
+          claveFila={(a) => a.id}
+          cargando={busqueda.isPending}
+          error={
+            busqueda.isError
+              ? { titulo: 'No se pudieron cargar los activos', descripcion: mensajeDeError(busqueda.error), onReintentar: () => void busqueda.refetch(), reintentando: busqueda.isFetching }
+              : null
+          }
+          vacio={
+            filtrando
+              ? {
+                  titulo: 'Nada coincide',
+                  descripcion: 'Prueba con otro código, nombre, serial, estado o ubicación.',
+                  accion: (
+                    <Boton variante="secundario" onClick={limpiar}>
+                      Limpiar filtros
+                    </Boton>
+                  ),
+                }
+              : {
+                  titulo: 'Aún no hay activos',
+                  descripcion: 'Escanea un sticker para crear el primero.',
+                  accion: (
+                    <>
+                      <Boton asChild>
+                        <Link to="/admin/activos/nuevo">Registrar activo</Link>
+                      </Boton>
+                      <Boton asChild variante="secundario">
+                        <Link to="/contar/escanear">Ir a escanear</Link>
+                      </Boton>
+                    </>
+                  ),
+                }
+          }
+          onAbrirFila={(a) => void navigate(ficha(a))}
+          accionesFila={(a) => <AccionesFila activo={a} />}
+          tarjeta={(a) => <TarjetaActivo activo={a} />}
+          barra={{
+            busqueda: {
+              valor: texto,
+              onCambio: (v) => {
+                setTexto(v)
+                setPagina(1)
+              },
+              etiqueta: 'Buscar activos',
+              placeholder: 'Código, nombre o serial',
+              maxLength: 120,
+            },
+            filtros: filtroUbicacion,
+            // Sin resultados, «Limpiar filtros» ya está en el vacío: no se repite.
+            hayFiltros: filtrando && activos.length > 0,
+            onLimpiar: limpiar,
+          }}
+          paginacion={
+            datos
+              ? {
+                  desde,
+                  hasta,
+                  total: datos.total,
+                  hayAnterior: pagina > 1,
+                  haySiguiente: hayMas,
+                  onAnterior: () => setPagina((p) => p - 1),
+                  onSiguiente: () => setPagina((p) => p + 1),
+                  ocupado: busqueda.isFetching,
+                }
+              : undefined
+          }
+        />
+      </Pestanas>
     </div>
   )
 }

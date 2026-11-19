@@ -54,6 +54,22 @@ describe('ListaDatos', () => {
     expect(document.querySelector('[data-kit=lista-datos]')?.getAttribute('data-disposicion')).toBe('columnas')
   })
 
+  // Spec 016, T8 (Deuda T3 b): `valor: false` (p. ej. `precio && formatCOP(precio)`) es un
+  // dato ausente, igual que null: ni rótulo ni un <dd> vacío.
+  it('valor false se trata como ausente: no deja un dd vacío', () => {
+    const precio = ''
+    const { container } = render(
+      <ListaDatos
+        datos={[
+          { rotulo: 'Código', valor: '000457', tipo: 'codigo' },
+          { rotulo: 'Precio de compra', valor: Boolean(precio) && precio, tipo: 'cifra' },
+        ]}
+      />,
+    )
+    expect(Array.from(container.querySelectorAll('dt')).map((dt) => dt.textContent)).toEqual(['Código'])
+    expect(Array.from(container.querySelectorAll('dd')).every((dd) => dd.textContent !== '')).toBe(true)
+  })
+
   it('sin datos no pinta una lista vacía', () => {
     const { container } = render(<ListaDatos datos={[null, false]} />)
     expect(container.querySelector('dl')).toBeNull()

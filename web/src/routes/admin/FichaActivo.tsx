@@ -1,48 +1,13 @@
-import {
-  Archive,
-  ArchiveRestore,
-  CircleAlert,
-  Ellipsis,
-  Lock,
-  type LucideIcon,
-  MapPin,
-  Pencil,
-  ReceiptText,
-  RefreshCw,
-  SearchX,
-  Tag,
-  Wrench,
-} from 'lucide-react'
-import { type ReactNode, type RefObject, useEffect, useId, useRef, useState } from 'react'
+import { Archive, ArchiveRestore, Ellipsis, Lock, type LucideIcon, MapPin, Pencil, ReceiptText, Tag, Wrench } from 'lucide-react'
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
 import { DarDeBaja, MoverActivo, Reactivar } from '@/components/app/AccionesActivo'
-import { FotoActivo } from '@/components/app/FotoActivo'
 import { EditarActivo } from '@/components/app/EditarActivo'
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
+import { FotoActivo } from '@/components/app/FotoActivo'
 import { HistorialActivo } from '@/components/app/LineaDeTiempo'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Aviso, Boton, Confirmar, EncabezadoPagina, Esqueleto, Estado, Insignia, ListaDatos, Menu, Panel } from '@/components/kit'
 import { type Activo, normalizarCodigo, useActivoPorCodigo } from '@/lib/activos'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { etiquetaMotivo, useAlternarReparacion, useHistorial } from '@/lib/cambiosActivo'
@@ -54,46 +19,58 @@ import { formatCOP } from '@/lib/format'
 // Spec 015 (T7, R13; maqueta A aprobada): encabezado con «Editar» (principal), «Mover» y
 // «Más» (enviar a reparación y dar de baja); en escritorio, foto y datos en tarjetas a la
 // izquierda e historial fijo a la derecha; en el teléfono, una columna.
+// Spec 016, T8 (R2, R11; D13): presentación con el kit. Paneles con ListaDatos, el menú
+// «Más» y la confirmación de reparación del kit, y la foto en una caja de tamaño prudente
+// (320 × 240 px; 200 px de alto en el teléfono) que se amplía al tocarla. Cada diálogo
+// devuelve el foco a un botón que sigue existiendo: «Mover» a «Mover»; «Dar de baja» a
+// «Reactivar» si se dio de baja (si no, a «Más»); «Reactivar» a «Editar» si se reactivó
+// (si no, a «Reactivar»).
 
 type Accion = 'editar' | 'mover' | 'baja' | 'reactivar'
 const ACCIONES: Accion[] = ['editar', 'mover', 'baja', 'reactivar']
 
-function AvisoDeBaja({ activo, onReactivar }: { activo: Activo; onReactivar: () => void }) {
+/** Al cerrar un diálogo, el foco va al primero de los botones que siga en pantalla. */
+function devolverFoco(evento: Event, ...destinos: (HTMLElement | null)[]) {
+  const destino = destinos.find((d) => d?.isConnected)
+  if (!destino) return
+  evento.preventDefault()
+  destino.focus()
+}
+
+function AvisoDeBaja({ activo, onReactivar, reactivarRef }: { activo: Activo; onReactivar: () => void; reactivarRef: RefObject<HTMLButtonElement | null> }) {
   const historial = useHistorial(activo.id)
   const baja = historial.data?.pages[0]?.eventos.find((e) => e.tipo === 'dado_de_baja')
   const { motivo, nota } = (baja?.datos ?? {}) as { motivo?: string; nota?: string }
   return (
-    <Alert variant="warning">
-      <Archive />
-      <AlertTitle>Dado de baja{motivo ? `: ${etiquetaMotivo(motivo).toLowerCase()}` : ''}</AlertTitle>
-      <AlertDescription className="flex flex-col items-start gap-3 text-foreground">
+    <Aviso
+      tono="aviso"
+      icono={<Archive aria-hidden="true" />}
+      titulo={`Dado de baja${motivo ? `: ${etiquetaMotivo(motivo).toLowerCase()}` : ''}`}
+      accion={
+        <Boton ref={reactivarRef} variante="secundario" icono={<ArchiveRestore />} onClick={onReactivar}>
+          Reactivar
+        </Boton>
+      }
+    >
+      <div className="flex flex-col gap-1">
         {nota && <span>«{nota}»</span>}
         <span>No cuenta en el valor del inventario y no se puede editar ni verificar.</span>
-        <Button size="sm" variant="outline" className="max-md:min-h-11" onClick={onReactivar}>
-          <ArchiveRestore />
-          Reactivar
-        </Button>
-      </AlertDescription>
-    </Alert>
+      </div>
+    </Aviso>
   )
-}
-
-/** Al cerrar un diálogo sin disparador de Radix, el foco vuelve al botón que lo abrió. */
-function devolverFoco(evento: Event, boton: HTMLButtonElement | null) {
-  if (!boton) return
-  evento.preventDefault()
-  boton.focus()
 }
 
 function Acciones({
   activo,
   abrir,
   editarRef,
+  moverRef,
   masRef,
 }: {
   activo: Activo
   abrir: (a: Accion) => void
   editarRef: RefObject<HTMLButtonElement | null>
+  moverRef: RefObject<HTMLButtonElement | null>
   masRef: RefObject<HTMLButtonElement | null>
 }) {
   const reparacion = useAlternarReparacion(activo)
@@ -110,103 +87,71 @@ function Acciones({
     ;(enReparacion ? volverRef.current : masRef.current)?.focus()
   }, [reparacion.guardando, enReparacion, masRef])
   return (
-    <div className="flex flex-wrap gap-2 [&_[data-slot=button]]:max-md:min-h-11">
-      <Button ref={editarRef} onClick={() => abrir('editar')}>
-        <Pencil />
+    <>
+      <Boton ref={editarRef} icono={<Pencil />} onClick={() => abrir('editar')}>
         Editar
-      </Button>
-      <Button variant="outline" onClick={() => abrir('mover')}>
-        <MapPin />
+      </Boton>
+      <Boton ref={moverRef} variante="secundario" icono={<MapPin />} onClick={() => abrir('mover')}>
         Mover
-      </Button>
+      </Boton>
       {/* «Volver a activo» no se confirma (015-T2) y queda a la vista mientras está en reparación. */}
       {enReparacion && (
-        <Button
+        <Boton
           ref={volverRef}
-          variant="outline"
+          variante="secundario"
+          icono={<Wrench />}
           disabled={reparacion.guardando}
           onClick={() => {
             enfocarAlTerminar.current = true
             reparacion.alternar()
           }}
         >
-          <Wrench />
           {reparacion.etiqueta}
-        </Button>
+        </Boton>
       )}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button ref={masRef} variant="outline" aria-label="Más acciones" className="max-md:min-h-11">
-            <Ellipsis />
+      <Menu
+        rotulo="Más acciones"
+        disparador={
+          <Boton ref={masRef} variante="secundario" icono={<Ellipsis />} aria-label="Más acciones">
             Más
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56 [&_[role=menuitem]]:max-md:min-h-11">
-          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Más acciones</DropdownMenuLabel>
-          {reparacion.requiereConfirmacion && (
-            <>
-              <DropdownMenuItem disabled={reparacion.guardando} onSelect={() => setConfirmando(true)}>
-                <Wrench />
-                Enviar a reparación…
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
-          <DropdownMenuItem variant="destructive" onSelect={() => abrir('baja')}>
-            <Archive />
-            Dar de baja…
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {/* Spec 015 (T2, Q5 A): solo el envío a reparación se confirma. */}
-      <AlertDialog open={confirmando} onOpenChange={setConfirmando}>
-        {/* Si el servidor responde antes de que termine la animación de cierre, ya existe
-            «Volver a activo» y el foco va ahí; si no, espera en «Más» (el efecto lo mueve). */}
-        <AlertDialogContent onCloseAutoFocus={(evento) => devolverFoco(evento, (enReparacion ? volverRef : masRef).current)}>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Enviar a reparación?</AlertDialogTitle>
-            <AlertDialogDescription>
-              «{activo.nombre}» quedará en reparación. Sigue contando en el inventario y lo puedes volver a activo cuando regrese.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="[&_button]:max-md:min-h-11">
-            <AlertDialogCancel>No</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                enfocarAlTerminar.current = true
-                reparacion.alternar()
-              }}
-            >Sí, enviar a reparación</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+          </Boton>
+        }
+        opciones={[
+          ...(reparacion.requiereConfirmacion
+            ? [{ etiqueta: 'Enviar a reparación…', icono: <Wrench />, deshabilitada: reparacion.guardando, alElegir: () => setConfirmando(true) }]
+            : []),
+          { etiqueta: 'Dar de baja…', icono: <Archive />, peligro: true, separadorAntes: reparacion.requiereConfirmacion, alElegir: () => abrir('baja') },
+        ]}
+      />
+      {/* Spec 015 (T2, Q5 A): solo el envío a reparación se confirma. Se cierra al elegir
+          «Sí» (no espera al servidor): si responde antes de que termine el cierre, ya existe
+          «Volver a activo» y el foco va ahí; si no, espera en «Más» (el efecto lo mueve). */}
+      <Confirmar
+        abierto={confirmando}
+        onAbiertoChange={setConfirmando}
+        titulo="¿Enviar a reparación?"
+        descripcion={`«${activo.nombre}» quedará en reparación. Sigue contando en el inventario y lo puedes volver a activo cuando regrese.`}
+        textoCancelar="No"
+        textoConfirmar="Sí, enviar a reparación"
+        onConfirmar={() => {
+          enfocarAlTerminar.current = true
+          reparacion.alternar()
+        }}
+        onCloseAutoFocus={(evento) => devolverFoco(evento, enReparacion ? volverRef.current : masRef.current)}
+      />
+    </>
   )
 }
 
 const fecha = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' })
 
-function Dato({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
+/** Título de un panel con su ícono (el ícono no cambia el nombre de la región). */
+function Titulo({ icono: Icono, children }: { icono: LucideIcon; children: ReactNode }) {
   return (
-    <div className="flex min-h-11 items-baseline justify-between gap-4 py-2.5">
-      <dt className="shrink-0 text-sm text-muted-foreground">{etiqueta}</dt>
-      <dd className="min-w-0 text-right font-medium break-words">{children ?? '—'}</dd>
-    </div>
-  )
-}
-
-/** Grupo de datos con título (Identificación, Ubicación, Compra). */
-function Tarjeta({ titulo, icono: Icono, children, pie }: { titulo: string; icono: LucideIcon; children: ReactNode; pie?: ReactNode }) {
-  const id = useId()
-  return (
-    <section aria-labelledby={id} className="flex flex-col rounded-xl border bg-card px-4 pt-4 pb-2">
-      <h2 id={id} className="flex items-center gap-2 text-sm font-semibold">
-        <Icono className="size-4 text-muted-foreground" aria-hidden="true" />
-        {titulo}
-      </h2>
-      <dl className="mt-1 divide-y">{children}</dl>
-      {pie}
-    </section>
+    <span className="flex items-center gap-2">
+      <Icono className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      {children}
+    </span>
   )
 }
 
@@ -217,7 +162,9 @@ export default function FichaActivo() {
   const [params, setParams] = useSearchParams()
   const [accion, setAccion] = useState<Accion | null>(() => ACCIONES.find((a) => a === params.get('accion')) ?? null)
   const editarRef = useRef<HTMLButtonElement>(null)
+  const moverRef = useRef<HTMLButtonElement>(null)
   const masRef = useRef<HTMLButtonElement>(null)
+  const reactivarRef = useRef<HTMLButtonElement>(null)
 
   function abrir(nueva: Accion | null) {
     setAccion(nueva)
@@ -229,42 +176,38 @@ export default function FichaActivo() {
 
   if (consulta.isPending) {
     return (
-      <div role="status" aria-label="Cargando el activo" className="flex flex-col gap-3">
-        <Skeleton className="h-8 w-2/3" />
-        <Skeleton className="h-64 rounded-xl" />
-      </div>
+      <Estado.Cargando etiqueta="Cargando el activo">
+        <Esqueleto className="h-8 w-2/3 rounded-lg" />
+        <Esqueleto className="h-64 rounded-xl" />
+      </Estado.Cargando>
     )
   }
   if (consulta.isError) {
     return (
-      <Alert variant="destructive" className="items-start">
-        <CircleAlert />
-        <AlertTitle>No se pudo cargar el activo</AlertTitle>
-        <AlertDescription className="flex flex-col items-start gap-3">
-          {mensajeDeError(consulta.error)}
-          <Button variant="outline" size="sm" className="max-md:min-h-11" onClick={() => void consulta.refetch()}>
-            <RefreshCw />
-            Reintentar
-          </Button>
-        </AlertDescription>
-      </Alert>
+      <Estado.Error
+        titulo="No se pudo cargar el activo"
+        descripcion={mensajeDeError(consulta.error)}
+        onReintentar={() => void consulta.refetch()}
+        reintentando={consulta.isFetching}
+      />
     )
   }
   const activo = consulta.data
   if (!activo) {
     return (
-      <div className="flex flex-col items-start gap-3">
-        <span className="flex size-10 items-center justify-center rounded-lg bg-muted" aria-hidden="true">
-          <SearchX className="size-5" />
-        </span>
-        <h1 className="text-2xl font-semibold tracking-tight">No encontramos ese código</h1>
-        <p className="text-sm text-muted-foreground">
-          El código <span className="font-mono">{codigo}</span> no existe en esta clínica.
-        </p>
-        <Button asChild variant="outline">
-          <Link to="/admin/activos">Ver activos</Link>
-        </Button>
-      </div>
+      <EncabezadoPagina
+        titulo="No encontramos ese código"
+        descripcion={
+          <>
+            El código <span className="font-mono">{codigo}</span> no existe en esta clínica.
+          </>
+        }
+        acciones={
+          <Boton asChild variante="secundario">
+            <Link to="/admin/activos">Ver activos</Link>
+          </Boton>
+        }
+      />
     )
   }
 
@@ -272,78 +215,110 @@ export default function FichaActivo() {
 
   return (
     <div className="flex w-full max-w-6xl flex-col gap-6">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight break-words">{activo.nombre}</h1>
-          <p className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="rounded bg-muted px-2 py-0.5 font-mono">{activo.codigo}</span>
-            <Badge variant="outline">{activo.categoria.nombre}</Badge>
-            <EstadoActivoBadge estado={activo.estado} />
-          </p>
-          <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
-            <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <span className="min-w-0 break-words">
-              <span className="sr-only">Ubicación: </span>
-              {activo.ubicacion.ruta}
+      <header>
+        <EncabezadoPagina
+          titulo={activo.nombre}
+          insignia={<EstadoActivoBadge estado={activo.estado} />}
+          descripcion={
+            <span className="flex flex-col gap-1.5">
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md border bg-card px-2 py-0.5 font-mono text-codigo text-foreground">{activo.codigo}</span>
+                <Insignia tono="neutro">{activo.categoria.nombre}</Insignia>
+              </span>
+              <span className="flex items-start gap-1.5 text-etiqueta font-normal">
+                <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 break-words">
+                  <span className="sr-only">Ubicación: </span>
+                  {activo.ubicacion.ruta}
+                </span>
+              </span>
             </span>
-          </p>
-        </div>
-        {!deBaja && <Acciones activo={activo} abrir={abrir} editarRef={editarRef} masRef={masRef} />}
+          }
+          claseAcciones="max-sm:w-full max-sm:[&>[data-slot=button]]:flex-1"
+          acciones={!deBaja && <Acciones activo={activo} abrir={abrir} editarRef={editarRef} moverRef={moverRef} masRef={masRef} />}
+        />
       </header>
-      {deBaja && <AvisoDeBaja activo={activo} onReactivar={() => abrir('reactivar')} />}
+      {deBaja && <AvisoDeBaja activo={activo} onReactivar={() => abrir('reactivar')} reactivarRef={reactivarRef} />}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
         <div className="@container flex min-w-0 flex-col gap-6">
           <FotoActivo activo={activo} editable={!deBaja} grande />
           <div className="grid gap-6 @2xl:grid-cols-2 @2xl:items-start">
-            <Tarjeta titulo="Identificación" icono={Tag}>
-              <Dato etiqueta="Código">
-                <span className="font-mono">{activo.codigo}</span>
-              </Dato>
-              <Dato etiqueta="Serial">{activo.serial && <span className="font-mono">{activo.serial}</span>}</Dato>
-              <Dato etiqueta="Categoría">{activo.categoria.nombre}</Dato>
-              <Dato etiqueta="Subtipo">{activo.subtipo}</Dato>
-              <Dato etiqueta="Marca">{activo.marca}</Dato>
-              <Dato etiqueta="Modelo">{activo.modelo}</Dato>
-            </Tarjeta>
-            <div className="flex flex-col gap-6">
-              <Tarjeta titulo="Ubicación" icono={MapPin}>
-                <Dato etiqueta="Sala o box">{activo.ubicacion.ruta}</Dato>
-              </Tarjeta>
-              <Tarjeta
-                titulo="Compra"
-                icono={ReceiptText}
+            <Panel titulo={<Titulo icono={Tag}>Identificación</Titulo>}>
+              <ListaDatos
+                className="-my-2"
+                datos={[
+                  { rotulo: 'Código', valor: activo.codigo, tipo: 'codigo' },
+                  { rotulo: 'Serial', valor: activo.serial ?? '', tipo: 'codigo', siVacio: '—' },
+                  { rotulo: 'Categoría', valor: activo.categoria.nombre },
+                  { rotulo: 'Subtipo', valor: activo.subtipo ?? '', siVacio: '—' },
+                  { rotulo: 'Marca', valor: activo.marca ?? '', siVacio: '—' },
+                  { rotulo: 'Modelo', valor: activo.modelo ?? '', siVacio: '—' },
+                ]}
+              />
+            </Panel>
+            <div className="flex min-w-0 flex-col gap-6">
+              <Panel titulo={<Titulo icono={MapPin}>Ubicación</Titulo>}>
+                <ListaDatos className="-my-2" datos={[{ rotulo: 'Sala o box', valor: activo.ubicacion.ruta }]} />
+              </Panel>
+              <Panel
+                titulo={<Titulo icono={ReceiptText}>Compra</Titulo>}
                 pie={
                   activo.precio_compra !== undefined && (
-                    <p className="flex items-center gap-1.5 pb-2 text-xs text-muted-foreground">
-                      <Lock className="size-3.5" aria-hidden="true" />
+                    <p className="flex items-center gap-1.5 text-etiqueta font-normal text-muted-foreground">
+                      <Lock className="size-3.5 shrink-0" aria-hidden="true" />
                       El precio solo lo ven los administradores.
                     </p>
                   )
                 }
               >
-                <Dato etiqueta="Precio de compra">{activo.precio_compra ? formatCOP(activo.precio_compra) : null}</Dato>
-                <Dato etiqueta="Fecha de compra">{activo.fecha_compra ? fecha.format(new Date(`${activo.fecha_compra}T12:00:00`)) : null}</Dato>
-                <Dato etiqueta="Registrado">{fecha.format(new Date(activo.creado_en))}</Dato>
-              </Tarjeta>
+                <ListaDatos
+                  className="-my-2"
+                  datos={[
+                    // El precio solo llega para el admin (lo decide el servidor): sin él no hay rótulo ni hueco (P13).
+                    activo.precio_compra !== undefined && {
+                      rotulo: 'Precio de compra',
+                      valor: activo.precio_compra ? formatCOP(activo.precio_compra) : '',
+                      tipo: 'cifra',
+                      siVacio: '—',
+                    },
+                    { rotulo: 'Fecha de compra', valor: activo.fecha_compra ? fecha.format(new Date(`${activo.fecha_compra}T12:00:00`)) : '', siVacio: '—' },
+                    { rotulo: 'Registrado', valor: fecha.format(new Date(activo.creado_en)) },
+                  ]}
+                />
+              </Panel>
             </div>
           </div>
         </div>
-        <section aria-labelledby="titulo-historial" className="flex flex-col gap-4 rounded-xl border bg-card p-4 xl:sticky xl:top-4">
-          <h2 id="titulo-historial" className="text-lg font-semibold">
-            Historial
-          </h2>
-          <HistorialActivo activoId={activo.id} />
-        </section>
+        {/* El título va junto al contenido (no en el encabezado del Panel): el historial y
+            su título comparten contenedor, como antes (lo usa la prueba del historial). */}
+        <Panel role="region" aria-labelledby="titulo-historial" className="xl:sticky xl:top-4">
+          <div className="flex flex-col gap-3">
+            <h2 id="titulo-historial" className="text-titulo-seccion">
+              Historial
+            </h2>
+            <HistorialActivo activoId={activo.id} />
+          </div>
+        </Panel>
       </div>
-      <EditarActivo activo={activo} abierto={accion === 'editar' && !deBaja} onAbierto={(v) => abrir(v ? 'editar' : null)} onCloseAutoFocus={(evento) => devolverFoco(evento, editarRef.current)} />
-      <MoverActivo activo={activo} abierto={accion === 'mover' && !deBaja} onAbierto={(v) => abrir(v ? 'mover' : null)} />
+      <EditarActivo activo={activo} abierto={accion === 'editar' && !deBaja} onAbierto={(v) => abrir(v ? 'editar' : null)} devolverFocoA={editarRef} />
+      <MoverActivo
+        activo={activo}
+        abierto={accion === 'mover' && !deBaja}
+        onAbierto={(v) => abrir(v ? 'mover' : null)}
+        onCloseAutoFocus={(evento) => devolverFoco(evento, moverRef.current, reactivarRef.current)}
+      />
       <DarDeBaja
         activo={activo}
         abierto={accion === 'baja' && !deBaja}
         onAbierto={(v) => abrir(v ? 'baja' : null)}
-        onCloseAutoFocus={(evento) => devolverFoco(evento, masRef.current)}
+        onCloseAutoFocus={(evento) => devolverFoco(evento, reactivarRef.current, masRef.current)}
       />
-      <Reactivar activo={activo} abierto={accion === 'reactivar' && deBaja} onAbierto={(v) => abrir(v ? 'reactivar' : null)} />
+      <Reactivar
+        activo={activo}
+        abierto={accion === 'reactivar' && deBaja}
+        onAbierto={(v) => abrir(v ? 'reactivar' : null)}
+        onCloseAutoFocus={(evento) => devolverFoco(evento, editarRef.current, reactivarRef.current)}
+      />
     </div>
   )
 }

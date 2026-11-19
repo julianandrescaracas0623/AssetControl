@@ -1,13 +1,8 @@
-import { Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
-import { Campo, Obligatorio } from '@/components/app/CampoFormulario'
 import { LocationPicker } from '@/components/app/LocationPicker'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Boton, Campo, Dialogo, MarcoCampo } from '@/components/kit'
 import type { Activo } from '@/lib/activos'
 import { ErrorApi } from '@/lib/api/cliente'
 import {
@@ -25,19 +20,19 @@ import { useUbicaciones } from '@/lib/catalogo'
 // Acciones del ciclo de vida desde la ficha (spec 005, T6; CU-CAT-06..08, Q1, Q2).
 // Cada una va con la versión que muestra la ficha; si otra persona cambió el activo
 // (412), la ficha ya muestra el vigente y se pide revisar antes de repetir.
+// Spec 016, T8: Dialogo y Campo del kit (centrado en computador, hoja inferior en el
+// teléfono, controles de 48 px). Al cerrar, el foco vuelve a donde diga la ficha
+// (`onCloseAutoFocus`) o a quien lo tenía al abrir. Mismos textos, mismas llamadas.
 
-function Guardando({ activo, texto }: { activo: boolean; texto: string }) {
-  return activo ? (
-    <>
-      <Loader2 className="animate-spin" aria-hidden="true" />
-      Guardando…
-    </>
-  ) : (
-    texto
-  )
+type PropsDialogo = {
+  activo: Activo
+  abierto: boolean
+  onAbierto: (v: boolean) => void
+  /** La ficha decide a qué botón vuelve el foco al cerrar (el que sigue en pantalla). */
+  onCloseAutoFocus?: (evento: Event) => void
 }
 
-export function MoverActivo({ activo, abierto, onAbierto }: { activo: Activo; abierto: boolean; onAbierto: (v: boolean) => void }) {
+export function MoverActivo({ activo, abierto, onAbierto, onCloseAutoFocus }: PropsDialogo) {
   const ubicaciones = useUbicaciones()
   const mover = useMoverActivo()
   const [destino, setDestino] = useState('')
@@ -58,41 +53,41 @@ export function MoverActivo({ activo, abierto, onAbierto }: { activo: Activo; ab
   }
 
   return (
-    <Dialog
-      open={abierto}
-      onOpenChange={(v) => {
+    <Dialogo
+      abierto={abierto}
+      onAbiertoChange={(v) => {
         setDestino('')
         setError(undefined)
         onAbierto(v)
       }}
-    >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Mover activo</DialogTitle>
-          <DialogDescription>Ahora está en {activo.ubicacion.ruta}. Queda en el historial.</DialogDescription>
-        </DialogHeader>
-        <Campo id="destino" etiqueta={<>Nueva ubicación <Obligatorio /></>} error={error} ayuda="Una sala o un box activos.">
-          <LocationPicker
-            id="destino"
-            ubicaciones={(ubicaciones.data ?? []).filter((u) => u.id !== activo.ubicacion.id)}
-            cargando={ubicaciones.isPending}
-            valor={destino || undefined}
-            onChange={(v) => {
-              setDestino(v)
-              setError(undefined)
-            }}
-          />
-        </Campo>
-        <DialogFooter className="[&_[data-slot=button]]:max-md:min-h-11">
-          <Button variant="ghost" onClick={() => onAbierto(false)}>
+      onCloseAutoFocus={onCloseAutoFocus}
+      titulo="Mover activo"
+      descripcion={`Ahora está en ${activo.ubicacion.ruta}. Queda en el historial.`}
+      pie={
+        <>
+          <Boton variante="secundario" onClick={() => onAbierto(false)}>
             Cancelar
-          </Button>
-          <Button onClick={confirmar} disabled={mover.isPending}>
-            <Guardando activo={mover.isPending} texto="Mover" />
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </Boton>
+          <Boton onClick={confirmar} cargando={mover.isPending} textoCargando="Guardando…">
+            Mover
+          </Boton>
+        </>
+      }
+    >
+      <MarcoCampo id="destino" etiqueta="Nueva ubicación" obligatorio error={error} ayuda="Una sala o un box activos.">
+        <LocationPicker
+          id="destino"
+          ubicaciones={(ubicaciones.data ?? []).filter((u) => u.id !== activo.ubicacion.id)}
+          cargando={ubicaciones.isPending}
+          valor={destino || undefined}
+          onChange={(v) => {
+            setDestino(v)
+            setError(undefined)
+          }}
+          className="h-control bg-card md:h-control"
+        />
+      </MarcoCampo>
+    </Dialogo>
   )
 }
 
@@ -115,23 +110,27 @@ function Motivo<M extends string>({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <Campo id={`${id}-motivo`} etiqueta={<>Motivo <Obligatorio /></>} error={error}>
-        <Select value={motivo} onValueChange={(v) => onMotivo(v as M)}>
-          <SelectTrigger id={`${id}-motivo`} className="w-full max-md:h-11" aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-motivo-error` : undefined}>
-            <SelectValue placeholder="Elige un motivo" />
-          </SelectTrigger>
-          <SelectContent>
-            {opciones.map((o) => (
-              <SelectItem key={o.valor} value={o.valor}>
-                {o.etiqueta}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Campo>
-      <Campo id={`${id}-nota`} etiqueta={motivo === 'otro' ? <>Nota <Obligatorio /></> : 'Nota (opcional)'} ayuda="Hasta 120 caracteres.">
-        <Input id={`${id}-nota`} value={nota} onChange={(e) => onNota(e.target.value)} maxLength={120} autoComplete="off" aria-describedby={`${id}-nota-ayuda`} className="max-md:h-11" />
-      </Campo>
+      <Campo
+        id={`${id}-motivo`}
+        tipo="seleccion"
+        etiqueta="Motivo"
+        obligatorio
+        error={error}
+        opciones={opciones.map((o) => ({ valor: o.valor, etiqueta: o.etiqueta }))}
+        valor={motivo}
+        onValorChange={(v) => onMotivo(v as M)}
+        placeholder="Elige un motivo"
+      />
+      <Campo
+        id={`${id}-nota`}
+        etiqueta={motivo === 'otro' ? 'Nota' : 'Nota (opcional)'}
+        obligatorio={motivo === 'otro'}
+        ayuda="Hasta 120 caracteres."
+        value={nota}
+        onChange={(e) => onNota(e.target.value)}
+        maxLength={120}
+        autoComplete="off"
+      />
     </div>
   )
 }
@@ -142,18 +141,7 @@ function validarMotivo(motivo: string, nota: string): string | undefined {
   return undefined
 }
 
-export function DarDeBaja({
-  activo,
-  abierto,
-  onAbierto,
-  onCloseAutoFocus,
-}: {
-  activo: Activo
-  abierto: boolean
-  onAbierto: (v: boolean) => void
-  /** Spec 015 (T7): se abre desde «Más»; la ficha devuelve el foco a ese botón. */
-  onCloseAutoFocus?: (evento: Event) => void
-}) {
+export function DarDeBaja({ activo, abierto, onAbierto, onCloseAutoFocus }: PropsDialogo) {
   const baja = useDarDeBaja()
   const [motivo, setMotivo] = useState<MotivoBaja | ''>('')
   const [nota, setNota] = useState('')
@@ -175,37 +163,34 @@ export function DarDeBaja({
   }
 
   return (
-    <Dialog
-      open={abierto}
-      onOpenChange={(v) => {
+    <Dialogo
+      abierto={abierto}
+      onAbiertoChange={(v) => {
         setMotivo('')
         setNota('')
         setError(undefined)
         onAbierto(v)
       }}
-    >
-      <DialogContent className="sm:max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
-        <DialogHeader>
-          <DialogTitle>Dar de baja</DialogTitle>
-          <DialogDescription>
-            {activo.nombre} sale del valor del inventario y no se podrá verificar en los conteos. Se puede reactivar después.
-          </DialogDescription>
-        </DialogHeader>
-        <Motivo id="baja" opciones={MOTIVOS_BAJA} motivo={motivo} nota={nota} error={error} onMotivo={(m) => { setMotivo(m); setError(undefined) }} onNota={setNota} />
-        <DialogFooter className="[&_[data-slot=button]]:max-md:min-h-11">
-          <Button variant="ghost" onClick={() => onAbierto(false)}>
+      onCloseAutoFocus={onCloseAutoFocus}
+      titulo="Dar de baja"
+      descripcion={`${activo.nombre} sale del valor del inventario y no se podrá verificar en los conteos. Se puede reactivar después.`}
+      pie={
+        <>
+          <Boton variante="secundario" onClick={() => onAbierto(false)}>
             Cancelar
-          </Button>
-          <Button variant="destructiveSolid" onClick={confirmar} disabled={baja.isPending}>
-            <Guardando activo={baja.isPending} texto="Dar de baja" />
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </Boton>
+          <Boton variante="peligro" className="font-semibold" onClick={confirmar} cargando={baja.isPending} textoCargando="Guardando…">
+            Dar de baja
+          </Boton>
+        </>
+      }
+    >
+      <Motivo id="baja" opciones={MOTIVOS_BAJA} motivo={motivo} nota={nota} error={error} onMotivo={(m) => { setMotivo(m); setError(undefined) }} onNota={setNota} />
+    </Dialogo>
   )
 }
 
-export function Reactivar({ activo, abierto, onAbierto }: { activo: Activo; abierto: boolean; onAbierto: (v: boolean) => void }) {
+export function Reactivar({ activo, abierto, onAbierto, onCloseAutoFocus }: PropsDialogo) {
   const cambiar = useCambiarEstado()
   const [motivo, setMotivo] = useState<MotivoReactivar | ''>('')
   const [nota, setNota] = useState('')
@@ -227,30 +212,29 @@ export function Reactivar({ activo, abierto, onAbierto }: { activo: Activo; abie
   }
 
   return (
-    <Dialog
-      open={abierto}
-      onOpenChange={(v) => {
+    <Dialogo
+      abierto={abierto}
+      onAbiertoChange={(v) => {
         setMotivo('')
         setNota('')
         setError(undefined)
         onAbierto(v)
       }}
-    >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Reactivar activo</DialogTitle>
-          <DialogDescription>Vuelve a estado activo en {activo.ubicacion.ruta}. Las sesiones ya cerradas no cambian.</DialogDescription>
-        </DialogHeader>
-        <Motivo id="reactivar" opciones={MOTIVOS_REACTIVAR} motivo={motivo} nota={nota} error={error} onMotivo={(m) => { setMotivo(m); setError(undefined) }} onNota={setNota} />
-        <DialogFooter className="[&_[data-slot=button]]:max-md:min-h-11">
-          <Button variant="ghost" onClick={() => onAbierto(false)}>
+      onCloseAutoFocus={onCloseAutoFocus}
+      titulo="Reactivar activo"
+      descripcion={`Vuelve a estado activo en ${activo.ubicacion.ruta}. Las sesiones ya cerradas no cambian.`}
+      pie={
+        <>
+          <Boton variante="secundario" onClick={() => onAbierto(false)}>
             Cancelar
-          </Button>
-          <Button onClick={confirmar} disabled={cambiar.isPending}>
-            <Guardando activo={cambiar.isPending} texto="Reactivar" />
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </Boton>
+          <Boton onClick={confirmar} cargando={cambiar.isPending} textoCargando="Guardando…">
+            Reactivar
+          </Boton>
+        </>
+      }
+    >
+      <Motivo id="reactivar" opciones={MOTIVOS_REACTIVAR} motivo={motivo} nota={nota} error={error} onMotivo={(m) => { setMotivo(m); setError(undefined) }} onNota={setNota} />
+    </Dialogo>
   )
 }

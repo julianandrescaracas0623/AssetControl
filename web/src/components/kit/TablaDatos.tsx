@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, X } from 'lucide-react'
 import { useId, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 
 import { Input } from '@/components/ui/input'
@@ -111,6 +111,9 @@ const CELDA: Record<TipoColumna, string> = {
 /** El doble clic o el Enter vienen de un control de la fila (menú, enlace, casilla). */
 function desdeControl(objetivo: EventTarget, fila: Element): boolean {
   if (!(objetivo instanceof Element)) return false
+  // React propaga los eventos de un portal (el menú de la fila) hasta la fila: lo que
+  // nace fuera de su DOM viene de un control propio y no la abre.
+  if (!fila.contains(objetivo)) return true
   const control = objetivo.closest('a, button, input, select, textarea, [role=menuitem], [role=checkbox]')
   return control !== null && fila.contains(control) && control !== fila
 }
@@ -434,12 +437,12 @@ function Paginacion({ etiqueta, desde, hasta, total, hayAnterior, haySiguiente, 
         {formatEntero(desde)}–{formatEntero(hasta)} de {formatEntero(total)}
       </span>
       <div className="flex gap-separacion">
-        <Boton variante="secundario" icono={<ChevronLeft />} disabled={!hayAnterior || ocupado} onClick={onAnterior}>
-          Anterior
+        {/* «‹ Anterior» y «Siguiente ›»: los nombres que ya tenían Activos y Categorías. */}
+        <Boton variante="secundario" disabled={!hayAnterior || ocupado} onClick={onAnterior}>
+          ‹ Anterior
         </Boton>
         <Boton variante="secundario" disabled={!haySiguiente || ocupado} onClick={onSiguiente}>
-          Siguiente
-          <ChevronRight aria-hidden="true" />
+          Siguiente ›
         </Boton>
       </div>
     </nav>
