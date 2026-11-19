@@ -53,5 +53,29 @@ describe('galería de componentes', () => {
     const modos = Array.from(densidad.querySelectorAll('[data-densidad]')).map((el) => el.getAttribute('data-densidad'))
     expect(modos).toEqual(['conteo', 'admin'])
   })
-})
 
+  // Spec 016, T2 (A7): los primitivos del kit en sus variantes y estados.
+  it('muestra los primitivos del kit con sus variantes y estados', () => {
+    render(<Componentes />)
+    const botones = screen.getByRole('region', { name: 'Botones' })
+    const variantes = Array.from(botones.querySelectorAll('[data-kit=boton]')).map((b) => b.getAttribute('data-variante'))
+    for (const v of ['principal', 'secundario', 'fuerte', 'fantasma', 'peligro']) expect(variantes, v).toContain(v)
+    expect(within(botones).getByRole('button', { name: 'Guardando…' }).getAttribute('aria-busy')).toBe('true')
+
+    const campos = screen.getByRole('region', { name: 'Campos' })
+    expect(campos.querySelectorAll('[data-kit=campo]').length).toBeGreaterThanOrEqual(8)
+    expect(within(campos).getByRole('combobox', { name: /Categoría/ })).toBeTruthy()
+
+    const insignias = screen.getByRole('region', { name: 'Insignias' })
+    const tonos = new Set(Array.from(insignias.querySelectorAll('[data-kit=insignia]')).map((i) => i.getAttribute('data-tono')))
+    for (const t of ['exito', 'aviso', 'error', 'info', 'neutro', 'fuerte']) expect(tonos.has(t), t).toBe(true)
+
+    const avisos = screen.getByRole('region', { name: 'Avisos' })
+    expect(avisos.querySelectorAll('[data-kit=aviso]')).toHaveLength(4)
+
+    const estados = screen.getByRole('region', { name: 'Estados' })
+    expect(within(estados).getByRole('status', { name: 'Cargando activos' })).toBeTruthy()
+    expect(within(estados).getByText('Aún no hay activos')).toBeTruthy()
+    expect(within(estados).getByRole('button', { name: 'Reintentar' })).toBeTruthy()
+  })
+})

@@ -1,23 +1,28 @@
-import { Wrench } from 'lucide-react'
+import { Ban, Wrench } from 'lucide-react'
 
-import { Badge } from '@/components/ui/badge'
+import { Insignia } from '@/components/kit'
 import type { EstadoActivo } from '@/mocks/datos-ficticios'
 
-// Estado del activo con ícono + texto (docs/08 §2.1).
+// Estado del activo con ícono + texto (docs/08 §2.1). Spec 016, T2: delega en
+// Insignia del kit; misma API.
 export function EstadoActivoBadge({ estado }: { estado: EstadoActivo }) {
   if (estado === 'en_reparacion') {
     return (
-      <Badge variant="warning">
-        <Wrench aria-hidden="true" />
+      <Insignia tono="aviso" icono={<Wrench aria-hidden="true" />}>
         En reparación
-      </Badge>
+      </Insignia>
     )
   }
-  if (estado === 'dado_de_baja') return <Badge variant="neutral">Dado de baja</Badge>
+  if (estado === 'dado_de_baja') {
+    return (
+      <Insignia tono="neutro" icono={<Ban aria-hidden="true" />}>
+        Dado de baja
+      </Insignia>
+    )
+  }
   return (
-    <Badge variant="success">
-      <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+    <Insignia tono="exito" icono={<span className="size-1.5 rounded-full bg-current" aria-hidden="true" />}>
       Activo
-    </Badge>
+    </Insignia>
   )
 }

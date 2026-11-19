@@ -1,16 +1,11 @@
 import {
-  AlertTriangle,
-  Check,
-  CircleAlert,
   Download,
-  Info,
   Lock,
   MoreHorizontal,
   Plus,
   RefreshCw,
   ScanBarcode,
   Wrench,
-  X,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -18,17 +13,15 @@ import { useState } from 'react'
 
 import { AssetCard } from '@/components/app/AssetCard'
 import { EmptyState } from '@/components/app/EmptyState'
+import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
 import { LiveValueCard, ThreeFiguresCard } from '@/components/app/FigureCards'
 import { LocationPicker } from '@/components/app/LocationPicker'
 import { NetworkStatus } from '@/components/app/NetworkStatus'
 import { PendingList } from '@/components/app/PendingList'
 import { StatCard } from '@/components/app/StatCard'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Aviso, Boton, Campo, Estado, Insignia, type OpcionCampo } from '@/components/kit'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -42,7 +35,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Textarea } from '@/components/ui/textarea'
 import { ACTIVOS, RESUMEN, ULTIMO_INFORME, UBICACIONES_API } from '@/mocks/datos-ficticios'
 
 // Galería del sistema de diseño (spec 001b, T2). Ruta de desarrollo
@@ -114,8 +106,8 @@ function DemoDensidad({ densidad, titulo, nota }: { densidad: 'conteo' | 'admin'
         <p className="text-etiqueta text-muted-foreground">{nota}</p>
       </div>
       <div className="flex flex-wrap gap-separacion">
-        <Button className="h-control px-4">Confirmar</Button>
-        <Button variant="outline" className="h-control px-4">Escribir código</Button>
+        <Boton>Confirmar</Boton>
+        <Boton variante="secundario">Escribir código</Boton>
       </div>
       <ul className="divide-y rounded-lg border">
         <li className="flex h-fila items-center justify-between gap-3 px-3">
@@ -131,8 +123,21 @@ function DemoDensidad({ densidad, titulo, nota }: { densidad: 'conteo' | 'admin'
   )
 }
 
+const CATEGORIAS: OpcionCampo[] = [
+  { valor: 'biomedicos', etiqueta: 'Biomédicos' },
+  { valor: 'mobiliario', etiqueta: 'Mobiliario' },
+  { valor: 'computo', etiqueta: 'Cómputo' },
+]
+
 export default function Componentes() {
   const [ubicacion, setUbicacion] = useState('administracion')
+  const [categoria, setCategoria] = useState('biomedicos')
+  const [reintentando, setReintentando] = useState(false)
+  // Demostración: «Reintentar» queda ocupado un momento, como mientras llega la respuesta.
+  function reintentar() {
+    setReintentando(true)
+    window.setTimeout(() => setReintentando(false), 1500)
+  }
   return (
     <main className="mx-auto flex w-full max-w-[1320px] flex-col gap-10 p-4 md:p-8">
       <header className="flex flex-col gap-1 border-b pb-6">
@@ -184,30 +189,30 @@ export default function Componentes() {
       </Section>
 
       <Section title="Botones">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button>Abrir sesión</Button>
-          <Button variant="outline">
-            <Download />
+        <p className="text-sm text-muted-foreground">
+          <span className="font-mono">Boton</span> del kit. Una sola acción principal por pantalla; la altura sale de la densidad.
+        </p>
+        <div className="flex flex-wrap items-center gap-separacion">
+          <Boton>Abrir sesión</Boton>
+          <Boton variante="secundario" icono={<Download />}>
             Exportar Excel
-          </Button>
-          <Button variant="secondary">Secundario</Button>
-          <Button variant="ghost">Cancelar</Button>
-          <Button variant="destructive">Dar de baja</Button>
-          <Button variant="link">Ver informe</Button>
-          <Button variant="outline" size="icon" aria-label="Más acciones">
-            <MoreHorizontal />
-          </Button>
-          <Button disabled>Deshabilitado</Button>
+          </Boton>
+          <Boton variante="fuerte">Fuerte</Boton>
+          <Boton variante="fantasma">Cancelar</Boton>
+          <Boton variante="peligro">Dar de baja</Boton>
+          <Boton variante="secundario" soloIcono aria-label="Más acciones" icono={<MoreHorizontal />} />
+          <Boton disabled>Deshabilitado</Boton>
+          <Boton cargando textoCargando="Guardando…">
+            Guardar
+          </Boton>
         </div>
-        <div className="flex max-w-md flex-col gap-2">
-          <Button variant="outline" className="h-12 text-base">
-            <Plus />
+        <div data-densidad="conteo" className="flex max-w-md flex-col gap-separacion">
+          <Boton variante="secundario" anchoCompleto icono={<Plus />}>
             Registrar activo nuevo
-          </Button>
-          <Button className="h-14 text-base font-semibold">
-            <ScanBarcode />
+          </Boton>
+          <Boton tamano="accion" anchoCompleto icono={<ScanBarcode />}>
             Escanear
-          </Button>
+          </Boton>
           <p className="text-xs text-muted-foreground">
             Conteo: acción principal de 56 px, a ancho completo y fija abajo.
           </p>
@@ -215,32 +220,28 @@ export default function Componentes() {
       </Section>
 
       <Section title="Campos">
+        <p className="text-sm text-muted-foreground">
+          <span className="font-mono">Campo</span> del kit: etiqueta visible, control sobre blanco, ayuda y error enlazados.
+        </p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor="g-nombre">Nombre</Label>
-            <Input id="g-nombre" defaultValue="Silla ergonómica" />
-          </div>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor="g-precio">Precio de compra (COP)</Label>
-            <Input id="g-precio" inputMode="decimal" className="tabular-nums" defaultValue="389.900" />
-          </div>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor="g-codigo">Código del sticker</Label>
-            <Input id="g-codigo" className="font-mono" defaultValue="000457" readOnly />
-            <p className="text-xs text-muted-foreground">Fijo: viene del sticker y no cambia.</p>
-          </div>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor="g-error">Precio de compra (COP)</Label>
-            <Input id="g-error" aria-invalid="true" aria-describedby="g-error-msg" placeholder="$ 0" />
-            <p id="g-error-msg" className="flex items-center gap-1.5 text-xs text-destructive">
-              <CircleAlert className="size-3.5" aria-hidden="true" />
-              Escribe el precio
-            </p>
-          </div>
-          <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-2">
-            <Label htmlFor="g-nota">Nota</Label>
-            <Textarea id="g-nota" placeholder="Opcional" />
-          </div>
+          <Campo id="g-nombre" etiqueta="Nombre" obligatorio defaultValue="Silla ergonómica" autoComplete="off" />
+          <Campo id="g-precio" etiqueta="Precio de compra (COP)" tipo="dinero" obligatorio defaultValue="389.900" ayuda="Solo lo ven los administradores." />
+          <Campo id="g-codigo" etiqueta="Código del sticker" tipo="codigo" defaultValue="000457" readOnly ayuda="Fijo: viene del sticker y no cambia." />
+          <Campo id="g-error" etiqueta="Precio de compra (COP)" tipo="dinero" obligatorio placeholder="0" error="Escribe el precio" />
+          <Campo id="g-unidades" etiqueta="Unidades iguales" tipo="numero" defaultValue="3" />
+          <Campo
+            id="g-categoria"
+            etiqueta="Categoría"
+            tipo="seleccion"
+            obligatorio
+            opciones={CATEGORIAS}
+            valor={categoria}
+            onValorChange={setCategoria}
+            ayuda="Lista cerrada de la clínica."
+          />
+          <Campo id="g-cargando" etiqueta="Ubicación" tipo="seleccion" cargando opciones={[]} placeholder="Elige una ubicación" />
+          <Campo id="g-deshabilitado" etiqueta="Serial" tipo="codigo" disabled defaultValue="SN-4471" />
+          <Campo id="g-nota" etiqueta="Nota" tipo="area" placeholder="Opcional" className="sm:col-span-2" ayuda="Hasta 120 caracteres." />
           <div className="flex items-center gap-2">
             <Checkbox id="g-coincide" defaultChecked />
             <Label htmlFor="g-coincide">Revisé que coincide con el sticker</Label>
@@ -254,54 +255,69 @@ export default function Componentes() {
 
       <Section title="Insignias">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="success">
-            <Check />
-            Encontrado
-          </Badge>
-          <Badge variant="destructive">
-            <X />
-            No encontrado
-          </Badge>
-          <Badge variant="warning">
-            <Wrench />
+          <Insignia tono="exito">Encontrado</Insignia>
+          <Insignia tono="error">No encontrado</Insignia>
+          <Insignia tono="aviso" icono={<Wrench aria-hidden="true" />}>
             En reparación
-          </Badge>
-          <Badge variant="warning">
-            <AlertTriangle />
-            Dañado
-          </Badge>
-          <Badge variant="brand">Abierta</Badge>
-          <Badge variant="neutral">Dado de baja</Badge>
-          <Badge variant="dark">
-            <Lock />
+          </Insignia>
+          <Insignia tono="aviso">Dañado</Insignia>
+          <Insignia tono="info">Abierta</Insignia>
+          <Insignia tono="neutro">Contador</Insignia>
+          <Insignia tono="fuerte" icono={<Lock aria-hidden="true" />}>
             Informe congelado
-          </Badge>
-          <Badge variant="outline">Contador</Badge>
+          </Insignia>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <EstadoActivoBadge estado="activo" />
+          <EstadoActivoBadge estado="en_reparacion" />
+          <EstadoActivoBadge estado="dado_de_baja" />
+          <Insignia tono="exito" tamano="grande">
+            Verificado
+          </Insignia>
+          <Insignia tono="aviso" tamano="grande">
+            No se pudo confirmar
+          </Insignia>
         </div>
       </Section>
 
       <Section title="Avisos">
         <div className="grid gap-3 md:grid-cols-2">
-          <Alert variant="info">
-            <Info />
-            <AlertTitle>Sin sticker no hay registro</AlertTitle>
-            <AlertDescription>El código lo trae el sticker pegado al activo.</AlertDescription>
-          </Alert>
-          <Alert variant="success">
-            <Check />
-            <AlertTitle>Verificado</AlertTitle>
-            <AlertDescription>Impresora multifuncional · 000215.</AlertDescription>
-          </Alert>
-          <Alert variant="warning">
-            <AlertTriangle />
-            <AlertTitle>No se pudo confirmar</AlertTitle>
-            <AlertDescription>No sabemos si quedó guardado. Reintentar no lo duplica.</AlertDescription>
-          </Alert>
-          <Alert variant="destructive">
-            <Lock />
-            <AlertTitle>La sesión se cerró</AlertTitle>
-            <AlertDescription>Esta verificación no se guardó.</AlertDescription>
-          </Alert>
+          <Aviso tono="info" titulo="Sin sticker no hay registro">
+            El código lo trae el sticker pegado al activo.
+          </Aviso>
+          <Aviso tono="exito" titulo="Verificado">
+            Impresora multifuncional · 000215.
+          </Aviso>
+          <Aviso
+            tono="aviso"
+            titulo="No se pudo confirmar"
+            accion={
+              <Boton variante="secundario" icono={<RefreshCw />}>
+                Reintentar
+              </Boton>
+            }
+          >
+            No sabemos si quedó guardado. Reintentar no lo duplica.
+          </Aviso>
+          <Aviso tono="error" titulo="La sesión se cerró" icono={<Lock aria-hidden="true" />}>
+            Esta verificación no se guardó.
+          </Aviso>
+        </div>
+      </Section>
+
+      <Section title="Estados">
+        <p className="text-sm text-muted-foreground">
+          <span className="font-mono">Estado.Cargando</span>, <span className="font-mono">Estado.Vacio</span> y{' '}
+          <span className="font-mono">Estado.Error</span>: el mismo aspecto en todas las pantallas.
+        </p>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Estado.Cargando etiqueta="Cargando activos" filas={4} />
+          <Estado.Vacio
+            titulo="Aún no hay activos"
+            descripcion="Escanea un sticker para crear el primero."
+            accion={<Boton icono={<ScanBarcode />}>Ir a escanear</Boton>}
+          />
+          <Estado.Error onReintentar={reintentar} reintentando={reintentando} />
         </div>
       </Section>
 
@@ -352,7 +368,7 @@ export default function Componentes() {
           <EmptyState
             titulo="Aún no hay activos"
             descripcion="Escanea un sticker para crear el primero."
-            accion={<Button>Registrar activo</Button>}
+            accion={<Boton>Registrar activo</Boton>}
           />
         </div>
       </Section>
@@ -414,10 +430,9 @@ export default function Componentes() {
             <p className="text-sm text-muted-foreground">Mismo formato por ubicación.</p>
           </TabsContent>
         </Tabs>
-        <Button variant="outline" className="self-start">
-          <RefreshCw />
+        <Boton variante="secundario" icono={<RefreshCw />} className="self-start">
           Reintentar
-        </Button>
+        </Boton>
       </Section>
     </main>
   )

@@ -1,14 +1,14 @@
-import { RefreshCw, TriangleAlert } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { Boton, Estado } from '@/components/kit'
 import type { EstadoSimulado } from '@/lib/simulacion'
 import { cn } from '@/lib/utils'
 
 // Estados de cada pantalla (docs/08 §8, R13): cargando, vacío con acción,
 // error con reintentar y éxito. En las maquetas el estado sale de ?estado=.
+// Spec 016, T2: ConEstado y ErrorCarga conservan su API y delegan en Estado del kit.
 
 /** Enlace a la misma pantalla sin ?estado= (el "reintento" de la maqueta). */
 function useRutaSinEstado(): string {
@@ -22,19 +22,17 @@ function useRutaSinEstado(): string {
 export function ErrorCarga({ titulo = 'No se pudo cargar' }: { titulo?: string }) {
   const ruta = useRutaSinEstado()
   return (
-    <Alert variant="destructive" className="items-start">
-      <TriangleAlert />
-      <AlertTitle>{titulo}</AlertTitle>
-      <AlertDescription className="flex flex-col items-start gap-3">
-        Revisa la conexión e intenta de nuevo.
-        <Button asChild variant="outline" size="sm" className="max-md:min-h-11">
+    <Estado.Error
+      titulo={titulo}
+      accion={
+        <Boton asChild variante="secundario">
           <Link to={ruta}>
-            <RefreshCw />
+            <RefreshCw aria-hidden="true" />
             Reintentar
           </Link>
-        </Button>
-      </AlertDescription>
-    </Alert>
+        </Boton>
+      }
+    />
   )
 }
 
@@ -53,10 +51,9 @@ export function ConEstado({
 }) {
   if (estado === 'cargando') {
     return (
-      <div role="status" aria-busy="true" className="flex flex-col gap-4">
-        <span className="sr-only">{etiquetaCargando}</span>
+      <Estado.Cargando etiqueta={etiquetaCargando} className="gap-4">
         {cargando}
-      </div>
+      </Estado.Cargando>
     )
   }
   if (estado === 'vacio') return <>{vacio}</>
