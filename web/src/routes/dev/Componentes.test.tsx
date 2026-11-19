@@ -78,4 +78,32 @@ describe('galería de componentes', () => {
     expect(within(estados).getByText('Aún no hay activos')).toBeTruthy()
     expect(within(estados).getByRole('button', { name: 'Reintentar' })).toBeTruthy()
   })
+
+  // Spec 016, T3 (A7): el resto del kit, con datos ficticios.
+  it('muestra los primitivos B del kit', () => {
+    render(<Componentes />)
+    const superficies = screen.getByRole('region', { name: 'Superficies' })
+    expect(superficies.querySelectorAll('[data-kit=panel]').length).toBeGreaterThanOrEqual(2)
+    expect(within(superficies).getByRole('button', { name: 'Más datos', expanded: false })).toBeTruthy()
+    expect(superficies.querySelector('[data-kit=encabezado-pagina]')).toBeTruthy()
+    expect(superficies.querySelectorAll('dl[data-kit=lista-datos]').length).toBeGreaterThanOrEqual(2)
+
+    const cifras = screen.getByRole('region', { name: 'Cifras' })
+    const fuentes = new Set(Array.from(cifras.querySelectorAll('[data-kit=cifra]')).map((c) => c.getAttribute('data-fuente')))
+    for (const f of ['indicador', 'en_vivo', 'congelada']) expect(fuentes.has(f), f).toBe(true)
+    expect(within(cifras).getByRole('status', { name: /Cargando/ })).toBeTruthy()
+
+    const dialogos = screen.getByRole('region', { name: 'Diálogos' })
+    for (const nombre of ['Editar ubicación', 'Editar activo', 'Dar de baja']) {
+      expect(within(dialogos).getByRole('button', { name: nombre })).toBeTruthy()
+    }
+    expect(dialogos.querySelector('[data-kit=barra-accion]')).toBeTruthy()
+
+    const tablas = screen.getByRole('region', { name: 'Tablas' })
+    expect(within(tablas).getByRole('tablist', { name: 'Vista de la tabla' })).toBeTruthy()
+    expect(within(tablas).getByRole('table', { name: 'Activos de ejemplo' })).toBeTruthy()
+    expect(within(tablas).getByRole('searchbox', { name: 'Buscar activos' })).toBeTruthy()
+    expect(within(tablas).getByRole('button', { name: /Categoría/ }).getAttribute('data-kit')).toBe('filtro')
+    expect(within(tablas).getByRole('navigation', { name: /Paginación/ })).toBeTruthy()
+  })
 })

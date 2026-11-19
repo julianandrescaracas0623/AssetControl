@@ -4,8 +4,13 @@
 import { EstadoCargando, EstadoError, EstadoVacio } from './Estado'
 
 export { Aviso, type AvisoProps, type TonoAviso } from './Aviso'
+export { BarraAccion, type BarraAccionProps } from './BarraAccion'
 export { Boton, type BotonProps, type TamanoBoton, type VarianteBoton } from './Boton'
 export { Campo, MarcaObligatorio, MarcoCampo, type CampoProps, type OpcionCampo } from './Campo'
+export { Cifra, CifrasCongeladas, type CifraCongelada, type CifraProps, type CifrasCongeladasProps } from './Cifra'
+export { Confirmar, type ConfirmarProps } from './Confirmar'
+export { Dialogo, type DialogoProps, type FormaDialogo } from './Dialogo'
+export { EncabezadoPagina, type EncabezadoPaginaProps, type Miga } from './EncabezadoPagina'
 export {
   EstadoCargando,
   EstadoError,
@@ -14,7 +19,20 @@ export {
   type EstadoErrorProps,
   type EstadoVacioProps,
 } from './Estado'
+export { Filtro, type FiltroProps, type OpcionFiltro } from './Filtro'
 export { Insignia, type InsigniaProps, type TonoInsignia } from './Insignia'
+export { ListaDatos, type Dato, type ListaDatosProps, type TipoDato } from './ListaDatos'
+export { Panel, type PanelProps } from './Panel'
+export { Pestanas, type Pestana, type PestanasProps } from './Pestanas'
+export {
+  TablaDatos,
+  type BarraTabla,
+  type ColumnaTabla,
+  type OrdenTabla,
+  type PaginacionTabla,
+  type TablaDatosProps,
+  type TipoColumna,
+} from './TablaDatos'
 
 /** `Estado.Cargando`, `Estado.Vacio` y `Estado.Error` (R3). */
 export const Estado = {

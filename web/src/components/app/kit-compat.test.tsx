@@ -3,9 +3,11 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { Campo, Obligatorio } from './CampoFormulario'
-import { ConEstado, ErrorCarga } from './ConEstado'
+import { ConEstado, EncabezadoPagina, ErrorCarga } from './ConEstado'
 import { EmptyState } from './EmptyState'
 import { EstadoActivoBadge } from './EstadoActivoBadge'
+import { LiveValueCard, ThreeFiguresCard } from './FigureCards'
+import { StatCard } from './StatCard'
 import { Input } from '@/components/ui/input'
 
 // Spec 016, T2: los componentes de app conservan su API y delegan en el kit.
@@ -105,5 +107,53 @@ describe('Campo (CampoFormulario) delega en MarcoCampo', () => {
       </Campo>,
     )
     expect(document.querySelector('[data-kit=campo]')?.getAttribute('data-controles-sobre-blanco')).toBe('true')
+  })
+})
+
+// Spec 016, T3: StatCard, ThreeFiguresCard, LiveValueCard y EncabezadoPagina conservan su
+// API y delegan en Cifra, CifrasCongeladas y EncabezadoPagina del kit.
+
+describe('cifras delegan en Cifra del kit (R7 de docs/03-07)', () => {
+  it('StatCard es una Cifra indicador', () => {
+    render(
+      <MemoryRouter>
+        <StatCard titulo="Activos hoy" valor="219" contexto="Incluye 2 en reparación" href="/admin/activos" />
+      </MemoryRouter>,
+    )
+    const enlace = screen.getByRole('link', { name: /Activos hoy/ })
+    expect(enlace.getAttribute('data-kit')).toBe('cifra')
+    expect(enlace.getAttribute('data-fuente')).toBe('indicador')
+  })
+
+  it('ThreeFiguresCard es CifrasCongeladas y LiveValueCard una Cifra en vivo', () => {
+    render(
+      <>
+        <ThreeFiguresCard
+          informe={{
+            fuente: 'informe_congelado',
+            sesion: 'Conteo may 2026',
+            corte: '15/05/2026',
+            encontrado: { valor: '262118400.00', unidades: 198 },
+            noEncontrado: { valor: '14731900.00', unidades: 9 },
+            total: { valor: '276850300.00', unidades: 207 },
+          }}
+        />
+        <LiveValueCard valor={{ fuente: 'valor_actual', valor: '286450300.00', activos: 219, consultadoA: '10:42' }} />
+      </>,
+    )
+    expect(screen.getByRole('region', { name: /Informe congelado/ }).getAttribute('data-fuente')).toBe('congelada')
+    const vivo = screen.getByRole('region', { name: /Valor actual/ })
+    expect(vivo.getAttribute('data-fuente')).toBe('en_vivo')
+    expect(vivo.textContent).toContain('No es el informe')
+  })
+})
+
+describe('EncabezadoPagina (ConEstado) delega en el kit', () => {
+  it('misma API: título, descripción, insignia y acciones', () => {
+    render(<EncabezadoPagina titulo="Activos" descripcion="219 activos" insignia={<span>nueva</span>} acciones={<button>Exportar</button>} claseAcciones="extra" />)
+    const h1 = screen.getByRole('heading', { level: 1, name: 'Activos' })
+    expect(h1.closest('[data-kit=encabezado-pagina]')).toBeTruthy()
+    expect(screen.getByText('nueva')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Exportar' }).parentElement?.className).toContain('extra')
   })
 })

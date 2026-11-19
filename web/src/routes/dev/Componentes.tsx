@@ -14,28 +14,17 @@ import { useState } from 'react'
 import { AssetCard } from '@/components/app/AssetCard'
 import { EmptyState } from '@/components/app/EmptyState'
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
-import { LiveValueCard, ThreeFiguresCard } from '@/components/app/FigureCards'
 import { LocationPicker } from '@/components/app/LocationPicker'
 import { NetworkStatus } from '@/components/app/NetworkStatus'
 import { PendingList } from '@/components/app/PendingList'
-import { StatCard } from '@/components/app/StatCard'
 import { Aviso, Boton, Campo, Estado, Insignia, type OpcionCampo } from '@/components/kit'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ACTIVOS, RESUMEN, ULTIMO_INFORME, UBICACIONES_API } from '@/mocks/datos-ficticios'
+import { ACTIVOS, RESUMEN, UBICACIONES_API } from '@/mocks/datos-ficticios'
+
+import { CifrasKit, DialogosKit, SuperficiesKit, TablasKit } from './GaleriaKit'
 
 // Galería del sistema de diseño (spec 001b, T2). Ruta de desarrollo
 // /dev/componentes: equivale a la página "Sistema visual" del lienzo aprobado
@@ -321,25 +310,16 @@ export default function Componentes() {
         </div>
       </Section>
 
+      <CifrasKit Seccion={Section} />
+
       <Section title="Datos">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard titulo="Activos hoy" valor="219" contexto="Incluye 2 en reparación" />
-          <StatCard titulo="Discrepancias" valor="3" contexto="Sin resolver" tono="aviso" />
-          <StatCard titulo={RESUMEN.conteoAbierto.nombre} valor="60,3 %" contexto="132 de 219 verificados">
-            <Progress value={60.3} aria-label="Avance del conteo" />
-          </StatCard>
-          <LiveValueCard valor={{ fuente: 'valor_actual', valor: RESUMEN.valorActual, activos: 219, consultadoA: '10:42' }} />
+        <div className="flex max-w-md flex-col gap-2">
+          <p className="text-xs font-medium text-muted-foreground">Progreso del conteo</p>
+          <Progress value={60.3} aria-label="Avance del conteo" />
+          <p className="text-xs text-muted-foreground tabular-nums">
+            {RESUMEN.conteoAbierto.nombre} · 132 de 219 verificados
+          </p>
         </div>
-        <ThreeFiguresCard
-          informe={{
-            fuente: 'informe_congelado',
-            sesion: ULTIMO_INFORME.sesion,
-            corte: ULTIMO_INFORME.corte,
-            encontrado: ULTIMO_INFORME.encontrado,
-            noEncontrado: ULTIMO_INFORME.noEncontrado,
-            total: ULTIMO_INFORME.total,
-          }}
-        />
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="flex flex-col gap-2">
             <p className="text-xs font-medium text-muted-foreground">AssetCard · admin</p>
@@ -374,66 +354,16 @@ export default function Componentes() {
       </Section>
 
       <Section title="Superficies">
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardDescription>Conteo nov 2026</CardDescription>
-              <CardTitle className="text-3xl tabular-nums">60,3 %</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              <Progress value={60.3} aria-label="Avance del conteo" />
-              <p className="text-xs text-muted-foreground tabular-nums">132 de 219 verificados</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>Cargando</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              <Skeleton className="h-8 w-40" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-2/3" />
-            </CardContent>
-          </Card>
-        </div>
-        <Tabs defaultValue="categoria">
-          <TabsList>
-            <TabsTrigger value="categoria">Por categoría</TabsTrigger>
-            <TabsTrigger value="ubicacion">Por ubicación</TabsTrigger>
-          </TabsList>
-          <TabsContent value="categoria">
-            <div className="overflow-x-auto rounded-xl border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Categoría</TableHead>
-                    <TableHead className="text-right">Activos</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="font-medium">Biomédicos</TableCell>
-                    <TableCell className="text-right tabular-nums">41</TableCell>
-                    <TableCell className="text-right tabular-nums">$ 168.240.000</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Mobiliario</TableCell>
-                    <TableCell className="text-right tabular-nums">96</TableCell>
-                    <TableCell className="text-right tabular-nums">$ 38.912.800</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
-          <TabsContent value="ubicacion">
-            <p className="text-sm text-muted-foreground">Mismo formato por ubicación.</p>
-          </TabsContent>
-        </Tabs>
-        <Boton variante="secundario" icono={<RefreshCw />} className="self-start">
-          Reintentar
-        </Boton>
+        <p className="text-sm text-muted-foreground">
+          <span className="font-mono">Panel</span>, <span className="font-mono">EncabezadoPagina</span> y{' '}
+          <span className="font-mono">ListaDatos</span>: superficie blanca sobre la página, rótulo y valor; el contador no recibe hueco de precio.
+        </p>
+        <SuperficiesKit />
       </Section>
+
+      <DialogosKit Seccion={Section} />
+
+      <TablasKit Seccion={Section} />
     </main>
   )
 }
