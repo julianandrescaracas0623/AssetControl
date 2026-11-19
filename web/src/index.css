@@ -4,8 +4,12 @@
 
 /*
  * Tema "Grafito y Cobalto" (docs/08 §2, aprobado 2026-11-13; spec 001b, T1).
- * Único lugar de la web con colores: las pantallas usan solo estas variables.
- * Base zinc, un acento cobalto y estados discretos. Sin modo oscuro en el MVP.
+ * Único lugar de la web con valores literales (color, radio, densidad, letra):
+ * las pantallas usan solo estas variables. Base zinc, un acento cobalto y estados
+ * discretos. Sin modo oscuro en el MVP.
+ * Spec 016, T1: lienzo en dos niveles (--page / --card, D1), botón principal
+ * cobalto (D2), radio 10 px (D3), escala tipográfica nombrada (D5) y densidad
+ * por modo con data-densidad="conteo|admin" (D6).
  */
 
 @custom-variant dark (&:is(.dark *));
@@ -52,6 +56,37 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
+    --color-page: var(--page);
+    --color-ink: var(--ink);
+    --color-ink-foreground: var(--ink-foreground);
+    --color-primary-hover: var(--primary-hover);
+    /* Densidad (D6): h-control, min-h-control, h-fila, h-accion, gap-separacion */
+    --spacing-control: var(--control-h);
+    --spacing-fila: var(--fila-h);
+    --spacing-accion: var(--accion-h);
+    --spacing-separacion: var(--separacion-objetivo);
+    /* Escala tipográfica nombrada (D5, plan §3): text-titulo-pagina, text-cifra… */
+    --text-titulo-pagina: var(--fs-titulo-pagina);
+    --text-titulo-pagina--line-height: var(--lh-titulo-pagina);
+    --text-titulo-pagina--font-weight: 600;
+    --text-titulo-pagina--letter-spacing: -0.025em;
+    --text-titulo-seccion: var(--fs-titulo-seccion);
+    --text-titulo-seccion--line-height: var(--lh-titulo-seccion);
+    --text-titulo-seccion--font-weight: 600;
+    --text-titulo-seccion--letter-spacing: -0.0125em;
+    --text-cuerpo: var(--fs-cuerpo);
+    --text-cuerpo--line-height: var(--lh-cuerpo);
+    --text-cuerpo--font-weight: 400;
+    --text-etiqueta: var(--fs-etiqueta);
+    --text-etiqueta--line-height: var(--lh-etiqueta);
+    --text-etiqueta--font-weight: 500;
+    --text-cifra: var(--fs-cifra);
+    --text-cifra--line-height: var(--lh-cifra);
+    --text-cifra--font-weight: 600;
+    --text-cifra--letter-spacing: -0.02em;
+    --text-codigo: var(--fs-codigo);
+    --text-codigo--line-height: var(--lh-codigo);
+    --text-codigo--font-weight: 500;
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -62,7 +97,8 @@
 }
 
 :root {
-    /* Superficies */
+    /* Superficies: página gris muy claro y todo lo demás blanco (D1) */
+    --page: #F6F6F7;
     --background: #FFFFFF;
     --foreground: #09090B;
     --card: #FFFFFF;
@@ -77,9 +113,13 @@
     --accent-foreground: #18181B;
     --border: #E4E4E7;
     --input: #8A8A93;
-    /* Acción principal: neutro oscuro (opción A) */
-    --primary: #18181B;
-    --primary-foreground: #FAFAFA;
+    /* Acción principal: cobalto (D2, reemplaza la opción A de docs/08 §2.1) */
+    --primary: #2B50E0;
+    --primary-foreground: #FFFFFF;
+    --primary-hover: #2443C4;
+    /* Neutro oscuro: botón fuerte, insignia «Informe congelado», visor de cámara */
+    --ink: #18181B;
+    --ink-foreground: #FFFFFF;
     /* Acento cobalto: foco, enlaces, selección, avance */
     --brand: #2B50E0;
     --brand-strong: #2443C4;
@@ -97,7 +137,7 @@
     --destructive-soft: #FEF2F2;
     --destructive-border: #FECACA;
     /* Barra lateral de administración */
-    --sidebar: #FAFAFA;
+    --sidebar: #FFFFFF;
     --sidebar-foreground: #09090B;
     --sidebar-primary: #18181B;
     --sidebar-primary-foreground: #FAFAFA;
@@ -105,7 +145,52 @@
     --sidebar-accent-foreground: #09090B;
     --sidebar-border: #E4E4E7;
     --sidebar-ring: #2B50E0;
-    --radius: 0.5rem;
+    --radius: 0.625rem;
+}
+
+:root {
+    /* Densidad por defecto = conteo y admin por debajo de md (D6) */
+    --control-h: 3rem;
+    --fila-h: 3.5rem;
+    --accion-h: 3.5rem;
+    --separacion-objetivo: 0.5rem;
+    /* Escala tipográfica, móvil (plan §3) */
+    --fs-titulo-pagina: 1.25rem;
+    --lh-titulo-pagina: 1.75rem;
+    --fs-titulo-seccion: 1rem;
+    --lh-titulo-seccion: 1.5rem;
+    --fs-cuerpo: 1rem;
+    --lh-cuerpo: 1.5rem;
+    --fs-etiqueta: 0.875rem;
+    --lh-etiqueta: 1.25rem;
+    --fs-cifra: 1.75rem;
+    --lh-cifra: 2.25rem;
+    --fs-codigo: 1.125rem;
+    --lh-codigo: 1.5rem;
+}
+
+/* El conteo es siempre de pulgar, también en computador. */
+[data-densidad="conteo"] {
+    --control-h: 3rem;
+    --fila-h: 3.5rem;
+}
+
+@media (width >= 48rem) {
+    :root {
+        --fs-titulo-pagina: 1.5rem;
+        --lh-titulo-pagina: 2rem;
+        --fs-cuerpo: 0.875rem;
+        --lh-cuerpo: 1.25rem;
+        --fs-etiqueta: 0.8125rem;
+        --lh-etiqueta: 1.125rem;
+        --fs-cifra: 1.875rem;
+        --fs-codigo: 0.8125rem;
+        --lh-codigo: 1.25rem;
+    }
+    [data-densidad="admin"] {
+        --control-h: 2.25rem;
+        --fila-h: 2.75rem;
+    }
 }
 
 @layer base {
@@ -114,7 +199,7 @@
     @apply border-border outline-ring;
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-page text-foreground antialiased;
   }
   html {
     @apply font-sans;

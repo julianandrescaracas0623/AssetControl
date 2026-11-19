@@ -22,7 +22,7 @@ const badgeVariants = cva(
           "border-destructive-border bg-destructive-soft text-destructive focus-visible:ring-destructive",
         brand: "border-brand-border bg-brand-soft text-brand-strong",
         neutral: "bg-muted text-secondary-foreground",
-        dark: "bg-primary text-primary-foreground",
+        dark: "bg-ink text-ink-foreground",
       },
     },
     defaultVariants: {

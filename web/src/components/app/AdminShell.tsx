@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { useDensidad } from '@/hooks/use-densidad'
 import { useEsEscritorio } from '@/hooks/use-escritorio'
 import { useInformeDeOrigen } from '@/lib/informe'
 import { etiquetaRol, iniciales, useCerrarSesion, useSesion } from '@/lib/sesion'
@@ -241,6 +242,8 @@ export default function AdminShell() {
   const { pathname } = useLocation()
   const [abierta] = useState(barraAbierta)
   const [buscando, setBuscando] = useState(false)
+  // Spec 016, T1 (D6): densidad de escritorio desde md, de pulgar por debajo.
+  useDensidad('admin')
 
   // Ctrl+K / ⌘K abre el buscador desde cualquier pantalla de administración.
   useEffect(() => {
@@ -255,9 +258,9 @@ export default function AdminShell() {
   }, [])
   return (
     <TooltipProvider delayDuration={0}>
-    <SidebarProvider defaultOpen={abierta}>
+    <SidebarProvider defaultOpen={abierta} data-densidad="admin">
       <BarraLateral />
-      <SidebarInset className="min-w-0">
+      <SidebarInset className="min-w-0 bg-page">
         {!conDatosReales(pathname) && <DatosFicticios />}
         <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-2 md:px-6">
           <SidebarTrigger className="size-11 md:size-8" aria-label="Mostrar u ocultar el menú" />

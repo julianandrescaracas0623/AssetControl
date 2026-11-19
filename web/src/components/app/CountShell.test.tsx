@@ -79,3 +79,14 @@ describe('CountShell: atajo al inicio del conteo', () => {
     expect(screen.queryByRole('link', { name: 'Inicio del conteo' })).toBeNull()
   })
 })
+
+// Spec 016, T1 (D6): el conteo usa siempre la densidad de móvil.
+describe('CountShell: densidad (spec 016, T1)', () => {
+  it('fija data-densidad="conteo" en el shell y en el documento', () => {
+    renderShell()
+    expect(screen.getByRole('main').closest('[data-densidad]')?.getAttribute('data-densidad')).toBe('conteo')
+    expect(document.documentElement.getAttribute('data-densidad')).toBe('conteo')
+    cleanup()
+    expect(document.documentElement.hasAttribute('data-densidad')).toBe(false)
+  })
+})

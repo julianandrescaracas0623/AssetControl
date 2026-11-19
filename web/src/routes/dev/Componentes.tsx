@@ -50,11 +50,84 @@ import { ACTIVOS, RESUMEN, ULTIMO_INFORME, UBICACIONES_API } from '@/mocks/datos
 // (docs/08). Solo datos de ejemplo; no llama a la API.
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
+  const id = `seccion-${title.toLowerCase().normalize('NFD').replace(/[^a-z]/g, '')}`
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+    <section aria-labelledby={id} className="flex flex-col gap-4">
+      <h2 id={id} className="text-titulo-seccion">{title}</h2>
       {children}
     </section>
+  )
+}
+
+// Spec 016, T1 (A7): la galería muestra los tokens por nombre; el valor se lee del
+// CSS en tiempo de ejecución (index.css es el único archivo con literales, R1).
+const PALETA: Array<{ token: string; muestra: string; uso: string }> = [
+  { token: '--page', muestra: 'bg-page', uso: 'Fondo de página' },
+  { token: '--card', muestra: 'bg-card', uso: 'Tarjetas, tablas, campos y diálogos' },
+  { token: '--muted', muestra: 'bg-muted', uso: 'Relleno neutro, pistas' },
+  { token: '--border', muestra: 'bg-border', uso: 'Bordes decorativos' },
+  { token: '--input', muestra: 'bg-input', uso: 'Contorno de controles (3 : 1)' },
+  { token: '--muted-foreground', muestra: 'bg-muted-foreground', uso: 'Texto secundario' },
+  { token: '--foreground', muestra: 'bg-foreground', uso: 'Texto' },
+  { token: '--ink', muestra: 'bg-ink', uso: 'Botón fuerte, informe congelado' },
+  { token: '--primary', muestra: 'bg-primary', uso: 'Acción principal' },
+  { token: '--primary-hover', muestra: 'bg-primary-hover', uso: 'Acción principal al pasar o pulsar' },
+  { token: '--brand-soft', muestra: 'bg-brand-soft', uso: 'Información, selección, ítem activo' },
+  { token: '--ring', muestra: 'bg-ring', uso: 'Foco: anillo de 2 px con 2 px de separación' },
+  { token: '--success', muestra: 'bg-success', uso: 'Encontrado, guardado' },
+  { token: '--warning', muestra: 'bg-warning', uso: 'Aviso, no confirmado' },
+  { token: '--destructive', muestra: 'bg-destructive', uso: 'Error, no encontrado' },
+]
+
+function valorToken(token: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(token).trim()
+}
+
+function Muestra({ token, muestra, uso }: { token: string; muestra: string; uso: string }) {
+  const [valor] = useState(() => valorToken(token))
+  return (
+    <li className="flex min-w-0 items-center gap-3 rounded-xl border bg-card p-3 shadow-xs">
+      <span className={`size-10 shrink-0 rounded-lg border ${muestra}`} aria-hidden="true" />
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate font-mono text-sm font-medium">{token}</span>
+        <span className="truncate text-xs text-muted-foreground">{uso}</span>
+        {valor && <span className="font-mono text-xs text-muted-foreground">{valor}</span>}
+      </span>
+    </li>
+  )
+}
+
+const ESCALA: Array<{ clase: string; ejemplo: string; nota: string }> = [
+  { clase: 'text-titulo-pagina', ejemplo: 'Activos', nota: '20 px / 24 px desde md · 600' },
+  { clase: 'text-titulo-seccion', ejemplo: 'Por ubicación', nota: '16 px · 600' },
+  { clase: 'text-cuerpo', ejemplo: 'Escanea el sticker del activo para verificarlo.', nota: '16 px / 14 px desde md · 400' },
+  { clase: 'text-etiqueta', ejemplo: 'Ubicación', nota: '14 px / 13 px desde md · 500' },
+  { clase: 'text-cifra', ejemplo: '$ 207.152.800', nota: '28 px / 30 px desde md · 600 · tabular-nums' },
+  { clase: 'text-codigo', ejemplo: '000457', nota: '18 px / 13 px desde md · Geist Mono 500' },
+]
+
+function DemoDensidad({ densidad, titulo, nota }: { densidad: 'conteo' | 'admin'; titulo: string; nota: string }) {
+  return (
+    <div data-densidad={densidad} className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs">
+      <div className="flex flex-col">
+        <p className="text-titulo-seccion">{titulo}</p>
+        <p className="text-etiqueta text-muted-foreground">{nota}</p>
+      </div>
+      <div className="flex flex-wrap gap-separacion">
+        <Button className="h-control px-4">Confirmar</Button>
+        <Button variant="outline" className="h-control px-4">Escribir código</Button>
+      </div>
+      <ul className="divide-y rounded-lg border">
+        <li className="flex h-fila items-center justify-between gap-3 px-3">
+          <span className="min-w-0 truncate">Silla ergonómica</span>
+          <span className="font-mono text-sm text-muted-foreground">000457</span>
+        </li>
+        <li className="flex h-fila items-center justify-between gap-3 px-3">
+          <span className="min-w-0 truncate">Impresora multifuncional</span>
+          <span className="font-mono text-sm text-muted-foreground">000215</span>
+        </li>
+      </ul>
+    </div>
   )
 }
 
@@ -64,13 +137,51 @@ export default function Componentes() {
     <main className="mx-auto flex w-full max-w-[1320px] flex-col gap-10 p-4 md:p-8">
       <header className="flex flex-col gap-1 border-b pb-6">
         <p className="text-xs font-medium text-muted-foreground">AssetControl · desarrollo</p>
-        <h1 className="text-2xl font-semibold tracking-tight">Sistema de diseño · Grafito y Cobalto</h1>
+        <h1 className="text-titulo-pagina">Sistema de diseño · Grafito y Cobalto</h1>
         <p className="text-sm text-muted-foreground">
           Componentes de shadcn/ui con el tema aprobado. Cifras con{' '}
           <span className="font-mono">tabular-nums</span>, códigos en{' '}
           <span className="font-mono">Geist Mono</span>.
         </p>
       </header>
+
+      <Section title="Paleta">
+        <p className="text-sm text-muted-foreground">
+          Página en gris muy claro y todo lo que se toca en blanco. Una sola señal de acción: el cobalto.
+        </p>
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {PALETA.map((m) => (
+            <Muestra key={m.token} {...m} />
+          ))}
+        </ul>
+      </Section>
+
+      <Section title="Tipografía">
+        <ul className="flex flex-col divide-y rounded-xl border bg-card shadow-xs">
+          {ESCALA.map(({ clase, ejemplo, nota }) => (
+            <li key={clase} className="flex flex-col gap-1 p-4 md:flex-row md:items-baseline md:gap-6">
+              <span className="w-44 shrink-0 font-mono text-xs text-muted-foreground">{clase}</span>
+              <span
+                className={`min-w-0 flex-1 ${clase} ${clase === 'text-cifra' ? 'tabular-nums' : ''} ${clase === 'text-codigo' ? 'font-mono' : ''} ${clase === 'text-etiqueta' ? 'text-muted-foreground' : ''}`}
+              >
+                {ejemplo}
+              </span>
+              <span className="text-xs text-muted-foreground">{nota}</span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
+      <Section title="Densidad">
+        <p className="text-sm text-muted-foreground">
+          Un mismo componente, dos densidades: <span className="font-mono">h-control</span> y{' '}
+          <span className="font-mono">h-fila</span> cambian con <span className="font-mono">data-densidad</span>.
+        </p>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <DemoDensidad densidad="conteo" titulo="Conteo" nota="Siempre: control 48 px, fila 56 px, separación 8 px." />
+          <DemoDensidad densidad="admin" titulo="Administración" nota="Desde 768 px: control 36 px, fila 44 px. Por debajo, como el conteo." />
+        </div>
+      </Section>
 
       <Section title="Botones">
         <div className="flex flex-wrap items-center gap-2">

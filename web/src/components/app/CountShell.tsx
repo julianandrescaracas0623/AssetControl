@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 
 import { NetworkStatus, type EstadoRed } from '@/components/app/NetworkStatus'
 import { Button } from '@/components/ui/button'
+import { useDensidad } from '@/hooks/use-densidad'
 
 // Shell del modo conteo (docs/08 §5, spec 001b T6): móvil primero y a una
 // mano. Encabezado compacto (retroceso, sesión y sala, estado de red),
@@ -30,8 +31,10 @@ export function CountShell({
   acciones?: ReactNode
   children: ReactNode
 }) {
+  // Spec 016, T1 (D6): el conteo siempre con objetivos de pulgar.
+  useDensidad('conteo')
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div data-densidad="conteo" className="flex min-h-0 flex-1 flex-col">
       <header className="sticky top-0 z-10 border-b bg-background">
         <div className="mx-auto flex h-14 w-full max-w-[480px] items-center gap-1 px-1.5">
           {volver ? (

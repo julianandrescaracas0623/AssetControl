@@ -65,7 +65,7 @@ export function Barras({
               <span className="h-2 rounded-full bg-muted" aria-hidden="true">
                 <span
                   data-slot="barra"
-                  className="block h-2 rounded-full bg-primary"
+                  className="block h-2 rounded-full bg-ink"
                   style={{ width: `${proporcion(f.valor, maximo)}%` }}
                 />
               </span>

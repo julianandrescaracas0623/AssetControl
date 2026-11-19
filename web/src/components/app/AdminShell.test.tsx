@@ -156,3 +156,25 @@ describe('«Ir a contar» según el dispositivo (spec 015, T9)', () => {
     expect(within(menu).getByRole('link', { name: 'Ir a contar' }).getAttribute('href')).toBe('/contar')
   })
 })
+
+// Spec 016, T1 (D1, D6): lienzo en dos niveles y densidad de administración.
+describe('AdminShell: densidad y lienzo (spec 016, T1)', () => {
+  beforeEach(() => simularAncho({ movil: false }))
+
+  it('fija data-densidad="admin" en el shell y en el documento (también para diálogos en portal)', async () => {
+    renderAt('/admin')
+    await screen.findByRole('navigation', { name: 'Navegación principal' })
+    expect(document.querySelector('[data-slot="sidebar-wrapper"]')?.getAttribute('data-densidad')).toBe('admin')
+    expect(document.documentElement.getAttribute('data-densidad')).toBe('admin')
+    cleanup()
+    expect(document.documentElement.hasAttribute('data-densidad')).toBe(false)
+  })
+
+  it('el contenido va sobre el fondo de página (--page)', async () => {
+    renderAt('/admin')
+    await screen.findByRole('navigation', { name: 'Navegación principal' })
+    const inset = document.querySelector('[data-slot="sidebar-inset"]')
+    expect(inset?.classList.contains('bg-page')).toBe(true)
+    expect(inset?.classList.contains('bg-background')).toBe(false)
+  })
+})

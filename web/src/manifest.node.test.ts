@@ -9,9 +9,11 @@ import { describe, expect, it } from 'vitest'
 const raiz = resolve(import.meta.dirname, '..')
 const manifest = JSON.parse(readFileSync(resolve(raiz, 'public/manifest.webmanifest'), 'utf8'))
 const indice = readFileSync(resolve(raiz, 'index.html'), 'utf8')
-// El color del tema es el `--primary` de index.css (aquí no se repite el valor).
+// El color del tema es el neutro oscuro de index.css (aquí no se repite el valor).
+// Spec 016, T1 (D2): `--primary` pasó a cobalto; el neutro oscuro vive en `--ink`,
+// que conserva el color de la barra del atajo y de sus íconos.
 const css = readFileSync(resolve(raiz, 'src/index.css'), 'utf8')
-const primario = /--primary:\s*(#[0-9A-Fa-f]{6});/.exec(css)![1]
+const primario = /--ink:\s*(#[0-9A-Fa-f]{6});/.exec(css)![1]
 
 describe('atajo tipo app', () => {
   it('abre la app en Conteo, sin barra del navegador y en español', () => {

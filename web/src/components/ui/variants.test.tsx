@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 // Spec 001b, T2: variantes semánticas del tema (docs/08 §2.1: fondo suave,
 // texto e ícono del color sólido).
@@ -15,7 +16,8 @@ describe('Badge', () => {
     ['warning', 'bg-warning-soft', 'text-warning'],
     ['brand', 'bg-brand-soft', 'text-brand-strong'],
     ['neutral', 'bg-muted', 'text-secondary-foreground'],
-    ['dark', 'bg-primary', 'text-primary-foreground'],
+    // Spec 016, T1 (D2): el neutro oscuro pasa a --ink; --primary es el cobalto del botón principal.
+    ['dark', 'bg-ink', 'text-ink-foreground'],
     ['destructive', 'bg-destructive-soft', 'text-destructive'],
   ] as const)('variante %s usa %s y %s', (variant, bg, text) => {
     render(<Badge variant={variant}>Estado</Badge>)
@@ -39,5 +41,17 @@ describe('Alert', () => {
       </Alert>,
     )
     expect(screen.getByRole('alert').classList.contains(bg), bg).toBe(true)
+  })
+})
+
+// Spec 016, T1 (D2): botón principal cobalto con hover opaco --primary-hover (AA);
+// primary/80 sobre blanco baja a ≈ 4,2 : 1 con texto blanco.
+describe('Button', () => {
+  it('la variante principal usa --primary y --primary-hover', () => {
+    render(<Button>Guardar</Button>)
+    const { classList } = screen.getByRole('button', { name: 'Guardar' })
+    expect(classList.contains('bg-primary')).toBe(true)
+    expect(classList.contains('hover:bg-primary-hover')).toBe(true)
+    expect(classList.contains('hover:bg-primary/80')).toBe(false)
   })
 })

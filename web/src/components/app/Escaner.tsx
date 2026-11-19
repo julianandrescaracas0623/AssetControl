@@ -89,13 +89,13 @@ export function Escaner({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className={`relative flex flex-1 items-center justify-center overflow-hidden rounded-2xl bg-primary text-primary-foreground ${className}`}>
+      <div className={`relative flex flex-1 items-center justify-center overflow-hidden rounded-2xl bg-ink text-ink-foreground ${className}`}>
         <video ref={video} className="absolute inset-0 size-full object-cover" muted playsInline aria-hidden="true" />
         {fallo ? (
           <div role="alert" className="relative flex max-w-xs flex-col items-center gap-3 px-6 text-center">
             <VideoOff className="size-8" aria-hidden="true" />
             <p className="font-semibold">{fallo.titulo}</p>
-            <p className="text-sm text-primary-foreground/80">{fallo.texto}</p>
+            <p className="text-sm text-ink-foreground/80">{fallo.texto}</p>
             {estado !== 'inseguro' && (
               <Button variant="secondary" className="min-h-11" onClick={() => { setEstado('iniciando'); setIntento((n) => n + 1) }}>
                 Reintentar la cámara
@@ -104,7 +104,7 @@ export function Escaner({
           </div>
         ) : (
           <>
-            <span className="absolute top-3 left-3 inline-flex h-7 items-center gap-1.5 rounded-full border border-primary-foreground/30 bg-primary/60 px-2.5 text-xs">
+            <span className="absolute top-3 left-3 inline-flex h-7 items-center gap-1.5 rounded-full border border-ink-foreground/30 bg-ink/60 px-2.5 text-xs">
               {estado === 'iniciando' ? (
                 <LoaderCircle className="size-3 animate-spin motion-reduce:animate-none" aria-hidden="true" />
               ) : (
@@ -113,15 +113,15 @@ export function Escaner({
               {estado === 'iniciando' ? 'Abriendo la cámara…' : 'Cámara activa'}
             </span>
             <div className="relative h-36 w-64" aria-hidden="true">
-              <span className="absolute top-0 left-0 size-8 rounded-tl-xl border-t-4 border-l-4 border-primary-foreground" />
-              <span className="absolute top-0 right-0 size-8 rounded-tr-xl border-t-4 border-r-4 border-primary-foreground" />
-              <span className="absolute bottom-0 left-0 size-8 rounded-bl-xl border-b-4 border-l-4 border-primary-foreground" />
-              <span className="absolute right-0 bottom-0 size-8 rounded-br-xl border-r-4 border-b-4 border-primary-foreground" />
+              <span className="absolute top-0 left-0 size-8 rounded-tl-xl border-t-4 border-l-4 border-ink-foreground" />
+              <span className="absolute top-0 right-0 size-8 rounded-tr-xl border-t-4 border-r-4 border-ink-foreground" />
+              <span className="absolute bottom-0 left-0 size-8 rounded-bl-xl border-b-4 border-l-4 border-ink-foreground" />
+              <span className="absolute right-0 bottom-0 size-8 rounded-br-xl border-r-4 border-b-4 border-ink-foreground" />
               <span className="absolute inset-x-4 top-1/2 h-0.5 bg-brand-border" />
             </div>
             <div className="absolute inset-x-0 bottom-5 flex flex-col items-center gap-1 px-4 text-center">
               <span className="font-semibold">Apunta al sticker</span>
-              <span className="text-sm text-primary-foreground/80">Se lee solo, sin tocar nada</span>
+              <span className="text-sm text-ink-foreground/80">Se lee solo, sin tocar nada</span>
             </div>
           </>
         )}
