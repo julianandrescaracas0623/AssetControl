@@ -10,7 +10,7 @@ import { LocationPicker } from '@/components/app/LocationPicker'
 import { CodigoNoEncontrado, Mensaje } from '@/components/app/MensajeConteo'
 import type { EstadoRed } from '@/components/app/NetworkStatus'
 import { OtraUbicacion } from '@/components/app/OtraUbicacion'
-import { Aviso, Boton, Campo, Estado, ListaDatos, MarcoCampo, Panel, Progreso } from '@/components/kit'
+import { Aviso, Boton, Campo, Estado, ListaDatos, MarcoCampo, Panel, Progreso, Tecla } from '@/components/kit'
 import { type Activo, aTarjeta, normalizarCodigo, useActivoPorCodigo } from '@/lib/activos'
 import { api, mensajeDeError } from '@/lib/api/cliente'
 import { rutaDe } from '@/lib/catalogo'
@@ -32,18 +32,10 @@ import { cn } from '@/lib/utils'
 // siguen siendo tres pantallas distintas. Mensaje y OtraUbicacion viven en components/app
 // y se reexportan aquí para el conteo de escritorio (spec 015, T8).
 
-export { Mensaje, OtraUbicacion }
+// Tecla de un atajo (spec 015, T8): desde la T6 de la 016 vive en el kit.
+export { Mensaje, OtraUbicacion, Tecla }
 
 const hora = new Intl.DateTimeFormat('es-CO', { hour: 'numeric', minute: '2-digit' })
-
-/** Tecla de un atajo (spec 015, T8). Decorativa: el nombre accesible lo da el texto. */
-export function Tecla({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <kbd aria-hidden="true" className={cn('rounded border bg-muted px-1.5 font-mono text-[11px] leading-5 font-normal text-muted-foreground', className)}>
-      {children}
-    </kbd>
-  )
-}
 
 // Spec 015, T8: el conteo de escritorio reutiliza estas piezas (con `atajos`, muestra la tecla).
 export function EstadoFisico({ valor, onValor, atajos = false }: { valor: 'ok' | 'danado'; onValor: (v: 'ok' | 'danado') => void; atajos?: boolean }) {

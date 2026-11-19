@@ -1,4 +1,4 @@
-import { Check, CircleAlert, Info, RefreshCw, X } from 'lucide-react'
+import { CircleAlert, RefreshCw, X } from 'lucide-react'
 import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
@@ -7,6 +7,7 @@ import { CopiarDeParecido } from '@/components/app/CopiarDeParecido'
 import { CountShell } from '@/components/app/CountShell'
 import {
   AvisoRegistrado,
+  CampoCategoria,
   CampoCodigo,
   Confirmacion,
   Etiqueta,
@@ -19,14 +20,11 @@ import {
 } from '@/components/app/FormularioAlta'
 import { InputSugerido } from '@/components/app/InputSugerido'
 import { LocationPicker } from '@/components/app/LocationPicker'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Aviso, Boton, Campo, EncabezadoPagina, MarcaObligatorio, MarcoCampo, Panel } from '@/components/kit'
+import { useDensidad } from '@/hooks/use-densidad'
 import { useEsEscritorio } from '@/hooks/use-escritorio'
 import type { Activo } from '@/lib/activos'
-import { claseConservado, type ErroresAlta, teclasDelAlta, useAltaActivo } from '@/lib/altaActivo'
+import { claseControlAlta, type ErroresAlta, teclasDelAlta, useAltaActivo } from '@/lib/altaActivo'
 import { useCategorias, useUbicaciones } from '@/lib/catalogo'
 import { useSalaDeTrabajo } from '@/lib/conteo'
 import { useRol } from '@/lib/sesion'
@@ -45,44 +43,17 @@ import { CabeceraEscritorio } from './Escritorio'
 // otro». En el teléfono, una columna como antes y «Guardar y registrar otro» en el pie.
 // Tras «registrar otro» (o sin código en la URL) el código se escribe o se escanea. La
 // ubicación empieza en la sala de trabajo del conteo, si hay una.
+// Spec 016, T6 (R2, R4, R10): presentación con el kit. Teléfono: la BarraAccion del
+// CountShell con «Guardar activo» como única principal (56 px) y «Guardar y registrar
+// otro» encima; los datos en paneles blancos sobre la página; controles de 48 px.
+// Escritorio: encabezado de página, el formulario en un panel con su pie de acciones y la
+// columna derecha con paneles. Mismos pasos, mismos campos y las mismas llamadas.
 
 const rutaActivo = (codigo: string) => `/contar/activo/${encodeURIComponent(codigo)}`
 
-function Campo({
-  id,
-  etiqueta,
-  error,
-  ayuda,
-  compacto,
-  children,
-}: {
-  id: string
-  etiqueta: ReactNode
-  error?: string
-  ayuda?: string
-  compacto: boolean
-  children: ReactNode
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <Label htmlFor={id} className={compacto ? undefined : 'text-[15px]'}>{etiqueta}</Label>
-      {children}
-      {error ? (
-        <p id={`${id}-error`} className={cn('flex items-center gap-1.5 text-destructive', compacto ? 'text-xs' : 'text-sm')}>
-          <CircleAlert className="size-4 shrink-0" aria-hidden="true" />
-          {error}
-        </p>
-      ) : (
-        ayuda && <p id={`${id}-ayuda`} className={cn('text-muted-foreground', compacto ? 'text-xs' : 'text-sm')}>{ayuda}</p>
-      )}
-    </div>
-  )
-}
-
-const Obligatorio = () => <span className="text-destructive" aria-hidden="true">*</span>
-const aria = (errores: ErroresAlta, campo: keyof ErroresAlta, ayuda = false) => ({
+const aria = (errores: ErroresAlta, campo: keyof ErroresAlta) => ({
   'aria-invalid': errores[campo] ? true : undefined,
-  'aria-describedby': errores[campo] ? `${campo}-error` : ayuda ? `${campo}-ayuda` : undefined,
+  'aria-describedby': errores[campo] ? `${campo}-error` : undefined,
 })
 
 export default function Alta() {
@@ -122,161 +93,187 @@ export default function Alta() {
   const salirDelAlta = escritorio ? '/contar/escanear' : '/contar'
 
   if (alta.creado) {
-    const aviso = (
-      <Alert variant="success">
-        <Check />
-        <AlertTitle>Activo creado</AlertTitle>
-        <AlertDescription className="flex flex-col items-start gap-2">
-          <span>
-            {alta.creado.nombre} · <span className="font-mono">{alta.creado.codigo}</span> quedó registrado en{' '}
-            {alta.creado.ubicacion.ruta}.
-          </span>
-          <EstadoFoto estado={alta.foto.estado} error={alta.foto.error} onReintentar={alta.reintentarFoto} />
-        </AlertDescription>
-      </Alert>
+    const creado = (
+      <span>
+        {alta.creado.nombre} · <span className="font-mono">{alta.creado.codigo}</span> quedó registrado en {alta.creado.ubicacion.ruta}.
+      </span>
     )
+    const foto = <EstadoFoto estado={alta.foto.estado} error={alta.foto.error} onReintentar={alta.reintentarFoto} />
     if (escritorio) {
       return (
         <MarcoEscritorio red="guardado">
-          <div className="flex flex-col gap-4 rounded-xl border bg-card p-6">
-            <h1 className="text-xl font-semibold tracking-tight">Registrar activo</h1>
-            {aviso}
-            <div className="flex gap-2">
-              <Button asChild>
-                <Link to="/contar/escanear">Volver al conteo</Link>
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setRegistrado(null)
-                  alta.otro()
-                }}
-              >
-                Registrar otro
-              </Button>
-            </div>
+          <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+            <EncabezadoPagina titulo="Registrar activo" />
+            <Aviso
+              tono="exito"
+              titulo="Activo creado"
+              accion={
+                <>
+                  <Boton asChild>
+                    <Link to="/contar/escanear">Volver al conteo</Link>
+                  </Boton>
+                  <Boton
+                    variante="secundario"
+                    onClick={() => {
+                      setRegistrado(null)
+                      alta.otro()
+                    }}
+                  >
+                    Registrar otro
+                  </Boton>
+                </>
+              }
+            >
+              <div className="flex flex-col items-start gap-2">
+                {creado}
+                {foto}
+              </div>
+            </Aviso>
           </div>
         </MarcoEscritorio>
       )
     }
     return (
-      <CountShell titulo="Registrar activo" volver="/contar" estadoRed="guardado"
-        acciones={
-          <Button asChild className="min-h-14 font-semibold">
+      <CountShell
+        titulo="Registrar activo"
+        volver="/contar"
+        estadoRed="guardado"
+        principal={
+          <Boton asChild tamano="accion">
             <Link to="/contar/escanear">Escanear otro</Link>
-          </Button>
+          </Boton>
         }
       >
         <h1 className="sr-only">Registrar activo</h1>
-        {aviso}
+        <Aviso tono="exito" titulo="Activo creado">
+          <div className="flex flex-col items-start gap-2">
+            {creado}
+            {foto}
+          </div>
+        </Aviso>
       </CountShell>
     )
   }
 
-  const control = escritorio ? undefined : 'h-12 text-base'
   const ayudaUbicacion = sala && campos.ubicacion === sala ? 'Viene de la sala donde estás contando.' : 'Sala o box donde está el activo.'
 
   const avisos = (
     <>
       {registrado && <AvisoRegistrado activo={registrado} rutaActivo={rutaActivo} />}
       {alta.errorGeneral && (
-        <Alert variant="destructive">
-          <CircleAlert />
-          <AlertTitle>No se guardó</AlertTitle>
-          <AlertDescription className="flex flex-col items-start gap-3">
-            {alta.errorGeneral.mensaje}
-            {alta.errorGeneral.reintentable && (
-              <Button type="submit" form="alta" variant="outline" className="min-h-11 md:min-h-0">
-                <RefreshCw />
+        <Aviso
+          tono="error"
+          titulo="No se guardó"
+          accion={
+            alta.errorGeneral.reintentable && (
+              <Boton type="submit" form="alta" variante="secundario" icono={<RefreshCw />}>
                 Reintentar
-              </Button>
-            )}
-          </AlertDescription>
-        </Alert>
+              </Boton>
+            )
+          }
+        >
+          {alta.errorGeneral.mensaje}
+        </Aviso>
       )}
       {alta.existente && (
-        <Alert variant="warning">
-          <Info />
-          <AlertTitle>Ese código ya está registrado</AlertTitle>
-          <AlertDescription className="flex flex-col items-start gap-3">
-            Es {alta.existente.nombre}. Ábrelo en vez de crear otro.
-            <Button asChild variant="outline" className="min-h-11 md:min-h-0">
+        <Aviso
+          tono="aviso"
+          titulo="Ese código ya está registrado"
+          accion={
+            <Boton asChild variante="secundario">
               <Link to={rutaActivo(alta.existente.codigo)}>Abrir activo</Link>
-            </Button>
-          </AlertDescription>
-        </Alert>
+            </Boton>
+          }
+        >
+          Es {alta.existente.nombre}. Ábrelo en vez de crear otro.
+        </Aviso>
       )}
     </>
   )
 
-  const codigoFijo = (
+  const errorCodigo = errores.codigo && (
+    <p id="codigo-error" className={cn('flex items-center gap-1.5 text-etiqueta font-normal text-destructive', escritorio && 'px-5 pt-3')}>
+      <CircleAlert className="size-4 shrink-0" aria-hidden="true" />
+      {errores.codigo}
+    </p>
+  )
+
+  const codigoFijo = escritorio ? (
     <>
-      <div className={cn('flex items-center gap-3 bg-muted/50', escritorio ? 'border-b px-6 py-3' : 'rounded-xl border px-3 py-2')}>
+      <div className="flex items-center gap-3 border-b bg-muted/40 px-5 py-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs text-muted-foreground">Código del sticker · nuevo</p>
+          <p className="truncate text-etiqueta font-normal text-muted-foreground">Código del sticker · nuevo</p>
           <p className="font-mono text-lg tracking-wider break-all">{codigo}</p>
         </div>
-        <Confirmacion alta={alta} texto={escritorio ? 'Coincide con el sticker' : 'Coincide'} />
+        <Confirmacion alta={alta} texto="Coincide con el sticker" />
       </div>
-      {errores.codigo && (
-        <p id="codigo-error" className={cn('flex items-center gap-1.5 text-sm text-destructive', escritorio ? 'px-6 pt-3' : '-mt-2')}>
-          <CircleAlert className="size-4 shrink-0" aria-hidden="true" />
-          {errores.codigo}
-        </p>
-      )}
+      {errorCodigo}
     </>
+  ) : (
+    <Panel>
+      <div className="flex flex-col gap-1">
+        <p className="text-etiqueta font-normal text-muted-foreground">Código del sticker · nuevo</p>
+        <p className="font-mono text-xl tracking-wider break-all">{codigo}</p>
+        <Confirmacion alta={alta} texto="Coincide" />
+        {errorCodigo}
+      </div>
+    </Panel>
   )
 
   const datos = (
     <>
       {duplicando ? (
-        <Alert variant="info" className={escritorio ? 'md:col-span-2' : undefined}>
-          <Info />
-          <AlertTitle>Se copia de {copiado!.nombre}</AlertTitle>
-          <AlertDescription className="flex flex-col items-start gap-2 text-foreground">
-            Nombre, categoría ({copiado!.categoria.nombre}), marca, modelo y precio se copian del original. El precio solo lo
-            ven los administradores.
-            <Button type="button" variant="ghost" className="min-h-11 px-1 text-brand-strong md:min-h-0" onClick={alta.quitarCopia}>
-              <X />
+        <Aviso
+          tono="info"
+          titulo={`Se copia de ${copiado!.nombre}`}
+          className={escritorio ? 'md:col-span-2' : undefined}
+          accion={
+            <Boton variante="fantasma" icono={<X />} className="-ml-2 px-2 text-brand-strong" onClick={alta.quitarCopia}>
               Quitar la copia
-            </Button>
-          </AlertDescription>
-        </Alert>
+            </Boton>
+          }
+        >
+          Nombre, categoría ({copiado!.categoria.nombre}), marca, modelo y precio se copian del original. El precio solo lo ven los administradores.
+        </Aviso>
       ) : (
         <>
-          <Campo compacto={escritorio} id="nombre" etiqueta={<>Nombre <Obligatorio /></>} error={errores.nombre}>
-            <InputSugerido campo="nombre" id="nombre" value={campos.nombre} onChange={(e) => alta.cambiar('nombre', e.target.value)} maxLength={120} autoComplete="off" enterKeyHint="next" {...aria(errores, 'nombre')} className={control} />
-          </Campo>
-          <Campo compacto={escritorio} id="precio" etiqueta={<>Precio de compra (COP) <Obligatorio /></>} error={errores.precio} ayuda="Después de guardar, solo lo verán los administradores.">
-            <div className="relative">
-              <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" aria-hidden="true">$</span>
-              <Input id="precio" value={campos.precio} onChange={(e) => alta.cambiar('precio', e.target.value)} inputMode="decimal" autoComplete="off" {...aria(errores, 'precio', true)} className={cn('pl-7 tabular-nums', control)} />
-            </div>
-          </Campo>
-          <Campo compacto={escritorio} id="categoria" etiqueta={<Etiqueta conserva>Categoría <Obligatorio /></Etiqueta>} error={errores.categoria}>
-            <Select value={campos.categoria} onValueChange={(v) => alta.cambiar('categoria', v)} disabled={categorias.isPending}>
-              <SelectTrigger id="categoria" className={cn('w-full', !escritorio && 'h-12! text-base', claseConservado(alta, 'categoria'))} {...aria(errores, 'categoria')}>
-                <SelectValue placeholder={categorias.isPending ? 'Cargando…' : 'Elige una categoría'} />
-              </SelectTrigger>
-              <SelectContent>
-                {(categorias.data ?? []).map((c) => (
-                  <SelectItem key={c.id} value={c.id} className="min-h-11 md:min-h-8">{c.nombre}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Campo>
+          <MarcoCampo id="nombre" etiqueta="Nombre" obligatorio error={errores.nombre}>
+            <InputSugerido
+              campo="nombre"
+              id="nombre"
+              value={campos.nombre}
+              onChange={(e) => alta.cambiar('nombre', e.target.value)}
+              maxLength={120}
+              autoComplete="off"
+              enterKeyHint="next"
+              {...aria(errores, 'nombre')}
+              className={claseControlAlta(alta, 'nombre')}
+            />
+          </MarcoCampo>
+          <Campo
+            id="precio"
+            tipo="dinero"
+            etiqueta="Precio de compra (COP)"
+            obligatorio
+            error={errores.precio}
+            ayuda="Después de guardar, solo lo verán los administradores."
+            value={campos.precio}
+            onChange={(e) => alta.cambiar('precio', e.target.value)}
+            autoComplete="off"
+          />
+          <CampoCategoria alta={alta} categorias={categorias.data ?? []} cargando={categorias.isPending} />
         </>
       )}
-      <Campo compacto={escritorio} id="ubicacion" etiqueta={<Etiqueta conserva>Ubicación <Obligatorio /></Etiqueta>} error={errores.ubicacion} ayuda={ayudaUbicacion}>
+      <MarcoCampo id="ubicacion" etiqueta={<Etiqueta conserva>Ubicación <MarcaObligatorio /></Etiqueta>} error={errores.ubicacion} ayuda={ayudaUbicacion}>
         <LocationPicker
           id="ubicacion"
           ubicaciones={ubicaciones.data ?? []}
           cargando={ubicaciones.isPending}
           valor={campos.ubicacion || undefined}
           onChange={(v) => alta.cambiar('ubicacion', v)}
-          className={cn(!escritorio && 'h-12 text-base md:h-12', claseConservado(alta, 'ubicacion'))}
+          className={claseControlAlta(alta, 'ubicacion', cn('md:h-control', errores.ubicacion && 'border-destructive'))}
         />
-      </Campo>
+      </MarcoCampo>
     </>
   )
 
@@ -288,62 +285,69 @@ export default function Alta() {
     evento.preventDefault()
     guardar(false)
   }
-  const textoGuardar = alta.guardando ? 'Guardando…' : 'Guardar activo'
 
   if (escritorio) {
     return (
       <MarcoEscritorio red="en_linea">
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="flex min-w-0 flex-col gap-4">
-            {avisos}
-            <form id="alta" noValidate onSubmit={enviar} {...teclas} className="flex flex-col rounded-xl border bg-card">
-              <div className="flex items-center justify-between gap-3 border-b px-6 py-4">
-                <div>
-                  <h1 className="text-xl font-semibold tracking-tight">Registrar activo</h1>
-                  <p className="text-sm text-muted-foreground">
-                    {codigoEditable ? 'Escanea el sticker con el lector o escribe el código impreso.' : 'El sticker no está registrado. Completa lo obligatorio y guarda.'}
-                  </p>
-                </div>
-                <Link to="/contar/escanear" className="text-sm text-brand-strong underline underline-offset-4">
-                  Volver al conteo
-                </Link>
-              </div>
-              {codigoEditable ? (
-                <div className="border-b px-6 py-5">
-                  <CampoCodigo alta={alta} rutaActivo={rutaActivo} />
-                </div>
-              ) : (
-                codigoFijo
-              )}
-              <div className="grid gap-4 px-6 py-5 md:grid-cols-2">{datos}</div>
-              <div className="px-6 pb-5">
-                <MasDatos alta={alta} soloSerial={duplicando} />
-              </div>
-              <div className="flex items-center justify-between gap-2 rounded-b-xl border-t bg-sidebar px-6 py-3">
-                <Button asChild variant="ghost">
-                  <Link to={salirDelAlta}>Cancelar</Link>
-                </Button>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" disabled={alta.guardando} onClick={() => guardar(true)}>
-                    Guardar y registrar otro
-                    <TeclaBoton>Ctrl Enter</TeclaBoton>
-                  </Button>
-                  <Button type="submit" disabled={alta.guardando}>
-                    {textoGuardar}
-                    {!alta.guardando && <TeclaBoton oscura>Enter</TeclaBoton>}
-                  </Button>
-                </div>
-              </div>
-            </form>
+        <div className="flex flex-col gap-5">
+          <EncabezadoPagina
+            titulo="Registrar activo"
+            descripcion={codigoEditable ? 'Escanea el sticker con el lector o escribe el código impreso.' : 'El sticker no está registrado. Completa lo obligatorio y guarda.'}
+            acciones={
+              <Boton asChild variante="secundario">
+                <Link to="/contar/escanear">Volver al conteo</Link>
+              </Boton>
+            }
+          />
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="flex min-w-0 flex-col gap-4">
+              {avisos}
+              <form id="alta" noValidate onSubmit={enviar} {...teclas}>
+                <Panel
+                  relleno={false}
+                  pie={
+                    <>
+                      <Boton asChild variante="fantasma">
+                        <Link to={salirDelAlta}>Cancelar</Link>
+                      </Boton>
+                      <div className="ml-auto flex flex-wrap gap-separacion">
+                        <Boton variante="secundario" disabled={alta.guardando} onClick={() => guardar(true)}>
+                          Guardar y registrar otro
+                          <TeclaBoton>Ctrl Enter</TeclaBoton>
+                        </Boton>
+                        <Boton type="submit" cargando={alta.guardando} textoCargando="Guardando…">
+                          Guardar activo
+                          <TeclaBoton oscura>Enter</TeclaBoton>
+                        </Boton>
+                      </div>
+                    </>
+                  }
+                >
+                  {codigoEditable ? (
+                    <div className="border-b px-5 py-5">
+                      <CampoCodigo alta={alta} rutaActivo={rutaActivo} />
+                    </div>
+                  ) : (
+                    codigoFijo
+                  )}
+                  <div className="grid gap-4 px-5 py-5 md:grid-cols-2">{datos}</div>
+                  <div className="px-5 pb-5">
+                    <MasDatos alta={alta} soloSerial={duplicando} />
+                  </div>
+                </Panel>
+              </form>
+            </div>
+            <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-24">
+              <TarjetaCopiar alta={alta} rol={rol} />
+              <TarjetaFoto alta={alta} />
+              <Resumen alta={alta} rol={rol} categorias={categorias.data ?? []} ubicaciones={ubicaciones.data ?? []}>
+                {rol !== 'admin' && (
+                  <p className="text-etiqueta font-normal text-muted-foreground">El precio no se muestra aquí; después de guardar, solo lo ven los administradores.</p>
+                )}
+                <NotaRegistrarOtro />
+              </Resumen>
+            </aside>
           </div>
-          <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-24">
-            <TarjetaCopiar alta={alta} rol={rol} />
-            <TarjetaFoto alta={alta} />
-            <Resumen alta={alta} rol={rol} categorias={categorias.data ?? []} ubicaciones={ubicaciones.data ?? []}>
-              {rol !== 'admin' && <p className="text-xs text-muted-foreground">El precio no se muestra aquí; después de guardar, solo lo ven los administradores.</p>}
-              <NotaRegistrarOtro />
-            </Resumen>
-          </aside>
         </div>
       </MarcoEscritorio>
     )
@@ -354,25 +358,35 @@ export default function Alta() {
       titulo="Registrar activo"
       volver="/contar/escribir"
       estadoRed="en_linea"
-      acciones={
-        <>
-          <Button type="button" variant="outline" disabled={alta.guardando} onClick={() => guardar(true)}>
-            Guardar y registrar otro
-          </Button>
-          <Button type="submit" form="alta" className="min-h-14 font-semibold" disabled={alta.guardando}>
-            {textoGuardar}
-          </Button>
-        </>
+      secundaria={
+        <Boton variante="secundario" disabled={alta.guardando} onClick={() => guardar(true)}>
+          Guardar y registrar otro
+        </Boton>
+      }
+      principal={
+        <Boton type="submit" form="alta" tamano="accion" cargando={alta.guardando} textoCargando="Guardando…">
+          Guardar activo
+        </Boton>
       }
     >
       <h1 className="sr-only">Registrar activo</h1>
       <form id="alta" noValidate onSubmit={enviar} {...teclas} className="flex flex-col gap-4">
         {avisos}
-        {codigoEditable ? <CampoCodigo alta={alta} rutaActivo={rutaActivo} /> : codigoFijo}
-        <CopiarDeParecido onCopiar={alta.copiar} copiado={copiado} className="h-12 text-base md:h-12" />
-        {datos}
-        <MasDatos alta={alta} plegable soloSerial={duplicando} claseControl="h-12 text-base" />
-        <CampoFoto archivo={alta.foto.archivo} onElegir={(f) => void alta.foto.elegir(f)} deshabilitado={alta.guardando} />
+        {codigoEditable ? (
+          <Panel>
+            <CampoCodigo alta={alta} rutaActivo={rutaActivo} />
+          </Panel>
+        ) : (
+          codigoFijo
+        )}
+        <CopiarDeParecido onCopiar={alta.copiar} copiado={copiado} className="h-control bg-card text-base md:h-control" />
+        <Panel>
+          <div className="flex flex-col gap-4">{datos}</div>
+        </Panel>
+        <MasDatos alta={alta} plegable soloSerial={duplicando} />
+        <Panel>
+          <CampoFoto archivo={alta.foto.archivo} onElegir={(f) => void alta.foto.elegir(f)} deshabilitado={alta.guardando} />
+        </Panel>
       </form>
     </CountShell>
   )
@@ -381,8 +395,10 @@ export default function Alta() {
 /** Escritorio: la cabecera del conteo (sesión, sala, avance) y el contenido centrado. */
 function MarcoEscritorio({ red, children }: { red: 'en_linea' | 'guardado'; children: ReactNode }) {
   const sesion = useSesionAbierta()
+  // Spec 016, T6 (D6): el conteo, también en el computador, con objetivos de 48 px.
+  useDensidad('conteo')
   return (
-    <div className="flex min-h-svh flex-1 flex-col bg-sidebar">
+    <div data-densidad="conteo" className="flex min-h-svh flex-1 flex-col bg-page">
       <CabeceraEscritorio sesion={sesion.data ?? null} cargando={sesion.isPending} red={red} />
       <div className="mx-auto w-full max-w-[1320px] flex-1 px-6 py-6">{children}</div>
     </div>

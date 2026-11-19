@@ -6,6 +6,7 @@ import { type Activo, aPrecioCanonico, CLAVE_ACTIVOS, type CuerpoAlta, normaliza
 import { api, ErrorApi, mensajeDeError, type Rol } from '@/lib/api/cliente'
 import { useFotoPendiente } from '@/lib/fotos'
 import { useApiAutenticada } from '@/lib/sesion'
+import { cn } from '@/lib/utils'
 
 // Estado y envío del formulario de alta (spec 004, T6; R3, R4, R6, Q3): lo comparten el
 // alta del modo conteo y la de administración, cada una con su diseño.
@@ -307,6 +308,15 @@ export type AltaActivo = ReturnType<typeof useAltaActivo>
 
 /** Resalta un campo que conservó «Guardar y registrar otro» hasta que se cambia. */
 export const claseConservado = (alta: Pick<AltaActivo, 'conservados'>, campo: CampoAlta) => (alta.conservados.has(campo) ? 'border-brand-border bg-brand-soft' : undefined)
+
+/**
+ * Spec 016, T6: clases de un control de una línea del alta. La altura de la densidad
+ * (h-control), 16 px en el teléfono y, sobre blanco, salvo que esté resaltado como «se
+ * conserva» (fondo cobalto suave): nunca los dos fondos a la vez.
+ */
+export function claseControlAlta(alta: Pick<AltaActivo, 'conservados'>, campo?: CampoAlta, extra?: string) {
+  return cn('h-control px-3 text-base shadow-xs md:text-sm', (campo && claseConservado(alta, campo)) || 'bg-card', extra)
+}
 
 // Spec 015, T10: teclas del formulario de alta (lo usan las dos pantallas).
 const NO_TEXTO = new Set(['button', 'checkbox', 'radio', 'submit', 'reset', 'file', 'range', 'color', 'image'])

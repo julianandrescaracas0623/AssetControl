@@ -1,5 +1,5 @@
-import { Archive, ArrowLeft, ArrowLeftRight, Camera, Check, CircleCheck, History, Info, Loader2, Lock, MapPin, Plus, RefreshCw, ScanBarcode, SearchX, TriangleAlert, Usb } from 'lucide-react'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Archive, ArrowLeft, ArrowLeftRight, Camera, Check, CircleAlert, History, Info, Lock, MapPin, Plus, RefreshCw, ScanBarcode, SearchX, TriangleAlert, Usb } from 'lucide-react'
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, Outlet, useMatch, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
@@ -8,16 +8,11 @@ import { EstadoFoto } from '@/components/app/CampoFoto'
 import { Escaner } from '@/components/app/Escaner'
 import { FotoActivo } from '@/components/app/FotoActivo'
 import { LocationPicker } from '@/components/app/LocationPicker'
+import { CodigoNoEncontrado } from '@/components/app/MensajeConteo'
 import { MenuCuenta } from '@/components/app/MenuCuenta'
 import { type EstadoRed, NetworkStatus } from '@/components/app/NetworkStatus'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Progress } from '@/components/ui/progress'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Aviso, Boton, Campo, Estado, Insignia, ListaDatos, MarcoCampo, Panel, Pestanas, Progreso } from '@/components/kit'
+import { useDensidad } from '@/hooks/use-densidad'
 import { useEsEscritorio } from '@/hooks/use-escritorio'
 import { type Activo, aTarjeta, normalizarCodigo, useActivoPorCodigo, useBuscarActivos } from '@/lib/activos'
 import { api, mensajeDeError } from '@/lib/api/cliente'
@@ -44,6 +39,14 @@ import { AvisoYaVerificado, EstadoFisico, Mensaje, OtraUbicacion, Tecla } from '
 // Enter seguidos no crean dos verificaciones; un activo nuevo es otra verificación. Nada
 // se confirma solo: si se lee otro sticker con uno abierto, el abierto se descarta y se
 // avisa. El contador no ve precios (P13: el servidor no se los manda).
+//
+// Spec 016, T6 (R2, R6, D1, D6): presentación con el kit. Página gris con tres paneles
+// blancos (captura, cola y verificación), objetivos de 48 px del conteo, avisos, estados,
+// pestañas y avance del kit (el avance ya dice su valor al lector: Deuda T5 e), y la tecla
+// de «Confirmar» sin relleno sobre el cobalto (Deuda T1 b). Al cerrar «¿Dónde lo
+// encontraste?» el foco vuelve al panel «Verificación», también si se abrió con el botón,
+// para que Enter confirme y el lector siga escribiendo (Deuda T5 i). Teclado, ráfaga del
+// lector, candado de envío y llamadas a la API: sin cambios.
 
 const hora = new Intl.DateTimeFormat('es-CO', { hour: 'numeric', minute: '2-digit' })
 /**
@@ -105,6 +108,8 @@ function ConteoEscritorio() {
   const codigo = crudo ? (normalizarCodigo(crudo) ?? crudo) : undefined
   const sesion = useSesionAbierta()
   const { sala } = useSalaDeTrabajo()
+  // Spec 016, T6 (D6): el conteo, también en el computador, con objetivos de 48 px.
+  useDensidad('conteo')
 
   const campo = useRef<HTMLInputElement>(null)
   const panel = useRef<HTMLElement>(null)
@@ -256,9 +261,9 @@ function ConteoEscritorio() {
   }, [])
 
   return (
-    <div className="flex min-h-svh flex-1 flex-col bg-sidebar">
+    <div data-densidad="conteo" className="flex min-h-svh flex-1 flex-col bg-page">
       <CabeceraEscritorio sesion={sesion.data ?? null} cargando={sesion.isPending} red={red} />
-      <div className="mx-auto grid w-full max-w-[1320px] flex-1 grid-cols-[420px_minmax(0,1fr)] items-start gap-6 px-6 py-6">
+      <div className="mx-auto grid w-full max-w-[1320px] flex-1 grid-cols-[minmax(340px,420px)_minmax(0,1fr)] items-start gap-6 px-6 py-6">
         <div className="flex min-w-0 flex-col gap-4">
           <Captura
             campo={campo}
@@ -278,30 +283,46 @@ function ConteoEscritorio() {
           />
           <Cola sesion={sesion.data ?? null} sala={sala} actual={codigo} onAbrir={abrir} />
         </div>
-        <section ref={panel} tabIndex={-1} aria-label="Verificación" className="flex min-w-0 flex-col rounded-xl border bg-card outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+        <Panel
+          ref={panel}
+          role="region"
+          tabIndex={-1}
+          aria-label="Verificación"
+          relleno={false}
+          className="outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-page"
+        >
           {aviso && codigo && (
-            <Alert variant="warning" className="rounded-b-none border-x-0 border-t-0">
-              <TriangleAlert />
-              <AlertDescription className="text-foreground">
-                {aviso.ambiguo ? (
-                  <span>
-                    <span className="font-mono">{aviso.codigo}</span>: no sabemos si se guardó; revisa en Verificados.
-                  </span>
-                ) : (
-                  <span>
-                    <span className="font-mono">{aviso.codigo}</span> quedó sin confirmar: no se guardó. Escanéalo de nuevo para verificarlo.
-                  </span>
-                )}
-              </AlertDescription>
-            </Alert>
+            <Aviso
+              tono="aviso"
+              titulo={aviso.ambiguo ? 'Intento anterior sin respuesta' : 'Activo anterior sin confirmar'}
+              className="rounded-none border-x-0 border-t-0"
+            >
+              {aviso.ambiguo ? (
+                <span>
+                  <span className="font-mono">{aviso.codigo}</span>: no sabemos si se guardó; revisa en Verificados.
+                </span>
+              ) : (
+                <span>
+                  <span className="font-mono">{aviso.codigo}</span> quedó sin confirmar: no se guardó. Escanéalo de nuevo para verificarlo.
+                </span>
+              )}
+            </Aviso>
           )}
           {ultima && <UltimaVerificada verificacion={ultima} sesionId={sesion.data?.id} compacta={Boolean(codigo)} />}
           {codigo ? (
-            <PanelActivo key={codigo} codigo={codigo} atajosRef={atajos} onEstado={alEstado} onGuardado={alGuardar} onDescartar={alDescartar} />
+            <PanelActivo
+              key={codigo}
+              codigo={codigo}
+              atajosRef={atajos}
+              panelRef={panel}
+              onEstado={alEstado}
+              onGuardado={alGuardar}
+              onDescartar={alDescartar}
+            />
           ) : (
             <PanelListo />
           )}
-        </section>
+        </Panel>
       </div>
     </div>
   )
@@ -319,54 +340,54 @@ export function CabeceraEscritorio({ sesion, cargando, red }: { sesion: SesionCo
   // no un parámetro de la URL. El contador no entra a /admin: conserva el inicio del conteo.
   const admin = useRol() === 'admin'
   return (
-    <header className="sticky top-0 z-10 border-b bg-background">
-      <div className="mx-auto flex h-16 w-full max-w-[1320px] items-center gap-4 px-6">
+    <header className="sticky top-0 z-20 border-b bg-card">
+      <div className="mx-auto flex h-18 w-full max-w-[1320px] items-center gap-4 px-6">
         {admin && sesion ? (
-          <Button asChild variant="outline" className="shrink-0">
+          <Boton asChild variante="secundario" className="shrink-0">
             <Link to={`/admin/sesiones/${encodeURIComponent(sesion.id)}`}>
               <ArrowLeft />
               Volver a la sesión
             </Link>
-          </Button>
+          </Boton>
         ) : (
-          <Button asChild size="icon" className="size-9 shrink-0">
+          <Boton asChild variante="fuerte" className="size-control shrink-0 p-0 [&_svg]:size-5">
             <Link to="/contar" aria-label="Inicio del conteo">
-              <ScanBarcode className="size-5" />
+              <ScanBarcode />
             </Link>
-          </Button>
+          </Boton>
         )}
-        <div className="flex min-w-0 flex-col">
-          <p className="truncate text-[15px] leading-5 font-semibold">{sesion?.nombre ?? (cargando ? 'Conteo' : 'Sin sesión abierta')}</p>
-          {sesion && <p className="truncate text-xs text-muted-foreground">Sesión abierta · corte {fechaCorte(sesion.fecha_corte)}</p>}
+        <div className="flex min-w-0 shrink flex-col">
+          <p className="truncate text-titulo-seccion">{sesion?.nombre ?? (cargando ? 'Conteo' : 'Sin sesión abierta')}</p>
+          {sesion && <p className="truncate text-etiqueta font-normal text-muted-foreground">Sesión abierta · corte {fechaCorte(sesion.fecha_corte)}</p>}
         </div>
         {sesion && (
           <>
-            <span className="h-8 w-px shrink-0 bg-border" aria-hidden="true" />
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <Label htmlFor="sala-escritorio" className="text-xs font-normal text-muted-foreground">
+            <span className="h-10 w-px shrink-0 bg-border" aria-hidden="true" />
+            <div className="flex min-w-0 shrink-[2] items-center gap-3">
+              <label htmlFor="sala-escritorio" className="shrink-0 text-etiqueta font-normal text-muted-foreground">
                 Estás contando en
-              </Label>
+              </label>
               <LocationPicker
                 id="sala-escritorio"
                 ubicaciones={ubicaciones.data ?? []}
                 cargando={ubicaciones.isPending}
                 valor={sala}
                 onChange={elegir}
-                className="h-8 max-w-[360px] min-w-56"
+                className="h-control w-auto max-w-[360px] min-w-44 bg-card md:h-control"
               />
             </div>
           </>
         )}
         <div className="flex-1" />
         {avance && (
-          <div className="flex w-56 flex-col gap-1">
-            <span className="flex justify-between text-xs">
+          <div className="flex w-48 shrink-0 flex-col gap-1.5 xl:w-56">
+            <span className="flex justify-between text-etiqueta font-normal">
               <span className="text-muted-foreground tabular-nums">
                 <b className="font-semibold text-foreground">{formatEntero(avance.verificados)}</b> de {formatEntero(avance.total)} verificados
               </span>
               <span className="font-semibold tabular-nums">{pct.toLocaleString('es-CO')} %</span>
             </span>
-            <Progress value={pct} aria-label="Avance del conteo" className="h-1.5" />
+            <Progreso valor={pct} etiqueta="Avance del conteo" tamano="fino" />
           </div>
         )}
         <NetworkStatus estado={red} />
@@ -400,7 +421,7 @@ function Captura({
   onCamara,
   alLeerCamara,
 }: {
-  campo: React.RefObject<HTMLInputElement | null>
+  campo: RefObject<HTMLInputElement | null>
   texto: string
   onTexto: (t: string) => void
   error: string
@@ -470,13 +491,15 @@ function Captura({
   }
 
   return (
-    <section aria-label="Capturar un activo" className="flex flex-col gap-3 rounded-xl border bg-card p-4">
-      <Label htmlFor="captura">Escanea el sticker o busca por código o nombre</Label>
-      <div className="relative">
-        <ScanBarcode className="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-        <Input
+    <Panel role="region" aria-label="Capturar un activo">
+      <div className="flex flex-col gap-3">
+        <Campo
           ref={campo}
           id="captura"
+          etiqueta="Escanea el sticker o busca por código o nombre"
+          tipo="codigo"
+          grande
+          sufijo={<Tecla className="mr-3">Enter</Tecla>}
           role="combobox"
           aria-expanded={resultados.length > 0}
           aria-controls="captura-resultados"
@@ -510,28 +533,26 @@ function Captura({
               setMarcado(0)
             }
           }}
-          className="h-14 pr-16 pl-11 font-mono text-xl tracking-wider md:text-xl"
         />
-        <Tecla className="absolute top-1/2 right-3 -translate-y-1/2">Enter</Tecla>
-      </div>
-      {error ? (
-        <p id="captura-error" role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      ) : avisoVarios ? (
-        <p id="captura-aviso" role="status" className="flex items-start gap-1.5 text-sm text-warning">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          {resultados.length} activos coinciden: elige uno con las flechas o con un clic, o pulsa Enter otra vez para abrir el marcado
-        </p>
-      ) : (
-        <p id="captura-ayuda" className="flex items-start gap-1.5 text-xs text-muted-foreground">
-          <Usb className="mt-0.5 size-3.5 shrink-0 text-success" aria-hidden="true" />
-          El campo está siempre listo: el lector USB escribe el código y lo abre con Enter.
-        </p>
-      )}
-      {resultados.length > 0 && (
+        {error ? (
+          <p id="captura-error" role="alert" className="flex items-start gap-1.5 text-etiqueta font-normal text-destructive">
+            <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            {error}
+          </p>
+        ) : avisoVarios ? (
+          <p id="captura-aviso" role="status" className="flex items-start gap-1.5 text-etiqueta font-normal text-warning">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            {resultados.length} activos coinciden: elige uno con las flechas o con un clic, o pulsa Enter otra vez para abrir el marcado
+          </p>
+        ) : (
+          <p id="captura-ayuda" className="flex items-start gap-1.5 text-etiqueta font-normal text-muted-foreground">
+            <Usb className="mt-0.5 size-3.5 shrink-0 text-success" aria-hidden="true" />
+            El campo está siempre listo: el lector USB escribe el código y lo abre con Enter.
+          </p>
+        )}
+        {resultados.length > 0 && (
         <div id="captura-resultados" role="listbox" aria-label="Resultados" className="flex flex-col overflow-hidden rounded-lg border">
-          <p className="border-b px-3 py-2 text-xs text-muted-foreground">
+          <p className="border-b bg-muted/40 px-3 py-2 text-etiqueta font-normal text-muted-foreground">
             {resultados.length} {resultados.length === 1 ? 'activo' : 'activos'} con «{limpio}» · {alcance}
           </p>
           {resultados.map((a, i) => (
@@ -543,12 +564,15 @@ function Captura({
               onMouseDown={(e) => e.preventDefault()}
               onMouseEnter={() => setMarcado(i)}
               onClick={() => onAbrir(a.codigo)}
-              className={cn('flex cursor-pointer items-center gap-3 border-t px-3 py-2.5 text-sm first-of-type:border-t-0', i === elegido && 'bg-brand-soft')}
+              className={cn(
+                'flex min-h-fila cursor-pointer items-center gap-3 border-t px-3 py-2 text-cuerpo first-of-type:border-t-0',
+                i === elegido && 'bg-brand-soft shadow-[inset_3px_0_0_var(--brand)]',
+              )}
             >
-              <span className="w-20 shrink-0 font-mono text-xs">{a.codigo}</span>
+              <span className="w-20 shrink-0 font-mono text-codigo">{a.codigo}</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{a.nombre}</span>
-                <span className="block truncate text-xs text-muted-foreground">
+                <span className="block truncate text-etiqueta font-normal text-muted-foreground">
                   {a.ubicacion.ruta}
                   {a.serial && ` · serial ${a.serial}`}
                   {estadoDe(a) && ` · ${estadoDe(a)}`}
@@ -559,22 +583,22 @@ function Captura({
           ))}
         </div>
       )}
-      <div className="flex items-center justify-between gap-3 border-t pt-3">
-        <Button variant="link" className="h-auto px-0 text-brand-strong" aria-expanded={camara} onClick={() => onCamara(!camara)}>
-          <Camera />
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t pt-3">
+        <Boton variante="fantasma" icono={<Camera />} className="-ml-2 px-2 text-brand-strong" aria-expanded={camara} onClick={() => onCamara(!camara)}>
           {camara ? 'Ocultar la cámara' : 'Usar la cámara de este equipo'}
-        </Button>
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        </Boton>
+        <span className="flex items-center gap-1 text-etiqueta font-normal text-muted-foreground">
           <Tecla>/</Tecla> buscar <Tecla className="ml-2">Esc</Tecla> limpiar
         </span>
       </div>
       {camara && (
         <div className="flex flex-col gap-2">
           <Escaner onLectura={alLeerCamara} className="aspect-[4/3]" />
-          <p className="text-xs text-muted-foreground">El campo de arriba sigue aceptando el lector USB.</p>
+          <p className="text-etiqueta font-normal text-muted-foreground">El campo de arriba sigue aceptando el lector USB.</p>
         </div>
       )}
-    </section>
+      </div>
+    </Panel>
   )
 }
 
@@ -599,108 +623,101 @@ function Cola({ sesion, sala, actual, onAbrir }: { sesion: SesionConteo | null; 
         type="button"
         onClick={() => onAbrir(a.codigo)}
         className={cn(
-          'flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset',
+          'flex min-h-fila w-full items-center gap-3 px-4 py-2 text-left text-cuerpo hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset',
           actual === a.codigo && 'bg-brand-soft shadow-[inset_3px_0_0_var(--brand)]',
         )}
       >
-        <span className="w-20 shrink-0 font-mono text-xs">{a.codigo}</span>
+        <span className="w-20 shrink-0 font-mono text-codigo">{a.codigo}</span>
         <span className="min-w-0 flex-1 truncate font-medium">{a.nombre}</span>
-        {a.estado === 'en_reparacion' && <Badge variant="warning">En reparación</Badge>}
+        {a.estado === 'en_reparacion' && <Insignia tono="aviso">En reparación</Insignia>}
       </button>
     </li>
   )
+  const nota = (texto: string) => <p className="px-4 py-5 text-cuerpo text-muted-foreground">{texto}</p>
+
+  const pendientesAqui = pendientes.isPending ? (
+    <Estado.Cargando etiqueta="Cargando pendientes" filas={2} className="p-4" />
+  ) : pendientes.isError ? (
+    <Estado.Error
+      titulo="No se pudieron cargar los pendientes"
+      descripcion={mensajeDeError(pendientes.error)}
+      onReintentar={() => void pendientes.refetch()}
+      reintentando={pendientes.isRefetching}
+      className="m-4 w-auto"
+    />
+  ) : lista.length === 0 ? (
+    nota('No quedan pendientes aquí.')
+  ) : (
+    <>
+      <ul className="flex flex-col divide-y">{lista.slice(0, MAX_COLA).map(item)}</ul>
+      {totalPendientes > MAX_COLA && (
+        <p className="border-t px-4 py-3 text-etiqueta font-normal text-muted-foreground">
+          Y {formatEntero(totalPendientes - MAX_COLA)} más ·{' '}
+          <Link
+            to={`/contar/pendientes?ubicacion=${sala}`}
+            className="rounded-sm text-brand-strong underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+          >
+            Ver todos los pendientes
+          </Link>
+        </p>
+      )}
+    </>
+  )
+  const verificadosAqui =
+    verificados.length > 0 ? (
+      <ul className="flex flex-col divide-y">{verificados.slice(0, MAX_COLA).map(item)}</ul>
+    ) : (
+      nota(totalVerificados === 0 ? 'Aún no hay verificados aquí.' : `${formatEntero(totalVerificados)} verificados en esta sala.`)
+    )
 
   return (
-    <section aria-label="Cola de la sala" className="flex min-h-0 flex-col rounded-xl border bg-card">
+    <Panel role="region" aria-label="Cola de la sala" relleno={false}>
       {!sala ? (
-        <p className="p-4 text-sm text-muted-foreground">Elige arriba dónde estás contando para ver sus pendientes.</p>
+        nota('Elige arriba dónde estás contando para ver sus pendientes.')
       ) : (
-        <Tabs defaultValue="pendientes" className="gap-0">
-          <TabsList className="m-1.5 grid h-9 grid-cols-2">
-            <TabsTrigger value="pendientes">
-              Pendientes aquí <Badge variant="outline" className="tabular-nums">{formatEntero(totalPendientes)}</Badge>
-            </TabsTrigger>
-            <TabsTrigger value="verificados">
-              Verificados <Badge variant="outline" className="tabular-nums">{formatEntero(totalVerificados)}</Badge>
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="pendientes" className="border-t">
-            {pendientes.isPending ? (
-              <div role="status" aria-label="Cargando pendientes" className="flex flex-col gap-2 p-4">
-                <Skeleton className="h-8" />
-                <Skeleton className="h-8" />
-              </div>
-            ) : pendientes.isError ? (
-              <p className="flex flex-wrap items-center gap-x-2 p-4 text-sm text-destructive">
-                {mensajeDeError(pendientes.error)}
-                <Button variant="link" className="h-auto px-0" onClick={() => void pendientes.refetch()}>
-                  Reintentar
-                </Button>
-              </p>
-            ) : lista.length === 0 ? (
-              <p className="p-4 text-sm text-muted-foreground">No quedan pendientes aquí.</p>
-            ) : (
-              <>
-                <ul className="flex flex-col divide-y">{lista.slice(0, MAX_COLA).map(item)}</ul>
-                {totalPendientes > MAX_COLA && (
-                  <p className="border-t px-4 py-2.5 text-xs text-muted-foreground">
-                    Y {formatEntero(totalPendientes - MAX_COLA)} más ·{' '}
-                    <Link to={`/contar/pendientes?ubicacion=${sala}`} className="text-brand-strong underline underline-offset-4">
-                      Ver todos los pendientes
-                    </Link>
-                  </p>
-                )}
-              </>
-            )}
-          </TabsContent>
-          <TabsContent value="verificados" className="border-t">
-            {verificados.length > 0 ? (
-              <ul className="flex flex-col divide-y">{verificados.slice(0, MAX_COLA).map(item)}</ul>
-            ) : (
-              <p className="p-4 text-sm text-muted-foreground">
-                {totalVerificados === 0 ? 'Aún no hay verificados aquí.' : `${formatEntero(totalVerificados)} verificados en esta sala.`}
-              </p>
-            )}
-          </TabsContent>
-        </Tabs>
+        <Pestanas
+          etiqueta="Pendientes y verificados de la sala"
+          className="gap-0 [&>div:first-child]:px-2 [&>div:first-child]:pt-1"
+          pestanas={[
+            { valor: 'pendientes', etiqueta: 'Pendientes aquí', conteo: totalPendientes, contenido: pendientesAqui },
+            { valor: 'verificados', etiqueta: 'Verificados', conteo: totalVerificados, contenido: verificadosAqui },
+          ]}
+        />
       )}
-    </section>
+    </Panel>
   )
 }
 
 // --- Panel derecho ---------------------------------------------------------------------
 
 function PanelListo() {
+  const atajos: [string, string[]][] = [
+    ['Abrir / confirmar', ['Enter']],
+    ['Elegir en la lista', ['↑', '↓']],
+    ['Estado: ok / dañado', ['O', 'D']],
+    ['Está en otra ubicación', ['U']],
+    ['Volver al campo', ['/', 'Esc']],
+  ]
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 py-16 text-center">
-      <span className="flex size-14 items-center justify-center rounded-2xl bg-muted" aria-hidden="true">
+      <span className="flex size-14 items-center justify-center rounded-xl border bg-card text-muted-foreground shadow-xs" aria-hidden="true">
         <ScanBarcode className="size-7" />
       </span>
-      <h1 className="text-xl font-semibold tracking-tight">Escanea el siguiente sticker</h1>
-      <p className="max-w-md text-sm text-muted-foreground">
+      <h1 className="text-titulo-pagina">Escanea el siguiente sticker</h1>
+      <p className="max-w-md text-cuerpo text-muted-foreground">
         Con el lector USB, el activo se abre solo. También puedes escribir parte del nombre o del código, o elegir uno de los pendientes de esta sala.
       </p>
-      <dl className="mt-2 grid w-full max-w-md grid-cols-2 gap-x-6 gap-y-2 rounded-xl border p-4 text-left text-sm">
-        <dt className="text-muted-foreground">Abrir / confirmar</dt>
-        <dd className="text-right">
-          <Tecla>Enter</Tecla>
-        </dd>
-        <dt className="text-muted-foreground">Elegir en la lista</dt>
-        <dd className="text-right">
-          <Tecla>↑</Tecla> <Tecla>↓</Tecla>
-        </dd>
-        <dt className="text-muted-foreground">Estado: ok / dañado</dt>
-        <dd className="text-right">
-          <Tecla>O</Tecla> <Tecla>D</Tecla>
-        </dd>
-        <dt className="text-muted-foreground">Está en otra ubicación</dt>
-        <dd className="text-right">
-          <Tecla>U</Tecla>
-        </dd>
-        <dt className="text-muted-foreground">Volver al campo</dt>
-        <dd className="text-right">
-          <Tecla>/</Tecla> <Tecla>Esc</Tecla>
-        </dd>
+      <dl className="mt-2 grid w-full max-w-md grid-cols-[1fr_auto] gap-x-6 rounded-xl border bg-muted/40 px-4 py-2 text-left text-cuerpo">
+        {atajos.map(([accion, teclas]) => (
+          <div key={accion} className="col-span-2 grid grid-cols-subgrid items-center border-b py-2 last:border-b-0">
+            <dt className="text-muted-foreground">{accion}</dt>
+            <dd className="flex justify-end gap-1">
+              {teclas.map((t) => (
+                <Tecla key={t}>{t}</Tecla>
+              ))}
+            </dd>
+          </div>
+        ))}
       </dl>
     </div>
   )
@@ -716,8 +733,8 @@ function UltimaVerificada({ verificacion, sesionId, compacta }: { verificacion: 
   const cuando = hora.format(new Date(verificacion.recibido_en))
   if (compacta) {
     return (
-      <p className="flex items-center gap-3 border-b px-5 py-2.5 text-sm text-muted-foreground">
-        <CircleCheck className="size-4 shrink-0 text-success" aria-hidden="true" />
+      <p className="flex items-center gap-3 border-b bg-muted/40 px-5 py-2.5 text-etiqueta font-normal text-muted-foreground">
+        <Check className="size-4 shrink-0 text-success" aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate">
           Anterior: {a.nombre} · <span className="font-mono">{a.codigo}</span> verificado a las {cuando}
         </span>
@@ -726,8 +743,8 @@ function UltimaVerificada({ verificacion, sesionId, compacta }: { verificacion: 
   }
   const subir: Subir = (t, f) => api.subirFotoVerificacion(t, verificacion.sesion_id, verificacion.id, f)
   return (
-    <div className="flex flex-col gap-2 rounded-t-xl border-b border-success-border bg-success-soft px-5 py-3">
-      <div className="flex items-center gap-3 text-sm">
+    <div className="flex flex-col gap-2 border-b border-success-border bg-success-soft px-5 py-3">
+      <div className="flex flex-wrap items-center gap-3 text-cuerpo">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-success text-primary-foreground" aria-hidden="true">
           <Check className="size-4" />
         </span>
@@ -735,15 +752,14 @@ function UltimaVerificada({ verificacion, sesionId, compacta }: { verificacion: 
           <b className="font-semibold">Verificado:</b> {a.nombre} · <span className="font-mono">{a.codigo}</span> · {verificacion.estado_fisico === 'ok' ? 'Ok' : 'Dañado'} · {cuando}
         </p>
         {fila && (
-          <span className="text-xs text-muted-foreground tabular-nums">
+          <span className="text-etiqueta font-normal text-muted-foreground tabular-nums">
             {fila.ubicacion.ruta}: {formatEntero(fila.verificados)} de {formatEntero(fila.total)}
           </span>
         )}
         {(pendiente.estado === 'sin_foto' || pendiente.estado === 'error') && (
-          <Button variant="outline" size="sm" onClick={() => entrada.current?.click()}>
-            <Camera />
+          <Boton variante="secundario" icono={<Camera />} onClick={() => entrada.current?.click()}>
             {pendiente.estado === 'error' ? 'Elegir otra foto' : 'Agregar foto'}
-          </Button>
+          </Boton>
         )}
       </div>
       <input
@@ -770,12 +786,14 @@ function UltimaVerificada({ verificacion, sesionId, compacta }: { verificacion: 
 function PanelActivo({
   codigo,
   atajosRef,
+  panelRef,
   onEstado,
   onGuardado,
   onDescartar,
 }: {
   codigo: string
-  atajosRef: React.RefObject<Atajos | null>
+  atajosRef: RefObject<Atajos | null>
+  panelRef: RefObject<HTMLElement | null>
   onEstado: (e: EstadoAbierto | null) => void
   onGuardado: (v: Verificacion) => void
   onDescartar: () => void
@@ -784,53 +802,60 @@ function PanelActivo({
   const sesion = useSesionAbierta()
 
   if (consulta.isPending || sesion.isPending) {
-    return (
-      <div role="status" aria-label="Buscando el código" className="flex flex-col gap-3 p-5">
-        <Skeleton className="h-8 w-3/4" />
-        <Skeleton className="h-28 rounded-xl" />
-      </div>
-    )
+    return <Estado.Cargando etiqueta="Buscando el código" filas={3} className="p-5" />
   }
   if (consulta.isError || sesion.isError) {
     return (
-      <div className="flex flex-col items-start gap-3 p-5">
-        <h1 className="text-xl font-semibold tracking-tight">No se pudo buscar el código</h1>
-        <p className="text-base text-muted-foreground">{mensajeDeError(consulta.error ?? sesion.error)}</p>
-        <Button
-          variant="outline"
-          onClick={() => {
-            void consulta.refetch()
-            void sesion.refetch()
-          }}
+      <div className="p-5">
+        <Mensaje
+          tono="peligro"
+          icono={<CircleAlert />}
+          titulo="No se pudo buscar el código"
+          accion={
+            <Boton
+              variante="secundario"
+              icono={<RefreshCw />}
+              cargando={consulta.isRefetching || sesion.isRefetching}
+              onClick={() => {
+                void consulta.refetch()
+                void sesion.refetch()
+              }}
+            >
+              Reintentar
+            </Boton>
+          }
         >
-          <RefreshCw />
-          Reintentar
-        </Button>
+          <p>{mensajeDeError(consulta.error ?? sesion.error)}</p>
+        </Mensaje>
       </div>
     )
   }
   const activo = consulta.data
   if (!activo) {
     return (
-      <div className="flex flex-col items-start gap-3 p-5">
-        <span className="flex size-11 items-center justify-center rounded-xl bg-muted" aria-hidden="true">
-          <SearchX className="size-5" />
-        </span>
-        <h1 className="text-xl font-semibold tracking-tight">No encontramos ese código</h1>
-        <p className="text-base text-muted-foreground">
+      <div className="flex flex-col items-start gap-4 p-5">
+        <CodigoNoEncontrado icono={<SearchX />}>
           El sticker <span className="font-mono text-foreground">{codigo}</span> no está registrado en esta clínica. Si es un activo nuevo, regístralo.
-        </p>
-        <Button asChild>
+        </CodigoNoEncontrado>
+        <Boton asChild>
           <Link to={`/contar/nuevo?codigo=${encodeURIComponent(codigo)}`}>
             <Plus />
             Crear activo con este código
           </Link>
-        </Button>
+        </Boton>
       </div>
     )
   }
   return sesion.data ? (
-    <VerificandoEscritorio activo={activo} sesion={sesion.data} atajosRef={atajosRef} onEstado={onEstado} onGuardado={onGuardado} onDescartar={onDescartar} />
+    <VerificandoEscritorio
+      activo={activo}
+      sesion={sesion.data}
+      atajosRef={atajosRef}
+      panelRef={panelRef}
+      onEstado={onEstado}
+      onGuardado={onGuardado}
+      onDescartar={onDescartar}
+    />
   ) : (
     <ConsultaEscritorio activo={activo} />
   )
@@ -838,12 +863,12 @@ function PanelActivo({
 
 function EnlaceHistorial({ codigo }: { codigo: string }) {
   return (
-    <Button variant="link" className="h-auto self-start px-0 text-brand-strong" asChild>
+    <Boton asChild variante="fantasma" className="self-start px-2 text-brand-strong">
       <Link to={`/contar/activo/${encodeURIComponent(codigo)}/historial`}>
         <History />
         Ver historial del activo
       </Link>
-    </Button>
+    </Boton>
   )
 }
 
@@ -853,11 +878,9 @@ function ConsultaEscritorio({ activo }: { activo: Activo }) {
     <div className="grid gap-6 p-5 xl:grid-cols-[minmax(0,1fr)_240px]">
       <div className="flex min-w-0 flex-col gap-5">
         <AssetCard activo={aTarjeta(activo)} rol={rol} titulo="h1" />
-        <Alert variant="info">
-          <Info />
-          <AlertTitle>No hay una sesión abierta</AlertTitle>
-          <AlertDescription>Puedes consultar el activo; para verificarlo, el administrador debe abrir una sesión de conteo.</AlertDescription>
-        </Alert>
+        <Aviso tono="info" icono={<Info aria-hidden="true" />} titulo="No hay una sesión abierta">
+          Puedes consultar el activo; para verificarlo, el administrador debe abrir una sesión de conteo.
+        </Aviso>
       </div>
       <div className="flex flex-col gap-3">
         <FotoActivo activo={activo} editable={activo.estado !== 'dado_de_baja'} />
@@ -871,13 +894,15 @@ function VerificandoEscritorio({
   activo,
   sesion,
   atajosRef,
+  panelRef,
   onEstado,
   onGuardado,
   onDescartar,
 }: {
   activo: Activo
   sesion: SesionConteo
-  atajosRef: React.RefObject<Atajos | null>
+  atajosRef: RefObject<Atajos | null>
+  panelRef: RefObject<HTMLElement | null>
   onEstado: (e: EstadoAbierto | null) => void
   onGuardado: (v: Verificacion) => void
   onDescartar: () => void
@@ -956,15 +981,21 @@ function VerificandoEscritorio({
   if (resultado.tipo === 'sesion_cerrada') {
     return (
       <div className="flex flex-col gap-4 p-5">
-        <Mensaje tono="peligro" icono={<Lock className="size-5" />} titulo="La sesión se cerró">
+        <Mensaje
+          tono="peligro"
+          icono={<Lock />}
+          titulo="La sesión se cerró"
+          accion={
+            <Boton asChild>
+              <Link to="/contar">Volver al inicio</Link>
+            </Boton>
+          }
+        >
           <p>
             El administrador cerró {sesion.nombre}. Esta verificación <b>no se guardó</b>.
           </p>
         </Mensaje>
-        <p className="text-sm text-muted-foreground">Las verificaciones confirmadas antes del cierre sí cuentan en el informe.</p>
-        <Button asChild className="self-start">
-          <Link to="/contar">Volver al inicio</Link>
-        </Button>
+        <p className="text-etiqueta font-normal text-muted-foreground">Las verificaciones confirmadas antes del cierre sí cuentan en el informe.</p>
       </div>
     )
   }
@@ -972,21 +1003,31 @@ function VerificandoEscritorio({
   if (resultado.tipo === 'no_confirmado') {
     return (
       <div className="flex flex-col gap-4 p-5">
-        <Mensaje tono="aviso" icono={<TriangleAlert className="size-5" />} titulo="No se pudo confirmar">
+        <Mensaje
+          tono="aviso"
+          icono={<TriangleAlert />}
+          titulo="No se pudo confirmar"
+          accion={
+            <>
+              <Boton icono={<RefreshCw />} onClick={enviar}>
+                Reintentar
+                <Tecla tono="sobrePrincipal" className="ml-1">
+                  Enter
+                </Tecla>
+              </Boton>
+              <Boton variante="fantasma" onClick={onDescartar}>
+                Descartar y seguir
+              </Boton>
+            </>
+          }
+        >
           <p>
             No sabemos si la verificación de {activo.nombre} (<span className="font-mono">{activo.codigo}</span>) quedó guardada. <b>Reintentar no la duplica.</b>
           </p>
         </Mensaje>
-        <p className="text-sm text-muted-foreground">No cuenta en el avance hasta confirmarse. Si cierras esta pestaña antes, se pierde y tendrás que escanearlo otra vez.</p>
-        <div className="flex items-center gap-3">
-          <Button onClick={enviar}>
-            <RefreshCw />
-            Reintentar
-          </Button>
-          <Button variant="ghost" onClick={onDescartar}>
-            Descartar y seguir
-          </Button>
-        </div>
+        <p className="text-etiqueta font-normal text-muted-foreground">
+          No cuenta en el avance hasta confirmarse. Si cierras esta pestaña antes, se pierde y tendrás que escanearlo otra vez.
+        </p>
       </div>
     )
   }
@@ -997,62 +1038,69 @@ function VerificandoEscritorio({
         <div className="flex min-w-0 flex-col gap-5">
           <AssetCard activo={aTarjeta(activo)} rol={rol} titulo="h1" />
           {deBaja ? (
-            <Alert variant="warning">
-              <Archive />
-              <AlertTitle>Dado de baja</AlertTitle>
-              <AlertDescription className="text-foreground">Un activo dado de baja no se verifica. Si apareció, pídele al administrador que lo reactive.</AlertDescription>
-            </Alert>
+            <Aviso tono="aviso" icono={<Archive aria-hidden="true" />} titulo="Dado de baja">
+              Un activo dado de baja no se verifica. Si apareció, pídele al administrador que lo reactive.
+            </Aviso>
           ) : (
             <>
               {resultado.tipo === 'error' && (
-                <Alert variant="destructive">
-                  <TriangleAlert />
-                  <AlertTitle>No se guardó</AlertTitle>
-                  <AlertDescription>{resultado.mensaje}</AlertDescription>
-                </Alert>
+                <Aviso tono="error" icono={<TriangleAlert aria-hidden="true" />} titulo="No se guardó">
+                  {resultado.mensaje}
+                </Aviso>
               )}
               {ultima.data && <AvisoYaVerificado verificacion={ultima.data} />}
               {sala ? (
-                <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border px-4 py-2">
-                  <span className="text-sm text-muted-foreground">Encontrada en</span>
-                  <span className={cn('flex min-w-0 items-center gap-1.5 font-medium', otra ? 'text-warning' : 'text-success')}>
-                    {otra ? <ArrowLeftRight className="size-4 shrink-0" aria-hidden="true" /> : <Check className="size-4 shrink-0" aria-hidden="true" />}
-                    <span className="truncate">{rutaDe(lista, encontrada!)}</span>
-                  </span>
+                <div className="flex flex-col gap-1">
+                  <Panel relleno={false} className="px-4">
+                    <ListaDatos
+                      datos={[
+                        {
+                          rotulo: 'Encontrada en',
+                          valor: (
+                            <span className={cn('flex min-w-0 items-center justify-end gap-1.5 font-medium', otra ? 'text-warning' : 'text-success')}>
+                              {otra ? <ArrowLeftRight className="size-4 shrink-0" aria-hidden="true" /> : <Check className="size-4 shrink-0" aria-hidden="true" />}
+                              <span className="truncate">{rutaDe(lista, encontrada!)}</span>
+                            </span>
+                          ),
+                        },
+                      ]}
+                    />
+                  </Panel>
+                  {otra && (
+                    <Boton variante="fantasma" icono={<MapPin />} className="self-start px-2 text-brand-strong" onClick={() => setOtra(undefined)}>
+                      Usar {rutaDe(lista, sala)}
+                    </Boton>
+                  )}
                 </div>
               ) : (
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="sala-verificar">¿Dónde estás contando?</Label>
-                  <LocationPicker id="sala-verificar" ubicaciones={lista} cargando={ubicaciones.isPending} valor={sala} onChange={elegir} />
-                  <p className="text-sm text-muted-foreground">Elígela una vez: queda para los siguientes activos.</p>
-                </div>
-              )}
-              {otra && (
-                <Button variant="link" className="-mt-3 h-auto self-start px-0" onClick={() => setOtra(undefined)}>
-                  <MapPin />
-                  Usar {rutaDe(lista, sala!)}
-                </Button>
+                <MarcoCampo id="sala-verificar" etiqueta="¿Dónde estás contando?" ayuda="Elígela una vez: queda para los siguientes activos.">
+                  <LocationPicker
+                    id="sala-verificar"
+                    ubicaciones={lista}
+                    cargando={ubicaciones.isPending}
+                    valor={sala}
+                    onChange={elegir}
+                    className="h-control bg-card text-base md:h-control"
+                  />
+                </MarcoCampo>
               )}
               <EstadoFisico valor={estado} onValor={setEstado} atajos />
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="nota">Nota {estado === 'danado' ? '(qué tiene)' : '(opcional)'}</Label>
-                <Input
-                  id="nota"
-                  value={nota}
-                  onChange={(e) => setNota(e.target.value)}
-                  // Enter en la nota no confirma (un lector podría escribir ahí): vuelve al
-                  // panel, donde Enter sí confirma.
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      e.currentTarget.closest<HTMLElement>('[aria-label="Verificación"]')?.focus()
-                    }
-                  }}
-                  maxLength={120}
-                  autoComplete="off"
-                  className="h-10"
-                />
-              </div>
+              <Campo
+                id="nota"
+                etiqueta={`Nota ${estado === 'danado' ? '(qué tiene)' : '(opcional)'}`}
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+                // Enter en la nota no confirma (un lector podría escribir ahí): vuelve al
+                // panel, donde Enter sí confirma.
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    e.currentTarget.closest<HTMLElement>('[aria-label="Verificación"]')?.focus()
+                  }
+                }}
+                maxLength={120}
+                autoComplete="off"
+              />
             </>
           )}
         </div>
@@ -1062,25 +1110,17 @@ function VerificandoEscritorio({
         </div>
       </div>
       {!deBaja && (
-        <div className="flex items-center justify-between gap-3 rounded-b-xl border-t bg-sidebar px-5 py-3">
-          <Button variant="outline" disabled={enviando || !sala} onClick={() => setEligiendo(true)}>
-            <ArrowLeftRight />
+        <div data-verificacion="acciones" className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/40 px-5 py-3">
+          <Boton variante="secundario" icono={<ArrowLeftRight />} disabled={enviando || !sala} onClick={() => setEligiendo(true)}>
             Está en otra ubicación
-            <Tecla>U</Tecla>
-          </Button>
-          <Button size="lg" className="min-w-56 text-base font-semibold" disabled={enviando || !encontrada} onClick={enviar}>
-            {enviando ? (
-              <>
-                <Loader2 className="animate-spin" aria-hidden="true" />
-                Confirmando…
-              </>
-            ) : (
-              <>
-                Confirmar
-                <Tecla className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">Enter</Tecla>
-              </>
-            )}
-          </Button>
+            <Tecla className="ml-1">U</Tecla>
+          </Boton>
+          <Boton tamano="accion" className="min-w-56" disabled={!encontrada} cargando={enviando} textoCargando="Confirmando…" onClick={enviar}>
+            Confirmar
+            <Tecla tono="sobrePrincipal" className="ml-1">
+              Enter
+            </Tecla>
+          </Boton>
         </div>
       )}
       <OtraUbicacion
@@ -1089,6 +1129,8 @@ function VerificandoEscritorio({
         esperada={activo.ubicacion.ruta}
         ubicaciones={lista}
         actual={encontrada}
+        // Al cerrar, el foco vuelve al panel: ahí Enter confirma y el lector sigue escribiendo.
+        devolverFocoA={panelRef}
         onElegir={(id) => {
           // Con un envío en curso no se cambia la ubicación ni se suelta el candado.
           if (ocupado.current) return

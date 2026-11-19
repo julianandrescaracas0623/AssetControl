@@ -1,7 +1,7 @@
 import { Camera, ImageOff, ImagePlus, LoaderCircle, RotateCcw, X } from 'lucide-react'
 import { type DragEvent, useId, useRef, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Boton } from '@/components/kit'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { type EstadoSubida, useImagenFoto, useUrlDeBlob } from '@/lib/fotos'
@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils'
 // pedir permisos a la página; en el PC abre el selector de archivos. Con `zona` (spec 015,
 // T10) el recuadro también acepta una imagen arrastrada desde el equipo, solo en los
 // formatos que acepta el servidor (JPEG, PNG y WebP; nunca SVG).
+// Spec 016, T6: botones del kit (48 px en el conteo; Deuda T5 g), etiqueta con la escala
+// nombrada y la zona de arrastre sobre blanco.
 
 const TIPOS_ARRASTRE = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
@@ -62,7 +64,7 @@ export function CampoFoto({
 
   return (
     <div className="space-y-2" {...arrastre}>
-      <p className="text-sm font-medium">{etiqueta}</p>
+      <p className="text-etiqueta text-foreground">{etiqueta}</p>
       <input
         ref={entrada}
         type="file"
@@ -79,21 +81,21 @@ export function CampoFoto({
       />
       {previa ? (
         <div className="flex items-start gap-3">
-          <img src={previa} alt="Vista previa de la foto" className="size-24 rounded-md border object-cover" />
+          <img src={previa} alt="Vista previa de la foto" className="size-24 shrink-0 rounded-lg border object-cover" />
           <div className="flex flex-col gap-2">
-            <Button type="button" variant="outline" size="sm" disabled={ocupado} onClick={() => entrada.current?.click()}>
-              <Camera aria-hidden="true" /> Cambiar foto
-            </Button>
-            <Button type="button" variant="ghost" size="sm" disabled={ocupado} onClick={() => onElegir(null)}>
-              <X aria-hidden="true" /> Quitar foto
-            </Button>
+            <Boton variante="secundario" icono={<Camera />} disabled={ocupado} onClick={() => entrada.current?.click()}>
+              Cambiar foto
+            </Boton>
+            <Boton variante="fantasma" icono={<X />} disabled={ocupado} onClick={() => onElegir(null)}>
+              Quitar foto
+            </Boton>
           </div>
         </div>
       ) : zona ? (
         <div
           data-zona-foto=""
           className={cn(
-            'flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-4 py-5 text-center text-sm',
+            'flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-input bg-card px-4 py-5 text-center text-cuerpo',
             encima && 'border-brand-border bg-brand-soft',
           )}
         >
@@ -104,7 +106,7 @@ export function CampoFoto({
               type="button"
               disabled={ocupado}
               aria-describedby={idAyuda}
-              className="text-brand-strong underline underline-offset-4 disabled:opacity-50"
+              className="rounded-sm text-brand-strong underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50"
               onClick={() => entrada.current?.click()}
             >
               elígela
@@ -112,36 +114,30 @@ export function CampoFoto({
           </span>
         </div>
       ) : (
-        <Button
-          type="button"
-          variant="outline"
-          disabled={ocupado}
-          aria-describedby={idAyuda}
-          onClick={() => entrada.current?.click()}
-        >
-          <Camera aria-hidden="true" /> Tomar foto
-        </Button>
+        <Boton variante="secundario" icono={<Camera />} disabled={ocupado} aria-describedby={idAyuda} onClick={() => entrada.current?.click()}>
+          Tomar foto
+        </Boton>
       )}
-      <p id={idAyuda} className="text-xs text-muted-foreground">
+      <p id={idAyuda} className="text-etiqueta font-normal text-muted-foreground">
         {ayuda}
       </p>
       {estado === 'subiendo' && (
-        <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
-          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> Subiendo la foto…
+        <p role="status" className="flex items-center gap-2 text-etiqueta font-normal text-muted-foreground">
+          <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> Subiendo la foto…
         </p>
       )}
       {estado === 'subida' && (
-        <p role="status" className="text-sm text-success">
+        <p role="status" className="text-etiqueta text-success">
           Foto guardada.
         </p>
       )}
       {estado === 'error' && (
-        <div role="alert" className="space-y-2 text-sm text-destructive">
+        <div role="alert" className="flex flex-col items-start gap-2 text-etiqueta font-normal text-destructive">
           <p>La foto no se subió. {error}</p>
           {onReintentar && (
-            <Button type="button" size="sm" variant="outline" onClick={onReintentar}>
-              <RotateCcw aria-hidden="true" /> Reintentar
-            </Button>
+            <Boton variante="secundario" icono={<RotateCcw />} onClick={onReintentar}>
+              Reintentar
+            </Boton>
           )}
         </div>
       )}
@@ -163,7 +159,7 @@ export function EstadoFoto({
   if (estado === 'subiendo') {
     return (
       <span role="status" className="flex items-center gap-2">
-        <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> Subiendo la foto…
+        <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> Subiendo la foto…
       </span>
     )
   }
@@ -171,9 +167,9 @@ export function EstadoFoto({
   return (
     <span role="alert" className="flex flex-col items-start gap-2 text-destructive">
       La foto no se subió. {error}
-      <Button type="button" size="sm" variant="outline" className="max-md:min-h-11" onClick={onReintentar}>
-        <RotateCcw aria-hidden="true" /> Reintentar la foto
-      </Button>
+      <Boton variante="secundario" icono={<RotateCcw />} onClick={onReintentar}>
+        Reintentar la foto
+      </Boton>
     </span>
   )
 }
