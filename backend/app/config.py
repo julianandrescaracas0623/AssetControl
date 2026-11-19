@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 
+from app.correo.config import CorreoConfig, load_correo, validar_entorno
 from app.fotos.almacen import (
     CARPETA_POR_DEFECTO,
     S3_VARS,
@@ -162,10 +163,13 @@ class Config:
     argon2_max_concurrency: int = DEFAULT_ARGON2_MAX_CONCURRENCY
     # Spec 012 (Q3): dónde se guardan las fotos; ``None`` = fotos desactivadas (503).
     almacen: AlmacenConfig | None = None
+    # Spec 014 (R7, R18): correo de recuperación; ``None`` = recuperación desactivada.
+    correo: CorreoConfig | None = None
 
     def __post_init__(self) -> None:
         if self.environment not in ALLOWED_ENVIRONMENTS:
             raise InvalidEnvironmentError()
+        validar_entorno(self.correo, self.environment)
         if (
             self.almacen is not None
             and self.almacen.tipo == "carpeta"
@@ -336,4 +340,5 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
             *ARGON2_MAX_CONCURRENCY_RANGE,
         ),
         almacen=load_almacen(source, source["ENVIRONMENT"].strip()),
+        correo=load_correo(source, source["ENVIRONMENT"].strip()),
     )

@@ -16,6 +16,8 @@ from app.catalogo.routes import categorias_bp, ubicaciones_bp
 from app.cli import register_cli
 from app.config import CONFIG_EXTENSION_KEY, Config, load_config
 from app.conteo.routes import bp as sesiones_bp
+from app.correo import EXTENSION_KEY as CORREO_EXTENSION_KEY
+from app.correo import crear as crear_correo
 from app.db import init_db
 from app.empresa.routes import bp as empresa_bp
 from app.errors import register_error_handlers
@@ -58,6 +60,13 @@ def create_app(config: Config | None = None) -> Flask:
     if config.almacen is None and not config.is_test:
         app.logger.warning(
             "Fotos desactivadas: falta ALMACEN=s3 y sus variables S3_* (docs/09-despliegue.md)."
+        )
+    # Spec 014 (R7): correo de recuperación; sin ``CORREO_MODO`` queda desactivada.
+    app.extensions[CORREO_EXTENSION_KEY] = crear_correo(config.correo)
+    if config.correo is None and not config.is_test:
+        app.logger.warning(
+            "Recuperación de contraseña desactivada: falta CORREO_MODO (carpeta en "
+            "development o smtp con TLS; docs/10-entorno-local.md)."
         )
     register_error_handlers(app)
     register_auth_http_policy(app)

@@ -57,3 +57,6 @@ MEMORY.md
 
 # Spec 012: fotos guardadas en la carpeta local de desarrollo (nunca al repo).
 backend/.almacen/
+
+# Spec 014: correos de desarrollo (.eml con enlaces válidos; nunca al repo).
+backend/.buzon/
