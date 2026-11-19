@@ -289,15 +289,9 @@ export default function FichaActivo() {
             </div>
           </div>
         </div>
-        {/* El título va junto al contenido (no en el encabezado del Panel): el historial y
-            su título comparten contenedor, como antes (lo usa la prueba del historial). */}
-        <Panel role="region" aria-labelledby="titulo-historial" className="xl:sticky xl:top-4">
-          <div className="flex flex-col gap-3">
-            <h2 id="titulo-historial" className="text-titulo-seccion">
-              Historial
-            </h2>
-            <HistorialActivo activoId={activo.id} />
-          </div>
+        {/* Spec 016, T10 (Deuda T8 e): el título va en el encabezado del Panel, como el resto. */}
+        <Panel titulo="Historial" className="xl:sticky xl:top-4">
+          <HistorialActivo activoId={activo.id} />
         </Panel>
       </div>
       <EditarActivo activo={activo} abierto={accion === 'editar' && !deBaja} onAbierto={(v) => abrir(v ? 'editar' : null)} devolverFocoA={editarRef} />

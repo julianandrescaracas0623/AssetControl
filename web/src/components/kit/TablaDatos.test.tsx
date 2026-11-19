@@ -292,6 +292,41 @@ describe('TablaDatos: pie (fila de total)', () => {
     expect(total.textContent).toBe('$ 1.639.900,00')
   })
 
+  // Spec 016, T10 (Deuda T7 a): la celda del pie que ocupa una columna lleva las clases de
+  // esa columna (ancho, ajuste de línea, relleno), así el total no ensancha la tabla en el
+  // teléfono; y admite clases propias.
+  it('una celda del pie de una columna hereda la clase de su columna y admite la propia', () => {
+    const columnas: ColumnaTabla<Fila>[] = [
+      { ...COLUMNAS[0], clase: 'min-w-20' },
+      { ...COLUMNAS[1], clase: 'whitespace-normal' },
+      COLUMNAS[2],
+      { ...COLUMNAS[3], clase: 'pr-4' },
+    ]
+    tabla({
+      columnas,
+      pie: [{ contenido: 'Total', columnas: 2 }, { contenido: '—', clase: 'italic' }, { contenido: '$ 1.639.900,00', tipo: 'cifra' }],
+    })
+    const pie = within(screen.getByRole('table')).getAllByRole('row').at(-1) as HTMLElement
+    const [rotulo, medio, total] = within(pie).getAllByRole('cell')
+    // Abarca dos columnas: no hereda la de ninguna.
+    expect(rotulo.className).not.toContain('min-w-20')
+    expect(rotulo.className).not.toContain('whitespace-normal')
+    expect(medio.className).toContain('italic')
+    expect(total.className).toContain('pr-4')
+    expect(total.className).toContain('text-right')
+  })
+
+  it('desplazar en el teléfono: el rótulo de una celda ancha se queda a la vista al desplazar (sin tapar el total)', () => {
+    simularAncho({ movil: true })
+    tabla({ pie: [{ contenido: '2 activos no encontrados', columnas: 3 }, { contenido: '$ 1.639.900,00', tipo: 'cifra' }], movil: 'desplazar' })
+    const pie = within(screen.getByRole('table')).getAllByRole('row').at(-1) as HTMLElement
+    const [rotulo] = within(pie).getAllByRole('cell')
+    expect(rotulo.className).not.toMatch(/\bsticky\b/)
+    const texto = within(rotulo).getByText('2 activos no encontrados')
+    expect(texto.className).toMatch(/\bsticky\b/)
+    expect(texto.className).toContain('left-4')
+  })
+
   it('tarjetas en el teléfono: el pie va al final como resumen', () => {
     simularAncho({ movil: true })
     tabla({ pie: PIE })
@@ -356,8 +391,52 @@ describe('TablaDatos: gestión (T9)', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Siguiente ›' }))
   })
 
+  // Spec 016, T10 (Deuda T9 b): con paginación del servidor (cursor), un clic que no cambia
+  // de página (la petición falla) no deja el «pulsado» armado: un cambio posterior (otro
+  // filtro que deja una sola página) no le roba el foco a quien lo tenga.
+  it('un clic cuya petición termina sin cambiar de página no mueve el foco después', () => {
+    const props = (haySiguiente: boolean, ocupado: boolean) => ({
+      desde: 26,
+      hasta: 50,
+      total: 60,
+      hayAnterior: true,
+      haySiguiente,
+      ocupado,
+      onAnterior: vi.fn(),
+      onSiguiente: vi.fn(),
+    })
+    const comun = { etiqueta: 'Activos', columnas: COLUMNAS, filas: FILAS, claveFila: (f: Fila) => f.id, vacio: { titulo: 'Vacío' } }
+    const { rerender } = tabla({ paginacion: props(true, false) })
+    const siguiente = screen.getByRole('button', { name: 'Siguiente ›' })
+    siguiente.focus()
+    fireEvent.click(siguiente)
+    rerender(<TablaDatos<Fila> {...comun} paginacion={props(true, true)} />)
+    rerender(<TablaDatos<Fila> {...comun} paginacion={props(true, false)} />)
+    const otro = document.createElement('input')
+    document.body.append(otro)
+    otro.focus()
+    rerender(<TablaDatos<Fila> {...comun} paginacion={props(false, false)} />)
+    expect(document.activeElement).toBe(otro)
+    otro.remove()
+  })
+
   it('la búsqueda no se autocompleta con lo que guardó el navegador', () => {
     tabla({ barra: { busqueda: { valor: '', onCambio: vi.fn(), etiqueta: 'Buscar activos' } } })
     expect(screen.getByRole('searchbox', { name: 'Buscar activos' }).getAttribute('autocomplete')).toBe('off')
+  })
+})
+
+// Spec 016, T10 (Deuda T7 a): a 375 px Valor desplazaba 12 px dentro de la tabla. Por
+// debajo de md las celdas usan 8 px de relleno lateral (12 px desde md).
+describe('TablaDatos: relleno compacto en el teléfono', () => {
+  it('encabezados, celdas y pie con px-2 y md:px-3', () => {
+    simularAncho({ movil: true })
+    tabla({ movil: 'desplazar', pie: [{ contenido: 'Total', columnas: 3 }, { contenido: '$ 1,00', tipo: 'cifra' }] })
+    const t = screen.getByRole('table')
+    const celdas = [within(t).getAllByRole('columnheader')[1], within(t).getAllByRole('cell')[1], within(t).getAllByRole('row').at(-1)!.querySelectorAll('td')[1]]
+    for (const c of celdas) {
+      expect(c.className.split(/\s+/)).toContain('px-2')
+      expect(c.className.split(/\s+/)).toContain('md:px-3')
+    }
   })
 })

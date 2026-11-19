@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatEntero } from '@/lib/format'
@@ -46,6 +46,27 @@ export function Pestanas({
   const [interno, setInterno] = useState(valorInicial ?? pestanas[0]?.valor ?? '')
   const actual = valor ?? interno
   const comun = pestanas.find((p) => p.valor === actual)?.contenido === undefined
+  // Spec 016, T10 (Deuda T8 c): si las pestañas no caben (teléfono), el carril se desplaza y
+  // un degradado en el borde avisa que hay más de ese lado.
+  const carril = useRef<HTMLDivElement>(null)
+  const [desborde, setDesborde] = useState<'ninguno' | 'derecha' | 'izquierda' | 'ambos'>('ninguno')
+  useEffect(() => {
+    const el = carril.current
+    if (!el) return
+    const medir = () => {
+      const izquierda = el.scrollLeft > 1
+      const derecha = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+      setDesborde(izquierda && derecha ? 'ambos' : derecha ? 'derecha' : izquierda ? 'izquierda' : 'ninguno')
+    }
+    medir()
+    el.addEventListener('scroll', medir, { passive: true })
+    const observador = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(medir)
+    observador?.observe(el)
+    return () => {
+      el.removeEventListener('scroll', medir)
+      observador?.disconnect()
+    }
+  }, [])
   return (
     <Tabs
       value={actual}
@@ -56,7 +77,7 @@ export function Pestanas({
       className={cn('min-w-0 gap-4 [&_[role=tabpanel]]:text-cuerpo', className)}
     >
       <div className="flex min-w-0 flex-col gap-3 border-b md:flex-row md:items-end md:justify-between">
-        <div className="-mb-px min-w-0 overflow-x-auto">
+        <div ref={carril} data-desborde={desborde} className="desvanecer-desborde -mb-px min-w-0 overflow-x-auto">
           <TabsList
             data-kit="pestanas"
             aria-label={etiqueta}

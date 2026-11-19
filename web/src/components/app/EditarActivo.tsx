@@ -1,5 +1,5 @@
 import { RefreshCw } from 'lucide-react'
-import { type RefObject, useState } from 'react'
+import { type RefObject, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { InputSugerido } from '@/components/app/InputSugerido'
@@ -76,9 +76,16 @@ function Edicion({
   onCloseAutoFocus?: (evento: Event) => void
 }) {
   const cerrar = () => onAbierto(false)
+  // Spec 016, T10 (Deuda T8 a): la respuesta de un guardado solo cierra este diálogo si
+  // sigue abierto. Si se cerró con el guardado en vuelo y se abrió otra acción (Mover,
+  // Dar de baja), cerrar() la cerraría a ella. El aviso «Cambios guardados» sí se muestra.
+  const sigueAbierto = useRef(abierto)
+  useEffect(() => {
+    sigueAbierto.current = abierto
+  }, [abierto])
   const edicion = useEdicionActivo(activo, (_guardado, sinCambios) => {
     toast.success(sinCambios ? 'Sin cambios que guardar' : 'Cambios guardados')
-    cerrar()
+    if (sigueAbierto.current) cerrar()
   })
   return (
     <Dialogo
@@ -136,7 +143,7 @@ function Formulario({ edicion }: { edicion: ReturnType<typeof useEdicionActivo> 
           titulo="Alguien cambió este activo mientras editabas"
           accion={
             <>
-              <Boton type="submit" disabled={edicion.guardando}>
+              <Boton type="submit" variante="secundario" disabled={edicion.guardando}>
                 Guardar mis cambios
               </Boton>
               <Boton variante="secundario" onClick={edicion.descartar}>

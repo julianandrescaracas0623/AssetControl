@@ -103,7 +103,12 @@ describe('historial (T7)', () => {
     const f = simularSesion('admin', catalogo.manejador)
     render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/admin/activos/000123'] })} />)
 
-    const seccion = (await screen.findByRole('heading', { level: 2, name: 'Historial' })).parentElement!
+    // Spec 016, T10 (Deuda T8 e): el título pasó al encabezado del Panel; la sección se
+    // busca por su región nombrada (antes, el padre del h2). Mismas aserciones.
+    const titulo = await screen.findByRole('heading', { level: 2, name: 'Historial' })
+    expect(titulo.closest('[data-panel=encabezado]')).toBeTruthy()
+    const seccion = screen.getByRole('region', { name: 'Historial' })
+    expect(seccion.contains(titulo)).toBe(true)
     expect(await within(seccion).findByText('$ 389.900,00 → $ 420.000,00')).toBeTruthy()
     fireEvent.click(within(seccion).getByRole('button', { name: 'Ver más' }))
     expect(await within(seccion).findByText('Registrado con el sticker · $ 389.900,00')).toBeTruthy()

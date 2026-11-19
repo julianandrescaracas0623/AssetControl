@@ -289,7 +289,8 @@ function ConteoEscritorio() {
           tabIndex={-1}
           aria-label="Verificación"
           relleno={false}
-          className="outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-page"
+          // Spec 016, T10 (Deuda T6 c): foco visible pero suave (recibe el foco tras cada lectura).
+          className="outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25"
         >
           {aviso && codigo && (
             <Aviso

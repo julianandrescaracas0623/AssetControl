@@ -49,6 +49,15 @@ describe('Estado', () => {
       expect(document.querySelector('[data-kit=estado-vacio]')).toBeTruthy()
     })
 
+    // Spec 016, T10 (Deuda T2 f): la acción es un Boton del kit y trae su propia altura;
+    // el selector descendiente de compatibilidad (para botones de shadcn sueltos) se retiró.
+    it('la acción usa la altura del Boton del kit, sin selector descendiente de compatibilidad', () => {
+      render(<EstadoVacio titulo="Nada" accion={<Boton>Registrar activo</Boton>} />)
+      const boton = screen.getByRole('button', { name: 'Registrar activo' })
+      expect(boton.className).toContain('h-control')
+      expect(boton.parentElement?.className).not.toContain('[data-slot=button]')
+    })
+
     it('el ícono es decorativo', () => {
       render(<EstadoVacio titulo="Nada" />)
       expect(document.querySelector('[data-kit=estado-vacio] [aria-hidden=true] svg')).toBeTruthy()

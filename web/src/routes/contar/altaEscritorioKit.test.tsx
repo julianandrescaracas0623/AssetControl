@@ -348,6 +348,20 @@ describe('diseño del conteo de escritorio con el kit (T6)', () => {
     expect(screen.getByRole('button', { name: 'Usar la cámara de este equipo' }).getAttribute('data-kit')).toBe('boton')
   })
 
+  // Spec 016, T10 (Deuda T6 c): el panel «Verificación» recibe el foco tras cada lectura;
+  // su foco se ve (borde cobalto y halo suave), sin el anillo grueso con separación que
+  // rodeaba todo el panel.
+  it('el foco del panel «Verificación» es visible y suave', async () => {
+    abrirEscritorio()
+    await campoCaptura()
+    const clases = panel().className.split(/\s+/)
+    expect(clases).toContain('focus-visible:border-ring')
+    expect(clases).toContain('focus-visible:ring-3')
+    expect(clases).toContain('focus-visible:ring-ring/25')
+    expect(clases).not.toContain('focus-visible:ring-offset-2')
+    expect(clases).not.toContain('focus-visible:ring-2')
+  })
+
   it('la cola usa las pestañas del kit con su cantidad', async () => {
     abrirEscritorio()
     const cola = await screen.findByRole('region', { name: 'Cola de la sala' })

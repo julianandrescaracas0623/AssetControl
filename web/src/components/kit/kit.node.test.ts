@@ -12,10 +12,7 @@ const SRC = path.resolve(KIT, '../..')
 const ROUTES = path.join(SRC, 'routes')
 
 /** Pantallas que todavía importan components/ui (rutas relativas a src/routes, con /). */
-const EXCEPCIONES: readonly string[] = [
-  // T10: galería de desarrollo (muestra también piezas de shadcn aún sin envoltorio)
-  'dev/Componentes.tsx',
-]
+const EXCEPCIONES: readonly string[] = []
 
 function pantallas(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -79,6 +76,22 @@ describe('guardia del kit (R7)', () => {
       .filter((file) => /['"][^'"]*components\/app\/CampoFormulario['"]/.test(readFileSync(file, 'utf8')))
       .map(relativa)
     expect(usan).toEqual([])
+  })
+
+  // Spec 016, T10 (A2): al cierre la lista queda vacía, la galería incluida.
+  it('al cierre de la spec la lista de excepciones está vacía', () => {
+    expect(EXCEPCIONES).toEqual([])
+  })
+
+  // Spec 016, T10: los envoltorios de compatibilidad de T2/T3 se retiraron al quedar sin
+  // pantallas (StatCard → Cifra, EmptyState y ConEstado → Estado y EncabezadoPagina,
+  // CampoFormulario → Campo/MarcoCampo del kit). Que no vuelvan como piezas paralelas.
+  it('los envoltorios de compatibilidad retirados no vuelven', () => {
+    const APP = path.join(SRC, 'components', 'app')
+    const vuelven = ['StatCard.tsx', 'EmptyState.tsx', 'ConEstado.tsx', 'CampoFormulario.tsx'].filter((n) =>
+      existsSync(path.join(APP, n)),
+    )
+    expect(vuelven).toEqual([])
   })
 
   it('la lista de excepciones no tiene duplicados', () => {

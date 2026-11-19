@@ -30,6 +30,11 @@ const VARIANTE: Record<VarianteBoton, string> = {
   peligro: 'border-destructive-border bg-destructive-soft text-destructive hover:bg-destructive/15',
 }
 
+// Spec 016, T10 (Deuda T2 c): foco como contorno de 2 px con 2 px de separación
+// transparente. El anillo de shadcn (box-shadow) pintaba la separación de blanco
+// (ring-offset-background): un halo sobre --page. El contorno deja ver el fondo real.
+const FOCO = 'focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
+
 const TAMANO: Record<TamanoBoton, string> = {
   normal: 'h-control gap-2 px-4 text-sm',
   accion: 'h-accion gap-2 px-5 text-base font-semibold [&_svg:not([class*=size-])]:size-5',
@@ -72,6 +77,7 @@ export function Boton({
   const clases = cn(
     VARIANTE[variante],
     soloIcono ? 'size-control p-0' : TAMANO[tamano],
+    FOCO,
     anchoCompleto && 'w-full',
     cargando && 'disabled:opacity-80',
     className,

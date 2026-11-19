@@ -12,16 +12,11 @@ import type { ReactNode } from 'react'
 import { useState } from 'react'
 
 import { AssetCard } from '@/components/app/AssetCard'
-import { EmptyState } from '@/components/app/EmptyState'
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
 import { LocationPicker } from '@/components/app/LocationPicker'
 import { NetworkStatus } from '@/components/app/NetworkStatus'
 import { PendingList } from '@/components/app/PendingList'
-import { Aviso, Boton, Campo, Estado, Insignia, type OpcionCampo } from '@/components/kit'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
-import { Progress } from '@/components/ui/progress'
-import { Switch } from '@/components/ui/switch'
+import { Aviso, Boton, Campo, Casilla, Estado, Insignia, Interruptor, MarcoCampo, Progreso, type OpcionCampo } from '@/components/kit'
 import { ACTIVOS, RESUMEN, UBICACIONES_API } from '@/mocks/datos-ficticios'
 
 import { CampoClave, CifrasKit, DialogosKit, ImagenesKit, SeleccionKit, SuperficiesKit, TablasKit } from './GaleriaKit'
@@ -122,6 +117,8 @@ export default function Componentes() {
   const [ubicacion, setUbicacion] = useState('administracion')
   const [categoria, setCategoria] = useState('biomedicos')
   const [reintentando, setReintentando] = useState(false)
+  const [coincide, setCoincide] = useState(true)
+  const [varias, setVarias] = useState(true)
   // Demostración: «Reintentar» queda ocupado un momento, como mientras llega la respuesta.
   function reintentar() {
     setReintentando(true)
@@ -232,14 +229,8 @@ export default function Componentes() {
           <Campo id="g-deshabilitado" etiqueta="Serial" tipo="codigo" disabled defaultValue="SN-4471" />
           <CampoClave />
           <Campo id="g-nota" etiqueta="Nota" tipo="area" placeholder="Opcional" className="sm:col-span-2" ayuda="Hasta 120 caracteres." />
-          <div className="flex items-center gap-2">
-            <Checkbox id="g-coincide" defaultChecked />
-            <Label htmlFor="g-coincide">Revisé que coincide con el sticker</Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch id="g-varias" defaultChecked />
-            <Label htmlFor="g-varias">Registrar varias unidades iguales</Label>
-          </div>
+          <Casilla etiqueta="Revisé que coincide con el sticker" etiquetaVisible marcada={coincide} onMarcadaChange={setCoincide} />
+          <Interruptor etiqueta="Registrar varias unidades iguales" activo={varias} onActivoChange={setVarias} />
         </div>
       </Section>
 
@@ -316,7 +307,7 @@ export default function Componentes() {
       <Section title="Datos">
         <div className="flex max-w-md flex-col gap-2">
           <p className="text-xs font-medium text-muted-foreground">Progreso del conteo</p>
-          <Progress value={60.3} aria-label="Avance del conteo" />
+          <Progreso valor={60.3} etiqueta="Avance del conteo" />
           <p className="text-xs text-muted-foreground tabular-nums">
             {RESUMEN.conteoAbierto.nombre} · 132 de 219 verificados
           </p>
@@ -332,10 +323,9 @@ export default function Componentes() {
           </div>
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="g-ubicacion">Ubicación</Label>
+          <MarcoCampo id="g-ubicacion" etiqueta="Ubicación">
             <LocationPicker id="g-ubicacion" ubicaciones={UBICACIONES_API} valor={ubicacion} ultimaUsada="c1b2" onChange={setUbicacion} />
-          </div>
+          </MarcoCampo>
           <div className="flex flex-wrap items-center gap-2">
             <NetworkStatus estado="en_linea" />
             <NetworkStatus estado="enviando" />
@@ -346,7 +336,7 @@ export default function Componentes() {
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
           <PendingList items={RESUMEN.conteoAbierto.pendientesPorUbicacion} />
-          <EmptyState
+          <Estado.Vacio
             titulo="Aún no hay activos"
             descripcion="Escanea un sticker para crear el primero."
             accion={<Boton>Registrar activo</Boton>}

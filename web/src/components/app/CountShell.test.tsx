@@ -1,8 +1,8 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { Button } from '@/components/ui/button'
+import { Boton } from '@/components/kit'
 import { CountShell } from './CountShell'
 
 // Spec 001b, T6: CountShell (R8, A6).
@@ -17,12 +17,8 @@ function renderShell() {
         subtitulo="Administración"
         volver="/contar"
         estadoRed="en_linea"
-        acciones={
-          <>
-            <Button variant="outline">Escribir código</Button>
-            <Button>Confirmar</Button>
-          </>
-        }
+        secundaria={<Boton variante="secundario">Escribir código</Boton>}
+        principal={<Boton>Confirmar</Boton>}
       >
         <p>Contenido</p>
       </CountShell>
@@ -43,13 +39,28 @@ describe('CountShell', () => {
     expect(volver.classList.contains('size-control')).toBe(true)
   })
 
+  // Spec 016, T10 (Deuda T6 e): la prop libre `acciones` se retiró; la barra es siempre la
+  // BarraAccion del kit con `principal` y `secundaria`. Mismas aserciones; el selector de
+  // altura pasa de min-h-12 (48 px) a h-control (48 px en conteo) y h-accion (56 px).
   it('pone las acciones en una barra fija abajo, a ancho completo y de 48 px o más', () => {
     renderShell()
     const barra = screen.getByRole('contentinfo')
-    for (const clase of ['sticky', 'bottom-0', '[&_[data-slot=button]]:w-full', '[&_[data-slot=button]]:min-h-12']) {
+    for (const clase of ['sticky', 'bottom-0', '[&_[data-slot=button]]:w-full']) {
       expect(barra.classList.contains(clase), clase).toBe(true)
     }
+    expect(screen.getByRole('button', { name: 'Escribir código' }).parentElement?.className).toContain('[&_[data-slot=button]]:h-control')
+    expect(screen.getByRole('button', { name: 'Confirmar' }).parentElement?.className).toContain('[&_[data-slot=button]]:h-accion')
     expect(barra.querySelectorAll('[data-slot=button]')).toHaveLength(2)
+  })
+
+  it('ya no acepta una barra libre (`acciones`): solo principal y secundaria', () => {
+    const malo = (
+      // @ts-expect-error: `acciones` se retiró en la spec 016, T10 (Deuda T6 e).
+      <CountShell titulo="x" estadoRed="en_linea" acciones={<Boton>x</Boton>}>
+        <p />
+      </CountShell>
+    )
+    expect(malo).toBeTruthy()
   })
 
   it('limita el ancho en computador a una columna de 480 px (D5)', () => {
@@ -143,5 +154,31 @@ describe('CountShell: principal y secundaria (spec 016, T5)', () => {
     expect(Array.from(barra.querySelectorAll('button')).map((b) => b.textContent)).toEqual(['Otra ubicación', 'Confirmar'])
     expect(screen.getByRole('button', { name: 'Confirmar' }).parentElement?.className).toContain('h-accion')
     expect(barra.className).toContain('safe-area-inset-bottom')
+  })
+})
+
+// Spec 016, T10 (Deuda T4 e): «Saltar al contenido» también en el conteo.
+describe('CountShell: saltar al contenido (spec 016, T10)', () => {
+  it('el primer enlace es «Saltar al contenido» y lleva el foco al contenido', () => {
+    renderShell()
+    const saltar = screen.getAllByRole('link')[0]
+    expect(saltar.textContent).toBe('Saltar al contenido')
+    fireEvent.click(saltar)
+    expect(document.activeElement).toBe(screen.getByRole('main'))
+  })
+})
+
+// Spec 016, T10 (Deuda T5 d): a 375 px el título se cortaba («Conteo novie…») entre los
+// botones y el estado de red. El título ocupa su fila; el estado de red va en la segunda
+// línea, junto a la sala.
+describe('CountShell: encabezado de dos líneas (spec 016, T10)', () => {
+  it('el título tiene la fila para él solo y el estado de red va junto a la sala', () => {
+    renderShell()
+    const titulo = screen.getByText('Conteo nov 2026')
+    const estado = screen.getByRole('status')
+    const sala = screen.getByText('Administración')
+    expect(titulo.parentElement?.contains(estado)).toBe(true)
+    expect(estado.parentElement).toBe(sala.parentElement)
+    expect(titulo.parentElement?.className).toContain('text-left')
   })
 })

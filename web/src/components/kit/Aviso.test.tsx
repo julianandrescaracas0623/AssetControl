@@ -55,4 +55,13 @@ describe('Aviso', () => {
     const descripcion = screen.getByText('Descripción')
     expect(descripcion.className).toContain('text-foreground')
   })
+
+  // Spec 016, T10 (Deuda T3 e): ui/alert fusiona con el `cn` sin la escala nombrada y
+  // tomaba text-cuerpo por un color (lo borraba junto a text-destructive/text-foreground):
+  // el título quedaba en 14 px en el teléfono. La escala va en un elemento propio.
+  it.each(['error', 'aviso', 'exito', 'info'] as const)('título y detalle con la escala text-cuerpo (tono %s)', (tono) => {
+    render(<Aviso tono={tono} titulo="Título del aviso">Detalle del aviso</Aviso>)
+    expect(screen.getByText('Título del aviso').className).toContain('text-cuerpo')
+    expect(screen.getByText('Detalle del aviso').className).toContain('text-cuerpo')
+  })
 })

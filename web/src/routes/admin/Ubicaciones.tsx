@@ -171,6 +171,10 @@ export default function Ubicaciones() {
   const [verInactivas, setVerInactivas] = useState(false)
   const [edicion, setEdicion] = useState<Edicion | null>(null)
   const [aDesactivar, setADesactivar] = useState<Ubicacion | null>(null)
+  // Spec 016, T10 (Deuda T9 c): el nombre se conserva mientras el diálogo se anima al
+  // cerrar (si no, el título queda «¿Desactivar «»?» un instante).
+  const [nombreADesactivar, setNombreADesactivar] = useState('')
+  if (aDesactivar && aDesactivar.nombre !== nombreADesactivar) setNombreADesactivar(aDesactivar.nombre)
   const navegar = useNavigate()
 
   function cambiarActiva(ubicacion: Ubicacion, activa: boolean) {
@@ -251,7 +255,7 @@ export default function Ubicaciones() {
       <Confirmar
         abierto={aDesactivar !== null}
         onAbiertoChange={(abierto) => !abierto && setADesactivar(null)}
-        titulo={`¿Desactivar «${aDesactivar?.nombre ?? ''}»?`}
+        titulo={`¿Desactivar «${aDesactivar?.nombre ?? nombreADesactivar}»?`}
         descripcion="Ya no aparecerá al elegir dónde se cuenta. No se borra: puedes reactivarla cuando quieras. Si tiene salas o boxes activos dentro, primero hay que desactivar esos."
         textoConfirmar="Desactivar"
         peligro

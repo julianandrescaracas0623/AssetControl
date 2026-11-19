@@ -149,4 +149,23 @@ describe('/admin/empresa', () => {
     expect(await screen.findByText('No tienes permiso para ver esto')).toBeTruthy()
     expect(f.mock.calls.some(([url]) => String(url) === '/api/empresa')).toBe(false)
   })
+
+  // Spec 016, T10 (Deuda T9 a): si los datos no cargan (500 del servidor, tras los dos
+  // reintentos automáticos de 5xx), lo dice y «Reintentar» los vuelve a pedir.
+  it('si los datos no cargan, lo dice y «Reintentar» los vuelve a pedir', async () => {
+    const base = api()
+    let falla = true
+    const f = abrir((url, init) => {
+      if (falla && url === '/api/empresa' && (init.method ?? 'GET') === 'GET') return errorApi(500, 'error_interno', 'Falló.')
+      return base.manejador(url, init)
+    })
+    expect(await screen.findByText('No se pudieron cargar los datos de la empresa', {}, { timeout: 10_000 })).toBeTruthy()
+    const pedidas = () => f.mock.calls.filter(([url, init]) => String(url) === '/api/empresa' && (init?.method ?? 'GET') === 'GET').length
+    const antes = pedidas()
+    falla = false
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+    await waitFor(() => expect(campo(/Nombre o razón social/).value).toBe('Clínica sintética'))
+    expect(pedidas()).toBe(antes + 1)
+    expect(screen.queryByText('No se pudieron cargar los datos de la empresa')).toBeNull()
+  }, 20_000)
 })

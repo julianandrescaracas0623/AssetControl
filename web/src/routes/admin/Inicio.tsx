@@ -21,7 +21,7 @@ import { fechaCorte, pendientes } from '@/lib/sesiones'
 const hora = new Intl.DateTimeFormat('es-CO', { timeStyle: 'short' })
 
 /** Error de una sola parte del Inicio, con su reintento (R7). */
-export function ErrorDeParte({ titulo, error, reintentar }: { titulo: string; error: unknown; reintentar: () => void }) {
+function ErrorDeParte({ titulo, error, reintentar }: { titulo: string; error: unknown; reintentar: () => void }) {
   return <Estado.Error titulo={titulo} descripcion={mensajeDeError(error)} onReintentar={reintentar} />
 }
 
@@ -271,7 +271,7 @@ function EvolucionConteos() {
   )
 }
 
-export function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) {
+function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
     <section aria-label={titulo} className="flex flex-col gap-4">
       {children}

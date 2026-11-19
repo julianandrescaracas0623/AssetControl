@@ -36,7 +36,7 @@ function ListaDeUbicacion({ sesionId, ubicacionId }: { sesionId: string; ubicaci
           <li key={a.id}>
             <Link
               to={`/contar/activo/${encodeURIComponent(a.codigo)}`}
-              className="flex min-h-16 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
+              className="flex min-h-fila items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
             >
               <span className="min-w-0 flex-1">
                 <span className="block text-cuerpo font-medium break-words">{a.nombre}</span>

@@ -192,6 +192,20 @@ describe('diseño del conteo con el kit (T5)', () => {
     expect(screen.getByRole('tablist').getAttribute('aria-label')).toBe('Ubicaciones con pendientes')
   })
 
+  // Spec 016, T10 (Deuda T5 b): cada pendiente mide una fila del token (56 px en conteo),
+  // no una altura a mano.
+  it('Pendientes: cada activo pendiente es una fila de la altura del token (min-h-fila)', async () => {
+    abrir(`/contar/pendientes?ubicacion=${BOX2}`)
+    await screen.findByRole('tab', { name: 'Consultorio 1 › Box 2 · 1' })
+    const pendientes = () => screen.queryAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/contar/activo/'))
+    await waitFor(() => expect(pendientes().length).toBeGreaterThan(0))
+    const filas = pendientes()
+    for (const fila of filas) {
+      expect(fila.className).toContain('min-h-fila')
+      expect(fila.className).not.toContain('min-h-16')
+    }
+  })
+
   it('Verificar: estado físico y campos con objetivos de 48 px; avisos del kit', async () => {
     const { catalogo } = abrir('/contar/activo/000215')
     const grupo = await screen.findByRole('radiogroup', { name: 'Estado físico' })

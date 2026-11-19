@@ -34,6 +34,17 @@ describe('Campo', () => {
     expect(document.getElementById('precio-ayuda')).toBeNull()
   })
 
+  // Spec 016, T10 (Deuda T4 b): una ayuda que es una regla (la política de la contraseña)
+  // no desaparece al mostrarse el error: se ven las dos y las dos describen al control.
+  it('ayudaFija: con error se ven el error y la ayuda, y el control las lee en ese orden', () => {
+    render(<Campo id="clave" etiqueta="Clave" ayuda="Entre 10 y 128 caracteres." ayudaFija error="Es demasiado común." />)
+    const campo = screen.getByLabelText('Clave')
+    expect(campo.getAttribute('aria-invalid')).toBe('true')
+    expect(campo.getAttribute('aria-describedby')).toBe('clave-error clave-ayuda')
+    expect(document.getElementById('clave-error')?.textContent).toBe('Es demasiado común.')
+    expect(document.getElementById('clave-ayuda')?.textContent).toBe('Entre 10 y 128 caracteres.')
+  })
+
   it('suma el aria-describedby que trae el consumidor', () => {
     render(<Campo id="a" etiqueta="A" ayuda="Ayuda" aria-describedby="otro" />)
     expect(screen.getByRole('textbox', { name: 'A' }).getAttribute('aria-describedby')).toBe('a-ayuda otro')
@@ -166,5 +177,16 @@ describe('MarcoCampo', () => {
     const clases = screen.getByRole('textbox', { name: 'Código del sticker' }).className
     for (const clase of ['h-accion', 'font-mono', 'text-center', 'text-2xl']) expect(clases, clase).toContain(clase)
     expect(clases).not.toMatch(/(^|\s)h-control(\s|$)/)
+  })
+})
+
+// Spec 016, T10: ui/label fusiona con el `cn` sin la escala nombrada y borraba text-etiqueta
+// al lado de text-foreground (la etiqueta quedaba en 14 px también en escritorio, donde la
+// escala pide 13 px). La escala va en un elemento propio dentro de la etiqueta.
+describe('Campo: escala de la etiqueta', () => {
+  it('el texto de la etiqueta lleva text-etiqueta', () => {
+    render(<Campo id="serie" etiqueta="Serial" obligatorio />)
+    expect(screen.getByText('Serial').className.split(/\s+/)).toContain('text-etiqueta')
+    expect(screen.getByRole('textbox', { name: /Serial/ })).toBeTruthy()
   })
 })

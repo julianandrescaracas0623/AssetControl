@@ -14,7 +14,10 @@ import { MEDIDAS_IMAGEN, type VarianteImagen } from './medidasImagen'
 // - `logo`: logo de la empresa en Ajustes (T9). Caja de 160 × 64 px, fondo neutro,
 //   contain: la marca se ve completa.
 // - `logoCabecera`: logo en cabeceras de informe o barra (T9). 32 px de alto, ancho
-//   automático hasta 120 px.
+//   automático hasta 120 px. Spec 016, T10: se conserva porque D13 (b) fija esa medida
+//   «donde ya se muestre», pero hoy ninguna pantalla de la web muestra el logo en una
+//   cabecera (solo Ajustes → Empresa y los informes Excel/PDF del servidor); solo la usa
+//   la galería. Si una cabecera llega a mostrarlo, debe usar esta variante.
 // Solo presentación: el límite de subida y el procesado de imágenes son del servidor.
 
 export type MarcoImagenProps = {

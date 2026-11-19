@@ -234,3 +234,27 @@ describe('AdminShell: navegación y encabezado (spec 016, T4)', () => {
     expect(document.querySelector('[data-kit=notificaciones]')).toBeTruthy()
   })
 })
+
+// Spec 016, T10 (Deuda T4 e, T4 f): «Saltar al contenido» y pie del menú con aire.
+describe('AdminShell: pulido (spec 016, T10)', () => {
+  beforeEach(() => simularAncho({ movil: false }))
+
+  it('el primer enlace es «Saltar al contenido» y lleva el foco al contenido principal', async () => {
+    renderAt('/admin/activos')
+    await screen.findByRole('navigation', { name: 'Navegación principal' })
+    const saltar = screen.getAllByRole('link')[0]
+    expect(saltar.textContent).toBe('Saltar al contenido')
+    fireEvent.click(saltar)
+    expect(document.activeElement).toBe(document.getElementById('contenido'))
+    // Un solo landmark main: el de SidebarInset (shadcn); el contenido es un div dentro.
+    expect(document.querySelectorAll('main')).toHaveLength(1)
+    expect(document.activeElement?.closest('main')).toBeTruthy()
+  })
+
+  it('«Ir a contar» y la tarjeta de la clínica no quedan pegados en el pie del menú', async () => {
+    renderAt('/admin')
+    await screen.findByRole('navigation', { name: 'Navegación principal' })
+    const pie = document.querySelector('[data-slot=sidebar-footer] [data-slot=sidebar-menu]')
+    expect(pie?.className.split(/\s+/)).toContain('gap-separacion')
+  })
+})

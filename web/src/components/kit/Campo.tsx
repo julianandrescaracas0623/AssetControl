@@ -19,6 +19,11 @@ type CampoBase = {
   ayuda?: ReactNode
   /** Mensaje concreto y en español; marca el control como inválido. */
   error?: string
+  /**
+   * La ayuda es una regla (p. ej. la política de la contraseña): sigue visible con el
+   * error y describe al control después de él. Por defecto el error reemplaza a la ayuda.
+   */
+  ayudaFija?: boolean
   /** Marca visual «*» (oculta al lector) y `aria-required` en el control. */
   obligatorio?: boolean
   /** Clases del contenedor (p. ej. `sm:col-span-2`). */
@@ -37,25 +42,27 @@ export function MarcaObligatorio() {
 type MarcoCampoProps = CampoBase & Omit<ComponentProps<'div'>, 'id' | 'className'> & { children: ReactNode }
 
 /** Solo el marco (etiqueta, ayuda y error) alrededor de un control propio. */
-export function MarcoCampo({ id, etiqueta, ayuda, error, obligatorio, className, children, ...props }: MarcoCampoProps) {
+export function MarcoCampo({ id, etiqueta, ayuda, error, ayudaFija = false, obligatorio, className, children, ...props }: MarcoCampoProps) {
   return (
     <div data-kit="campo" className={cn('flex min-w-0 flex-col gap-1.5', className)} {...props}>
-      <Label htmlFor={id} className="text-etiqueta leading-snug text-foreground">
-        {etiqueta}
-        {obligatorio && <MarcaObligatorio />}
+      {/* Spec 016, T10: la escala va en un span (ui/label la borraría al fusionar clases). */}
+      <Label htmlFor={id} className="leading-snug text-foreground">
+        <span className="text-etiqueta">
+          {etiqueta}
+          {obligatorio && <MarcaObligatorio />}
+        </span>
       </Label>
       {children}
-      {error ? (
+      {error && (
         <p id={`${id}-error`} className="flex items-start gap-1.5 text-etiqueta font-normal text-destructive">
           <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           {error}
         </p>
-      ) : (
-        ayuda && (
-          <p id={`${id}-ayuda`} className="text-etiqueta font-normal text-muted-foreground">
-            {ayuda}
-          </p>
-        )
+      )}
+      {ayuda && (!error || ayudaFija) && (
+        <p id={`${id}-ayuda`} className="text-etiqueta font-normal text-muted-foreground">
+          {ayuda}
+        </p>
       )}
     </div>
   )
@@ -119,8 +126,8 @@ function sinTipo<T extends object>(props: T): Omit<T, 'tipo'> {
   return copia
 }
 
-function describir(id: string, error: string | undefined, ayuda: ReactNode, propio: string | undefined) {
-  const ids = [error ? `${id}-error` : ayuda ? `${id}-ayuda` : null, propio].filter(Boolean)
+function describir(id: string, error: string | undefined, ayuda: ReactNode, ayudaFija: boolean, propio: string | undefined) {
+  const ids = [error ? `${id}-error` : null, ayuda && (!error || ayudaFija) ? `${id}-ayuda` : null, propio].filter(Boolean)
   return ids.length > 0 ? ids.join(' ') : undefined
 }
 
@@ -129,9 +136,9 @@ function describir(id: string, error: string | undefined, ayuda: ReactNode, prop
  * el valor es el texto tal cual, nunca un float), codigo (mono), area o seleccion.
  */
 export function Campo(props: CampoProps) {
-  const { id, etiqueta, ayuda, error, obligatorio, className, ...resto } = props
-  const marco = { id, etiqueta, ayuda, error, obligatorio, className }
-  const describedBy = describir(id, error, ayuda, resto['aria-describedby'])
+  const { id, etiqueta, ayuda, error, ayudaFija = false, obligatorio, className, ...resto } = props
+  const marco = { id, etiqueta, ayuda, error, ayudaFija, obligatorio, className }
+  const describedBy = describir(id, error, ayuda, ayudaFija, resto['aria-describedby'])
 
   if (resto.tipo === 'seleccion') {
     const { opciones, valor, onValorChange, placeholder, cargando, disabled, name } = resto

@@ -31,32 +31,99 @@ function declarations(body: string): Record<string, string> {
   return vars
 }
 
-/** Variables de los bloques `:root { … }` de nivel superior (sin @media). */
-function rootVariables(): Record<string, string> {
-  const css = themeCss().replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '')
+// Spec 016, T10 (Deuda T1 f): un lector de bloques por llaves (no una expresión regular),
+// para que un @media anidado (o un bloque dentro de otro) no confunda a la prueba.
+type Bloque = { prelude: string; propio: string; hijos: Bloque[] }
+
+function bloques(css: string): Bloque[] {
+  const texto = css.replace(/\/\*[\s\S]*?\*\//g, '')
+  const raiz: Bloque = { prelude: '', propio: '', hijos: [] }
+  const pila: Bloque[] = [raiz]
+  let trozo = ''
+  for (const c of texto) {
+    const actual = pila[pila.length - 1]
+    if (c === '{') {
+      // Lo que va antes de la llave, tras la última declaración, es el prelude del bloque.
+      const corte = Math.max(trozo.lastIndexOf(';'), trozo.lastIndexOf('}'))
+      actual.propio += trozo.slice(0, corte + 1)
+      const hijo: Bloque = { prelude: trozo.slice(corte + 1).trim(), propio: '', hijos: [] }
+      actual.hijos.push(hijo)
+      pila.push(hijo)
+      trozo = ''
+    } else if (c === '}') {
+      actual.propio += trozo
+      trozo = ''
+      if (pila.length > 1) pila.pop()
+    } else {
+      trozo += c
+    }
+  }
+  raiz.propio += trozo
+  return raiz.hijos
+}
+
+function esMedia(b: Bloque) {
+  return b.prelude.startsWith('@media')
+}
+
+function selectores(b: Bloque) {
+  return b.prelude.split(',').map((s) => s.trim())
+}
+
+/** Variables de los bloques `:root { … }` de nivel superior (fuera de todo @media). */
+function rootVariables(css = themeCss()): Record<string, string> {
   const vars: Record<string, string> = {}
-  for (const [, body] of css.matchAll(/:root\s*\{([^}]*)\}/g)) Object.assign(vars, declarations(body))
+  for (const b of bloques(css)) if (!esMedia(b) && selectores(b).includes(':root')) Object.assign(vars, declarations(b.propio))
   if (Object.keys(vars).length === 0) throw new Error('index.css no tiene bloque :root')
   return vars
 }
 
-function themeInline(): Record<string, string> {
-  const block = themeCss().match(/@theme\s+inline\s*\{([^}]*)\}/)
+function themeInline(css = themeCss()): Record<string, string> {
+  const block = bloques(css).find((b) => /^@theme\s+inline$/.test(b.prelude))
   if (!block) throw new Error('index.css no tiene bloque @theme inline')
-  return declarations(block[1])
+  return declarations(block.propio)
 }
 
-/** Declaraciones del selector dentro de `@media (width >= 48rem)` (escritorio, md). */
-function desktopVariables(selector: string): Record<string, string> {
-  const media = themeCss().match(/@media\s*\(width\s*>=\s*48rem\)\s*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}/g) ?? []
+/** Declaraciones del selector dentro de `@media (width >= 48rem)` (escritorio, md), a cualquier profundidad. */
+function desktopVariables(selector: string, css = themeCss()): Record<string, string> {
   const vars: Record<string, string> = {}
-  for (const bloque of media) {
-    for (const [, sel, body] of bloque.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-      if (sel.split(',').map((s) => s.trim()).includes(selector)) Object.assign(vars, declarations(body))
+  const recorrer = (lista: Bloque[], enEscritorio: boolean) => {
+    for (const b of lista) {
+      const escritorio = enEscritorio || (esMedia(b) && /\(\s*width\s*>=\s*48rem\s*\)/.test(b.prelude))
+      if (escritorio && !esMedia(b) && selectores(b).includes(selector)) Object.assign(vars, declarations(b.propio))
+      recorrer(b.hijos, escritorio)
     }
   }
+  recorrer(bloques(css), false)
   return vars
 }
+
+describe('lector de bloques de index.css (Deuda T1 f)', () => {
+  const CSS = `
+    /* comentario con { llaves } */
+    :root { --a: #111111; --control-h: 3rem; }
+    @theme inline { --color-a: var(--a); }
+    @media (prefers-reduced-motion: reduce) {
+      @media (width >= 48rem) { :root { --a: #222222; } }
+      :root { --b: #333333; }
+    }
+    @media (width >= 48rem) {
+      @supports (display: grid) { [data-densidad="admin"], .x { --control-h: 2.25rem; } }
+    }`
+
+  it('los :root dentro de un @media (también anidado) no cuentan como raíz', () => {
+    expect(rootVariables(CSS)).toEqual({ a: '#111111', 'control-h': '3rem' })
+  })
+
+  it('encuentra el bloque @theme inline', () => {
+    expect(themeInline(CSS)).toEqual({ 'color-a': 'var(--a)' })
+  })
+
+  it('lee el escritorio a cualquier profundidad dentro del @media (width >= 48rem)', () => {
+    expect(desktopVariables('[data-densidad="admin"]', CSS)).toEqual({ 'control-h': '2.25rem' })
+    expect(desktopVariables(':root', CSS)).toEqual({ a: '#222222' })
+  })
+})
 
 // Variables que no son color: medidas (radio, densidad y escala tipográfica).
 const NON_COLOR = /^(?:radius|control-h|fila-h|accion-h|separacion-objetivo|(?:fs|lh)-[\w-]+)$/

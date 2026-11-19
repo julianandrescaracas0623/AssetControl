@@ -211,3 +211,17 @@
     }
   }
 }
+
+/* Spec 016, T10 (Deuda T8 c): carril de pestañas que no cabe (teléfono). Un degradado de
+   2,5 rem en el borde por el que hay más pestañas; Pestanas marca data-desborde. */
+@utility desvanecer-desborde {
+  &[data-desborde="derecha"] {
+    mask-image: linear-gradient(to right, #000000 calc(100% - 2.5rem), transparent);
+  }
+  &[data-desborde="izquierda"] {
+    mask-image: linear-gradient(to left, #000000 calc(100% - 2.5rem), transparent);
+  }
+  &[data-desborde="ambos"] {
+    mask-image: linear-gradient(to right, transparent, #000000 2.5rem, #000000 calc(100% - 2.5rem), transparent);
+  }
+}

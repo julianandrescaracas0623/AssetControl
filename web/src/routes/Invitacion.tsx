@@ -86,6 +86,7 @@ function Formulario({ token }: { token: string }) {
           minLength={10}
           maxLength={128}
           ayuda={POLITICA}
+          ayudaFija
           error={errorClave ?? undefined}
           sufijo={
             <Boton

@@ -79,7 +79,7 @@ export function EstadoVacio({ titulo, descripcion, accion, icono = <Inbox />, cl
         {descripcion && <div className="text-cuerpo text-muted-foreground">{descripcion}</div>}
       </div>
       {accion && (
-        <div className="mt-1 flex flex-wrap justify-center gap-separacion [&_[data-slot=button]]:min-h-control">{accion}</div>
+        <div className="mt-1 flex flex-wrap justify-center gap-separacion">{accion}</div>
       )}
     </div>
   )

@@ -85,3 +85,23 @@ describe('Pestanas', () => {
     expect(screen.getByRole('tab', { name: 'Por categoría' }).className).toContain('h-control')
   })
 })
+
+// Spec 016, T10 (Deuda T8 c): en el teléfono las pestañas que no caben se desplazan; un
+// degradado en el borde avisa que hay más (la cuarta, «Dados de baja», quedaba cortada).
+describe('Pestanas: desborde', () => {
+  it('marca el lado por el que hay más pestañas y lo actualiza al desplazar', () => {
+    render(<Pestanas etiqueta="Estado" pestanas={PESTANAS} />)
+    const rail = screen.getByRole('tablist').parentElement as HTMLElement
+    expect(rail.getAttribute('data-desborde')).toBe('ninguno')
+    Object.defineProperty(rail, 'scrollWidth', { configurable: true, value: 500 })
+    Object.defineProperty(rail, 'clientWidth', { configurable: true, value: 300 })
+    fireEvent.scroll(rail)
+    expect(rail.getAttribute('data-desborde')).toBe('derecha')
+    rail.scrollLeft = 100
+    fireEvent.scroll(rail)
+    expect(rail.getAttribute('data-desborde')).toBe('ambos')
+    rail.scrollLeft = 200
+    fireEvent.scroll(rail)
+    expect(rail.getAttribute('data-desborde')).toBe('izquierda')
+  })
+})

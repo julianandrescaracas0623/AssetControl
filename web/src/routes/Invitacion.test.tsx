@@ -112,6 +112,9 @@ describe('/invitacion', () => {
     const clave = screen.getByLabelText('Contraseña')
     expect(clave.getAttribute('aria-invalid')).toBe('true')
     expect(clave.getAttribute('aria-describedby')).toContain('invitacion-password-error')
+    // Spec 016, T10 (Deuda T4 b): la política sigue a la vista junto al error.
+    expect(screen.getByText('Entre 10 y 128 caracteres. Evita contraseñas comunes.')).toBeTruthy()
+    expect(clave.getAttribute('aria-describedby')).toContain('invitacion-password-ayuda')
   })
 
   it('un nombre rechazado (H-3) se marca en el campo, que admite hasta 120 caracteres', async () => {

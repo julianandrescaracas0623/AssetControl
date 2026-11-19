@@ -77,6 +77,10 @@ describe('editar (T5)', () => {
     expect(aviso.textContent).toContain('Cambió: precio de compra')
     expect((within(panel).getByLabelText(/Nombre/) as HTMLInputElement).value).toBe('Silla ergonómica gris')
     expect(within(panel).getByText('Otra persona lo cambió a «$ 400.000,00»')).toBeTruthy()
+    // Spec 016, T10 (Deuda T8 b): una sola acción principal en el diálogo (la del pie); la
+    // del aviso es secundaria.
+    expect(within(aviso).getByRole('button', { name: 'Guardar mis cambios' }).getAttribute('data-variante')).toBe('secundario')
+    expect(panel.querySelectorAll('[data-kit=boton][data-variante=principal]')).toHaveLength(1)
 
     fireEvent.click(within(aviso).getByRole('button', { name: 'Guardar mis cambios' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -110,6 +114,46 @@ describe('editar (T5)', () => {
     const panel = await abrirEdicion()
     expect(panel.getAttribute('data-slot')).toBe('dialog-content')
     expect(document.querySelector('[data-slot="sheet-content"]')).toBeNull()
+  })
+
+  // Spec 016, T10 (Deuda T8 a): reabrir la edición empieza del activo, no de lo escrito.
+  it('cancelar y reabrir empieza de cero', async () => {
+    abrir()
+    let panel = await abrirEdicion()
+    fireEvent.change(within(panel).getByLabelText('Marca'), { target: { value: 'Otra marca' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Cancelar' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    panel = await abrirEdicion()
+    expect((within(panel).getByLabelText('Marca') as HTMLInputElement).value).toBe('Rimax')
+  })
+
+  // Spec 016, T10 (Deuda T8 a): si se cierra el diálogo con el guardado en vuelo y se abre
+  // otra acción, la respuesta no cierra esa otra acción (solo cierra su propio diálogo).
+  it('un guardado que termina con el diálogo ya cerrado no cierra «Mover»', async () => {
+    const catalogo = catalogoDemo('admin')
+    let soltar = () => {}
+    const enVuelo = new Promise<void>((r) => (soltar = r))
+    simularAncho({ movil: false })
+    const f = simularSesion('admin', (url, init) => {
+      // El PATCH espera a `soltar()`: el guardado queda en vuelo.
+      if (init?.method === 'PATCH' && String(url) === `/api/activos/${SILLA}`) {
+        return enVuelo.then(() => catalogo.manejador(url, init)) as Promise<Response>
+      }
+      return catalogo.manejador(url, init)
+    })
+    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/admin/activos/000123'] })} />)
+    const panel = await abrirEdicion()
+    fireEvent.change(within(panel).getByLabelText(/Nombre/), { target: { value: 'Silla en vuelo' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(cambios(f)).toHaveLength(1))
+    fireEvent.keyDown(panel, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Editar activo' })).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: 'Mover' }))
+    expect(await screen.findByRole('dialog', { name: 'Mover activo' })).toBeTruthy()
+    soltar()
+    // El diálogo «Mover» es modal: la ficha queda oculta al lector mientras tanto (hidden).
+    expect(await screen.findByRole('heading', { level: 1, name: 'Silla en vuelo', hidden: true })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Mover activo' })).toBeTruthy()
   })
 
   it('Escape cierra el diálogo sin guardar (015-T2)', async () => {

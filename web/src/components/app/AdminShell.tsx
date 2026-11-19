@@ -6,7 +6,7 @@ import { DatosFicticios } from '@/components/app/DatosFicticios'
 import { GlobalSearch } from '@/components/app/GlobalSearch'
 import { Logo } from '@/components/app/Logo'
 import { ADMIN_NAV, entradaDeRuta, migasDeRuta } from '@/components/app/admin-nav'
-import { Boton, Notificaciones } from '@/components/kit'
+import { Boton, ID_CONTENIDO, Notificaciones, SaltarContenido } from '@/components/kit'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   Breadcrumb,
@@ -123,7 +123,8 @@ function BarraLateral() {
         </nav>
       </SidebarContent>
       <SidebarFooter>
-        <SidebarMenu>
+        {/* Spec 016, T10 (Deuda T4 f): 8 px entre «Ir a contar» y la tarjeta de la clínica. */}
+        <SidebarMenu className="gap-separacion">
           {!escritorio && (
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Ir a contar" variant="outline" className="h-control gap-2.5 bg-card px-2.5">
@@ -278,6 +279,7 @@ export default function AdminShell() {
   return (
     <TooltipProvider delayDuration={0}>
     <SidebarProvider defaultOpen={abierta} data-densidad="admin">
+      <SaltarContenido />
       <BarraLateral />
       <SidebarInset className="min-w-0 bg-page">
         {!conDatosReales(pathname) && <DatosFicticios />}
@@ -296,9 +298,10 @@ export default function AdminShell() {
           <BotonBuscar onAbrir={() => setBuscando(true)} />
           <MenuUsuario />
         </header>
-        <main className="mx-auto flex w-full max-w-[1320px] min-w-0 flex-1 flex-col p-4 md:p-8">
+        {/* Spec 016, T10: div (no main): SidebarInset ya es el único landmark main. */}
+        <div id={ID_CONTENIDO} tabIndex={-1} className="mx-auto flex w-full max-w-[1320px] min-w-0 flex-1 flex-col p-4 outline-none md:p-8">
           <Outlet />
-        </main>
+        </div>
         <GlobalSearch open={buscando} onOpenChange={setBuscando} />
         <Notificaciones posicion="bottom-right" />
       </SidebarInset>

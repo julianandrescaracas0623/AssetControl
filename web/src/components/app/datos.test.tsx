@@ -1,17 +1,16 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { AssetCard } from './AssetCard'
-import { EmptyState } from './EmptyState'
 import { LiveValueCard, ThreeFiguresCard } from './FigureCards'
 import { LocationPicker } from './LocationPicker'
 import { PendingList } from './PendingList'
-import { StatCard } from './StatCard'
 import type { InformeCongelado, ValorActual } from '@/lib/cifras'
 import { UBICACIONES_API } from '@/mocks/datos-ficticios'
 
 // Spec 001b, T7: componentes propios de datos (R10, R11, R12; A7).
+// Spec 016, T10: StatCard y EmptyState se retiraron (sin pantallas); su prueba vive en
+// Cifra.test (rótulo, cifra, contexto y enlace al detalle) y Estado.test (vacío con acción).
 
 afterEach(cleanup)
 
@@ -94,20 +93,6 @@ describe('AssetCard (R11)', () => {
   })
 })
 
-describe('StatCard', () => {
-  it('muestra rótulo, cifra y contexto, y enlaza al detalle', () => {
-    render(
-      <MemoryRouter>
-        <StatCard titulo="Activos hoy" valor="219" contexto="Incluye 2 en reparación" href="/admin/activos" />
-      </MemoryRouter>,
-    )
-    const enlace = screen.getByRole('link', { name: /Activos hoy/ })
-    expect(enlace.getAttribute('href')).toBe('/admin/activos')
-    expect(enlace.textContent).toContain('219')
-    expect(enlace.textContent).toContain('Incluye 2 en reparación')
-  })
-})
-
 describe('PendingList', () => {
   it('lista pendientes por ubicación', () => {
     render(
@@ -122,14 +107,6 @@ describe('PendingList', () => {
     expect(filas).toHaveLength(2)
     expect(within(filas[1]).getByText('13 de 29')).toBeTruthy()
     expect(within(filas[1]).getByText('16')).toBeTruthy()
-  })
-})
-
-describe('EmptyState', () => {
-  it('muestra título, ayuda y una acción', () => {
-    render(<EmptyState titulo="Aún no hay activos" descripcion="Escanea un sticker." accion={<button>Ir a escanear</button>} />)
-    expect(screen.getByText('Aún no hay activos')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Ir a escanear' })).toBeTruthy()
   })
 })
 

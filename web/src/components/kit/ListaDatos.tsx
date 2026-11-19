@@ -3,9 +3,9 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 // Spec 016, T3 (R9, P13): filas rótulo/valor de la ficha y de la verificación. El valor
-// llega ya formateado (el dinero, del servidor y con formatCOP). Un dato ausente
-// (null, false, o valor undefined, null o false) no se pinta: el contador no recibe el precio y no ve
-// ni su rótulo ni un hueco ni «•••».
+// llega ya formateado (el dinero, del servidor y con formatCOP). No se pinta la fila
+// cuando el dato mismo es null o false, ni cuando su valor es undefined, null o false:
+// así el contador, que no recibe el precio, no ve su rótulo, ni un hueco, ni «•••».
 
 export type TipoDato = 'texto' | 'codigo' | 'cifra'
 

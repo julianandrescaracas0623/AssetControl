@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 
 import { NetworkStatus, type EstadoRed } from '@/components/app/NetworkStatus'
-import { BarraAccion, Boton } from '@/components/kit'
+import { BarraAccion, Boton, ID_CONTENIDO, SaltarContenido } from '@/components/kit'
 import { useDensidad } from '@/hooks/use-densidad'
 
 // Shell del modo conteo (docs/08 §5, spec 001b T6): móvil primero y a una
@@ -14,7 +14,7 @@ import { useDensidad } from '@/hooks/use-densidad'
 // kit con objetivos de 48 px y 8 px entre objetivos.
 // Spec 016, T5 (R4, Deuda T4 g): `principal` y `secundaria` van en la BarraAccion del kit
 // (principal de 56 px abajo, secundaria encima); las pantallas no ponen alturas a mano.
-// `acciones` queda para las pantallas aún no migradas (alta, T6).
+// Spec 016, T10 (Deuda T6 e): se retiró la barra libre `acciones` (ya sin pantallas).
 
 export function CountShell({
   titulo,
@@ -24,7 +24,6 @@ export function CountShell({
   estadoRed,
   principal,
   secundaria,
-  acciones,
   children,
 }: {
   titulo: string
@@ -38,16 +37,15 @@ export function CountShell({
   principal?: ReactNode
   /** Acciones secundarias, encima de la principal. */
   secundaria?: ReactNode
-  /** Barra libre (pantallas aún no migradas al kit): principal y secundaria juntas. */
-  acciones?: ReactNode
   children: ReactNode
 }) {
   // Spec 016, T1 (D6): el conteo siempre con objetivos de pulgar.
   useDensidad('conteo')
   return (
     <div data-densidad="conteo" className="flex min-h-0 flex-1 flex-col">
+      <SaltarContenido />
       <header className="sticky top-0 z-10 border-b bg-card">
-        <div className="mx-auto flex h-14 w-full max-w-[480px] items-center gap-1 px-1">
+        <div className="mx-auto flex min-h-fila w-full max-w-[480px] items-center gap-1 px-1 py-1">
           {volver ? (
             <>
               <Boton asChild variante="fantasma" className="size-control shrink-0 p-0 [&_svg]:size-5">
@@ -67,21 +65,22 @@ export function CountShell({
           ) : (
             (menu ?? <span className="size-control shrink-0" aria-hidden="true" />)
           )}
-          <div className="min-w-0 flex-1 px-1 text-center">
-            <p className="truncate text-titulo-seccion">{titulo}</p>
-            {subtitulo && <p className="truncate text-etiqueta font-normal text-muted-foreground">{subtitulo}</p>}
+          {/* Spec 016, T10 (Deuda T5 d): el título tiene su fila (antes se cortaba entre los
+              botones y el estado de red a 375 px); el estado de red va en la segunda línea,
+              junto a la sala, alineado a la izquierda como el resto del encabezado. */}
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-1 pr-3 text-left">
+            <p className="truncate text-titulo-seccion leading-tight">{titulo}</p>
+            <div className="flex min-w-0 items-center gap-2">
+              {subtitulo && <p className="min-w-0 truncate text-etiqueta font-normal text-muted-foreground">{subtitulo}</p>}
+              <NetworkStatus estado={estadoRed} className="h-6 shrink-0 px-2" />
+            </div>
           </div>
-          <NetworkStatus estado={estadoRed} className="mr-1" />
         </div>
       </header>
-      <main className="mx-auto flex w-full max-w-[480px] min-w-0 flex-1 flex-col gap-4 p-4">{children}</main>
-      {principal ? (
-        <BarraAccion elemento="footer" principal={principal} secundaria={secundaria} />
-      ) : acciones && (
-        <footer className="sticky bottom-0 z-10 border-t bg-card pb-[calc(0.75rem+env(safe-area-inset-bottom))] [&_[data-slot=button]]:min-h-12 [&_[data-slot=button]]:w-full [&_[data-slot=button]]:text-base">
-          <div className="mx-auto flex w-full max-w-[480px] flex-col gap-separacion px-4 pt-3">{acciones}</div>
-        </footer>
-      )}
+      <main id={ID_CONTENIDO} tabIndex={-1} className="mx-auto flex w-full max-w-[480px] min-w-0 flex-1 flex-col gap-4 p-4 outline-none">
+        {children}
+      </main>
+      {principal && <BarraAccion elemento="footer" principal={principal} secundaria={secundaria} />}
     </div>
   )
 }

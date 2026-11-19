@@ -132,4 +132,18 @@ describe('galería de componentes', () => {
     expect(seleccion.querySelectorAll('[data-kit=casilla]').length).toBeGreaterThanOrEqual(3)
     expect(seleccion.querySelector('[data-kit=interruptor]')).toBeTruthy()
   })
+
+  // Spec 016, T10 (A2, A7): la galería también se arma solo con el kit: la casilla, el
+  // interruptor y el avance de los ejemplos son los del kit (con su nombre y su valor).
+  it('los ejemplos de campos y datos usan Casilla, Interruptor, Progreso y Estado.Vacio del kit', () => {
+    render(<Componentes />)
+    const campos = screen.getByRole('region', { name: 'Campos' })
+    expect(within(campos).getByRole('checkbox', { name: 'Revisé que coincide con el sticker' }).closest('[data-kit=casilla]')).toBeTruthy()
+    expect(within(campos).getByRole('switch', { name: 'Registrar varias unidades iguales' }).closest('[data-kit=interruptor]')).toBeTruthy()
+    const datos = screen.getByRole('region', { name: 'Datos' })
+    const avance = within(datos).getByRole('progressbar', { name: 'Avance del conteo' })
+    expect(avance.closest('[data-kit=progreso]')).toBeTruthy()
+    expect(datos.querySelector('[data-kit=estado-vacio]')?.textContent).toContain('Aún no hay activos')
+    expect(within(datos).getByRole('combobox', { name: 'Ubicación' })).toBeTruthy()
+  })
 })

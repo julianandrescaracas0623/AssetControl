@@ -102,11 +102,22 @@ describe('Boton', () => {
     expect(enlace.className).toContain('h-control')
   })
 
+  // Spec 016, T10 (Deuda T2 c): el anillo de shadcn pintaba su separación de blanco
+  // (ring-offset-background), un halo sobre --page. Ahora es un contorno (outline) de 2 px
+  // con 2 px de separación transparente: se ve igual sobre la página y sobre una tarjeta.
+  // Edición de la prueba: el selector pasa de ring-2/ring-offset-2 a outline-2/outline-offset-2
+  // (misma regla R6: 2 px sólidos + 2 px de separación).
   it('el foco es el anillo sólido de 2 px con separación (R6)', () => {
     render(<Boton>Foco</Boton>)
-    const clases = screen.getByRole('button', { name: 'Foco' }).className
-    expect(clases).toContain('focus-visible:ring-2')
-    expect(clases).toContain('focus-visible:ring-offset-2')
+    const clases = screen.getByRole('button', { name: 'Foco' }).className.split(/\s+/)
+    expect(clases).toContain('focus-visible:outline-2')
+    expect(clases).toContain('focus-visible:outline-offset-2')
+    expect(clases).toContain('focus-visible:outline-ring')
+    // Sin el anillo de sombra ni su separación pintada.
+    expect(clases).toContain('focus-visible:ring-0')
+    expect(clases).toContain('focus-visible:ring-offset-0')
+    expect(clases).not.toContain('focus-visible:ring-2')
+    expect(clases).not.toContain('focus-visible:ring-offset-2')
   })
 
   it('respeta type="submit"', () => {

@@ -48,11 +48,17 @@ export function Aviso({ tono, titulo, accion, icono, rol, className, children, .
       {...props}
     >
       {icono ?? ICONO[tono]}
-      <AlertTitle className={cn('text-cuerpo font-semibold', tono === 'error' ? 'text-destructive' : 'text-foreground')}>{titulo}</AlertTitle>
+      {/* Spec 016, T10 (Deuda T3 e): ui/alert fusiona con el `cn` sin la escala nombrada, que
+          toma text-cuerpo por un color y lo borra al lado de otro color. El título no lleva
+          color propio (lo hereda de la variante: oscuro, o rojo en error) y el detalle lleva
+          la escala en su propio elemento. */}
+      <AlertTitle className="text-cuerpo font-semibold">{titulo}</AlertTitle>
       {(children || accion) && (
-        <AlertDescription className="min-w-0 text-cuerpo text-foreground">
-          {children}
-          {accion && <div className={cn('flex flex-wrap gap-separacion', children ? 'mt-3' : 'mt-2')}>{accion}</div>}
+        <AlertDescription className="min-w-0 text-foreground">
+          <div className="text-cuerpo text-foreground">
+            {children}
+            {accion && <div className={cn('flex flex-wrap gap-separacion', children ? 'mt-3' : 'mt-2')}>{accion}</div>}
+          </div>
         </AlertDescription>
       )}
     </Alert>

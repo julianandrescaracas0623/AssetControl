@@ -41,9 +41,11 @@ export type ColumnaTabla<T> = {
 /**
  * Celda de la fila de total. El contenido llega ya calculado y formateado (del servidor):
  * la tabla no suma. `columnas` es cuántas columnas ocupa (colSpan). En el teléfono con
- * `desplazar`, la primera celda solo queda fija si ocupa una columna.
+ * `desplazar`, la primera celda solo queda fija si ocupa una columna; si ocupa varias, su
+ * texto se queda a la vista al desplazar sin tapar el resto de la fila. Una celda de una
+ * sola columna lleva la `clase` de esa columna (Spec 016, T10); `clase` añade las propias.
  */
-export type CeldaPie = { contenido: ReactNode; columnas?: number; tipo?: TipoColumna }
+export type CeldaPie = { contenido: ReactNode; columnas?: number; tipo?: TipoColumna; clase?: string }
 
 export type OrdenTabla = { columna: string; direccion: 'asc' | 'desc' }
 
@@ -260,7 +262,7 @@ function Encabezado<T>({ columna, orden, onOrdenChange, fija }: { columna: Colum
     <TableHead
       aria-sort={ariaSort}
       className={cn(
-        'h-10 px-3 text-muted-foreground first:pl-4',
+        'h-10 px-2 text-muted-foreground first:pl-4 md:px-3',
         columna.tipo === 'cifra' && 'text-right',
         fija && 'sticky left-0 z-10 bg-muted',
         columna.clase,
@@ -355,7 +357,7 @@ function Tabla<T>({
                 key={c.id}
                 id={idNombre && c === nombre ? idNombre(fila) : undefined}
                 className={cn(
-                  'px-3 first:pl-4',
+                  'px-2 first:pl-4 md:px-3',
                   CELDA[c.tipo ?? 'texto'],
                   c.principal && 'font-medium',
                   primeraFija && i === 0 && 'sticky left-0 z-10 bg-card',
@@ -372,22 +374,37 @@ function Tabla<T>({
       {pie && pie.length > 0 && (
         <TableFooter className="bg-muted">
           <TableRow className="h-fila hover:bg-transparent">
-            {pie.map((celda, i) => (
-              <TableCell
-                key={i}
-                colSpan={celda.columnas}
-                className={cn(
-                  'px-3 font-semibold first:pl-4',
-                  CELDA[celda.tipo ?? 'texto'],
-                  // Fija y opaca: el resto de la fila pasa por debajo al desplazar. Solo si
-                  // ocupa una columna: una celda fija más ancha que la pantalla taparía el
-                  // total del final (revisión de la T7).
-                  primeraFija && i === 0 && (celda.columnas ?? 1) <= 1 && 'sticky left-0 z-10 bg-muted',
-                )}
-              >
-                {celda.contenido}
-              </TableCell>
-            ))}
+            {pie.map((celda, i) => {
+              const ancho = celda.columnas ?? 1
+              // Columna en la que empieza la celda (las anteriores pueden abarcar varias).
+              const inicio = pie.slice(0, i).reduce((suma, c) => suma + (c.columnas ?? 1), 0)
+              const columna = ancho === 1 ? columnas[inicio] : undefined
+              const rotuloAncho = primeraFija && i === 0 && ancho > 1
+              return (
+                <TableCell
+                  key={i}
+                  colSpan={celda.columnas}
+                  className={cn(
+                    'px-2 font-semibold first:pl-4 md:px-3',
+                    CELDA[celda.tipo ?? 'texto'],
+                    // Fija y opaca: el resto de la fila pasa por debajo al desplazar. Solo si
+                    // ocupa una columna: una celda fija más ancha que la pantalla taparía el
+                    // total del final (revisión de la T7).
+                    primeraFija && i === 0 && ancho <= 1 && 'sticky left-0 z-10 bg-muted',
+                    columna?.clase,
+                    celda.clase,
+                  )}
+                >
+                  {rotuloAncho ? (
+                    // Spec 016, T10: el texto (no la celda) se pega a la izquierda: se lee al
+                    // desplazar y el total del final sigue a la vista.
+                    <span className="sticky left-4 inline-block">{celda.contenido}</span>
+                  ) : (
+                    celda.contenido
+                  )}
+                </TableCell>
+              )
+            })}
             {accionesFila && <TableCell className="pr-4" />}
           </TableRow>
         </TableFooter>
@@ -466,13 +483,17 @@ function Paginacion({ etiqueta, desde, hasta, total, hayAnterior, haySiguiente, 
   const siguiente = useRef<HTMLButtonElement>(null)
   // Si el botón pulsado queda deshabilitado (primera o última página), el foco pasa al
   // otro en vez de perderse en el documento (spec 015, T6; Categorías).
+  // Spec 016, T10 (Deuda T9 b): con paginación del servidor se espera a que termine la
+  // petición (`ocupado`) y, cambie o no la página, el clic queda atendido: si falló, un
+  // cambio posterior (otro filtro) no mueve el foco.
   const pulsado = useRef<'anterior' | 'siguiente' | null>(null)
   useEffect(() => {
+    if (ocupado) return
     const cual = pulsado.current
+    pulsado.current = null
     if (cual === 'siguiente' && !haySiguiente) anterior.current?.focus()
     if (cual === 'anterior' && !hayAnterior) siguiente.current?.focus()
-    pulsado.current = null
-  }, [desde, hayAnterior, haySiguiente])
+  }, [desde, hayAnterior, haySiguiente, ocupado])
   return (
     <nav aria-labelledby={id} className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
       <span id={id} className="sr-only">

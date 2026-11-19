@@ -32,6 +32,7 @@ export { Notificaciones, type NotificacionesProps } from './Notificaciones'
 export { Panel, type PanelProps } from './Panel'
 export { Pestanas, type Pestana, type PestanasProps } from './Pestanas'
 export { Progreso, type ProgresoProps } from './Progreso'
+export { ID_CONTENIDO, SaltarContenido } from './SaltarContenido'
 export { Tecla, type TeclaProps } from './Tecla'
 export {
   TablaDatos,
