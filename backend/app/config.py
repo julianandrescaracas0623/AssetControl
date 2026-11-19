@@ -98,8 +98,9 @@ class RateLimits:
     """Umbrales de los límites de tasa (R13, Q10): ventana fija y máximos por ventana.
 
     Los valores por defecto son los de referencia de Q10 (ventana de 15 min; login 5
-    fallidos por cuenta y 20 por IP; validar y aceptar 10 por IP; refresh 30 por IP);
-    se ajustan con ``RATE_LIMIT_*``.
+    fallidos por cuenta y 20 por IP; validar y aceptar 10 por IP; refresh 30 por IP) y
+    de la spec 014 (R12: recuperar 10 por IP y 3 por cuenta; restablecer 10 por IP); se
+    ajustan con ``RATE_LIMIT_*``.
     """
 
     window_seconds: int = 900
@@ -108,6 +109,9 @@ class RateLimits:
     refresh_ip: int = 30
     validate_ip: int = 10
     accept_ip: int = 10
+    recover_ip: int = 10
+    recover_account: int = 3
+    reset_ip: int = 10
 
 
 # Variable de entorno -> (campo de RateLimits, mínimo, máximo). La ventana máxima es un día:
@@ -119,6 +123,9 @@ RATE_LIMIT_VARS: dict[str, tuple[str, int, int]] = {
     "RATE_LIMIT_REFRESH_IP": ("refresh_ip", 1, 10000),
     "RATE_LIMIT_VALIDATE_IP": ("validate_ip", 1, 10000),
     "RATE_LIMIT_ACCEPT_IP": ("accept_ip", 1, 10000),
+    "RATE_LIMIT_RECOVER_IP": ("recover_ip", 1, 10000),
+    "RATE_LIMIT_RECOVER_ACCOUNT": ("recover_account", 1, 10000),
+    "RATE_LIMIT_RESET_IP": ("reset_ip", 1, 10000),
 }
 TRUSTED_PROXY_HOPS_VAR = "TRUSTED_PROXY_HOPS"
 TRUSTED_PROXY_HOPS_RANGE = (0, 5)

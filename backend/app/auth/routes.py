@@ -17,17 +17,31 @@ Límites de tasa (T10, R13; ``app.auth.limits``): login por IP y cuenta y refres
 IP, contados antes de Argon2 y de la base; ``429`` genérico o ``503`` si no se puede
 contar. Si la petición termina bien se devuelve su intento (solo cuentan los fallos).
 El logout no se limita.
+
+Recuperar y restablecer contraseña (spec 014, T4; plan §5): públicos, sin sesión ni
+cookies; exigen la cabecera personalizada y el mismo sitio (``403`` antes de mirar el
+cuerpo, R14). ``POST /auth/recuperar`` ``{email}`` responde **siempre** el mismo ``202``
+(R1; solo la forma da ``400``, y los límites ``429``/``503``); sin correo configurado,
+el mismo ``202`` sin tocar la base. ``POST /auth/restablecer`` ``{token, password}``:
+``400 contrasena_*`` antes de contar, ``restablecer_ip``, Argon2 siempre, ``204`` sin
+sesión (R10) o ``400 enlace_invalido`` idéntico para todo enlace no canjeable.
 """
 
 from flask import Blueprint, abort, current_app, jsonify, request
 from flask.typing import ResponseReturnValue
 from flask.wrappers import Response
 
-from app.auth import limits, service
-from app.auth.credentials import ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL
+from app.auth import limits, recuperacion, service
+from app.auth.credentials import (
+    ACCESS_TOKEN_TTL,
+    REFRESH_TOKEN_TTL,
+    PasswordPolicyError,
+    check_password_policy,
+)
 from app.auth.decorators import current_user, require_auth
 from app.auth.http import is_same_site_request, refresh_cookie_options
 from app.config import get_config
+from app.correo import correo_activo
 from app.errors import error_response
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
@@ -105,3 +119,54 @@ def logout() -> ResponseReturnValue:
 @require_auth
 def me() -> ResponseReturnValue:
     return jsonify(current_user().to_json())
+
+
+# --- Recuperar y restablecer contraseña (spec 014, T4) -----------------------------------
+
+
+def _text_fields(*names: str) -> tuple[str, ...] | None:
+    """Los campos ``names`` del cuerpo JSON, o ``None`` si el cuerpo o alguno no es texto."""
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return None
+    values = tuple(body.get(name) for name in names)
+    if not all(isinstance(value, str) for value in values):
+        return None
+    return values
+
+
+@bp.post("/recuperar")
+def recuperar() -> ResponseReturnValue:
+    if not is_same_site_request():
+        abort(403)
+    fields = _text_fields("email")
+    if fields is None:
+        return error_response(400, *BAD_REQUEST)
+    (email,) = fields
+    # Requisito 4 de T3: sin correo configurado no se cuenta, no se crea ni se invalida
+    # ningún enlace; la respuesta es la misma para todos.
+    if correo_activo(current_app):
+        recuperacion.solicitar(email)
+    return jsonify(mensaje=recuperacion.RECOVERY_MESSAGE), 202
+
+
+@bp.post("/restablecer")
+def restablecer() -> ResponseReturnValue:
+    if not is_same_site_request():
+        abort(403)
+    fields = _text_fields("token", "password")
+    if fields is None:
+        return error_response(400, *BAD_REQUEST)
+    token, password = fields
+    policy_error = None
+    try:
+        # R11: antes de contar y de Argon2; no depende del token.
+        check_password_policy(password)
+    except PasswordPolicyError as exc:
+        policy_error = (exc.code, str(exc))
+    if policy_error is not None:
+        return error_response(400, *policy_error)
+    limits.limit_reset()
+    if not recuperacion.restablecer(token, password):
+        return error_response(400, *recuperacion.INVALID_LINK)
+    return Response(status=204)

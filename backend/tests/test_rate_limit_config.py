@@ -37,6 +37,10 @@ SETTINGS = {
     "RATE_LIMIT_REFRESH_IP": ("refresh_ip", 1, 10000),
     "RATE_LIMIT_VALIDATE_IP": ("validate_ip", 1, 10000),
     "RATE_LIMIT_ACCEPT_IP": ("accept_ip", 1, 10000),
+    # Spec 014 (T4, R12): recuperar y restablecer contraseña.
+    "RATE_LIMIT_RECOVER_IP": ("recover_ip", 1, 10000),
+    "RATE_LIMIT_RECOVER_ACCOUNT": ("recover_account", 1, 10000),
+    "RATE_LIMIT_RESET_IP": ("reset_ip", 1, 10000),
 }
 
 
@@ -53,6 +57,12 @@ def test_thresholds_are_adjustable_by_environment(name):
     for value in (low, high):
         config = load_config({**BASE_ENV, name: f" {value} "})
         assert getattr(config.rate_limits, field) == value
+
+
+def test_recovery_defaults_are_those_of_spec_014():
+    """Spec 014 (R12, plan §6): recuperar 10 por IP y 3 por cuenta; restablecer 10 por IP."""
+    limits = RateLimits()
+    assert (limits.recover_ip, limits.recover_account, limits.reset_ip) == (10, 3, 10)
 
 
 def test_proxy_hops_and_argon2_concurrency_are_read():

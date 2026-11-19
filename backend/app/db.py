@@ -39,7 +39,8 @@ activa) y deja en el logger emisor un filtro que descarta los registros DEBUG
 Las funciones ``acceso.*`` (antes de conocer el tenant) se llaman con funciones
 propias de este módulo sin tenant y en su propia transacción, como
 ``buscar_login`` (spec 002, T6; plan.md §2), ``validar_invitacion`` y
-``aceptar_invitacion`` (T9), nunca dentro de ``tenant_session``.
+``aceptar_invitacion`` (T9), ``contar_y_solicitar_recuperacion`` y
+``restablecer_contrasena`` (spec 014, T4), nunca dentro de ``tenant_session``.
 
 El engine se crea en ``init_db`` (llamado por ``create_app``), nunca al importar.
 ``create_engine`` no abre conexiones; la primera se abre al usar la sesión.
@@ -48,7 +49,7 @@ Ningún mensaje de este módulo incluye la URL de la base ni credenciales.
 
 import logging
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -432,16 +433,8 @@ def contar_intentos(items: list[tuple[str, bytes]], window_seconds: int) -> list
     resultado sale en el orden de ``items``. Cualquier error se propaga.
     """
     database = _get_database()
-    order = sorted(range(len(items)), key=lambda i: items[i])
-    results: dict[int, CounterRow] = {}
     with database.engine.begin() as connection:
-        for index in order:
-            ambito, clave = items[index]
-            row = connection.execute(
-                _CONTAR_INTENTO, {"ambito": ambito, "clave": clave, "ventana": window_seconds}
-            ).one()
-            results[index] = CounterRow(intentos=row.intentos, ventana_inicio=row.ventana_inicio)
-    return [results[index] for index in range(len(items))]
+        return _sumar_intentos(connection, items, window_seconds)
 
 
 def devolver_intentos(items: list[tuple[str, bytes, Any]]) -> None:
@@ -456,6 +449,146 @@ def devolver_intentos(items: list[tuple[str, bytes, Any]]) -> None:
             connection.execute(
                 _DEVOLVER_INTENTO, {"ambito": ambito, "clave": clave, "ventana": ventana}
             )
+
+
+def _sumar_intentos(
+    connection: Connection, items: list[tuple[str, bytes]], window_seconds: int
+) -> list[CounterRow]:
+    """Suma un intento a cada contador en ``connection`` (orden estable, sin confirmar)."""
+    order = sorted(range(len(items)), key=lambda i: items[i])
+    results: dict[int, CounterRow] = {}
+    for index in order:
+        ambito, clave = items[index]
+        row = connection.execute(
+            _CONTAR_INTENTO, {"ambito": ambito, "clave": clave, "ventana": window_seconds}
+        ).one()
+        results[index] = CounterRow(intentos=row.intentos, ventana_inicio=row.ventana_inicio)
+    return [results[index] for index in range(len(items))]
+
+
+# --- Recuperación de contraseña (spec 014, T4; plan §4, §4.1) ---------------------------
+
+_SOLICITAR_RECUPERACION = text("select acceso.solicitar_recuperacion(:email, :clave)")
+_RESTABLECER_CONTRASENA = text("select acceso.restablecer_contrasena(:clave, :password_hash)")
+# Excepción estática de restablecer_contrasena (sin eco): clave o hash mal formados, enlace
+# inexistente, usado, invalidado o vencido, o cuenta ya no elegible. Revierte el consumo.
+_ENLACE_INVALIDO = ("P0001", "enlace_invalido")
+_RESTABLECER_ISOLATION = "READ COMMITTED"
+
+
+class CounterUnavailableError(Exception):
+    """No se pudo sumar el intento al límite de tasa (falla cerrado, ``503``).
+
+    Solo lleva el tipo del error y su ``sqlstate``: nunca el mensaje, el SQL ni los
+    parámetros.
+    """
+
+    def __init__(self, tipo: str, sqlstate: str) -> None:
+        self.tipo = tipo
+        self.sqlstate = sqlstate
+        super().__init__("Límite de tasa no disponible.")
+
+
+def _resumen_error(exc: BaseException) -> tuple[str, str]:
+    orig = getattr(exc, "orig", None)
+    sqlstate = getattr(orig, "sqlstate", None) or getattr(exc, "sqlstate", None)
+    return type(exc).__name__, sqlstate if isinstance(sqlstate, str) else "desconocido"
+
+
+def contar_y_solicitar_recuperacion(
+    items: list[tuple[str, bytes]],
+    window_seconds: int,
+    permitido: Callable[[list[CounterRow]], bool],
+    email: str,
+    clave: str,
+) -> tuple[list[CounterRow], bool | None]:
+    """Contadores y ``acceso.solicitar_recuperacion`` en **una** transacción sin tenant.
+
+    M1 de la auditoría de T2: el ``upsert`` de ``limite_tasa`` es una escritura que ocurre
+    en todas las ramas (exista o no la cuenta), así que el ``COMMIT`` hace el mismo
+    trabajo aunque la función no inserte nada.
+
+    1. Suma un intento a cada ``(ambito, clave_hash)``; si falla, ``CounterUnavailableError``
+       sin llamar a la función.
+    2. Si ``permitido(contadores)`` es falso, confirma solo los contadores y devuelve
+       ``(contadores, None)``.
+    3. Si no, llama a la función dentro de un *savepoint*: si falla, se revierte solo la
+       función, los contadores se confirman igual (el intento sobrevive al fallo de la
+       petición) y el error se propaga (``500``).
+    4. ``COMMIT`` y ``(contadores, creado)``; ``creado`` es ``True`` solo si la función
+       insertó el enlace. Si el ``COMMIT`` falla, el error se propaga: quien llama no
+       llega a programar el correo.
+
+    ``email`` ya normalizado (o vacío) y ``clave = sha256(token)`` en hex. Nunca se llama
+    dentro de ``tenant_session``.
+    """
+    database = _get_database()
+    fallo_conteo: tuple[str, str] | None = None
+    with database.engine.connect() as connection:
+        transaction = connection.begin()
+        try:
+            try:
+                rows = _sumar_intentos(connection, items, window_seconds)
+            except Exception as exc:
+                fallo_conteo = _resumen_error(exc)
+                raise
+            if not permitido(rows):
+                transaction.commit()
+                return rows, None
+            savepoint = connection.begin_nested()
+            try:
+                creado = connection.scalar(
+                    _SOLICITAR_RECUPERACION, {"email": email, "clave": clave}
+                )
+            except BaseException:
+                savepoint.rollback()
+                transaction.commit()
+                raise
+            savepoint.commit()
+            transaction.commit()
+        except BaseException:
+            if transaction.is_active:
+                transaction.rollback()
+            if fallo_conteo is None:
+                raise
+    if fallo_conteo is not None:
+        # Fuera del except: sin causa ni contexto que arrastren SQL o parámetros.
+        raise CounterUnavailableError(*fallo_conteo)
+    return rows, creado is True
+
+
+def _is_enlace_invalido(exc: DBAPIError) -> bool:
+    orig = exc.orig
+    message = getattr(getattr(orig, "diag", None), "message_primary", None)
+    return (getattr(orig, "sqlstate", None), message) == _ENLACE_INVALIDO
+
+
+def restablecer_contrasena(clave: str, password_hash: str) -> uuid.UUID | None:
+    """``acceso.restablecer_contrasena`` como primera sentencia de una transacción nueva.
+
+    B2 de la auditoría de T2: conexión propia, ``READ COMMITTED`` explícito (con
+    ``REPEATABLE READ`` el segundo canje simultáneo daría ``40001``), sin
+    ``tenant_session`` y con el hash Argon2 ya calculado: la transacción solo dura la
+    función. Devuelve el ``usuario_id`` o ``None`` si la función lanza su excepción
+    estática ``enlace_invalido`` o devuelve ``NULL`` (nunca se trata como éxito).
+    Cualquier otro error de base se propaga sin leer su mensaje (``500``).
+    """
+    database = _get_database()
+    params = {"clave": clave, "password_hash": password_hash}
+    rechazado = False
+    usuario = None
+    try:
+        with database.engine.connect() as connection:
+            connection.execution_options(isolation_level=_RESTABLECER_ISOLATION)
+            with connection.begin():
+                usuario = connection.scalar(_RESTABLECER_CONTRASENA, params)
+    except DBAPIError as exc:
+        if not _is_enlace_invalido(exc):
+            raise
+        rechazado = True
+    if rechazado or not isinstance(usuario, uuid.UUID):
+        return None
+    return usuario
 
 
 def _session_tenant(session: Session) -> uuid.UUID:

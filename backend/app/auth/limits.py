@@ -1,4 +1,5 @@
-"""Límites de tasa de login, refresh, validar y aceptar invitación (spec 002, T10).
+"""Límites de tasa de login, refresh, validar y aceptar invitación (spec 002, T10) y de
+recuperar y restablecer contraseña (spec 014, T4; R12, plan §6).
 
 R13, Q10 y A13; contadores en la tabla de infraestructura ``limite_tasa``
 (``docs/03`` cambio 6, ``plan.md`` §3.1), sin Flask-Limiter ni Redis.
@@ -29,6 +30,13 @@ R13, Q10 y A13; contadores en la tabla de infraestructura ``limite_tasa``
 - **Solo los fallos de login y refresh.** Si la petición termina bien se devuelve
   su intento (``give_back``); validar y aceptar cuentan todas (Q10). El logout no
   se limita.
+- **Recuperar y restablecer (spec 014).** Cuentan todas las peticiones, sin
+  ``give_back``: ``recuperar_ip`` y ``recuperar_cuenta`` (``account_key`` del correo,
+  exista o no; lo no normalizable en el cubo fijo) y ``restablecer_ip``. Los dos de
+  recuperar se suman en la **misma** transacción que ``acceso.solicitar_recuperacion``
+  (``limit_recover_and_request``; M1 de la auditoría de T2): el ``upsert`` es una
+  escritura en todas las ramas. Superado: ``429`` sin llamar a la función; si no se
+  puede contar, ``503``.
 
 Nada de este módulo registra IP, email, claves ni el mensaje de un error de base.
 """
@@ -45,7 +53,13 @@ from flask import current_app, request
 from app.auth.credentials import derive_key
 from app.auth.service import normalize_email
 from app.config import RateLimits, get_config
-from app.db import contar_intentos, devolver_intentos
+from app.db import (
+    CounterRow,
+    CounterUnavailableError,
+    contar_intentos,
+    contar_y_solicitar_recuperacion,
+    devolver_intentos,
+)
 from app.errors import ServiceUnavailableError, TooManyRequestsError, current_request_id
 
 IP_KEY_CONTEXT = "limite-tasa-ip"
@@ -62,6 +76,9 @@ LOGIN_ACCOUNT = "login_cuenta"
 REFRESH_IP = "refresh_ip"
 VALIDATE_IP = "validar_ip"
 ACCEPT_IP = "aceptar_ip"
+RECOVER_IP = "recuperar_ip"
+RECOVER_ACCOUNT = "recuperar_cuenta"
+RESET_IP = "restablecer_ip"
 
 
 def client_address(raw: str | None) -> str:
@@ -118,6 +135,38 @@ def increment_attempts(
 ) -> list[Counter]:
     """Suma un intento a cada ``(ambito, clave_hash, umbral)``; transacción propia confirmada."""
     rows = contar_intentos([(ambito, clave) for ambito, clave, _ in items], window_seconds)
+    return _counters(items, rows)
+
+
+def _error_summary(exc: BaseException) -> tuple[str, str]:
+    orig = getattr(exc, "orig", None)
+    sqlstate = getattr(orig, "sqlstate", None) or getattr(exc, "sqlstate", None)
+    return type(exc).__name__, sqlstate if isinstance(sqlstate, str) else "desconocido"
+
+
+def _unavailable(failure: tuple[str, str]) -> ServiceUnavailableError:
+    current_app.logger.error(
+        "Límite de tasa no disponible; se responde 503 (request_id=%s, tipo=%s, sqlstate=%s)",
+        current_request_id(),
+        *failure,
+    )
+    return ServiceUnavailableError()
+
+
+def _enforce(items: Sequence[tuple[str, bytes, int]], limits: RateLimits) -> list[Counter]:
+    failure: tuple[str, str] | None = None
+    counters: list[Counter] = []
+    try:
+        counters = increment_attempts(items, limits.window_seconds)
+    except Exception as exc:  # noqa: BLE001 - falla cerrado ante cualquier error
+        failure = _error_summary(exc)
+    if failure is not None:
+        # Fuera del except: sin causa ni contexto que arrastren SQL, parámetros o valores.
+        raise _unavailable(failure)
+    return _check(counters, limits)
+
+
+def _counters(items: Sequence[tuple[str, bytes, int]], rows: Sequence[CounterRow]) -> list[Counter]:
     return [
         Counter(
             ambito=ambito,
@@ -130,27 +179,8 @@ def increment_attempts(
     ]
 
 
-def _error_summary(exc: BaseException) -> tuple[str, str]:
-    orig = getattr(exc, "orig", None)
-    sqlstate = getattr(orig, "sqlstate", None) or getattr(exc, "sqlstate", None)
-    return type(exc).__name__, sqlstate if isinstance(sqlstate, str) else "desconocido"
-
-
-def _enforce(items: Sequence[tuple[str, bytes, int]], limits: RateLimits) -> list[Counter]:
-    failure: tuple[str, str] | None = None
-    counters: list[Counter] = []
-    try:
-        counters = increment_attempts(items, limits.window_seconds)
-    except Exception as exc:  # noqa: BLE001 - falla cerrado ante cualquier error
-        failure = _error_summary(exc)
-    if failure is not None:
-        # Fuera del except: sin causa ni contexto que arrastren SQL, parámetros o valores.
-        current_app.logger.error(
-            "Límite de tasa no disponible; se responde 503 (request_id=%s, tipo=%s, sqlstate=%s)",
-            current_request_id(),
-            *failure,
-        )
-        raise ServiceUnavailableError()
+def _check(counters: list[Counter], limits: RateLimits) -> list[Counter]:
+    """``429`` si algún contador superó su umbral; si no, los contadores."""
     exceeded = sorted({counter.ambito for counter in counters if counter.exceeded})
     if exceeded:
         current_app.logger.warning(
@@ -195,6 +225,50 @@ def limit_validate() -> list[Counter]:
 def limit_accept() -> list[Counter]:
     secret, limits = _settings()
     return _enforce([(ACCEPT_IP, ip_key(secret, _ip()), limits.accept_ip)], limits)
+
+
+def limit_reset() -> list[Counter]:
+    """Restablecer contraseña: por IP; antes de Argon2 y de ``acceso.*`` (spec 014)."""
+    secret, limits = _settings()
+    return _enforce([(RESET_IP, ip_key(secret, _ip()), limits.reset_ip)], limits)
+
+
+def limit_recover_and_request(email: str, destino: str, clave: str) -> bool:
+    """Recuperar contraseña: cuenta por IP y por cuenta y, si cabe, pide el enlace.
+
+    ``email`` es el recibido (la clave del contador se calcula con ``account_key``, exista
+    o no la cuenta); ``destino`` el correo normalizado que recibe la función (vacío si no
+    hay uno válido) y ``clave = sha256(token)`` en hex. Todo en una transacción
+    (``app.db.contar_y_solicitar_recuperacion``). ``429`` si se supera un umbral (la
+    función no se llama), ``503`` si no se puede contar. Devuelve ``True`` solo si la
+    función creó el enlace; el resultado nunca cambia la respuesta (R1).
+    """
+    secret, limits = _settings()
+    items = [
+        (RECOVER_IP, ip_key(secret, _ip()), limits.recover_ip),
+        (RECOVER_ACCOUNT, account_key(secret, email), limits.recover_account),
+    ]
+
+    def permitido(rows: list[CounterRow]) -> bool:
+        return not any(counter.exceeded for counter in _counters(items, rows))
+
+    failure: tuple[str, str] | None = None
+    result: tuple[list[CounterRow], bool | None] | None = None
+    try:
+        result = contar_y_solicitar_recuperacion(
+            [(ambito, clave_hash) for ambito, clave_hash, _ in items],
+            limits.window_seconds,
+            permitido,
+            destino,
+            clave,
+        )
+    except CounterUnavailableError as exc:
+        failure = (exc.tipo, exc.sqlstate)
+    if failure is not None or result is None:
+        raise _unavailable(failure or ("desconocido", "desconocido"))
+    rows, created = result
+    _check(_counters(items, rows), limits)
+    return created is True
 
 
 def give_back(counters: Sequence[Counter]) -> None:

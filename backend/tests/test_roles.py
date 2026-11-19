@@ -404,6 +404,10 @@ PUBLIC_ENDPOINTS = frozenset(
         "auth.logout",
         "invitaciones.validar",
         "invitaciones.aceptar",
+        # Spec 014 (plan §5): recuperar y restablecer contraseña, sin sesión; su prueba de
+        # aislamiento (A11) está en test_recuperacion_endpoints.py.
+        "auth.recuperar",
+        "auth.restablecer",
     }
 )
 # Todo endpoint protegido, con sus roles. Añadir uno exige su prueba de rol (401/403)
@@ -576,6 +580,8 @@ AUTH_RULES = (
     "/auth/refresh",
     "/auth/logout",
     "/auth/me",
+    "/auth/recuperar",
+    "/auth/restablecer",
     "/invitaciones",
     "/invitaciones/validar",
     "/invitaciones/aceptar",

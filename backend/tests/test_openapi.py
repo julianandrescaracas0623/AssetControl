@@ -307,8 +307,18 @@ def _contract_operations() -> set[tuple[str, str]]:
     }
 
 
+# Spec 014: las rutas llegan en T4 y el contrato en T5. Excepción transitoria y cerrada:
+# T5 la vacía (la segunda prueba falla en cuanto el contrato las describa).
+PENDING_CONTRACT = frozenset({("post", "/auth/recuperar"), ("post", "/auth/restablecer")})
+
+
 def test_flask_routes_and_contract_paths_are_the_same(contrato_app):
-    assert _flask_operations(contrato_app) == _contract_operations()
+    assert _flask_operations(contrato_app) - PENDING_CONTRACT == _contract_operations()
+
+
+def test_pending_contract_routes_exist_and_are_not_yet_in_the_contract(contrato_app):
+    assert PENDING_CONTRACT <= _flask_operations(contrato_app)
+    assert not PENDING_CONTRACT & _contract_operations()
 
 
 # --- 3. Respuestas reales ---------------------------------------------------------------
