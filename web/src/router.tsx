@@ -32,6 +32,7 @@ import Maqueta from './routes/Maqueta'
 import NoEncontrado from './routes/NoEncontrado'
 import RequiereSesion from './routes/RequiereSesion'
 import Raiz from './routes/Raiz'
+import RecuperarContrasena from './routes/RecuperarContrasena'
 
 // Rutas de la web (spec 001b, T3; sesión y guardas de la spec 002b, T3). /admin y
 // /contar exigen sesión; las pantallas que aún son maqueta lo dicen con su banda.
@@ -43,6 +44,7 @@ export const routes: RouteObject[] = [
       { path: '/health', element: <App /> },
       { path: '/login', element: <Login /> },
       { path: '/invitacion', element: <Invitacion /> },
+      { path: '/recuperar', element: <RecuperarContrasena /> },
       { path: '/dev/componentes', element: <Componentes /> },
       {
         element: <RequiereSesion />,
