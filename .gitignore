@@ -47,6 +47,8 @@ coverage/
 # Arneses y configuración local de asistentes (NO se publican, ADR-004)
 .claude/
 .cursor/
+.agents/
+skills-lock.json
 AGENTS.md
 CLAUDE.md
 MEMORY.md

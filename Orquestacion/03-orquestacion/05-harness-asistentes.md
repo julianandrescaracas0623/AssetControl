@@ -30,15 +30,15 @@ docs/constitution.md               principios innegociables
 specs/                             specs SDD activas
 
 .claude/
-  agents/*.md                      6 roles (frontmatter tools/disallowedTools)
+  agents/*.md                      7 roles (frontmatter tools/disallowedTools)
   commands/*.md                    11 comandos (/sdd-*, /feature, /review)
-  skills/*/SKILL.md                5 skills (sdd + 4 de conocimiento)
+  skills/*/SKILL.md                7 skills (sdd + 4 de conocimiento + 2 de diseño de terceros)
   settings.json                    allow / ask / deny
 
 .cursor/
   rules/*.mdc                      6 reglas (core, dominio, seguridad, UI, specs, docs)
-  agents/*.md                      6 roles (frontmatter readonly)
-  skills/*/SKILL.md                7 skills (3 flujos + 4 de conocimiento)
+  agents/*.md                      7 roles (frontmatter readonly)
+  skills/*/SKILL.md                9 skills (3 flujos + 4 de conocimiento + 2 de diseño de terceros)
 
 scripts/
   hooks/pre-commit                 bloquea publicar el arnés local
@@ -99,6 +99,7 @@ Solo si toca ≤3 archivos y no cambia dominio, esquema, auth, roles ni precios.
 | `coordinator` | tools: `Agent, Read, Grep, Glob, AskUserQuestion`; sin `Write`/`Edit`; es el agente por defecto | `readonly: true` |
 | `planner` | `Read, Grep, Glob, Write, Edit`; sin `Bash` ni `Agent` | `readonly: false` |
 | `implementer` | `Read, Grep, Glob, Bash, Write, Edit`; sin `Agent` | `readonly: false` |
+| `designer` | `Read, Grep, Glob, Bash, Write, Edit`; sin `Agent` (pantallas y frontend de `web/`) | `readonly: false` |
 | `reviewer` | `Read, Grep, Glob, Bash`; sin `Write`/`Edit` | `readonly: true` |
 | `domain-guardian` | `Read, Grep, Glob, Bash`; sin `Write`/`Edit` | `readonly: true` |
 | `security-reviewer` | `Read, Grep, Glob, Bash`; sin `Write`/`Edit` | `readonly: true` |
@@ -129,6 +130,8 @@ Con el reviewer, el domain-guardian y el security-reviewer pasa algo parecido, p
 | `tenant-security` | Se toca SQL, auth, roles, subidas, exportación o logs | `backend/**/*.py`, `backend/migrations/**` |
 | `web-ui` | Se crean o modifican pantallas (Tailwind, shadcn/ui) | `web/**` |
 | `browser-qa` | Se verifica UI en navegador a 375 px y 1440 px | `web/**` |
+| `frontend-design` | El `designer` define jerarquía, tipografía y texto de interfaz (terceros: anthropics/skills) | — |
+| `design-taste-frontend` | El `designer` revisa calidad visual; solo criterio, sin ejecutar sus scripts (terceros: Leonxlnx/taste-skill) | — |
 
 Las skills no se cargan todas: se cargan cuando hacen falta. Eso mantiene el contexto pequeño.
 
@@ -224,10 +227,14 @@ Estos archivos viven solo en la máquina del desarrollador:
 ```text
 .claude/
 .cursor/
+.agents/
+skills-lock.json
 AGENTS.md
 CLAUDE.md
 MEMORY.md
 ```
+
+`.agents/` y `skills-lock.json` los crea `npx skills` al instalar skills de terceros (copia universal y registro de versiones).
 
 Tres capas los protegen:
 
@@ -240,7 +247,7 @@ Tres capas los protegen:
 Comprobar:
 
 ```sh
-git check-ignore -v .claude/settings.json .cursor/rules/00-core.mdc AGENTS.md
+git check-ignore -v .claude/settings.json .cursor/rules/00-core.mdc .agents/skills skills-lock.json AGENTS.md
 ```
 
 ### 13.2 Ningún asistente como autor ni coautor
