@@ -58,6 +58,10 @@ Alternos: enlace vencido o ya usado → error sin crear cuenta; reuso concurrent
 
 **CU-ACC-05 Desactivar usuario / membresía.** Actor: admin. `[PENDIENTE]` si entra al MVP (ver 5).
 
+**CU-ACC-06 Recuperar contraseña.** Actor: admin/contador que olvidó su contraseña (sin sesión). Pre: ninguna (sin sesión); el envío solo ocurre si el correo es de un `usuario` activo con exactamente una membresía activa (spec 014).
+1. En `/login` elige «¿Olvidaste tu contraseña?» y en `/recuperar` escribe su correo. 2. El servidor responde siempre igual («Si el correo está registrado, te enviamos un enlace…»); si la cuenta es elegible, invalida el enlace pendiente anterior, crea uno nuevo de un solo uso que vence a los 30 minutos y lo envía por correo (SMTP) fuera de la petición, a `{URL_PUBLICA}/restablecer#<token>`. 3. Abre el enlace; en `/restablecer` escribe la contraseña nueva (política de 002: 10–128 caracteres, sin comunes). 4. En una sola operación el servidor consume el enlace, guarda la contraseña, revoca todas las sesiones (refresh) del usuario e invalida sus otros enlaces pendientes. 5. Sin iniciar sesión: la app lleva a `/login` con el aviso «Tu contraseña se actualizó. Inicia sesión con la nueva.»
+Alternos: correo inexistente, no normalizable, usuario inactivo, membresía inactiva o varias membresías activas → misma respuesta, sin enlace ni correo; enlace vencido, usado, invalidado o inexistente → «Enlace vencido o ya usado. Pide uno nuevo.»; contraseña que no cumple la política → error sin consumir el enlace; límite de tasa superado → `429` genérico; fallo del SMTP → el solicitante no se entera. Reglas: sin oráculo de cuentas en respuesta, tiempo, logs ni límites; se guarda solo `sha256(sha256(token))`; nada se borra (enlaces usados o vencidos se conservan marcados); las invitaciones siguen sin correo (T5). Contribuye a: —.
+
 ### M2. Ubicaciones
 
 **CU-UBI-01 Crear ubicación.** Actor: admin. Pre: sesión de admin.
@@ -241,7 +245,7 @@ Las specs 002 y 003 son pequeñas y podrían fusionarse si el planner confirma q
 | Reconocimiento por imagen, OCR de seriales | Fuera de alcance |
 | Consumibles, stock, depreciación, compras, proveedores | Fuera de alcance |
 | Multisucursal con permisos avanzados | Fuera de alcance |
-| Desactivar usuarios y restablecer contraseña | No hay decisión; sin proveedor de correo (T5). Mínimo viable: el admin desactiva la membresía; contraseña olvidada vía nueva invitación `[PENDIENTE]` |
+| Desactivar usuarios y restablecer contraseña | Restablecer contraseña: por correo con enlace de 30 min (spec 014, CU-ACC-06). Desactivar usuarios: sigue pendiente (P17) |
 | Pantalla de alta de tenant | El tenant se crea por script/CLI (03) |
 | Edición masiva de activos; reportes comparativos entre sesiones más allá de la evolución del Inicio (CU-DSH-04) | No pedidos; se evalúan tras el piloto. La evolución entre conteos sí entra (decisión del 2026-11-11) |
 | Pistola lectora | Sin pistola lectora en el MVP (P4) |
