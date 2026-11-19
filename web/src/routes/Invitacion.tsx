@@ -1,8 +1,9 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Eye, EyeOff, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 
+import { CampoContrasena, POLITICA_CONTRASENA } from '@/components/app/CampoContrasena'
 import { MarcoAcceso } from '@/components/app/MarcoAcceso'
 import { Aviso, Boton, Campo } from '@/components/kit'
 import { api, ErrorApi, mensajeDeError } from '@/lib/api/cliente'
@@ -14,7 +15,6 @@ import { PantallaCarga } from './PantallaCarga'
 // historial). Viaja únicamente en el cuerpo de validar y aceptar. Solo se pide
 // nombre y contraseña: el correo lo fijó quien invitó.
 
-const POLITICA = 'Entre 10 y 128 caracteres. Evita contraseñas comunes.'
 // Cambio H-3 de la spec 002: el servidor exige letras o números visibles y 120 como máximo.
 const NOMBRE_MAX = 120
 const ERROR_NOMBRE = `Revisa el nombre: usa letras o números, hasta ${NOMBRE_MAX} caracteres y sin símbolos invisibles.`
@@ -35,7 +35,6 @@ function EnlaceNoValido() {
 function Formulario({ token }: { token: string }) {
   const { iniciar } = useSesion()
   const navigate = useNavigate()
-  const [visible, setVisible] = useState(false)
 
   const aceptar = useMutation({
     mutationFn: api.aceptarInvitacion,
@@ -76,29 +75,12 @@ function Formulario({ token }: { token: string }) {
           autoFocus
           error={errorNombre ?? undefined}
         />
-        <Campo
+        <CampoContrasena
           id="invitacion-password"
           etiqueta="Contraseña"
           name="password"
-          type={visible ? 'text' : 'password'}
-          autoComplete="new-password"
-          required
-          minLength={10}
-          maxLength={128}
-          ayuda={POLITICA}
-          ayudaFija
+          ayuda={POLITICA_CONTRASENA}
           error={errorClave ?? undefined}
-          sufijo={
-            <Boton
-              variante="fantasma"
-              soloIcono
-              icono={visible ? <EyeOff /> : <Eye />}
-              aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              aria-pressed={visible}
-              className="text-muted-foreground hover:bg-transparent hover:text-foreground"
-              onClick={() => setVisible((v) => !v)}
-            />
-          }
         />
         <Boton type="submit" anchoCompleto className="mt-2" cargando={enviando} textoCargando="Creando tu cuenta…">
           Crear cuenta y entrar

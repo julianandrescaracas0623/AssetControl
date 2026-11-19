@@ -1,29 +1,23 @@
 import { useMutation } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 
 import { MarcoAcceso } from '@/components/app/MarcoAcceso'
 import { Aviso, Boton, Campo } from '@/components/kit'
 import { api, ErrorApi } from '@/lib/api/cliente'
+import { textoEspera } from '@/lib/espera'
 
 // /recuperar (spec 014, T6; R1, R12, R17; A16). Pide solo el correo. Todo 202 muestra
 // el mismo texto, sin repetir el correo ni usar el del servidor: la pantalla no dice si
 // la cuenta existe (con el correo desactivado el servidor también responde 202). El
-// correo puede llegar del login en el estado del router (cero digitación).
+// correo puede llegar del login en el estado del router (cero digitación); se lee una
+// vez y se borra del historial (mismo registro, sin estado) para no dejarlo guardado.
 
 const MENSAJE_ENVIADO = 'Si existe una cuenta con ese correo, te enviamos un enlace que vale 30 minutos.'
 const ERROR_CORREO = 'Revisa el correo: escribe la dirección completa, por ejemplo nombre@clinica.com.'
 const ERROR_SERVICIO = 'El servicio no está disponible en este momento. Intenta de nuevo en unos minutos.'
 const ERROR_GENERICO = 'No pudimos enviar la solicitud. Intenta de nuevo.'
-
-/** «15 minutos», «1 minuto», «45 segundos»; `null` si no hay un número útil. */
-function textoEspera(segundos: number | undefined): string | null {
-  if (segundos === undefined || !Number.isFinite(segundos) || segundos <= 0) return null
-  if (segundos < 60) return segundos === 1 ? '1 segundo' : `${segundos} segundos`
-  const minutos = Math.ceil(segundos / 60)
-  return minutos === 1 ? '1 minuto' : `${minutos} minutos`
-}
 
 function mensajeGeneral(error: unknown): string {
   if (!(error instanceof ErrorApi)) return ERROR_GENERICO
@@ -48,6 +42,7 @@ function correoInicial(estado: unknown): string {
 
 export default function RecuperarContrasena() {
   const location = useLocation()
+  const navigate = useNavigate()
   const [correo, setCorreo] = useState(() => correoInicial(location.state))
   const enviando = useRef(false)
   const campoRef = useRef<HTMLInputElement>(null)
@@ -63,6 +58,12 @@ export default function RecuperarContrasena() {
 
   const errorCorreo = solicitar.isError && esErrorDeCorreo(solicitar.error) ? ERROR_CORREO : null
   const errorGeneral = solicitar.isError && !errorCorreo ? mensajeGeneral(solicitar.error) : null
+
+  const conEstado = location.state != null
+  useEffect(() => {
+    if (!conEstado) return
+    navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null })
+  }, [conEstado, location.pathname, location.search, navigate])
 
   // Foco al resultado: el lector lo lee y quien usa teclado sigue desde ahí.
   useEffect(() => {

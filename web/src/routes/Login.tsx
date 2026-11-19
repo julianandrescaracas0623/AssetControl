@@ -1,15 +1,20 @@
 import { useMutation } from '@tanstack/react-query'
-import { type FormEvent, type MouseEvent, useRef } from 'react'
+import { type FormEvent, type MouseEvent, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 
 import { MarcoAcceso } from '@/components/app/MarcoAcceso'
 import { Aviso, Boton, Campo } from '@/components/kit'
 import { api, mensajeDeError } from '@/lib/api/cliente'
+import { AVISO_CONTRASENA_ACTUALIZADA } from '@/lib/avisos'
 import { destinoTrasLogin, useSesion } from '@/lib/sesion'
 import { PantallaCarga } from './PantallaCarga'
 
 // /login (spec 002b, T3; R2, R3): solo correo y contraseña. El destino lo decide el
 // rol que devuelve el servidor; `desde` llega en el estado del router.
+// Spec 014, T7 (R10): tras restablecer la contraseña llega `aviso` en el estado; se
+// muestra una vez (el estado se limpia al leerlo, no reaparece al recargar).
+
+const TEXTO_CONTRASENA_ACTUALIZADA = 'Tu contraseña se actualizó. Inicia sesión con la nueva.'
 
 export default function Login() {
   const { estado, sesion, iniciar } = useSesion()
@@ -17,6 +22,24 @@ export default function Login() {
   const navigate = useNavigate()
   const desde = (location.state as { desde?: unknown } | null)?.desde
   const correoRef = useRef<HTMLInputElement>(null)
+  const avisoRef = useRef<HTMLDivElement>(null)
+  const [aviso] = useState(
+    () => (location.state as { aviso?: unknown } | null)?.aviso === AVISO_CONTRASENA_ACTUALIZADA,
+  )
+  const avisoEnEstado = (location.state as { aviso?: unknown } | null)?.aviso !== undefined
+
+  useEffect(() => {
+    if (!avisoEnEstado) return
+    navigate(
+      { pathname: location.pathname, search: location.search },
+      { replace: true, state: desde === undefined ? null : { desde } },
+    )
+  }, [avisoEnEstado, desde, location.pathname, location.search, navigate])
+
+  // El aviso recibe el foco: el lector lo anuncia y el teclado sigue al correo.
+  useEffect(() => {
+    if (aviso) avisoRef.current?.focus()
+  }, [aviso, estado])
 
   const entrar = useMutation({
     mutationFn: api.login,
@@ -50,6 +73,9 @@ export default function Login() {
   return (
     <MarcoAcceso titulo="Iniciar sesión" descripcion="Entra con el correo con el que te invitó tu clínica.">
       <form className="flex flex-col gap-4" onSubmit={alEnviar}>
+        {aviso && entrar.isIdle && (
+          <Aviso ref={avisoRef} tabIndex={-1} tono="exito" titulo={TEXTO_CONTRASENA_ACTUALIZADA} className="outline-none" />
+        )}
         {entrar.isError && <Aviso tono="error" titulo={mensajeDeError(entrar.error)} />}
         <Campo
           ref={correoRef}
@@ -62,7 +88,7 @@ export default function Login() {
           autoCapitalize="none"
           spellCheck={false}
           required
-          autoFocus
+          autoFocus={!aviso}
         />
         <Campo
           id="login-password"

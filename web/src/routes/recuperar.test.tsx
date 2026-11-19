@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -180,6 +180,8 @@ describe('/recuperar', () => {
     })
     render(<RouterProvider router={router} />)
     await h1('Recuperar contraseña')
+    expect((screen.getByLabelText('Correo') as HTMLInputElement).value).toBe(CORREO)
+    await waitFor(() => expect(router.state.location.state).toBeNull())
     fireEvent.click(screen.getByRole('button', { name: 'Enviar enlace' }))
     await h1('Revisa tu correo')
     const [, init] = llamadas(f, URL_RECUPERAR)[0]
@@ -221,6 +223,25 @@ describe('/login → /recuperar', () => {
     await h1('Recuperar contraseña')
     expect(router.state.location.pathname).toBe('/recuperar')
     expect((screen.getByLabelText('Correo') as HTMLInputElement).value).toBe(CORREO)
+  })
+
+  it('el correo precargado sale del historial al leerlo, sin cambiar el índice', async () => {
+    const { router } = abrir('/login')
+    await h1('Iniciar sesión')
+    fireEvent.change(screen.getByLabelText('Correo'), { target: { value: CORREO } })
+    fireEvent.click(screen.getByRole('link', { name: '¿Olvidaste tu contraseña?' }))
+    await h1('Recuperar contraseña')
+    expect((screen.getByLabelText('Correo') as HTMLInputElement).value).toBe(CORREO)
+    await waitFor(() => expect(router.state.location.state).toBeNull())
+    expect(router.state.location.pathname).toBe('/recuperar')
+    expect(router.state.historyAction).toBe('REPLACE')
+    // El campo conserva el correo aunque el estado ya no lo tenga.
+    expect((screen.getByLabelText('Correo') as HTMLInputElement).value).toBe(CORREO)
+    // Atrás vuelve al login: el reemplazo no añadió una entrada nueva.
+    await act(async () => {
+      await router.navigate(-1)
+    })
+    await h1('Iniciar sesión')
   })
 
   it('sin correo escrito en el login, /recuperar abre con el campo vacío', async () => {

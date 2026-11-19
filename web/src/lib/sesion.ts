@@ -29,6 +29,19 @@ function renovarCompartido(cliente: QueryClient): Promise<Sesion | null> {
   return cliente.fetchQuery({ queryKey: CLAVE_SESION, queryFn: renovar, staleTime: 0 })
 }
 
+/**
+ * Olvida la sesión solo en esta pestaña (memoria y caché), sin llamar al servidor: para
+ * cuando el servidor ya la revocó (spec 014, T7: tras restablecer la contraseña). No
+ * dispara una consulta de la sesión, así que sirve también en pantallas públicas.
+ */
+export function useOlvidarSesionLocal(): () => void {
+  const cliente = useQueryClient()
+  return useCallback(() => {
+    cliente.clear()
+    cliente.setQueryData<Sesion | null>(CLAVE_SESION, null)
+  }, [cliente])
+}
+
 export function useSesion() {
   const cliente = useQueryClient()
   const navigate = useNavigate()
@@ -52,13 +65,14 @@ export function useSesion() {
     [cliente],
   )
 
+  const olvidarLocal = useOlvidarSesionLocal()
+
   /** Cierra en el servidor y luego en memoria; si el servidor falla, la sesión sigue. */
   const cerrar = useCallback(async () => {
     await api.logout()
-    cliente.clear()
-    cliente.setQueryData<Sesion | null>(CLAVE_SESION, null)
+    olvidarLocal()
     navigate('/login', { replace: true })
-  }, [cliente, navigate])
+  }, [olvidarLocal, navigate])
 
   const { refetch } = consulta
   const reintentar = useCallback(() => void refetch(), [refetch])

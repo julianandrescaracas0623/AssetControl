@@ -30,6 +30,7 @@ import Invitacion from './routes/Invitacion'
 import Login from './routes/Login'
 import Maqueta from './routes/Maqueta'
 import NoEncontrado from './routes/NoEncontrado'
+import NuevaContrasena from './routes/NuevaContrasena'
 import RequiereSesion from './routes/RequiereSesion'
 import Raiz from './routes/Raiz'
 import RecuperarContrasena from './routes/RecuperarContrasena'
@@ -45,6 +46,7 @@ export const routes: RouteObject[] = [
       { path: '/login', element: <Login /> },
       { path: '/invitacion', element: <Invitacion /> },
       { path: '/recuperar', element: <RecuperarContrasena /> },
+      { path: '/restablecer', element: <NuevaContrasena /> },
       { path: '/dev/componentes', element: <Componentes /> },
       {
         element: <RequiereSesion />,
