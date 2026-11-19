@@ -6,6 +6,7 @@ import { DatosFicticios } from '@/components/app/DatosFicticios'
 import { GlobalSearch } from '@/components/app/GlobalSearch'
 import { Logo } from '@/components/app/Logo'
 import { ADMIN_NAV, entradaDeRuta, migasDeRuta } from '@/components/app/admin-nav'
+import { Boton, Notificaciones } from '@/components/kit'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   Breadcrumb,
@@ -15,7 +16,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
-import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,16 +41,28 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useDensidad } from '@/hooks/use-densidad'
 import { useEsEscritorio } from '@/hooks/use-escritorio'
 import { useInformeDeOrigen } from '@/lib/informe'
+import { cn } from '@/lib/utils'
 import { etiquetaRol, iniciales, useCerrarSesion, useSesion } from '@/lib/sesion'
 
 // App shell de administración (docs/08 §4.1, spec 001b T4): barra lateral
 // colapsable a íconos (estado recordado en la cookie de shadcn), menú tipo
 // sheet por debajo de md, migas de pan, buscador y menú de usuario.
+// Spec 016, T4 (D1, D6, D8): barra lateral blanca; el ítem activo se marca con fondo
+// --brand-soft, texto cobalto fuerte, peso y una barra de acento (nunca solo el color:
+// también aria-current). Encabezado blanco con borde sobre la página (--page).
+
+/** Receta del ítem de la barra: altura de control y estado activo de D8. */
+const ITEM_NAV = cn(
+  'relative h-control gap-2.5 px-2.5 text-sidebar-foreground/80 hover:text-sidebar-foreground',
+  'data-active:bg-brand-soft data-active:text-brand-strong data-active:font-semibold',
+  'data-active:hover:bg-brand-soft data-active:hover:text-brand-strong',
+  "before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r-full before:content-['']",
+  'data-active:before:bg-primary group-data-[collapsible=icon]:before:hidden',
+)
 
 function barraAbierta(): boolean {
   return !document.cookie.split('; ').includes('sidebar_state=false')
@@ -73,10 +85,10 @@ function BarraLateral() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild size="lg" tooltip="AssetControl">
+            <SidebarMenuButton asChild size="lg" tooltip="AssetControl" className="gap-2.5">
               <Link to="/admin" onClick={alElegir}>
-                <Logo />
-                <span className="truncate text-[15px] font-semibold tracking-tight">AssetControl</span>
+                <Logo className="size-8" />
+                <span className="truncate text-titulo-seccion tracking-tight">AssetControl</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -86,16 +98,16 @@ function BarraLateral() {
         <nav aria-label="Navegación principal">
           {ADMIN_NAV.map((grupo) => (
             <SidebarGroup key={grupo.titulo}>
-              <SidebarGroupLabel>{grupo.titulo}</SidebarGroupLabel>
+              <SidebarGroupLabel className="text-etiqueta font-medium text-muted-foreground">{grupo.titulo}</SidebarGroupLabel>
               <SidebarGroupContent>
-                <SidebarMenu>
+                <SidebarMenu className="gap-0.5">
                   {grupo.items.map((item) => (
                     <SidebarMenuItem key={item.ruta}>
                       <SidebarMenuButton
                         asChild
                         isActive={activa === item.ruta}
                         tooltip={item.titulo}
-                        className="max-md:h-11 data-[active=true]:bg-background data-[active=true]:font-semibold data-[active=true]:shadow-[0_0_0_1px_var(--sidebar-border)]"
+                        className={ITEM_NAV}
                       >
                         <NavLink to={item.ruta} end onClick={alElegir}>
                           <item.icono />
@@ -114,7 +126,7 @@ function BarraLateral() {
         <SidebarMenu>
           {!escritorio && (
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Ir a contar" variant="outline" className="max-md:h-11">
+              <SidebarMenuButton asChild tooltip="Ir a contar" variant="outline" className="h-control gap-2.5 bg-card px-2.5">
                 <Link to="/contar" onClick={alElegir}>
                   <ScanBarcode />
                   <span>Ir a contar</span>
@@ -123,13 +135,13 @@ function BarraLateral() {
             </SidebarMenuItem>
           )}
           <SidebarMenuItem>
-            <div className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-xs group-data-[collapsible=icon]:hidden">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-soft text-[10px] font-semibold text-brand-strong">
+            <div className="flex min-w-0 items-center gap-2.5 rounded-lg border bg-page px-2.5 py-2 group-data-[collapsible=icon]:hidden">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-brand-border bg-brand-soft text-xs font-semibold text-brand-strong">
                 {iniciales(clinica)}
               </span>
-              <span className="min-w-0">
+              <span className="min-w-0 text-etiqueta">
                 <span className="block truncate font-medium text-sidebar-foreground">{clinica}</span>
-                <span className="block truncate text-muted-foreground">Clínica activa</span>
+                <span className="block truncate font-normal text-muted-foreground">Clínica activa</span>
               </span>
             </div>
           </SidebarMenuItem>
@@ -147,17 +159,22 @@ function Migas() {
   const migas = migasDeRuta(pathname, origen)
   return (
     <Breadcrumb aria-label="Migas de pan" className="min-w-0">
-      <BreadcrumbList className="flex-nowrap">
+      <BreadcrumbList className="flex-nowrap text-etiqueta font-normal">
         {migas.map((miga, i) => {
           const ultima = i === migas.length - 1
           return (
             <Fragment key={`${i}-${miga.texto}`}>
               <BreadcrumbItem className={ultima ? 'min-w-0' : 'hidden md:inline-flex'}>
                 {ultima ? (
-                  <BreadcrumbPage className="truncate">{miga.texto}</BreadcrumbPage>
+                  <BreadcrumbPage className="truncate font-medium">{miga.texto}</BreadcrumbPage>
                 ) : miga.ruta ? (
                   <BreadcrumbLink asChild>
-                    <Link to={miga.ruta}>{miga.texto}</Link>
+                    <Link
+                      to={miga.ruta}
+                      className="rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+                    >
+                      {miga.texto}
+                    </Link>
                   </BreadcrumbLink>
                 ) : (
                   <span>{miga.texto}</span>
@@ -175,14 +192,16 @@ function Migas() {
 function BotonBuscar({ onAbrir }: { onAbrir: () => void }) {
   return (
     <>
-      <Button variant="outline" className="hidden w-80 justify-start gap-2 text-muted-foreground md:inline-flex" onClick={onAbrir}>
-        <Search />
+      <Boton
+        variante="secundario"
+        icono={<Search />}
+        className="hidden w-80 justify-start bg-page px-3 font-normal text-muted-foreground shadow-none hover:bg-muted hover:text-foreground md:inline-flex"
+        onClick={onAbrir}
+      >
         <span className="flex-1 truncate text-left">Buscar por código o nombre</span>
-        <kbd className="rounded border bg-muted px-1.5 font-mono text-[11px] text-muted-foreground">Ctrl K</kbd>
-      </Button>
-      <Button variant="ghost" size="icon" className="size-11 md:hidden" aria-label="Buscar activo" onClick={onAbrir}>
-        <Search />
-      </Button>
+        <kbd className="rounded-md border bg-card px-1.5 py-0.5 font-mono text-xs leading-none text-muted-foreground">Ctrl K</kbd>
+      </Boton>
+      <Boton variante="fantasma" soloIcono icono={<Search />} aria-label="Buscar activo" className="md:hidden" onClick={onAbrir} />
     </>
   )
 }
@@ -197,25 +216,25 @@ function MenuUsuario() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-11 gap-2 px-1.5 md:h-9">
+        <Boton variante="fantasma" className="gap-2 px-1.5 md:pr-2">
           <span className="sr-only">{`Menú de usuario: ${nombre}, ${rol}`}</span>
-          <Avatar className="size-7" aria-hidden="true">
-            <AvatarFallback className="text-[11px] font-semibold">{iniciales(nombre)}</AvatarFallback>
+          <Avatar className="size-8 md:size-7" aria-hidden="true">
+            <AvatarFallback className="bg-brand-soft text-xs font-semibold text-brand-strong">{iniciales(nombre)}</AvatarFallback>
           </Avatar>
-          <span className="hidden max-w-32 truncate text-sm md:inline" aria-hidden="true">{nombre.trim().split(/\s+/)[0]}</span>
-          <ChevronsUpDown className="hidden size-3.5 text-muted-foreground md:block" />
-        </Button>
+          <span className="hidden max-w-32 truncate text-sm font-medium md:inline" aria-hidden="true">{nombre.trim().split(/\s+/)[0]}</span>
+          <ChevronsUpDown className="hidden size-3.5 text-muted-foreground md:block" aria-hidden="true" />
+        </Boton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
-        <DropdownMenuLabel className="flex flex-col gap-0.5">
-          <span className="truncate text-sm font-medium text-foreground">{nombre}</span>
-          <span className="truncate text-xs font-normal text-muted-foreground">{email}</span>
-          <span className="text-xs font-normal text-muted-foreground">Rol: {rol}</span>
+        <DropdownMenuLabel className="flex flex-col gap-0.5 px-2 py-2">
+          <span className="truncate text-cuerpo font-medium text-foreground">{nombre}</span>
+          <span className="truncate text-etiqueta font-normal text-muted-foreground">{email}</span>
+          <span className="text-etiqueta font-normal text-muted-foreground">Rol: {rol}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {!escritorio && (
           <>
-            <DropdownMenuItem asChild>
+            <DropdownMenuItem asChild className="min-h-control">
               <Link to="/contar">
                 <ScanBarcode />
                 Ir a contar
@@ -224,7 +243,7 @@ function MenuUsuario() {
             <DropdownMenuSeparator />
           </>
         )}
-        <DropdownMenuItem onSelect={cerrarSesion}>
+        <DropdownMenuItem className="min-h-control" onSelect={cerrarSesion}>
           <LogOut />
           Cerrar sesión
         </DropdownMenuItem>
@@ -262,15 +281,15 @@ export default function AdminShell() {
       <BarraLateral />
       <SidebarInset className="min-w-0 bg-page">
         {!conDatosReales(pathname) && <DatosFicticios />}
-        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-2 md:px-6">
-          <SidebarTrigger className="size-11 md:size-8" aria-label="Mostrar u ocultar el menú" />
-          <div className="hidden h-5 w-px bg-border md:block" aria-hidden="true" />
+        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-1 border-b bg-card px-2 md:gap-2 md:px-6">
+          <SidebarTrigger className="size-control text-muted-foreground hover:text-foreground" aria-label="Mostrar u ocultar el menú" />
+          <div className="mr-1 hidden h-5 w-px bg-border md:block" aria-hidden="true" />
           {pathname !== '/admin' && (
-            <Button asChild variant="ghost" size="icon" className="size-11 shrink-0 md:hidden">
+            <Boton asChild variante="fantasma" className="size-control shrink-0 p-0 md:hidden">
               <Link to="/admin" aria-label="Ir al inicio">
                 <House />
               </Link>
-            </Button>
+            </Boton>
           )}
           <Migas />
           <div className="flex-1" />
@@ -281,7 +300,7 @@ export default function AdminShell() {
           <Outlet />
         </main>
         <GlobalSearch open={buscando} onOpenChange={setBuscando} />
-        <Toaster position="bottom-right" />
+        <Notificaciones posicion="bottom-right" />
       </SidebarInset>
     </SidebarProvider>
     </TooltipProvider>

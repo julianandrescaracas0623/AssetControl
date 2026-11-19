@@ -1,4 +1,5 @@
-import { Download, MoreHorizontal, Plus, ScanBarcode } from 'lucide-react'
+import { Download, Eye, EyeOff, MoreHorizontal, Plus, ScanBarcode } from 'lucide-react'
+import { toast } from 'sonner'
 import { useMemo, useState, type ReactNode } from 'react'
 
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
@@ -14,6 +15,7 @@ import {
   Filtro,
   Insignia,
   ListaDatos,
+  Notificaciones,
   Panel,
   Pestanas,
   TablaDatos,
@@ -96,6 +98,32 @@ export function SuperficiesKit() {
   )
 }
 
+/** Campo con sufijo (spec 016, T4): mostrar u ocultar la contraseña sin salir del campo. */
+export function CampoClave() {
+  const [visible, setVisible] = useState(false)
+  return (
+    <Campo
+      id="g-clave"
+      etiqueta="Contraseña"
+      type={visible ? 'text' : 'password'}
+      defaultValue="clave-de-ejemplo"
+      autoComplete="off"
+      ayuda="Con sufijo: el botón vive dentro del campo."
+      sufijo={
+        <Boton
+          variante="fantasma"
+          soloIcono
+          icono={visible ? <EyeOff /> : <Eye />}
+          aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+          aria-pressed={visible}
+          className="text-muted-foreground hover:bg-transparent hover:text-foreground"
+          onClick={() => setVisible((v) => !v)}
+        />
+      }
+    />
+  )
+}
+
 export function CifrasKit({ Seccion }: SeccionProps) {
   return (
     <Seccion title="Cifras">
@@ -156,7 +184,11 @@ export function DialogosKit({ Seccion }: SeccionProps) {
         <Boton variante="peligro" onClick={() => setBaja(true)}>
           Dar de baja
         </Boton>
+        <Boton variante="fantasma" onClick={() => toast.success('Ubicación guardada (ejemplo)')}>
+          Mostrar notificación
+        </Boton>
       </div>
+      <Notificaciones />
       <Dialogo
         abierto={centrado}
         onAbiertoChange={setCentrado}

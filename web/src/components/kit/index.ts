@@ -22,6 +22,7 @@ export {
 export { Filtro, type FiltroProps, type OpcionFiltro } from './Filtro'
 export { Insignia, type InsigniaProps, type TonoInsignia } from './Insignia'
 export { ListaDatos, type Dato, type ListaDatosProps, type TipoDato } from './ListaDatos'
+export { Notificaciones, type NotificacionesProps } from './Notificaciones'
 export { Panel, type PanelProps } from './Panel'
 export { Pestanas, type Pestana, type PestanasProps } from './Pestanas'
 export {

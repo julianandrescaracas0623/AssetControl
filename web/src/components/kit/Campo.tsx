@@ -69,7 +69,15 @@ type TextareaNativo = Omit<ComponentProps<'textarea'>, 'id' | 'className' | 'chi
 
 export type OpcionCampo = { valor: string; etiqueta: string }
 
-type CampoEntrada = CampoBase & InputNativo & { tipo?: 'texto' | 'numero' | 'dinero' | 'codigo' }
+type CampoEntrada = CampoBase &
+  InputNativo & {
+    tipo?: 'texto' | 'numero' | 'dinero' | 'codigo'
+    /**
+     * Control dentro del campo, a la derecha (p. ej. «Mostrar contraseña»). Mide como
+     * mucho `size-control` y lleva nombre propio; el texto no queda debajo de él.
+     */
+    sufijo?: ReactNode
+  }
 type CampoArea = CampoBase & TextareaNativo & { tipo: 'area' }
 type CampoSeleccion = CampoBase & {
   tipo: 'seleccion'
@@ -156,7 +164,7 @@ export function Campo(props: CampoProps) {
     )
   }
 
-  const { tipo = 'texto', ...nativo } = resto
+  const { tipo = 'texto', sufijo, ...nativo } = resto
   const { clase, inputMode } = ENTRADA[tipo]
   const control = (
     <Input
@@ -167,9 +175,20 @@ export function Campo(props: CampoProps) {
       aria-describedby={describedBy}
       aria-invalid={error ? true : nativo['aria-invalid']}
       aria-required={obligatorio || nativo['aria-required']}
-      className={cn(CONTROL, clase)}
+      className={cn(CONTROL, clase, sufijo !== undefined && 'pr-12')}
     />
   )
+  const conSufijo =
+    sufijo === undefined ? (
+      control
+    ) : (
+      <div className="relative">
+        {control}
+        <div data-sufijo="" className="absolute inset-y-0 right-0 flex items-center">
+          {sufijo}
+        </div>
+      </div>
+    )
 
   return (
     <MarcoCampo {...marco}>
@@ -182,10 +201,10 @@ export function Campo(props: CampoProps) {
           >
             $
           </span>
-          {control}
+          {conSufijo}
         </div>
       ) : (
-        control
+        conSufijo
       )}
     </MarcoCampo>
   )

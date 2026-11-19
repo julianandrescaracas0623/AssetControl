@@ -119,6 +119,33 @@ describe('Campo', () => {
     expect(screen.getByRole('textbox', { name: 'Deshabilitado' }).hasAttribute('disabled')).toBe(true)
     expect(screen.getByRole('textbox', { name: 'Código del sticker' }).hasAttribute('readonly')).toBe(true)
   })
+
+  // Spec 016, T4: un control al final del campo (mostrar contraseña) sin salir del kit.
+  it('sufijo: va dentro del campo, a la derecha, y el texto no queda debajo de él', () => {
+    const alPulsar = vi.fn()
+    render(
+      <Campo
+        id="clave"
+        etiqueta="Contraseña"
+        type="text"
+        ayuda="Entre 10 y 128 caracteres."
+        sufijo={
+          <button type="button" aria-label="Ocultar contraseña" onClick={alPulsar}>
+            x
+          </button>
+        }
+      />,
+    )
+    const campo = screen.getByRole('textbox', { name: 'Contraseña' })
+    expect(campo.className).toContain('pr-12')
+    expect(campo.hasAttribute('sufijo')).toBe(false)
+    const sufijo = campo.parentElement!.querySelector('[data-sufijo]')!
+    expect(sufijo.className).toContain('absolute')
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar contraseña' }))
+    expect(alPulsar).toHaveBeenCalledOnce()
+    // El sufijo no cambia la convención de ids: la ayuda sigue describiendo al control.
+    expect(campo.getAttribute('aria-describedby')).toBe('clave-ayuda')
+  })
 })
 
 describe('MarcoCampo', () => {

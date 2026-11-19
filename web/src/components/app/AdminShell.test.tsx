@@ -178,3 +178,59 @@ describe('AdminShell: densidad y lienzo (spec 016, T1)', () => {
     expect(inset?.classList.contains('bg-background')).toBe(false)
   })
 })
+
+// Spec 016, T4 (D1, D8; Deuda T1 c): barra lateral blanca con el ítem activo marcado por
+// una barra de acento cobalto y fondo --brand-soft (nunca solo el color: también
+// aria-current y peso), encabezado blanco sobre la página y piezas del kit.
+describe('AdminShell: navegación y encabezado (spec 016, T4)', () => {
+  beforeEach(() => simularAncho({ movil: false }))
+
+  it('el ítem activo lleva fondo --brand-soft, texto cobalto fuerte y barra de acento', async () => {
+    renderAt('/admin/activos')
+    const nav = await screen.findByRole('navigation', { name: 'Navegación principal' })
+    const activo = within(nav).getByRole('link', { name: 'Activos' })
+    expect(activo.getAttribute('data-active')).toBe('true')
+    for (const clase of [
+      'data-active:bg-brand-soft',
+      'data-active:text-brand-strong',
+      'data-active:font-semibold',
+      'data-active:before:bg-primary',
+    ]) {
+      expect(activo.classList.contains(clase), clase).toBe(true)
+    }
+    // La fusión de clases reemplaza el gris activo de shadcn (no quedan dos fondos en pugna).
+    expect(activo.classList.contains('data-active:bg-sidebar-accent')).toBe(false)
+    // Los demás comparten la receta, pero no están activos.
+    expect(within(nav).getByRole('link', { name: 'Ubicaciones' }).getAttribute('data-active')).toBe('false')
+  })
+
+  it('las entradas de la barra miden la altura de control de la densidad', async () => {
+    renderAt('/admin')
+    const nav = await screen.findByRole('navigation', { name: 'Navegación principal' })
+    expect(within(nav).getByRole('link', { name: 'Sesiones' }).classList.contains('h-control')).toBe(true)
+  })
+
+  it('la barra lateral es blanca (--sidebar) y el encabezado va en blanco con borde inferior', async () => {
+    renderAt('/admin')
+    await screen.findByRole('navigation', { name: 'Navegación principal' })
+    const encabezado = screen.getByRole('banner')
+    expect(encabezado.classList.contains('bg-card')).toBe(true)
+    expect(encabezado.classList.contains('border-b')).toBe(true)
+  })
+
+  it('el buscador y el menú de usuario son botones del kit', async () => {
+    renderAt('/admin')
+    await screen.findByRole('navigation', { name: 'Navegación principal' })
+    const buscar = screen.getByRole('button', { name: /Buscar por código o nombre/ })
+    expect(buscar.getAttribute('data-kit')).toBe('boton')
+    expect(buscar.getAttribute('data-variante')).toBe('secundario')
+    expect(screen.getByRole('button', { name: /Menú de usuario/ }).getAttribute('data-kit')).toBe('boton')
+    expect(screen.getByRole('button', { name: 'Buscar activo' }).getAttribute('data-kit')).toBe('boton')
+  })
+
+  it('monta las notificaciones del kit', async () => {
+    renderAt('/admin')
+    await screen.findByRole('navigation', { name: 'Navegación principal' })
+    expect(document.querySelector('[data-kit=notificaciones]')).toBeTruthy()
+  })
+})

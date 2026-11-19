@@ -74,7 +74,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                 key={activo.id}
                 value={`activo ${activo.id}`}
                 onSelect={() => ir(`/admin/activos/${encodeURIComponent(activo.codigo)}`)}
-                className="min-h-11 md:min-h-8"
+                className="min-h-control"
               >
                 <Package />
                 <span className="min-w-0 flex-1 truncate">{activo.nombre}</span>
@@ -91,7 +91,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
                 key={item.ruta}
                 value={`ir ${item.titulo}`}
                 onSelect={() => ir(item.ruta)}
-                className="min-h-11 md:min-h-8"
+                className="min-h-control"
               >
                 <item.icono />
                 <span className="truncate">{item.titulo}</span>

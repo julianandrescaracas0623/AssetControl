@@ -24,7 +24,7 @@ import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
 import { ACTIVOS, RESUMEN, UBICACIONES_API } from '@/mocks/datos-ficticios'
 
-import { CifrasKit, DialogosKit, SuperficiesKit, TablasKit } from './GaleriaKit'
+import { CampoClave, CifrasKit, DialogosKit, SuperficiesKit, TablasKit } from './GaleriaKit'
 
 // Galería del sistema de diseño (spec 001b, T2). Ruta de desarrollo
 // /dev/componentes: equivale a la página "Sistema visual" del lienzo aprobado
@@ -230,6 +230,7 @@ export default function Componentes() {
           />
           <Campo id="g-cargando" etiqueta="Ubicación" tipo="seleccion" cargando opciones={[]} placeholder="Elige una ubicación" />
           <Campo id="g-deshabilitado" etiqueta="Serial" tipo="codigo" disabled defaultValue="SN-4471" />
+          <CampoClave />
           <Campo id="g-nota" etiqueta="Nota" tipo="area" placeholder="Opcional" className="sm:col-span-2" ayuda="Hasta 120 caracteres." />
           <div className="flex items-center gap-2">
             <Checkbox id="g-coincide" defaultChecked />

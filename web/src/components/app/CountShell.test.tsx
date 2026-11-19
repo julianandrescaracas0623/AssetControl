@@ -39,7 +39,8 @@ describe('CountShell', () => {
     expect(screen.getByRole('status').textContent).toBe('En línea')
     const volver = screen.getByRole('link', { name: 'Volver' })
     expect(volver.getAttribute('href')).toBe('/contar')
-    expect(volver.classList.contains('size-11')).toBe(true)
+    // Spec 016, T4: selector visual de size-11 (44 px) a size-control (48 px en conteo, D6).
+    expect(volver.classList.contains('size-control')).toBe(true)
   })
 
   it('pone las acciones en una barra fija abajo, a ancho completo y de 48 px o más', () => {
@@ -88,5 +89,35 @@ describe('CountShell: densidad (spec 016, T1)', () => {
     expect(document.documentElement.getAttribute('data-densidad')).toBe('conteo')
     cleanup()
     expect(document.documentElement.hasAttribute('data-densidad')).toBe(false)
+  })
+})
+
+// Spec 016, T4 (D1, D8): encabezado compacto en blanco sobre la página, botones del kit
+// y barra de acción en blanco con área segura.
+describe('CountShell: encabezado y barra con el kit (spec 016, T4)', () => {
+  it('el encabezado es blanco con borde y el retroceso y el atajo son botones del kit', () => {
+    render(
+      <MemoryRouter>
+        <CountShell titulo="Unidad odontológica" volver="/contar/escanear" estadoRed="en_linea">
+          <p>Contenido</p>
+        </CountShell>
+      </MemoryRouter>,
+    )
+    const encabezado = screen.getByRole('banner')
+    expect(encabezado.classList.contains('bg-card')).toBe(true)
+    expect(encabezado.classList.contains('border-b')).toBe(true)
+    for (const nombre of ['Volver', 'Inicio del conteo']) {
+      const enlace = screen.getByRole('link', { name: nombre })
+      expect(enlace.getAttribute('data-kit'), nombre).toBe('boton')
+      expect(enlace.getAttribute('data-variante'), nombre).toBe('fantasma')
+    }
+  })
+
+  it('la barra de acción es blanca, respeta el área segura y separa los objetivos 8 px', () => {
+    renderShell()
+    const barra = screen.getByRole('contentinfo')
+    expect(barra.classList.contains('bg-card')).toBe(true)
+    expect(barra.className).toContain('safe-area-inset-bottom')
+    expect(barra.querySelector('.gap-separacion')).toBeTruthy()
   })
 })

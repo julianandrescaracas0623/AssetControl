@@ -3,13 +3,15 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 
 import { NetworkStatus, type EstadoRed } from '@/components/app/NetworkStatus'
-import { Button } from '@/components/ui/button'
+import { Boton } from '@/components/kit'
 import { useDensidad } from '@/hooks/use-densidad'
 
 // Shell del modo conteo (docs/08 §5, spec 001b T6): móvil primero y a una
 // mano. Encabezado compacto (retroceso, sesión y sala, estado de red),
 // contenido y barra de acción fija abajo con área segura. En computador, una
 // columna centrada de 480 px (D5).
+// Spec 016, T4 (D1, D6, D8): encabezado y barra en blanco sobre la página, botones del
+// kit con objetivos de 48 px y 8 px entre objetivos.
 
 export function CountShell({
   titulo,
@@ -35,38 +37,38 @@ export function CountShell({
   useDensidad('conteo')
   return (
     <div data-densidad="conteo" className="flex min-h-0 flex-1 flex-col">
-      <header className="sticky top-0 z-10 border-b bg-background">
-        <div className="mx-auto flex h-14 w-full max-w-[480px] items-center gap-1 px-1.5">
+      <header className="sticky top-0 z-10 border-b bg-card">
+        <div className="mx-auto flex h-14 w-full max-w-[480px] items-center gap-1 px-1">
           {volver ? (
             <>
-              <Button asChild variant="ghost" size="icon" className="size-11 shrink-0">
+              <Boton asChild variante="fantasma" className="size-control shrink-0 p-0 [&_svg]:size-5">
                 <Link to={volver} aria-label="Volver">
-                  <ArrowLeft className="size-5" />
+                  <ArrowLeft />
                 </Link>
-              </Button>
+              </Boton>
               {/* Atajo al inicio del conteo cuando «Volver» lleva a otra pantalla. */}
               {volver !== '/contar' && (
-                <Button asChild variant="ghost" size="icon" className="size-11 shrink-0">
+                <Boton asChild variante="fantasma" className="size-control shrink-0 p-0 [&_svg]:size-5">
                   <Link to="/contar" aria-label="Inicio del conteo">
-                    <House className="size-5" />
+                    <House />
                   </Link>
-                </Button>
+                </Boton>
               )}
             </>
           ) : (
-            (menu ?? <span className="size-11 shrink-0" aria-hidden="true" />)
+            (menu ?? <span className="size-control shrink-0" aria-hidden="true" />)
           )}
-          <div className="min-w-0 flex-1 text-center">
-            <p className="truncate text-[15px] leading-5 font-semibold">{titulo}</p>
-            {subtitulo && <p className="truncate text-xs leading-4 text-muted-foreground">{subtitulo}</p>}
+          <div className="min-w-0 flex-1 px-1 text-center">
+            <p className="truncate text-titulo-seccion">{titulo}</p>
+            {subtitulo && <p className="truncate text-etiqueta font-normal text-muted-foreground">{subtitulo}</p>}
           </div>
           <NetworkStatus estado={estadoRed} className="mr-1" />
         </div>
       </header>
       <main className="mx-auto flex w-full max-w-[480px] min-w-0 flex-1 flex-col gap-4 p-4">{children}</main>
       {acciones && (
-        <footer className="sticky bottom-0 border-t bg-background pb-[calc(0.75rem+env(safe-area-inset-bottom))] [&_[data-slot=button]]:min-h-12 [&_[data-slot=button]]:w-full [&_[data-slot=button]]:text-base">
-          <div className="mx-auto flex w-full max-w-[480px] flex-col gap-2.5 px-4 pt-3">{acciones}</div>
+        <footer className="sticky bottom-0 z-10 border-t bg-card pb-[calc(0.75rem+env(safe-area-inset-bottom))] [&_[data-slot=button]]:min-h-12 [&_[data-slot=button]]:w-full [&_[data-slot=button]]:text-base">
+          <div className="mx-auto flex w-full max-w-[480px] flex-col gap-separacion px-4 pt-3">{acciones}</div>
         </footer>
       )}
     </div>

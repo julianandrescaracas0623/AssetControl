@@ -98,6 +98,10 @@ describe('galería de componentes', () => {
       expect(within(dialogos).getByRole('button', { name: nombre })).toBeTruthy()
     }
     expect(dialogos.querySelector('[data-kit=barra-accion]')).toBeTruthy()
+    // Spec 016, T4: notificaciones del kit y campo con sufijo.
+    expect(within(dialogos).getByRole('button', { name: 'Mostrar notificación' })).toBeTruthy()
+    expect(document.querySelector('[data-kit=notificaciones]')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Mostrar contraseña' }).closest('[data-sufijo]')).toBeTruthy()
 
     const tablas = screen.getByRole('region', { name: 'Tablas' })
     expect(within(tablas).getByRole('tablist', { name: 'Vista de la tabla' })).toBeTruthy()

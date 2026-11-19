@@ -1,14 +1,10 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { CircleAlert, Eye, EyeOff, LoaderCircle } from 'lucide-react'
+import { Eye, EyeOff, RefreshCw } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 
 import { MarcoAcceso } from '@/components/app/MarcoAcceso'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Aviso, Boton, Campo } from '@/components/kit'
 import { api, ErrorApi, mensajeDeError } from '@/lib/api/cliente'
 import { inicioDeRol, useSesion } from '@/lib/sesion'
 import { PantallaCarga } from './PantallaCarga'
@@ -23,29 +19,15 @@ const POLITICA = 'Entre 10 y 128 caracteres. Evita contraseñas comunes.'
 const NOMBRE_MAX = 120
 const ERROR_NOMBRE = `Revisa el nombre: usa letras o números, hasta ${NOMBRE_MAX} caracteres y sin símbolos invisibles.`
 
-function Encabezado({ titulo, descripcion }: { titulo: string; descripcion: string }) {
-  return (
-    <CardHeader>
-      <CardTitle>
-        <h1 className="text-xl font-semibold tracking-tight">{titulo}</h1>
-      </CardTitle>
-      <CardDescription>{descripcion}</CardDescription>
-    </CardHeader>
-  )
-}
-
 function EnlaceNoValido() {
   return (
-    <MarcoAcceso>
-      <Encabezado
-        titulo="Este enlace no es válido"
-        descripcion="Puede que haya vencido o que ya se haya usado. Si recargaste la página, abre otra vez el enlace que te enviaron; si sigue sin funcionar, pide al administrador de tu clínica una invitación nueva."
-      />
-      <CardContent>
-        <Button asChild variant="outline" className="h-11 w-full md:h-9">
-          <Link to="/login">Ir a iniciar sesión</Link>
-        </Button>
-      </CardContent>
+    <MarcoAcceso
+      titulo="Este enlace no es válido"
+      descripcion="Puede que haya vencido o que ya se haya usado. Si recargaste la página, abre otra vez el enlace que te enviaron; si sigue sin funcionar, pide al administrador de tu clínica una invitación nueva."
+    >
+      <Boton asChild variante="secundario" anchoCompleto>
+        <Link to="/login">Ir a iniciar sesión</Link>
+      </Boton>
     </MarcoAcceso>
   )
 }
@@ -78,80 +60,49 @@ function Formulario({ token }: { token: string }) {
 
   const enviando = aceptar.isPending || aceptar.isSuccess
   return (
-    <MarcoAcceso>
-      <Encabezado
-        titulo="Crea tu cuenta"
-        descripcion="Te invitaron a AssetControl. Escribe tu nombre y una contraseña; tu correo ya quedó en la invitación."
-      />
-      <CardContent>
-        <form className="flex flex-col gap-4" onSubmit={alEnviar}>
-          {errorGeneral && (
-            <Alert variant="destructive">
-              <CircleAlert />
-              <AlertDescription>{errorGeneral}</AlertDescription>
-            </Alert>
-          )}
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="invitacion-nombre">Nombre</Label>
-            <Input
-              id="invitacion-nombre"
-              name="nombre"
-              autoComplete="name"
-              required
-              maxLength={NOMBRE_MAX}
-              autoFocus
-              aria-invalid={errorNombre ? true : undefined}
-              aria-describedby={errorNombre ? 'invitacion-nombre-error' : undefined}
-              className="h-11 md:h-9"
+    <MarcoAcceso
+      titulo="Crea tu cuenta"
+      descripcion="Te invitaron a AssetControl. Escribe tu nombre y una contraseña; tu correo ya quedó en la invitación."
+    >
+      <form className="flex flex-col gap-4" onSubmit={alEnviar}>
+        {errorGeneral && <Aviso tono="error" titulo={errorGeneral} />}
+        <Campo
+          id="invitacion-nombre"
+          etiqueta="Nombre"
+          name="nombre"
+          autoComplete="name"
+          required
+          maxLength={NOMBRE_MAX}
+          autoFocus
+          error={errorNombre ?? undefined}
+        />
+        <Campo
+          id="invitacion-password"
+          etiqueta="Contraseña"
+          name="password"
+          type={visible ? 'text' : 'password'}
+          autoComplete="new-password"
+          required
+          minLength={10}
+          maxLength={128}
+          ayuda={POLITICA}
+          error={errorClave ?? undefined}
+          sufijo={
+            <Boton
+              variante="fantasma"
+              soloIcono
+              icono={visible ? <EyeOff /> : <Eye />}
+              aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              aria-pressed={visible}
+              className="text-muted-foreground hover:bg-transparent hover:text-foreground"
+              onClick={() => setVisible((v) => !v)}
             />
-            {errorNombre && (
-              <p id="invitacion-nombre-error" className="text-sm text-destructive">
-                {errorNombre}
-              </p>
-            )}
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="invitacion-password">Contraseña</Label>
-            <div className="relative">
-              <Input
-                id="invitacion-password"
-                name="password"
-                type={visible ? 'text' : 'password'}
-                autoComplete="new-password"
-                required
-                minLength={10}
-                maxLength={128}
-                aria-invalid={errorClave ? true : undefined}
-                aria-describedby={errorClave ? 'invitacion-password-error invitacion-password-ayuda' : 'invitacion-password-ayuda'}
-                className="h-11 pr-12 md:h-9 md:pr-10"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute top-0 right-0 size-11 text-muted-foreground md:size-9"
-                aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                aria-pressed={visible}
-                onClick={() => setVisible((v) => !v)}
-              >
-                {visible ? <EyeOff /> : <Eye />}
-              </Button>
-            </div>
-            {errorClave && (
-              <p id="invitacion-password-error" className="text-sm text-destructive">
-                {errorClave}
-              </p>
-            )}
-            <p id="invitacion-password-ayuda" className="text-xs text-muted-foreground">
-              {POLITICA}
-            </p>
-          </div>
-          <Button type="submit" className="h-11 w-full md:h-9" disabled={enviando}>
-            {enviando && <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden="true" />}
-            Crear cuenta y entrar
-          </Button>
-        </form>
-      </CardContent>
+          }
+        />
+        <Boton type="submit" anchoCompleto className="mt-2" cargando={enviando} textoCargando="Creando tu cuenta…">
+          Crear cuenta y entrar
+        </Boton>
+      </form>
     </MarcoAcceso>
   )
 }
@@ -182,13 +133,16 @@ export default function Invitacion() {
   if (validacion.isPending) return <PantallaCarga etiqueta="Comprobando la invitación" />
   if (validacion.isError) {
     return (
-      <MarcoAcceso>
-        <Encabezado titulo="No pudimos revisar el enlace" descripcion={mensajeDeError(validacion.error)} />
-        <CardContent>
-          <Button className="h-11 w-full md:h-9" onClick={() => void validacion.refetch()}>
-            Reintentar
-          </Button>
-        </CardContent>
+      <MarcoAcceso titulo="No pudimos revisar el enlace" descripcion={mensajeDeError(validacion.error)}>
+        <Boton
+          anchoCompleto
+          icono={<RefreshCw />}
+          cargando={validacion.isFetching}
+          textoCargando="Reintentando…"
+          onClick={() => void validacion.refetch()}
+        >
+          Reintentar
+        </Boton>
       </MarcoAcceso>
     )
   }

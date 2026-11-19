@@ -13,14 +13,6 @@ const ROUTES = path.join(SRC, 'routes')
 
 /** Pantallas que todavía importan components/ui (rutas relativas a src/routes, con /). */
 const EXCEPCIONES: readonly string[] = [
-  // T4: acceso y pantallas de sistema
-  'Invitacion.tsx',
-  'Login.tsx',
-  'Maqueta.tsx',
-  'NoEncontrado.tsx',
-  'PantallaSistema.tsx',
-  'SinConexion.tsx',
-  'SinPermiso.tsx',
   // T5 y T6: conteo
   'contar/Alta.tsx',
   'contar/Escanear.tsx',

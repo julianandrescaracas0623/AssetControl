@@ -1,19 +1,19 @@
 import { SearchX } from 'lucide-react'
 import { Link } from 'react-router'
 
-import { Button } from '@/components/ui/button'
+import { Boton } from '@/components/kit'
 import { PantallaSistema } from './PantallaSistema'
 
 export default function NoEncontrado() {
   return (
     <PantallaSistema
-      icono={<SearchX className="size-5" />}
+      icono={<SearchX />}
       titulo="No encontramos esta página"
       descripcion="Revisa la dirección o vuelve al inicio."
     >
-      <Button asChild>
+      <Boton asChild>
         <Link to="/">Ir al inicio</Link>
-      </Button>
+      </Boton>
     </PantallaSistema>
   )
 }
