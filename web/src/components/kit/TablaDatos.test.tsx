@@ -214,3 +214,71 @@ describe('TablaDatos: por debajo de md (docs/08 §4.4)', () => {
     expect(within(t).getByText('000457').closest('td')?.className).toContain('sticky')
   })
 })
+
+// Spec 016, T7: fila de total del servidor (valor actual, desglose del informe, no
+// encontrados). La tabla no suma: cada celda del pie llega ya formateada.
+describe('TablaDatos: pie (fila de total)', () => {
+  const PIE = [
+    { contenido: 'Total', columnas: 3 },
+    { contenido: '$ 1.639.900,00', tipo: 'cifra' as const },
+  ]
+
+  it('en la tabla: una fila de pie con las celdas dadas, cifras a la derecha y el ancho pedido', () => {
+    tabla({ pie: PIE })
+    const t = screen.getByRole('table', { name: 'Activos' })
+    const filas = within(t).getAllByRole('row')
+    expect(filas).toHaveLength(4)
+    const pie = filas.at(-1) as HTMLElement
+    expect(pie.closest('tfoot')).toBeTruthy()
+    const celdas = within(pie).getAllByRole('cell')
+    expect(celdas.map((c) => c.textContent)).toEqual(['Total', '$ 1.639.900,00'])
+    expect(celdas[0].getAttribute('colspan')).toBe('3')
+    expect(celdas[1].className).toContain('text-right')
+    expect(celdas[1].className).toContain('tabular-nums')
+  })
+
+  it('con acciones por fila, el pie completa la columna de acciones', () => {
+    tabla({ pie: PIE, accionesFila: () => <span>⋯</span> })
+    const pie = within(screen.getByRole('table')).getAllByRole('row').at(-1) as HTMLElement
+    expect(within(pie).getAllByRole('cell')).toHaveLength(3)
+  })
+
+  it('desplazar en el teléfono: una primera celda del pie de una sola columna queda fija y es opaca', () => {
+    simularAncho({ movil: true })
+    tabla({
+      pie: [{ contenido: 'Total' }, { contenido: '—' }, { contenido: '—' }, { contenido: '$ 1.639.900,00', tipo: 'cifra' }],
+      movil: 'desplazar',
+    })
+    const pie = within(screen.getByRole('table')).getAllByRole('row').at(-1) as HTMLElement
+    const primera = within(pie).getAllByRole('cell')[0]
+    expect(primera.className).toContain('sticky')
+    expect(primera.className).toContain('bg-muted')
+  })
+
+  // Revisión de la T7: una celda fija que abarca varias columnas mide más que la pantalla
+  // y, al desplazar, tapa el total del final (el precio congelado de los no encontrados).
+  it.each([2, 3, 5])('desplazar en el teléfono: una celda del pie que abarca %i columnas no queda fija ni tapa el total', (columnas) => {
+    simularAncho({ movil: true })
+    tabla({ pie: [{ contenido: '2 activos no encontrados · lista congelada al cierre', columnas }, { contenido: '$ 1.639.900,00', tipo: 'cifra' }], movil: 'desplazar' })
+    const pie = within(screen.getByRole('table')).getAllByRole('row').at(-1) as HTMLElement
+    const [rotulo, total] = within(pie).getAllByRole('cell')
+    expect(rotulo.getAttribute('colspan')).toBe(String(columnas))
+    expect(rotulo.className).not.toMatch(/\bsticky\b/)
+    expect(rotulo.className).not.toMatch(/\bz-10\b/)
+    expect(total.className).not.toMatch(/\bsticky\b/)
+    expect(total.textContent).toBe('$ 1.639.900,00')
+  })
+
+  it('tarjetas en el teléfono: el pie va al final como resumen', () => {
+    simularAncho({ movil: true })
+    tabla({ pie: PIE })
+    const resumen = document.querySelector('[data-tabla=pie]') as HTMLElement
+    expect(resumen.textContent).toBe('Total$ 1.639.900,00')
+  })
+
+  it('sin filas no hay pie', () => {
+    tabla({ pie: PIE, filas: [] })
+    expect(document.querySelector('tfoot')).toBeNull()
+    expect(document.querySelector('[data-tabla=pie]')).toBeNull()
+  })
+})

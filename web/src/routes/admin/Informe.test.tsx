@@ -116,6 +116,36 @@ describe('Informe de sesión (spec 008, T5)', () => {
   it('una sesión inexistente lo dice', async () => {
     abrir('/admin/sesiones/00000000-0000-4000-8000-0000000000ff/informe', catalogoDemo('admin'))
     expect(await screen.findByText('Esa sesión no existe')).toBeTruthy()
+    // Spec 016, T7: el estado de error conserva el título de la página (h1).
+    expect(screen.getByRole('heading', { level: 1, name: 'Informe' })).toBeTruthy()
+  })
+
+  it('si el servidor falla, lo dice con «Reintentar» bajo el título de la página', async () => {
+    const catalogo = cerrado()
+    simularAncho({ movil: false })
+    simularSesion('admin', (url, init) =>
+      url.split('?')[0] === `/api/sesiones/${SESION}/informe` ? errorApi(500, 'error_interno', 'El servidor no respondió.') : catalogo.manejador(url, init),
+    )
+    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: [INFORME] })} />)
+    expect(await screen.findByText('No se pudo cargar el informe')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'Informe' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeTruthy()
+  })
+
+  it('en el teléfono, el total de los no encontrados no queda tapado por el rótulo del pie', async () => {
+    const catalogo = cerrado()
+    simularSesion('admin', catalogo.manejador)
+    simularAncho({ movil: true })
+    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: [INFORME] })} />)
+    await screen.findByRole('table')
+    pestaña(/No encontrados/)
+    const tabla = await screen.findByRole('table', { name: 'No encontrados' })
+    const pie = within(tabla).getAllByRole('row').at(-1) as HTMLElement
+    const [rotulo, total] = within(pie).getAllByRole('cell')
+    expect(rotulo.textContent).toContain('1 activo no encontrado')
+    expect(Number(rotulo.getAttribute('colspan'))).toBeGreaterThan(1)
+    expect(rotulo.className).not.toMatch(/\bsticky\b/)
+    expect(cop(total.textContent ?? '')).toBe('$ 389.900,00')
   })
 
   it('una sesión sin activos cierra en ceros', async () => {

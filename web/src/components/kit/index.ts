@@ -12,6 +12,7 @@ export { Confirmar, type ConfirmarProps } from './Confirmar'
 export { Dialogo, type DialogoProps, type FormaDialogo } from './Dialogo'
 export { EncabezadoPagina, type EncabezadoPaginaProps, type Miga } from './EncabezadoPagina'
 export {
+  Esqueleto,
   EstadoCargando,
   EstadoError,
   EstadoVacio,
@@ -30,6 +31,7 @@ export { Tecla, type TeclaProps } from './Tecla'
 export {
   TablaDatos,
   type BarraTabla,
+  type CeldaPie,
   type ColumnaTabla,
   type OrdenTabla,
   type PaginacionTabla,

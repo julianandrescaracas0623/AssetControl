@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Search, X }
 import { useId, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 
 import { Input } from '@/components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { formatEntero } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -35,6 +35,13 @@ export type ColumnaTabla<T> = {
   /** Clases de la columna (ancho mínimo, ajuste de línea). */
   clase?: string
 }
+
+/**
+ * Celda de la fila de total. El contenido llega ya calculado y formateado (del servidor):
+ * la tabla no suma. `columnas` es cuántas columnas ocupa (colSpan). En el teléfono con
+ * `desplazar`, la primera celda solo queda fija si ocupa una columna.
+ */
+export type CeldaPie = { contenido: ReactNode; columnas?: number; tipo?: TipoColumna }
 
 export type OrdenTabla = { columna: string; direccion: 'asc' | 'desc' }
 
@@ -86,6 +93,8 @@ export type TablaDatosProps<T> = {
   accionesFila?: (fila: T) => ReactNode
   barra?: BarraTabla
   paginacion?: PaginacionTabla
+  /** Fila de total al pie (en tarjetas, un resumen al final). Solo si hay filas. */
+  pie?: readonly CeldaPie[]
   /** Por debajo de md: `tarjetas` (por defecto) o `desplazar` (tabla con la primera columna fija). */
   movil?: 'tarjetas' | 'desplazar'
   /** Tarjeta propia del teléfono, si la genérica no basta. */
@@ -121,6 +130,7 @@ export function TablaDatos<T>({
   accionesFila,
   barra,
   paginacion,
+  pie,
   movil: formaMovil = 'tarjetas',
   tarjeta,
   className,
@@ -144,7 +154,12 @@ export function TablaDatos<T>({
       </div>
     )
   } else if (esMovil && formaMovil === 'tarjetas') {
-    cuerpo = <Tarjetas etiqueta={etiqueta} columnas={columnas} filas={filas} claveFila={claveFila} accionesFila={accionesFila} tarjeta={tarjeta} />
+    cuerpo = (
+      <>
+        <Tarjetas etiqueta={etiqueta} columnas={columnas} filas={filas} claveFila={claveFila} accionesFila={accionesFila} tarjeta={tarjeta} />
+        {pie && pie.length > 0 && <ResumenPie pie={pie} />}
+      </>
+    )
   } else {
     cuerpo = (
       <Tabla
@@ -156,6 +171,7 @@ export function TablaDatos<T>({
         onOrdenChange={onOrdenChange}
         onAbrirFila={onAbrirFila}
         accionesFila={accionesFila}
+        pie={pie}
         primeraFija={esMovil}
       />
     )
@@ -223,7 +239,7 @@ function Encabezado<T>({ columna, orden, onOrdenChange, fija }: { columna: Colum
       className={cn(
         'h-10 px-3 text-muted-foreground first:pl-4',
         columna.tipo === 'cifra' && 'text-right',
-        fija && 'sticky left-0 z-10 bg-card',
+        fija && 'sticky left-0 z-10 bg-muted',
         columna.clase,
       )}
     >
@@ -256,6 +272,7 @@ function Tabla<T>({
   onOrdenChange,
   onAbrirFila,
   accionesFila,
+  pie,
   primeraFija,
 }: {
   etiqueta: string
@@ -266,6 +283,7 @@ function Tabla<T>({
   onOrdenChange?: (o: OrdenTabla) => void
   onAbrirFila?: (fila: T) => void
   accionesFila?: (fila: T) => ReactNode
+  pie?: readonly CeldaPie[]
   primeraFija: boolean
 }) {
   function dobleClic(fila: T, e: MouseEvent<HTMLTableRowElement>) {
@@ -279,7 +297,7 @@ function Tabla<T>({
   }
   return (
     <Table aria-label={etiqueta}>
-      <TableHeader className="bg-muted/40">
+      <TableHeader className="bg-muted">
         <TableRow className="hover:bg-transparent">
           {columnas.map((c, i) => (
             <Encabezado key={c.id} columna={c} orden={orden} onOrdenChange={onOrdenChange} fija={primeraFija && i === 0} />
@@ -321,7 +339,45 @@ function Tabla<T>({
           </TableRow>
         ))}
       </TableBody>
+      {pie && pie.length > 0 && (
+        <TableFooter className="bg-muted">
+          <TableRow className="h-fila hover:bg-transparent">
+            {pie.map((celda, i) => (
+              <TableCell
+                key={i}
+                colSpan={celda.columnas}
+                className={cn(
+                  'px-3 font-semibold first:pl-4',
+                  CELDA[celda.tipo ?? 'texto'],
+                  // Fija y opaca: el resto de la fila pasa por debajo al desplazar. Solo si
+                  // ocupa una columna: una celda fija más ancha que la pantalla taparía el
+                  // total del final (revisión de la T7).
+                  primeraFija && i === 0 && (celda.columnas ?? 1) <= 1 && 'sticky left-0 z-10 bg-muted',
+                )}
+              >
+                {celda.contenido}
+              </TableCell>
+            ))}
+            {accionesFila && <TableCell className="pr-4" />}
+          </TableRow>
+        </TableFooter>
+      )}
     </Table>
+  )
+}
+
+/** Total al final de la lista de tarjetas: la primera celda como rótulo, el resto a la derecha. */
+function ResumenPie({ pie }: { pie: readonly CeldaPie[] }) {
+  const [rotulo, ...resto] = pie
+  return (
+    <div data-tabla="pie" className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t bg-muted px-3 py-3 text-cuerpo font-semibold">
+      <span className="min-w-0">{rotulo.contenido}</span>
+      {resto.map((celda, i) => (
+        <span key={i} className={cn('shrink-0', CELDA[celda.tipo ?? 'texto'])}>
+          {celda.contenido}
+        </span>
+      ))}
+    </div>
   )
 }
 

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Boton } from './Boton'
-import { EstadoCargando, EstadoError, EstadoVacio } from './Estado'
+import { Esqueleto, EstadoCargando, EstadoError, EstadoVacio } from './Estado'
 import { Estado } from './index'
 
 // Spec 016, T2 (R3, A3): cargando, vacío con acción y error con «Reintentar».
@@ -86,5 +86,41 @@ describe('Estado', () => {
       render(<EstadoError titulo="La sesión se cerró" descripcion="Esta verificación no se guardó." />)
       expect(screen.queryByRole('button')).toBeNull()
     })
+  })
+})
+
+// Spec 016, T7: esqueleto con la forma del contenido (tarjetas, gráfica) dentro de
+// Estado.Cargando, sin que las pantallas importen ui/skeleton.
+describe('Esqueleto', () => {
+  it('es decorativo (aria-hidden) y toma la forma que se le pide', () => {
+    render(
+      <EstadoCargando etiqueta="Cargando los indicadores">
+        <Esqueleto className="h-28 rounded-xl" />
+      </EstadoCargando>,
+    )
+    const estado = screen.getByRole('status', { name: 'Cargando los indicadores' })
+    // Reemplaza al esqueleto por defecto: una sola pieza, la propia.
+    const piezas = estado.querySelectorAll('[data-slot=skeleton]')
+    expect(piezas).toHaveLength(1)
+    const pieza = piezas[0] as HTMLElement
+    expect(pieza.tagName).toBe('DIV')
+    expect(pieza.getAttribute('data-kit')).toBe('esqueleto')
+    expect(pieza.getAttribute('aria-hidden')).toBe('true')
+    expect(pieza.getAttribute('role')).toBeNull()
+    expect(pieza.hasAttribute('tabindex')).toBe(false)
+    expect(pieza.childNodes).toHaveLength(0)
+    // Forma pedida sobre el tinte y el pulso del kit; el radio pedido sustituye al de base.
+    const clases = pieza.className.split(/\s+/)
+    expect(clases).toEqual(expect.arrayContaining(['h-28', 'rounded-xl', 'animate-pulse', 'bg-foreground/6']))
+    expect(clases).not.toContain('rounded-md')
+    // El lector solo oye la etiqueta del estado.
+    expect(estado.textContent).toBe('Cargando los indicadores')
+  })
+
+  it('sin clases conserva la forma base del kit', () => {
+    render(<Esqueleto />)
+    const pieza = document.querySelector('[data-kit=esqueleto]') as HTMLElement
+    expect(pieza.getAttribute('aria-hidden')).toBe('true')
+    expect(pieza.className.split(/\s+/)).toEqual(expect.arrayContaining(['animate-pulse', 'rounded-md', 'bg-foreground/6']))
   })
 })

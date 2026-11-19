@@ -42,6 +42,14 @@ export function EstadoCargando({ etiqueta, filas = 3, children, className }: Est
   )
 }
 
+/**
+ * Pieza del esqueleto con la forma del contenido (tarjeta, gráfica, fila). Decorativa:
+ * quien la usa la pone dentro de Estado.Cargando, que es lo que oye el lector.
+ */
+export function Esqueleto({ className }: { className?: string }) {
+  return <Skeleton data-kit="esqueleto" aria-hidden="true" className={className} />
+}
+
 export type EstadoVacioProps = {
   titulo: string
   descripcion?: ReactNode
