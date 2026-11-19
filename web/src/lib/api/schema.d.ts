@@ -106,6 +106,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/recuperar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pedir un enlace para restablecer la contraseña (público, sin sesión)
+         * @description Responde siempre el mismo 202, exista o no la cuenta, esté o no activa y haya o no correo configurado. El enlace (30 minutos, un solo uso) llega por correo solo si la cuenta está activa y tiene exactamente una membresía activa.
+         */
+        post: operations["solicitarRecuperacion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/restablecer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cambiar la contraseña con el token del enlace (público; no inicia sesión)
+         * @description Si cambia, cierra todas las sesiones de la persona y no emite cookies: entra con el login. Vencido, usado, invalidado, inexistente o mal formado dan el mismo 400 enlace_invalido.
+         */
+        post: operations["restablecerContrasena"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invitaciones": {
         parameters: {
             query?: never;
@@ -828,7 +868,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta" | "fotos_no_disponibles" | "sin_foto" | "foto_id_en_uso" | "empresa_sin_datos" | "sin_logo" | "logo_id_en_uso" | "foto_existente" | "imagen_demasiado_grande" | "tipo_no_admitido" | "imagen_invalida" | "exportacion_demasiado_grande";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "enlace_invalido" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta" | "fotos_no_disponibles" | "sin_foto" | "foto_id_en_uso" | "empresa_sin_datos" | "sin_logo" | "logo_id_en_uso" | "foto_existente" | "imagen_demasiado_grande" | "tipo_no_admitido" | "imagen_invalida" | "exportacion_demasiado_grande";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -887,6 +927,19 @@ export interface components {
             token: string;
             /** @description Nombre visible: se guarda en NFC y sin espacios en los extremos; necesita una letra o un número y no admite caracteres invisibles o de control. */
             nombre: string;
+            /** Format: password */
+            password: string;
+        };
+        RecuperarBody: {
+            email: string;
+        };
+        RecuperacionSolicitada: {
+            /** @description Texto genérico en español para mostrar. */
+            mensaje: string;
+        };
+        RestablecerBody: {
+            /** @description Token del fragmento del enlace (/restablecer#token); va solo en el cuerpo, nunca en la URL. */
+            token: string;
             /** Format: password */
             password: string;
         };
@@ -1943,6 +1996,76 @@ export interface operations {
                 };
             };
             401: components["responses"]["NoAutenticado"];
+        };
+    };
+    solicitarRecuperacion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Debe valer 1; además la petición debe venir del mismo sitio. */
+                "X-AssetControl-CSRF": components["parameters"]["Csrf"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecuperarBody"];
+            };
+        };
+        responses: {
+            /** @description Solicitud recibida (mismo cuerpo para cualquier correo). */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecuperacionSolicitada"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            403: components["responses"]["Prohibido"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            429: components["responses"]["DemasiadasSolicitudes"];
+            503: components["responses"]["ServicioNoDisponible"];
+        };
+    };
+    restablecerContrasena: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Debe valer 1; además la petición debe venir del mismo sitio. */
+                "X-AssetControl-CSRF": components["parameters"]["Csrf"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestablecerBody"];
+            };
+        };
+        responses: {
+            /** @description Contraseña cambiada; sin cuerpo y sin Set-Cookie. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cuerpo no válido (solicitud_invalida), contraseña fuera de la política (contrasena_*) o enlace no canjeable (enlace_invalido, mismo mensaje para cualquier causa). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            403: components["responses"]["Prohibido"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            429: components["responses"]["DemasiadasSolicitudes"];
+            503: components["responses"]["ServicioNoDisponible"];
         };
     };
     crearInvitacion: {

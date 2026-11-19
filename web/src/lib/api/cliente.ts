@@ -30,14 +30,24 @@ export class ErrorApi extends Error {
   readonly requestId: string | undefined
   /** Cuerpo completo del error (p. ej. `activo` en `codigo_existente`). */
   readonly cuerpo: unknown
+  /** Segundos de `Retry-After` en un `429` (spec 014); `undefined` si no vino. */
+  readonly reintentarEn: number | undefined
 
-  constructor(status: number, code: CodigoError, message: string, requestId?: string, cuerpo?: unknown) {
+  constructor(
+    status: number,
+    code: CodigoError,
+    message: string,
+    requestId?: string,
+    cuerpo?: unknown,
+    reintentarEn?: number,
+  ) {
     super(message)
     this.name = 'ErrorApi'
     this.status = status
     this.code = code
     this.requestId = requestId
     this.cuerpo = cuerpo
+    this.reintentarEn = reintentarEn
   }
 }
 
@@ -61,7 +71,9 @@ type ExitoDe<O> = O extends { responses: infer Rs }
     ? Json<Rs[200]>
     : 201 extends keyof Rs
       ? Json<Rs[201]>
-      : undefined
+      : 202 extends keyof Rs
+        ? Json<Rs[202]>
+        : undefined
   : never
 
 export interface Opciones<B> {
@@ -97,7 +109,14 @@ async function aError(respuesta: Response): Promise<ErrorApi> {
   }
   if (!esErrorDeApi(cuerpo)) return new ErrorApi(respuesta.status, 'error_interno', MENSAJE_INESPERADO)
   const { code, message, request_id } = cuerpo.error
-  return new ErrorApi(respuesta.status, code, message, request_id, cuerpo)
+  return new ErrorApi(respuesta.status, code, message, request_id, cuerpo, segundosDeReintento(respuesta))
+}
+
+/** `Retry-After` en segundos enteros (el backend no manda fechas); otro valor se ignora. */
+function segundosDeReintento(respuesta: Response): number | undefined {
+  const valor = respuesta.headers.get('Retry-After')?.trim()
+  if (!valor || !/^\d+$/.test(valor)) return undefined
+  return Number(valor)
 }
 
 export async function pedir<R extends Ruta, M extends MetodoDe<R>>(
@@ -267,6 +286,13 @@ export const api = {
     pedir('post', '/invitaciones', { token, cuerpo }),
   validarInvitacion: (token: string) => pedir('post', '/invitaciones/validar', { cuerpo: { token } }),
   aceptarInvitacion: (cuerpo: Esquemas['AceptarBody']) => pedir('post', '/invitaciones/aceptar', { cuerpo }),
+  // Spec 014: recuperar contraseña (público, con CSRF). El token va solo en el cuerpo;
+  // restablecer no inicia sesión (204 sin cuerpo): se entra luego con el login.
+  solicitarRecuperacion: (cuerpo: Esquemas['RecuperarBody']) =>
+    pedir('post', '/auth/recuperar', { cuerpo, csrf: true }),
+  restablecerContrasena: async (cuerpo: Esquemas['RestablecerBody']): Promise<void> => {
+    await pedir('post', '/auth/restablecer', { cuerpo, csrf: true })
+  },
   // Spec 003: catálogo (todas con el token de la sesión).
   listarUbicaciones: (token: string) => pedir('get', '/ubicaciones', { token }),
   crearUbicacion: (token: string, cuerpo: Esquemas['CrearUbicacionBody']) =>

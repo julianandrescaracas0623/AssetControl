@@ -42,9 +42,14 @@ import app.meta.routes as meta_routes
 from app import errors
 from app.activos import cambios as activos_cambios
 from app.activos import service as activos_service
-from app.auth import limits
+from app.auth import limits, recuperacion
 from app.auth import routes as auth_routes
-from app.auth.credentials import COMMON_PASSWORDS, PasswordPolicyError, check_password_policy
+from app.auth.credentials import (
+    COMMON_PASSWORDS,
+    PasswordPolicyError,
+    check_password_policy,
+    new_token,
+)
 from app.auth.decorators import NOT_AUTHENTICATED
 from app.auth.http import AUTH_MAX_BODY_BYTES, CSRF_HEADER, CSRF_HEADER_VALUE
 from app.catalogo import service as catalogo_service
@@ -52,6 +57,7 @@ from app.config import RateLimits
 from app.conteo import cierre as conteo_cierre
 from app.conteo import service as conteo_service
 from app.conteo import verificaciones as conteo_verificaciones
+from app.db import CounterRow, CounterUnavailableError
 from app.empresa import service as empresa_service
 from app.fotos import imagen as fotos_imagen
 from app.fotos import service as fotos_service
@@ -63,6 +69,7 @@ CONTRACT_FILE = Path(__file__).resolve().parent.parent / "openapi.yaml"
 CSRF = {CSRF_HEADER: CSRF_HEADER_VALUE}
 LINK_PREFIX = "/invitacion#"
 NEW_PASSWORD = "Clave-Nueva-002b-segura"
+OTHER_PASSWORD = "Clave-Recuperada-014-segura"
 
 # Estados declarados que estas pruebas no provocan, con su motivo.
 NOT_EXERCISED = {
@@ -307,18 +314,8 @@ def _contract_operations() -> set[tuple[str, str]]:
     }
 
 
-# Spec 014: las rutas llegan en T4 y el contrato en T5. Excepción transitoria y cerrada:
-# T5 la vacía (la segunda prueba falla en cuanto el contrato las describa).
-PENDING_CONTRACT = frozenset({("post", "/auth/recuperar"), ("post", "/auth/restablecer")})
-
-
 def test_flask_routes_and_contract_paths_are_the_same(contrato_app):
-    assert _flask_operations(contrato_app) - PENDING_CONTRACT == _contract_operations()
-
-
-def test_pending_contract_routes_exist_and_are_not_yet_in_the_contract(contrato_app):
-    assert PENDING_CONTRACT <= _flask_operations(contrato_app)
-    assert not PENDING_CONTRACT & _contract_operations()
+    assert _flask_operations(contrato_app) == _contract_operations()
 
 
 # --- 3. Respuestas reales ---------------------------------------------------------------
@@ -489,6 +486,77 @@ def test_validar_y_aceptar_responses(client):
     )
     accepted = check("post", "/invitaciones/aceptar", aceptar())
     assert accepted["rol"] == "contador"
+
+
+def cuenta_nueva(client) -> str:
+    """Correo de una cuenta nueva con una sola membresía activa (por invitación)."""
+    email = nuevo_email()
+    creada = client.post(
+        "/invitaciones",
+        json={"email": email, "rol": "contador"},
+        headers=bearer(ADMIN_A, TENANT_A),
+    )
+    token = check("post", "/invitaciones", creada)["enlace"].removeprefix(LINK_PREFIX)
+    body = {"token": token, "nombre": "Persona Sintética", "password": NEW_PASSWORD}
+    check("post", "/invitaciones/aceptar", client.post("/invitaciones/aceptar", json=body))
+    return email
+
+
+def test_recuperar_responses(client, monkeypatch):
+    ruta = "/auth/recuperar"
+    # Sin correo configurado (la app de contrato no lo tiene): el mismo 202.
+    body = check("post", ruta, client.post(ruta, json={"email": nuevo_email()}, headers=CSRF))
+    assert body == {"mensaje": recuperacion.RECOVERY_MESSAGE}
+    check("post", ruta, client.post(ruta, json={"email": nuevo_email()}))  # 403 sin cabecera
+    check("post", ruta, client.post(ruta, json={"email": 1}, headers=CSRF))  # 400
+    check(
+        "post",
+        ruta,
+        client.post(ruta, data="x" * (AUTH_MAX_BODY_BYTES + 1), headers=CSRF),
+    )  # 413
+
+    # Con correo: cuenta y pide el enlace en la base (correo inexistente, sin enlace).
+    monkeypatch.setattr(auth_routes, "correo_activo", lambda _app: True)
+    check("post", ruta, client.post(ruta, json={"email": nuevo_email()}, headers=CSRF))
+
+    def exceeded(items, window_seconds, permitido, destino, clave):
+        now = datetime.now(UTC)
+        return [CounterRow(intentos=10**6, ventana_inicio=now) for _ in items], None
+
+    def unavailable(items, window_seconds, permitido, destino, clave):
+        raise CounterUnavailableError("Sintetico", "XX000")
+
+    monkeypatch.setattr(limits, "contar_y_solicitar_recuperacion", exceeded)
+    check("post", ruta, client.post(ruta, json={"email": nuevo_email()}, headers=CSRF))  # 429
+    monkeypatch.setattr(limits, "contar_y_solicitar_recuperacion", unavailable)
+    check("post", ruta, client.post(ruta, json={"email": nuevo_email()}, headers=CSRF))  # 503
+
+
+def test_restablecer_responses(client, monkeypatch):
+    ruta = "/auth/restablecer"
+    email = cuenta_nueva(client)
+    token = new_token()
+    monkeypatch.setattr(auth_routes, "correo_activo", lambda _app: True)
+    monkeypatch.setattr(recuperacion, "new_token", lambda: token)
+    pedido = client.post("/auth/recuperar", json={"email": email}, headers=CSRF)
+    check("post", "/auth/recuperar", pedido)
+
+    def restablecer(password=OTHER_PASSWORD, tok=token, headers=CSRF):
+        return client.post(ruta, json={"token": tok, "password": password}, headers=headers)
+
+    check("post", ruta, restablecer(headers={}))  # 403
+    check("post", ruta, client.post(ruta, json={"token": 1}, headers=CSRF))  # 400
+    for bad in ("\ud800", "corta", "x" * 200, next(iter(COMMON_PASSWORDS))):
+        check("post", ruta, restablecer(password=bad))  # 400 contrasena_*
+    check("post", ruta, client.post(ruta, data="x" * (AUTH_MAX_BODY_BYTES + 1), headers=CSRF))
+    check("post", ruta, restablecer(tok="no-existe"))  # 400 enlace_invalido
+
+    hecho = restablecer()
+    assert check("post", ruta, hecho) is None  # 204
+    assert "Set-Cookie" not in hecho.headers
+    assert login(client, email=email, password=OTHER_PASSWORD).status_code == 200
+    reusado = check("post", ruta, restablecer())  # el mismo enlace ya no sirve
+    assert reusado["error"]["code"] == "enlace_invalido"
 
 
 def test_ubicaciones_responses(client):
@@ -1212,6 +1280,7 @@ LIMITED = [
     ("post", "/auth/refresh", None, CSRF),
     ("post", "/invitaciones/validar", {"token": "x"}, {}),
     ("post", "/invitaciones/aceptar", {"token": "x", "nombre": "N", "password": NEW_PASSWORD}, {}),
+    ("post", "/auth/restablecer", {"token": "x", "password": NEW_PASSWORD}, CSRF),
 ]
 
 
@@ -1273,6 +1342,7 @@ def backend_error_codes() -> set[str]:
         auth_routes.INVALID_CREDENTIALS[0],
         auth_routes.BAD_REQUEST[0],
         invitaciones_routes.INVALID_INVITATION[0],
+        recuperacion.INVALID_LINK[0],
     }
     codes |= {error.code for error in catalogo_service.ERRORES}
     codes |= {

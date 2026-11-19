@@ -146,6 +146,82 @@ paths:
         "401":
           $ref: "#/components/responses/NoAutenticado"
 
+  /auth/recuperar:
+    post:
+      tags: [auth]
+      operationId: solicitarRecuperacion
+      summary: Pedir un enlace para restablecer la contraseña (público, sin sesión)
+      description: >-
+        Responde siempre el mismo 202, exista o no la cuenta, esté o no activa y haya o no
+        correo configurado. El enlace (30 minutos, un solo uso) llega por correo solo si la
+        cuenta está activa y tiene exactamente una membresía activa.
+      parameters:
+        - $ref: "#/components/parameters/Csrf"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RecuperarBody" }
+      responses:
+        "202":
+          description: Solicitud recibida (mismo cuerpo para cualquier correo).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecuperacionSolicitada" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /auth/restablecer:
+    post:
+      tags: [auth]
+      operationId: restablecerContrasena
+      summary: Cambiar la contraseña con el token del enlace (público; no inicia sesión)
+      description: >-
+        Si cambia, cierra todas las sesiones de la persona y no emite cookies: entra con
+        el login. Vencido, usado, invalidado, inexistente o mal formado dan el mismo 400
+        enlace_invalido.
+      parameters:
+        - $ref: "#/components/parameters/Csrf"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RestablecerBody" }
+      responses:
+        "204":
+          description: Contraseña cambiada; sin cuerpo y sin Set-Cookie.
+        "400":
+          description: >-
+            Cuerpo no válido (solicitud_invalida), contraseña fuera de la política
+            (contrasena_*) o enlace no canjeable (enlace_invalido, mismo mensaje para
+            cualquier causa).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos:
+            - solicitud_invalida
+            - contrasena_invalida
+            - contrasena_corta
+            - contrasena_larga
+            - contrasena_comun
+            - enlace_invalido
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
   /invitaciones:
     post:
       tags: [invitaciones]
@@ -1774,6 +1850,7 @@ components:
         - demasiadas_solicitudes
         - credenciales_invalidas
         - invitacion_invalida
+        - enlace_invalido
         - contrasena_invalida
         - contrasena_corta
         - contrasena_larga
@@ -1893,6 +1970,33 @@ components:
           description: >-
             Nombre visible: se guarda en NFC y sin espacios en los extremos; necesita una
             letra o un número y no admite caracteres invisibles o de control.
+        password:
+          type: string
+          format: password
+          minLength: 10
+          maxLength: 128
+    RecuperarBody:
+      type: object
+      required: [email]
+      additionalProperties: false
+      properties:
+        email: { type: string }
+    RecuperacionSolicitada:
+      type: object
+      required: [mensaje]
+      additionalProperties: false
+      properties:
+        mensaje: { type: string, description: Texto genérico en español para mostrar. }
+    RestablecerBody:
+      type: object
+      required: [token, password]
+      additionalProperties: false
+      properties:
+        token:
+          type: string
+          description: >-
+            Token del fragmento del enlace (/restablecer#token); va solo en el cuerpo,
+            nunca en la URL.
         password:
           type: string
           format: password

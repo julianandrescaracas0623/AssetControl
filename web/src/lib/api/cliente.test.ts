@@ -173,6 +173,99 @@ describe('errores', () => {
   })
 })
 
+describe('recuperar contraseña (spec 014, T5)', () => {
+  const TOKEN = 'a'.repeat(64)
+  const error = (code: string, message: string) => ({ error: { code, message, request_id: 'r-9' } })
+
+  it('solicitarRecuperacion: POST con CSRF, cuerpo JSON, mismo origen y sin sesión; 202 devuelve el mensaje', async () => {
+    const f = responder(202, { mensaje: 'Si existe una cuenta, te enviamos un enlace.' })
+    await expect(api.solicitarRecuperacion({ email: 'ana@ejemplo.test' })).resolves.toEqual({
+      mensaje: 'Si existe una cuenta, te enviamos un enlace.',
+    })
+    const { url, init, headers } = peticion(f)
+    expect(url).toBe('/api/auth/recuperar')
+    expect(init.method).toBe('POST')
+    expect(init.credentials).toBe('same-origin')
+    expect(headers.get('X-AssetControl-CSRF')).toBe('1')
+    expect(headers.get('Content-Type')).toBe('application/json')
+    expect(headers.has('Authorization')).toBe(false)
+    expect(JSON.parse(String(init.body))).toEqual({ email: 'ana@ejemplo.test' })
+  })
+
+  it('restablecerContrasena: POST con CSRF y el token solo en el cuerpo; 204 devuelve undefined', async () => {
+    const f = responder(204)
+    await expect(api.restablecerContrasena({ token: TOKEN, password: 'nueva-clave-sintetica' })).resolves.toBeUndefined()
+    const { url, init, headers } = peticion(f)
+    expect(url).toBe('/api/auth/restablecer')
+    expect(url).not.toContain(TOKEN)
+    expect(init.method).toBe('POST')
+    expect(init.credentials).toBe('same-origin')
+    expect(headers.get('X-AssetControl-CSRF')).toBe('1')
+    expect(headers.has('Authorization')).toBe(false)
+    expect(JSON.parse(String(init.body))).toEqual({ token: TOKEN, password: 'nueva-clave-sintetica' })
+  })
+
+  it('mapea enlace_invalido y contrasena_* a ErrorApi con su código y mensaje', async () => {
+    responder(400, error('enlace_invalido', 'Enlace vencido o ya usado.'))
+    await expect(api.restablecerContrasena({ token: TOKEN, password: 'x' })).rejects.toMatchObject({
+      status: 400,
+      code: 'enlace_invalido',
+      message: 'Enlace vencido o ya usado.',
+      requestId: 'r-9',
+    })
+
+    for (const code of ['contrasena_corta', 'contrasena_larga', 'contrasena_comun', 'contrasena_invalida']) {
+      responder(400, error(code, 'La contraseña no cumple la política.'))
+      await expect(api.restablecerContrasena({ token: TOKEN, password: 'x' })).rejects.toMatchObject({ status: 400, code })
+    }
+  })
+
+  it('429 trae los segundos de Retry-After; sin la cabecera queda undefined', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify(error('demasiadas_solicitudes', 'Demasiados intentos.')), {
+            status: 429,
+            headers: { 'Content-Type': 'application/json', 'Retry-After': '120' },
+          }),
+      ),
+    )
+    const conCabecera = await api.solicitarRecuperacion({ email: 'a@b.c' }).catch((e: unknown) => e)
+    expect(conCabecera).toBeInstanceOf(ErrorApi)
+    expect(conCabecera).toMatchObject({ status: 429, code: 'demasiadas_solicitudes', reintentarEn: 120 })
+
+    responder(429, error('demasiadas_solicitudes', 'Demasiados intentos.'))
+    const sinCabecera = await api.restablecerContrasena({ token: TOKEN, password: 'x' }).catch((e: unknown) => e)
+    expect(sinCabecera).toMatchObject({ status: 429, reintentarEn: undefined })
+  })
+
+  it('503 es servicio_no_disponible', async () => {
+    responder(503, error('servicio_no_disponible', 'El servicio no está disponible.'))
+    await expect(api.solicitarRecuperacion({ email: 'a@b.c' })).rejects.toMatchObject({
+      status: 503,
+      code: 'servicio_no_disponible',
+    })
+  })
+
+  it('el token nunca se escribe en console (éxito ni error)', async () => {
+    const espias = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) =>
+      vi.spyOn(console, m).mockImplementation(() => {}),
+    )
+    try {
+      responder(204)
+      await api.restablecerContrasena({ token: TOKEN, password: 'nueva-clave-sintetica' })
+      responder(400, error('enlace_invalido', 'Enlace vencido o ya usado.'))
+      await api.restablecerContrasena({ token: TOKEN, password: 'nueva-clave-sintetica' }).catch(() => undefined)
+      vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))))
+      await api.restablecerContrasena({ token: TOKEN, password: 'nueva-clave-sintetica' }).catch(() => undefined)
+      for (const espia of espias) expect(espia).not.toHaveBeenCalled()
+    } finally {
+      for (const espia of espias) espia.mockRestore()
+    }
+  })
+})
+
 describe('tipos (los comprueba npm run typecheck)', () => {
   it('rechaza rutas, métodos y cuerpos fuera del contrato', () => {
     const nunca = () => {
@@ -184,6 +277,8 @@ describe('tipos (los comprueba npm run typecheck)', () => {
       void api.login({ email: 'a@b.c' })
       // @ts-expect-error rol fuera de la lista cerrada
       void api.crearInvitacion('t', { email: 'a@b.c', rol: 'superadmin' })
+      // @ts-expect-error restablecer exige token y password
+      void api.restablecerContrasena({ password: 'x' })
     }
     expect(typeof nunca).toBe('function')
   })
