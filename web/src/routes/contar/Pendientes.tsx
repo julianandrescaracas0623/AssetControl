@@ -1,12 +1,8 @@
-import { ChevronRight, CircleAlert, ClipboardList, Loader2, RefreshCw, ScanBarcode } from 'lucide-react'
+import { ChevronRight, ClipboardCheck, ClipboardList, ScanBarcode } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 
 import { CountShell } from '@/components/app/CountShell'
-import { EmptyState } from '@/components/app/EmptyState'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Boton, EncabezadoPagina, Estado, Insignia, Pestanas } from '@/components/kit'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { useCabeceraConteo, useSalaDeTrabajo } from '@/lib/conteo'
 import { usePendientes } from '@/lib/discrepancias'
@@ -16,58 +12,50 @@ import { useDetalleSesion, useSesionAbierta } from '@/lib/sesiones'
 // Pendientes por ubicación (spec 007, T7; docs/08 §6.1, CU-VER-04): los activos
 // `activo` o `en_reparacion` sin verificación en la sesión abierta, por su ubicación
 // vigente. Sin precios (P13). Un pendiente es solo la falta de verificación (Q4).
+// Spec 016, T5: ubicaciones como Pestanas del kit (la activa se marca con el subrayado
+// cobalto, no con un botón relleno: Deuda T1 a), filas de 56 px y estados del kit.
 
 function ListaDeUbicacion({ sesionId, ubicacionId }: { sesionId: string; ubicacionId: string }) {
   const consulta = usePendientes(sesionId, ubicacionId)
-  if (consulta.isPending) {
-    return (
-      <div role="status" aria-label="Cargando pendientes" className="flex flex-col gap-2 pt-2">
-        <Skeleton className="h-14" />
-        <Skeleton className="h-14" />
-      </div>
-    )
-  }
+  if (consulta.isPending) return <Estado.Cargando etiqueta="Cargando pendientes" filas={2} />
   if (consulta.isError) {
     return (
-      <div className="flex flex-col items-start gap-3 pt-2">
-        <p className="flex items-center gap-2 text-base text-destructive">
-          <CircleAlert className="size-4" aria-hidden="true" />
-          {mensajeDeError(consulta.error)}
-        </p>
-        <Button variant="outline" className="min-h-11" onClick={() => void consulta.refetch()}>
-          <RefreshCw />
-          Reintentar
-        </Button>
-      </div>
+      <Estado.Error
+        descripcion={mensajeDeError(consulta.error)}
+        onReintentar={() => void consulta.refetch()}
+        reintentando={consulta.isRefetching}
+      />
     )
   }
   const activos = consulta.data.pages.flatMap((p) => p.activos)
-  if (activos.length === 0) return <p className="py-6 text-center text-sm text-muted-foreground">No quedan pendientes aquí.</p>
+  if (activos.length === 0) return <p className="py-6 text-center text-cuerpo text-muted-foreground">No quedan pendientes aquí.</p>
   return (
-    <>
-      <ul className="divide-y">
+    <div className="flex flex-col gap-3">
+      <ul className="divide-y overflow-hidden rounded-xl border bg-card shadow-xs">
         {activos.map((a) => (
           <li key={a.id}>
-            <Link to={`/contar/activo/${encodeURIComponent(a.codigo)}`} className="flex min-h-16 items-center gap-3 py-2">
+            <Link
+              to={`/contar/activo/${encodeURIComponent(a.codigo)}`}
+              className="flex min-h-16 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
+            >
               <span className="min-w-0 flex-1">
-                <span className="block font-medium break-words">{a.nombre}</span>
-                <span className="text-sm text-muted-foreground">
+                <span className="block text-cuerpo font-medium break-words">{a.nombre}</span>
+                <span className="text-etiqueta font-normal text-muted-foreground">
                   <span className="font-mono">{a.codigo}</span> · {a.categoria.nombre}
                 </span>
               </span>
-              {a.estado === 'en_reparacion' && <Badge variant="warning">En reparación</Badge>}
-              <ChevronRight className="size-5 text-muted-foreground" aria-hidden="true" />
+              {a.estado === 'en_reparacion' && <Insignia tono="aviso">En reparación</Insignia>}
+              <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
             </Link>
           </li>
         ))}
       </ul>
       {consulta.hasNextPage && (
-        <Button variant="outline" className="min-h-11 w-full" disabled={consulta.isFetchingNextPage} onClick={() => void consulta.fetchNextPage()}>
-          {consulta.isFetchingNextPage && <Loader2 className="animate-spin" aria-hidden="true" />}
+        <Boton variante="secundario" anchoCompleto cargando={consulta.isFetchingNextPage} onClick={() => void consulta.fetchNextPage()}>
           Ver más
-        </Button>
+        </Boton>
       )}
-    </>
+    </div>
   )
 }
 
@@ -88,69 +76,47 @@ export default function Pendientes() {
       subtitulo={cabecera.subtitulo}
       volver="/contar"
       estadoRed="en_linea"
-      acciones={
-        <Button asChild className="min-h-14 font-semibold">
+      principal={
+        <Boton asChild tamano="accion">
           <Link to="/contar/escanear">
-            <ScanBarcode className="size-5" />
+            <ScanBarcode />
             Escanear
           </Link>
-        </Button>
+        </Boton>
       }
     >
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Pendientes</h1>
-        {total !== undefined && <p className="text-sm text-muted-foreground">{total === 0 ? 'Todo verificado' : `${formatEntero(total)} sin verificar`}</p>}
-      </div>
+      <EncabezadoPagina
+        titulo="Pendientes"
+        descripcion={total !== undefined ? (total === 0 ? 'Todo verificado' : `${formatEntero(total)} sin verificar`) : undefined}
+      />
       {sesion.isPending || (sesion.data && detalle.isPending) ? (
-        <div role="status" aria-label="Cargando pendientes" className="flex flex-col gap-2">
-          <Skeleton className="h-11 rounded-full" />
-          <Skeleton className="h-14" />
-        </div>
+        <Estado.Cargando etiqueta="Cargando pendientes" filas={3} />
       ) : sesion.isError || detalle.isError ? (
-        <div className="flex flex-col items-start gap-3">
-          <p className="text-base text-muted-foreground">{mensajeDeError(sesion.error ?? detalle.error)}</p>
-          <Button
-            variant="outline"
-            className="min-h-11"
-            onClick={() => {
-              void sesion.refetch()
-              void detalle.refetch()
-            }}
-          >
-            <RefreshCw />
-            Reintentar
-          </Button>
-        </div>
+        <Estado.Error
+          descripcion={mensajeDeError(sesion.error ?? detalle.error)}
+          onReintentar={() => {
+            void sesion.refetch()
+            void detalle.refetch()
+          }}
+          reintentando={sesion.isRefetching || detalle.isRefetching}
+        />
       ) : !sesion.data ? (
-        <EmptyState icono={<ClipboardList className="size-5" />} titulo="No hay una sesión abierta" descripcion="Los pendientes aparecen cuando el administrador abre un conteo." />
+        <Estado.Vacio icono={<ClipboardList />} titulo="No hay una sesión abierta" descripcion="Los pendientes aparecen cuando el administrador abre un conteo." />
       ) : filas.length === 0 || !elegida ? (
-        <EmptyState titulo="No queda nada por verificar" descripcion="Todos los activos de esta sesión ya tienen verificación." />
+        <Estado.Vacio icono={<ClipboardCheck />} titulo="No queda nada por verificar" descripcion="Todos los activos de esta sesión ya tienen verificación." />
       ) : (
-        <>
-          <Tabs
-            value={elegida}
-            onValueChange={(v) => {
-              params.set('ubicacion', v)
-              setParams(params, { replace: true })
-            }}
-            className="gap-2"
-          >
-            <TabsList className="h-auto w-full justify-start gap-2 overflow-x-auto rounded-none bg-transparent px-0.5 py-1 [scrollbar-width:none]">
-              {filas.map((f) => (
-                <TabsTrigger
-                  key={f.ubicacion.id}
-                  value={f.ubicacion.id}
-                  className="min-h-11 flex-none rounded-full border px-3.5 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                >
-                  {f.ubicacion.ruta} · {formatEntero(f.pendientes)}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            <TabsContent value={elegida}>
-              <ListaDeUbicacion key={elegida} sesionId={sesion.data.id} ubicacionId={elegida} />
-            </TabsContent>
-          </Tabs>
-        </>
+        <Pestanas
+          etiqueta="Ubicaciones con pendientes"
+          pestanas={filas.map((f) => ({ valor: f.ubicacion.id, etiqueta: `${f.ubicacion.ruta} · ${formatEntero(f.pendientes)}` }))}
+          valor={elegida}
+          onValorChange={(v) => {
+            params.set('ubicacion', v)
+            setParams(params, { replace: true })
+          }}
+          className="gap-3"
+        >
+          <ListaDeUbicacion key={elegida} sesionId={sesion.data.id} ubicacionId={elegida} />
+        </Pestanas>
       )}
     </CountShell>
   )

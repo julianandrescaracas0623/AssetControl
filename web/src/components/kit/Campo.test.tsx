@@ -160,4 +160,11 @@ describe('MarcoCampo', () => {
     expect(document.getElementById('ubi-error')?.textContent).toBe('Elige una ubicación')
     expect(document.querySelector('[data-kit=campo]')).toBeTruthy()
   })
+
+  it('grande: el campo protagonista de la pantalla (código del sticker) mide la acción de conteo', () => {
+    render(<Campo id="codigo" tipo="codigo" grande etiqueta="Código del sticker" />)
+    const clases = screen.getByRole('textbox', { name: 'Código del sticker' }).className
+    for (const clase of ['h-accion', 'font-mono', 'text-center', 'text-2xl']) expect(clases, clase).toContain(clase)
+    expect(clases).not.toMatch(/(^|\s)h-control(\s|$)/)
+  })
 })

@@ -36,4 +36,10 @@ describe('BarraAccion', () => {
     render(<BarraAccion etiqueta="Acciones del activo" principal={<Boton>Confirmar</Boton>} />)
     expect(screen.getByRole('region', { name: 'Acciones del activo' })).toBeTruthy()
   })
+
+  it('puede ser el pie de la pantalla (footer: contentinfo) del conteo', () => {
+    render(<BarraAccion elemento="footer" principal={<Boton>Escanear</Boton>} />)
+    const barra = screen.getByRole('contentinfo')
+    expect(barra.getAttribute('data-kit')).toBe('barra-accion')
+  })
 })

@@ -14,13 +14,16 @@ export type BarraAccionProps = {
   nota?: ReactNode
   /** Nombre de la región para el lector («Acciones del activo»). */
   etiqueta?: string
+  /** `footer` cuando es el pie de la pantalla (CountShell): el lector la anuncia como tal. */
+  elemento?: 'div' | 'footer'
   className?: string
 }
 
-export function BarraAccion({ principal, secundaria, nota, etiqueta, className }: BarraAccionProps) {
+export function BarraAccion({ principal, secundaria, nota, etiqueta, elemento = 'div', className }: BarraAccionProps) {
   const id = useId()
+  const Elemento = elemento
   return (
-    <div
+    <Elemento
       data-kit="barra-accion"
       role={etiqueta ? 'region' : undefined}
       aria-labelledby={etiqueta ? id : undefined}
@@ -42,6 +45,6 @@ export function BarraAccion({ principal, secundaria, nota, etiqueta, className }
           {principal}
         </div>
       </div>
-    </div>
+    </Elemento>
   )
 }

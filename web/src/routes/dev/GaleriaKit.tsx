@@ -18,6 +18,7 @@ import {
   Notificaciones,
   Panel,
   Pestanas,
+  Progreso,
   TablaDatos,
   type ColumnaTabla,
   type OrdenTabla,
@@ -148,6 +149,17 @@ export function CifrasKit({ Seccion }: SeccionProps) {
       />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Cifra rotulo="Valor por ubicación" valor="—" estado="error" onReintentar={() => undefined} />
+      </div>
+      {/* Spec 016, T5: avance del conteo. El porcentaje sale de unidades del servidor. */}
+      <div className="grid max-w-md gap-3 rounded-xl border bg-card p-4 shadow-xs">
+        <span className="flex items-center justify-between text-etiqueta">
+          Progreso · normal <span className="tabular-nums text-foreground">60 %</span>
+        </span>
+        <Progreso valor={60} etiqueta="Avance del conteo (ejemplo)" />
+        <span className="flex items-center justify-between text-etiqueta">
+          Progreso · fino <span className="tabular-nums text-foreground">25 %</span>
+        </span>
+        <Progreso valor={25} tamano="fino" etiqueta="Avance en Bodega (ejemplo)" />
       </div>
     </Seccion>
   )

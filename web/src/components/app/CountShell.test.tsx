@@ -121,3 +121,27 @@ describe('CountShell: encabezado y barra con el kit (spec 016, T4)', () => {
     expect(barra.querySelector('.gap-separacion')).toBeTruthy()
   })
 })
+
+// Spec 016, T5 (R4, Deuda T4 g): la barra de acción del conteo es la BarraAccion del kit;
+// las pantallas pasan la principal y la secundaria sin poner alturas a mano.
+describe('CountShell: principal y secundaria (spec 016, T5)', () => {
+  it('pone la secundaria encima y la principal abajo, de 56 px, en el pie de la pantalla', () => {
+    render(
+      <MemoryRouter>
+        <CountShell
+          titulo="Conteo"
+          estadoRed="en_linea"
+          secundaria={<button data-slot="button">Otra ubicación</button>}
+          principal={<button data-slot="button">Confirmar</button>}
+        >
+          <p>Contenido</p>
+        </CountShell>
+      </MemoryRouter>,
+    )
+    const barra = screen.getByRole('contentinfo')
+    expect(barra.getAttribute('data-kit')).toBe('barra-accion')
+    expect(Array.from(barra.querySelectorAll('button')).map((b) => b.textContent)).toEqual(['Otra ubicación', 'Confirmar'])
+    expect(screen.getByRole('button', { name: 'Confirmar' }).parentElement?.className).toContain('h-accion')
+    expect(barra.className).toContain('safe-area-inset-bottom')
+  })
+})

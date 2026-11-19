@@ -1,16 +1,18 @@
-import { CircleAlert, RefreshCw } from 'lucide-react'
+import { CircleAlert, RefreshCw, SearchX } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 
 import { CountShell } from '@/components/app/CountShell'
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
 import { HistorialActivo } from '@/components/app/LineaDeTiempo'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { CodigoNoEncontrado, Mensaje } from '@/components/app/MensajeConteo'
+import { Boton, EncabezadoPagina, Estado, Panel } from '@/components/kit'
 import { normalizarCodigo, useActivoPorCodigo } from '@/lib/activos'
 import { mensajeDeError } from '@/lib/api/cliente'
 
 // Historial del activo en el celular (spec 005, T7; docs/08 §6.1, CU-HIS-01). Para el
 // contador, el servidor no envía eventos ni valores de precio (P13): aquí no se filtra.
+// Spec 016, T5: encabezado de página del kit (nombre, estado, código y ubicación) y la
+// línea de tiempo sobre un Panel blanco.
 
 export default function Historial() {
   const { codigo: crudo = '' } = useParams()
@@ -23,45 +25,46 @@ export default function Historial() {
       titulo="Historial"
       volver={`/contar/activo/${encodeURIComponent(codigo)}`}
       estadoRed="en_linea"
-      acciones={
-        <Button asChild variant="outline">
+      principal={
+        <Boton asChild variante="secundario" tamano="accion">
           <Link to="/contar/escanear">Volver a escanear</Link>
-        </Button>
+        </Boton>
       }
     >
       {consulta.isPending ? (
-        <div role="status" aria-label="Cargando el activo" className="flex flex-col gap-3 pt-2">
-          <Skeleton className="h-8 w-3/4" />
-          <Skeleton className="h-28 rounded-xl" />
-        </div>
+        <Estado.Cargando etiqueta="Cargando el activo" filas={2} />
       ) : consulta.isError ? (
-        <div className="flex flex-col items-start gap-3 pt-4">
-          <CircleAlert className="size-6 text-destructive" aria-hidden="true" />
-          <h1 className="text-xl font-semibold tracking-tight">No se pudo cargar el activo</h1>
-          <p className="text-base text-muted-foreground">{mensajeDeError(consulta.error)}</p>
-          <Button variant="outline" className="min-h-11" onClick={() => void consulta.refetch()}>
-            <RefreshCw />
-            Reintentar
-          </Button>
-        </div>
+        <Mensaje
+          tono="peligro"
+          icono={<CircleAlert />}
+          titulo="No se pudo cargar el activo"
+          accion={
+            <Boton variante="secundario" icono={<RefreshCw />} cargando={consulta.isRefetching} onClick={() => void consulta.refetch()}>
+              Reintentar
+            </Boton>
+          }
+        >
+          <p>{mensajeDeError(consulta.error)}</p>
+        </Mensaje>
       ) : !activo ? (
-        <div className="flex flex-col items-start gap-3 pt-4">
-          <h1 className="text-xl font-semibold tracking-tight">No encontramos ese código</h1>
-          <p className="text-base text-muted-foreground">
-            El código <span className="font-mono text-foreground">{codigo}</span> no está registrado en esta clínica.
-          </p>
-        </div>
+        <CodigoNoEncontrado icono={<SearchX />}>
+          El código <span className="font-mono text-foreground">{codigo}</span> no está registrado en esta clínica.
+        </CodigoNoEncontrado>
       ) : (
         <>
-          <div className="flex flex-col gap-1.5">
-            <h1 className="text-[22px] leading-7 font-semibold tracking-tight break-words">{activo.nombre}</h1>
-            <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-foreground">{activo.codigo}</span>
-              <span>{activo.ubicacion.ruta}</span>
-              <EstadoActivoBadge estado={activo.estado} />
-            </p>
-          </div>
-          <HistorialActivo activoId={activo.id} />
+          <EncabezadoPagina
+            titulo={activo.nombre}
+            insignia={<EstadoActivoBadge estado={activo.estado} />}
+            descripcion={
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="rounded-md border bg-card px-2 py-0.5 font-mono text-codigo text-foreground">{activo.codigo}</span>
+                <span>{activo.ubicacion.ruta}</span>
+              </span>
+            }
+          />
+          <Panel>
+            <HistorialActivo activoId={activo.id} />
+          </Panel>
         </>
       )}
     </CountShell>

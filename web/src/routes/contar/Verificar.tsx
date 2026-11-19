@@ -1,4 +1,4 @@
-import { Archive, ArrowLeftRight, Camera, Check, History, Info, Loader2, Lock, MapPin, Plus, RefreshCw, ScanBarcode, SearchX, TriangleAlert } from 'lucide-react'
+import { Archive, ArrowLeftRight, Camera, Check, CircleAlert, History, Info, Lock, MapPin, Plus, RefreshCw, ScanBarcode, SearchX, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
@@ -7,18 +7,13 @@ import { EstadoFoto } from '@/components/app/CampoFoto'
 import { FotoActivo } from '@/components/app/FotoActivo'
 import { CountShell } from '@/components/app/CountShell'
 import { LocationPicker } from '@/components/app/LocationPicker'
+import { CodigoNoEncontrado, Mensaje } from '@/components/app/MensajeConteo'
 import type { EstadoRed } from '@/components/app/NetworkStatus'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Progress } from '@/components/ui/progress'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { Skeleton } from '@/components/ui/skeleton'
+import { OtraUbicacion } from '@/components/app/OtraUbicacion'
+import { Aviso, Boton, Campo, Estado, ListaDatos, MarcoCampo, Panel, Progreso } from '@/components/kit'
 import { type Activo, aTarjeta, normalizarCodigo, useActivoPorCodigo } from '@/lib/activos'
-import { api, mensajeDeError, type Ubicacion } from '@/lib/api/cliente'
-import { opcionesDeSelector, rutaDe } from '@/lib/catalogo'
+import { api, mensajeDeError } from '@/lib/api/cliente'
+import { rutaDe } from '@/lib/catalogo'
 import { useCabeceraConteo, useConfirmarVerificacion, useSalaDeTrabajo } from '@/lib/conteo'
 import { formatEntero } from '@/lib/format'
 import { type Subir, useFotoPendiente } from '@/lib/fotos'
@@ -31,6 +26,13 @@ import { cn } from '@/lib/utils'
 // otra ubicación" la cambia solo para esta verificación: es una observación y el activo
 // no se mueve (R6). El contador no ve precios; el admin ve el de referencia (P13).
 // Confirmar usa un id creado al abrir la pantalla, el mismo en cada reintento (R2).
+// Spec 016, T5 (R4, D6, D7): presentación con el kit; una sola acción principal en la
+// BarraAccion (56 px), objetivos de 48 px, avisos y datos del kit. «Verificado» (verde),
+// «No se pudo confirmar» (ámbar, Reintentar) y «La sesión se cerró» (rojo, sin Reintentar)
+// siguen siendo tres pantallas distintas. Mensaje y OtraUbicacion viven en components/app
+// y se reexportan aquí para el conteo de escritorio (spec 015, T8).
+
+export { Mensaje, OtraUbicacion }
 
 const hora = new Intl.DateTimeFormat('es-CO', { hour: 'numeric', minute: '2-digit' })
 
@@ -51,10 +53,10 @@ export function EstadoFisico({ valor, onValor, atajos = false }: { valor: 'ok' |
   ]
   return (
     <div className="flex flex-col gap-2">
-      <span id="estado-fisico" className="text-sm text-muted-foreground">
+      <span id="estado-fisico" className="text-etiqueta text-foreground">
         Estado físico
       </span>
-      <div role="radiogroup" aria-labelledby="estado-fisico" className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+      <div role="radiogroup" aria-labelledby="estado-fisico" className="grid grid-cols-2 gap-1 rounded-lg border bg-muted p-1">
         {opciones.map(({ id, texto, icono: Icono, tecla }) => (
           <button
             key={id}
@@ -63,8 +65,8 @@ export function EstadoFisico({ valor, onValor, atajos = false }: { valor: 'ok' |
             aria-checked={valor === id}
             onClick={() => onValor(id)}
             className={cn(
-              'flex min-h-11 items-center justify-center gap-2 rounded-md text-base font-medium text-muted-foreground transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none',
-              valor === id && 'bg-background text-foreground shadow-sm',
+              'flex min-h-control items-center justify-center gap-2 rounded-md text-base font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-muted focus-visible:outline-none',
+              valor === id && 'bg-card text-foreground shadow-xs',
               valor === id && id === 'danado' && 'text-warning',
             )}
           >
@@ -78,69 +80,11 @@ export function EstadoFisico({ valor, onValor, atajos = false }: { valor: 'ok' |
   )
 }
 
-export function OtraUbicacion({
-  abierto,
-  onAbierto,
-  esperada,
-  ubicaciones,
-  actual,
-  onElegir,
-}: {
-  abierto: boolean
-  onAbierto: (v: boolean) => void
-  esperada: string
-  ubicaciones: Ubicacion[]
-  actual: string | undefined
-  onElegir: (id: string) => void
-}) {
-  return (
-    <Sheet open={abierto} onOpenChange={onAbierto}>
-      <SheetContent side="bottom" className="mx-auto max-h-[88dvh] max-w-[480px] gap-0 rounded-t-2xl p-0">
-        <SheetHeader className="pb-2">
-          <SheetTitle className="text-lg">¿Dónde lo encontraste?</SheetTitle>
-          <SheetDescription>Esperada: {esperada}</SheetDescription>
-        </SheetHeader>
-        <Command label="Buscar ubicación" className="min-h-0 flex-1 bg-transparent px-2">
-          <CommandInput placeholder="Buscar sala o box…" />
-          <CommandList className="max-h-none min-h-0 flex-1 overflow-y-auto">
-            <CommandEmpty>Sin ubicaciones con ese nombre</CommandEmpty>
-            {opcionesDeSelector(ubicaciones).map(({ sede, opciones }) => (
-              <CommandGroup key={sede.id} heading={sede.nombre}>
-                {opciones.map((u) => (
-                  <CommandItem
-                    key={u.id}
-                    value={`${u.id} ${rutaDe(ubicaciones, u.id)}`}
-                    onSelect={() => onElegir(u.id)}
-                    className={cn('min-h-12 text-base', actual === u.id && 'font-semibold')}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{rutaDe(ubicaciones, u.id)}</span>
-                    {actual === u.id && <Check className="text-brand" aria-hidden="true" />}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            ))}
-          </CommandList>
-        </Command>
-        <div className="border-t p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-          <Alert variant="warning">
-            <ArrowLeftRight />
-            <AlertDescription className="text-foreground">Se registra como diferencia. El activo no se mueve hasta que el administrador lo aplique.</AlertDescription>
-          </Alert>
-        </div>
-      </SheetContent>
-    </Sheet>
-  )
-}
-
 export function AvisoYaVerificado({ verificacion }: { verificacion: Verificacion }) {
   return (
-    <Alert variant="info">
-      <Info />
-      <AlertTitle>Ya se verificó en esta sesión</AlertTitle>
-      <AlertDescription>
-        {verificacion.verificado_por.nombre} a las {hora.format(new Date(verificacion.recibido_en))} en {verificacion.ubicacion_encontrada.ruta}. Puedes verificarlo de nuevo: cuenta la última.
-      </AlertDescription>
-    </Alert>
+    <Aviso tono="info" icono={<Info aria-hidden="true" />} titulo="Ya se verificó en esta sesión">
+      {verificacion.verificado_por.nombre} a las {hora.format(new Date(verificacion.recibido_en))} en {verificacion.ubicacion_encontrada.ruta}. Puedes verificarlo de nuevo: cuenta la última.
+    </Aviso>
   )
 }
 
@@ -162,45 +106,37 @@ function Guardado({ verificacion, sesion }: { verificacion: Verificacion; sesion
   const otra = verificacion.ubicacion_encontrada.id !== verificacion.ubicacion_esperada.id
   return (
     <>
-      <div className="-mx-4 -mt-4 flex flex-col items-center gap-2 bg-success px-5 py-7 text-center text-primary-foreground">
-        <span className="flex size-16 items-center justify-center rounded-full bg-primary-foreground/15" aria-hidden="true">
+      <div data-verificado="" className="-mx-4 -mt-4 flex flex-col items-center gap-2 bg-success px-5 py-7 text-center text-primary-foreground">
+        <span className="flex size-16 items-center justify-center rounded-full bg-primary-foreground/15 ring-1 ring-primary-foreground/30" aria-hidden="true">
           <Check className="size-8" strokeWidth={2.25} />
         </span>
-        <h1 className="text-2xl font-semibold tracking-tight">Verificado</h1>
-        <p className="text-[15px] break-words">
+        <h1 className="text-titulo-pagina">Verificado</h1>
+        <p className="text-cuerpo break-words">
           {verificacion.activo.nombre} · <span className="font-mono">{verificacion.activo.codigo}</span>
         </p>
       </div>
-      <dl className="divide-y rounded-xl border px-4">
-        <div className="flex min-h-12 items-center justify-between gap-3 py-2">
-          <dt className="text-sm text-muted-foreground">Encontrada en</dt>
-          <dd className="min-w-0 truncate text-right font-medium">{verificacion.ubicacion_encontrada.ruta}</dd>
-        </div>
-        {otra && (
-          <div className="flex min-h-12 items-center justify-between gap-3 py-2">
-            <dt className="text-sm text-muted-foreground">Esperada</dt>
-            <dd className="min-w-0 truncate text-right">{verificacion.ubicacion_esperada.ruta}</dd>
-          </div>
-        )}
-        <div className="flex min-h-12 items-center justify-between gap-3 py-2">
-          <dt className="text-sm text-muted-foreground">Estado físico</dt>
-          <dd className="font-medium">{verificacion.estado_fisico === 'ok' ? 'Ok' : 'Dañado'}</dd>
-        </div>
-        <div className="flex min-h-12 items-center justify-between gap-3 py-2">
-          <dt className="text-sm text-muted-foreground">Guardado</dt>
-          <dd className="font-medium tabular-nums">{hora.format(new Date(verificacion.recibido_en))}</dd>
-        </div>
-      </dl>
+      <Panel relleno={false} className="px-4">
+        <ListaDatos
+          datos={[
+            { rotulo: 'Encontrada en', valor: <span className="block truncate font-medium">{verificacion.ubicacion_encontrada.ruta}</span> },
+            otra && { rotulo: 'Esperada', valor: <span className="block truncate">{verificacion.ubicacion_esperada.ruta}</span> },
+            { rotulo: 'Estado físico', valor: <span className="font-medium">{verificacion.estado_fisico === 'ok' ? 'Ok' : 'Dañado'}</span> },
+            { rotulo: 'Guardado', valor: hora.format(new Date(verificacion.recibido_en)), tipo: 'cifra' },
+          ]}
+        />
+      </Panel>
       {fila && (
-        <div className="flex items-center gap-3 rounded-xl bg-muted px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm text-muted-foreground">{fila.ubicacion.ruta}</p>
-            <p className="tabular-nums">
-              <b className="font-semibold">{formatEntero(fila.verificados)}</b> de {formatEntero(fila.total)} verificados
-            </p>
+        <Panel>
+          <div className="flex items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-etiqueta font-normal text-muted-foreground">{fila.ubicacion.ruta}</p>
+              <p className="text-cuerpo tabular-nums">
+                <b className="font-semibold">{formatEntero(fila.verificados)}</b> de {formatEntero(fila.total)} verificados
+              </p>
+            </div>
+            <Progreso valor={porcentaje(fila.verificados, fila.total)} etiqueta={`Avance en ${fila.ubicacion.ruta}`} className="w-24 shrink-0" />
           </div>
-          <Progress value={porcentaje(fila.verificados, fila.total)} aria-label={`Avance en ${fila.ubicacion.ruta}`} className="w-24" />
-        </div>
+        </Panel>
       )}
       <input
         ref={entrada}
@@ -220,42 +156,23 @@ function Guardado({ verificacion, sesion }: { verificacion: Verificacion; sesion
         }}
       />
       {pendiente.estado === 'sin_foto' || pendiente.estado === 'error' ? (
-        <Button
-          variant="outline"
-          className="min-h-12"
+        <Boton
+          variante="secundario"
+          icono={<Camera />}
           onClick={() => {
             setQuedarse(true)
             entrada.current?.click()
           }}
         >
-          <Camera className="size-5" aria-hidden="true" />
           {pendiente.estado === 'error' ? 'Tomar otra foto' : 'Agregar foto (opcional)'}
-        </Button>
+        </Boton>
       ) : null}
       <EstadoFoto estado={pendiente.estado} error={pendiente.error} onReintentar={() => void pendiente.enviar(subir)} />
       {/* Con foto, la vuelta automática se detiene; «Escanear siguiente» (abajo) sigue. */}
       {quedarse ? null : (
-        <p className="text-center text-sm text-muted-foreground">La cámara vuelve sola en un momento…</p>
+        <p className="text-center text-etiqueta font-normal text-muted-foreground">La cámara vuelve sola en un momento…</p>
       )}
     </>
-  )
-}
-
-export function Mensaje({ tono, icono, titulo, children }: { tono: 'aviso' | 'peligro'; icono: React.ReactNode; titulo: string; children: React.ReactNode }) {
-  return (
-    <div
-      role="alert"
-      className={cn(
-        'flex flex-col gap-3 rounded-2xl border p-5',
-        tono === 'peligro' ? 'border-destructive-border bg-destructive-soft' : 'border-warning-border bg-warning-soft',
-      )}
-    >
-      <span className={cn('flex size-11 items-center justify-center rounded-xl bg-background', tono === 'peligro' ? 'text-destructive' : 'text-warning')} aria-hidden="true">
-        {icono}
-      </span>
-      <h1 className="text-xl font-semibold">{titulo}</h1>
-      <div className="flex flex-col gap-2 text-base">{children}</div>
-    </div>
   )
 }
 
@@ -287,13 +204,13 @@ function Verificando({ activo, sesion }: { activo: Activo; sesion: SesionConteo 
       <CountShell
         {...shell}
         volver="/contar"
-        acciones={
-          <Button asChild className="min-h-14 font-semibold">
+        principal={
+          <Boton asChild tamano="accion">
             <Link to="/contar/escanear">
-              <ScanBarcode className="size-5" />
+              <ScanBarcode />
               Escanear siguiente
             </Link>
-          </Button>
+          </Boton>
         }
       >
         <Guardado verificacion={resultado.verificacion} sesion={sesion} />
@@ -305,18 +222,18 @@ function Verificando({ activo, sesion }: { activo: Activo; sesion: SesionConteo 
     return (
       <CountShell
         {...shell}
-        acciones={
-          <Button asChild className="min-h-14 font-semibold">
+        principal={
+          <Boton asChild tamano="accion">
             <Link to="/contar">Volver al inicio</Link>
-          </Button>
+          </Boton>
         }
       >
-        <Mensaje tono="peligro" icono={<Lock className="size-5" />} titulo="La sesión se cerró">
+        <Mensaje tono="peligro" icono={<Lock />} titulo="La sesión se cerró">
           <p>
             El administrador cerró {sesion.nombre}. Esta verificación <b>no se guardó</b>.
           </p>
         </Mensaje>
-        <p className="text-sm text-muted-foreground">Las verificaciones confirmadas antes del cierre sí cuentan en el informe.</p>
+        <p className="text-etiqueta font-normal text-muted-foreground">Las verificaciones confirmadas antes del cierre sí cuentan en el informe.</p>
       </CountShell>
     )
   }
@@ -325,34 +242,33 @@ function Verificando({ activo, sesion }: { activo: Activo; sesion: SesionConteo 
     return (
       <CountShell
         {...shell}
-        acciones={
-          <>
-            <Button asChild variant="ghost">
-              <Link to="/contar/escanear">Descartar y seguir</Link>
-            </Button>
-            <Button className="min-h-14 font-semibold" onClick={() => enviar()}>
-              <RefreshCw />
-              Reintentar
-            </Button>
-          </>
+        secundaria={
+          <Boton asChild variante="fantasma">
+            <Link to="/contar/escanear">Descartar y seguir</Link>
+          </Boton>
+        }
+        principal={
+          <Boton tamano="accion" icono={<RefreshCw />} onClick={() => enviar()}>
+            Reintentar
+          </Boton>
         }
       >
-        <Mensaje tono="aviso" icono={<TriangleAlert className="size-5" />} titulo="No se pudo confirmar">
+        <Mensaje tono="aviso" icono={<TriangleAlert />} titulo="No se pudo confirmar">
           <p>
             No sabemos si la verificación quedó guardada. <b>Reintentar no la duplica.</b>
           </p>
         </Mensaje>
-        <dl className="divide-y rounded-xl border px-4">
-          <div className="flex min-h-12 items-center justify-between gap-3 py-2">
-            <dt className="text-sm text-muted-foreground">Activo</dt>
-            <dd className="min-w-0 truncate font-medium">{activo.nombre}</dd>
-          </div>
-          <div className="flex min-h-12 items-center justify-between gap-3 py-2">
-            <dt className="text-sm text-muted-foreground">Código</dt>
-            <dd className="font-mono">{activo.codigo}</dd>
-          </div>
-        </dl>
-        <p className="text-sm text-muted-foreground">No cuenta en el avance hasta confirmarse. Si cierras esta pestaña antes, se pierde y tendrás que escanearlo otra vez.</p>
+        <Panel relleno={false} className="px-4">
+          <ListaDatos
+            datos={[
+              { rotulo: 'Activo', valor: <span className="block truncate font-medium">{activo.nombre}</span> },
+              { rotulo: 'Código', valor: activo.codigo, tipo: 'codigo' },
+            ]}
+          />
+        </Panel>
+        <p className="text-etiqueta font-normal text-muted-foreground">
+          No cuenta en el avance hasta confirmarse. Si cierras esta pestaña antes, se pierde y tendrás que escanearlo otra vez.
+        </p>
       </CountShell>
     )
   }
@@ -361,86 +277,89 @@ function Verificando({ activo, sesion }: { activo: Activo; sesion: SesionConteo 
   return (
     <CountShell
       {...shell}
-      acciones={
+      secundaria={
+        deBaja ? undefined : (
+          <Boton variante="secundario" icono={<ArrowLeftRight />} disabled={enviando || !sala} onClick={() => setEligiendo(true)}>
+            Está en otra ubicación
+          </Boton>
+        )
+      }
+      principal={
         deBaja ? (
-          <Button asChild className="min-h-14 font-semibold">
+          <Boton asChild tamano="accion">
             <Link to="/contar/escanear">
-              <ScanBarcode className="size-5" />
+              <ScanBarcode />
               Escanear otro
             </Link>
-          </Button>
+          </Boton>
         ) : (
-          <>
-            <Button variant="outline" disabled={enviando || !sala} onClick={() => setEligiendo(true)}>
-              <ArrowLeftRight />
-              Está en otra ubicación
-            </Button>
-            <Button className="min-h-14 font-semibold" disabled={enviando || !encontrada} onClick={() => enviar()}>
-              {enviando ? (
-                <>
-                  <Loader2 className="animate-spin" aria-hidden="true" />
-                  Confirmando…
-                </>
-              ) : (
-                'Confirmar'
-              )}
-            </Button>
-          </>
+          <Boton tamano="accion" disabled={!encontrada} cargando={enviando} textoCargando="Confirmando…" onClick={() => enviar()}>
+            Confirmar
+          </Boton>
         )
       }
     >
       <AssetCard activo={aTarjeta(activo)} rol={rol} titulo="h1" />
       <FotoActivo activo={activo} editable={!deBaja} />
       {deBaja ? (
-        <Alert variant="warning">
-          <Archive />
-          <AlertTitle>Dado de baja</AlertTitle>
-          <AlertDescription className="text-foreground">Un activo dado de baja no se verifica. Si apareció, pídele al administrador que lo reactive.</AlertDescription>
-        </Alert>
+        <Aviso tono="aviso" icono={<Archive aria-hidden="true" />} titulo="Dado de baja">
+          Un activo dado de baja no se verifica. Si apareció, pídele al administrador que lo reactive.
+        </Aviso>
       ) : (
         <>
           {resultado.tipo === 'error' && (
-            <Alert variant="destructive">
-              <TriangleAlert />
-              <AlertTitle>No se guardó</AlertTitle>
-              <AlertDescription>{resultado.mensaje}</AlertDescription>
-            </Alert>
+            <Aviso tono="error" icono={<TriangleAlert aria-hidden="true" />} titulo="No se guardó">
+              {resultado.mensaje}
+            </Aviso>
           )}
           {ultima.data && <AvisoYaVerificado verificacion={ultima.data} />}
           {sala ? (
-            <div className="flex min-h-12 items-center justify-between gap-3 rounded-xl border px-4 py-2">
-              <span className="text-sm text-muted-foreground">Encontrada en</span>
-              <span className={cn('flex min-w-0 items-center gap-1.5 font-medium', otra ? 'text-warning' : 'text-success')}>
-                {otra ? <ArrowLeftRight className="size-4 shrink-0" aria-hidden="true" /> : <Check className="size-4 shrink-0" aria-hidden="true" />}
-                <span className="truncate">{rutaDe(lista, encontrada!)}</span>
-              </span>
+            <div className="flex flex-col gap-1">
+              <Panel relleno={false} className="px-4">
+                <ListaDatos
+                  datos={[
+                    {
+                      rotulo: 'Encontrada en',
+                      valor: (
+                        <span className={cn('flex min-w-0 items-center justify-end gap-1.5 font-medium', otra ? 'text-warning' : 'text-success')}>
+                          {otra ? <ArrowLeftRight className="size-4 shrink-0" aria-hidden="true" /> : <Check className="size-4 shrink-0" aria-hidden="true" />}
+                          <span className="truncate">{rutaDe(lista, encontrada!)}</span>
+                        </span>
+                      ),
+                    },
+                  ]}
+                />
+              </Panel>
+              {otra && (
+                <Boton variante="fantasma" icono={<MapPin />} className="self-start px-2 text-brand-strong" onClick={() => setOtra(undefined)}>
+                  Usar {rutaDe(lista, sala)}
+                </Boton>
+              )}
             </div>
           ) : (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="sala-verificar">¿Dónde estás contando?</Label>
-              <LocationPicker id="sala-verificar" ubicaciones={lista} cargando={ubicaciones.isPending} valor={sala} onChange={elegir} className="h-12 text-base md:h-12" />
-              <p className="text-sm text-muted-foreground">Elígela una vez: queda para los siguientes activos.</p>
-            </div>
-          )}
-          {otra && (
-            <Button variant="link" className="-mt-2 h-11 self-start px-0 md:h-auto" onClick={() => setOtra(undefined)}>
-              <MapPin />
-              Usar {rutaDe(lista, sala!)}
-            </Button>
+            <MarcoCampo id="sala-verificar" etiqueta="¿Dónde estás contando?" ayuda="Elígela una vez: queda para los siguientes activos.">
+              <LocationPicker
+                id="sala-verificar"
+                ubicaciones={lista}
+                cargando={ubicaciones.isPending}
+                valor={sala}
+                onChange={elegir}
+                className="h-control bg-card text-base md:h-control"
+              />
+            </MarcoCampo>
           )}
           <EstadoFisico valor={estado} onValor={setEstado} />
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="nota">Nota {estado === 'danado' ? '(qué tiene)' : '(opcional)'}</Label>
-            <Input id="nota" value={nota} onChange={(e) => setNota(e.target.value)} maxLength={120} autoComplete="off" className="h-11" />
-          </div>
+          <Campo
+            id="nota"
+            etiqueta={`Nota ${estado === 'danado' ? '(qué tiene)' : '(opcional)'}`}
+            value={nota}
+            onChange={(e) => setNota(e.target.value)}
+            maxLength={120}
+            autoComplete="off"
+          />
         </>
       )}
-      <Button variant="ghost" className="min-h-11 self-start px-1 text-brand-strong" asChild>
-        <Link to={`/contar/activo/${encodeURIComponent(activo.codigo)}/historial`}>
-          <History />
-          Ver historial del activo
-        </Link>
-      </Button>
+      <EnlaceHistorial codigo={activo.codigo} />
       <OtraUbicacion
         abierto={eligiendo}
         onAbierto={setEligiendo}
@@ -457,6 +376,17 @@ function Verificando({ activo, sesion }: { activo: Activo; sesion: SesionConteo 
   )
 }
 
+function EnlaceHistorial({ codigo }: { codigo: string }) {
+  return (
+    <Boton asChild variante="fantasma" className="self-start px-2 text-brand-strong">
+      <Link to={`/contar/activo/${encodeURIComponent(codigo)}/historial`}>
+        <History />
+        Ver historial del activo
+      </Link>
+    </Boton>
+  )
+}
+
 function SoloConsulta({ activo }: { activo: Activo }) {
   const rol = useRol()
   const cabecera = useCabeceraConteo()
@@ -466,28 +396,21 @@ function SoloConsulta({ activo }: { activo: Activo }) {
       subtitulo={cabecera.subtitulo}
       volver="/contar/escanear"
       estadoRed="en_linea"
-      acciones={
-        <Button asChild className="min-h-14 font-semibold">
+      principal={
+        <Boton asChild tamano="accion">
           <Link to="/contar/escanear">
-            <ScanBarcode className="size-5" />
+            <ScanBarcode />
             Escanear otro
           </Link>
-        </Button>
+        </Boton>
       }
     >
       <AssetCard activo={aTarjeta(activo)} rol={rol} titulo="h1" />
       <FotoActivo activo={activo} editable={activo.estado !== 'dado_de_baja'} />
-      <Alert variant="info">
-        <Info />
-        <AlertTitle>No hay una sesión abierta</AlertTitle>
-        <AlertDescription>Puedes consultar el activo; para verificarlo, el administrador debe abrir una sesión de conteo.</AlertDescription>
-      </Alert>
-      <Button variant="ghost" className="min-h-11 self-start px-1 text-brand-strong" asChild>
-        <Link to={`/contar/activo/${encodeURIComponent(activo.codigo)}/historial`}>
-          <History />
-          Ver historial del activo
-        </Link>
-      </Button>
+      <Aviso tono="info" icono={<Info aria-hidden="true" />} titulo="No hay una sesión abierta">
+        Puedes consultar el activo; para verificarlo, el administrador debe abrir una sesión de conteo.
+      </Aviso>
+      <EnlaceHistorial codigo={activo.codigo} />
     </CountShell>
   )
 }
@@ -501,10 +424,7 @@ function PantallaVerificar({ codigo }: { codigo: string }) {
   if (consulta.isPending || sesion.isPending) {
     return (
       <CountShell {...shell}>
-        <div role="status" aria-label="Buscando el código" className="flex flex-col gap-3 pt-2">
-          <Skeleton className="h-8 w-3/4" />
-          <Skeleton className="h-28 rounded-xl" />
-        </div>
+        <Estado.Cargando etiqueta="Buscando el código" filas={3} className="pt-2" />
       </CountShell>
     )
   }
@@ -517,20 +437,24 @@ function PantallaVerificar({ codigo }: { codigo: string }) {
     return (
       <CountShell
         {...shell}
-        acciones={
-          <Button asChild className="min-h-14 font-semibold">
+        principal={
+          <Boton asChild variante="secundario" tamano="accion">
             <Link to="/contar/escribir">Escribir el código</Link>
-          </Button>
+          </Boton>
         }
       >
-        <div className="flex flex-col items-start gap-3 pt-4">
-          <h1 className="text-xl font-semibold tracking-tight">No se pudo buscar el código</h1>
-          <p className="text-base text-muted-foreground">{mensajeDeError(consulta.error ?? sesion.error)}</p>
-          <Button variant="outline" className="min-h-11" onClick={reintentar}>
-            <RefreshCw />
-            Reintentar
-          </Button>
-        </div>
+        <Mensaje
+          tono="peligro"
+          icono={<CircleAlert />}
+          titulo="No se pudo buscar el código"
+          accion={
+            <Boton variante="secundario" icono={<RefreshCw />} cargando={consulta.isRefetching || sesion.isRefetching} onClick={reintentar}>
+              Reintentar
+            </Boton>
+          }
+        >
+          <p>{mensajeDeError(consulta.error ?? sesion.error)}</p>
+        </Mensaje>
       </CountShell>
     )
   }
@@ -540,29 +464,23 @@ function PantallaVerificar({ codigo }: { codigo: string }) {
     return (
       <CountShell
         {...shell}
-        acciones={
-          <>
-            <Button asChild variant="outline">
-              <Link to="/contar/escribir">Escribir otro</Link>
-            </Button>
-            <Button asChild className="min-h-14 font-semibold">
-              <Link to={`/contar/nuevo?codigo=${encodeURIComponent(codigo)}`}>
-                <Plus />
-                Crear activo con este código
-              </Link>
-            </Button>
-          </>
+        secundaria={
+          <Boton asChild variante="secundario">
+            <Link to="/contar/escribir">Escribir otro</Link>
+          </Boton>
+        }
+        principal={
+          <Boton asChild tamano="accion">
+            <Link to={`/contar/nuevo?codigo=${encodeURIComponent(codigo)}`}>
+              <Plus />
+              Crear activo con este código
+            </Link>
+          </Boton>
         }
       >
-        <div className="flex flex-col items-start gap-3 pt-4">
-          <span className="flex size-11 items-center justify-center rounded-xl bg-muted" aria-hidden="true">
-            <SearchX className="size-5" />
-          </span>
-          <h1 className="text-xl font-semibold tracking-tight">No encontramos ese código</h1>
-          <p className="text-base text-muted-foreground">
-            El sticker <span className="font-mono text-foreground">{codigo}</span> no está registrado en esta clínica. Si es un activo nuevo, regístralo.
-          </p>
-        </div>
+        <CodigoNoEncontrado icono={<SearchX />}>
+          El sticker <span className="font-mono text-foreground">{codigo}</span> no está registrado en esta clínica. Si es un activo nuevo, regístralo.
+        </CodigoNoEncontrado>
       </CountShell>
     )
   }

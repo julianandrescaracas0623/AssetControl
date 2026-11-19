@@ -5,12 +5,14 @@ import { toast } from 'sonner'
 
 import { CountShell } from '@/components/app/CountShell'
 import { Escaner } from '@/components/app/Escaner'
-import { Button } from '@/components/ui/button'
+import { Boton } from '@/components/kit'
 import { normalizarCodigo } from '@/lib/activos'
 import { useCabeceraConteo } from '@/lib/conteo'
 
 // Escáner (docs/08 §7.1; spec 004, T8). Cada lectura abre el activo de ese código (o
 // el alta si no existe). "Escribir código" siempre está a la mano.
+// Spec 016, T5: la cámara lee sola, así que la única acción de la barra es la salida
+// manual, a ancho completo en la zona del pulgar pero sin el cobalto de una principal.
 
 export default function Escanear() {
   const navigate = useNavigate()
@@ -33,13 +35,13 @@ export default function Escanear() {
       subtitulo={cabecera.subtitulo}
       volver="/contar"
       estadoRed="en_linea"
-      acciones={
-        <Button asChild variant="outline">
+      principal={
+        <Boton asChild variante="secundario" tamano="accion">
           <Link to="/contar/escribir">
             <Keyboard />
             Escribir código
           </Link>
-        </Button>
+        </Boton>
       }
     >
       <h1 className="sr-only">Escanear</h1>

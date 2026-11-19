@@ -3,15 +3,11 @@ import { Link } from 'react-router'
 
 import { ActividadReciente } from '@/components/app/ActividadReciente'
 import { CountShell } from '@/components/app/CountShell'
-import { EmptyState } from '@/components/app/EmptyState'
 import { LocationPicker } from '@/components/app/LocationPicker'
+import { Mensaje } from '@/components/app/MensajeConteo'
 import { MenuCuenta } from '@/components/app/MenuCuenta'
 import { PendingList } from '@/components/app/PendingList'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Progress } from '@/components/ui/progress'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Boton, Cifra, EncabezadoPagina, Estado, Insignia, MarcoCampo, Panel, Progreso } from '@/components/kit'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { useSalaDeTrabajo } from '@/lib/conteo'
 import { formatEntero } from '@/lib/format'
@@ -24,35 +20,45 @@ import { fechaCorte, pendientes, porcentaje, type SesionConteo, useDetalleSesion
 // precio (P13). Spec 007: cada fila de pendientes abre la lista de esa ubicación.
 // Spec 010 (Q3, P25): además, activos hoy (unidades) y la actividad reciente, sin precios:
 // el servidor no se los manda al contador.
+// Spec 016, T5: encabezado de página, avance en un Panel con la barra del kit, sala de
+// trabajo como campo del kit, «Activos hoy» como Cifra y estados del kit. «Escanear» es la
+// única acción principal; «Registrar activo nuevo» va encima, como secundaria.
 
 function SalaDeTrabajo({ rol }: { rol: string | undefined }) {
   const { sala, elegir, ubicaciones } = useSalaDeTrabajo()
+  const sinSalas = ubicaciones.data && !ubicaciones.data.some((u) => u.activa && u.tipo !== 'sede')
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor="sala">Estás contando en</Label>
-      <LocationPicker
+    <div className="flex flex-col gap-2">
+      <MarcoCampo
         id="sala"
-        ubicaciones={ubicaciones.data ?? []}
-        cargando={ubicaciones.isPending}
-        valor={sala}
-        onChange={elegir}
-        className="h-12 text-base md:h-12"
-      />
-      {!sala && ubicaciones.isSuccess && <p className="text-sm text-muted-foreground">Elígela antes de escanear: es donde quedan encontrados los activos.</p>}
+        etiqueta="Estás contando en"
+        ayuda={!sala && ubicaciones.isSuccess ? 'Elígela antes de escanear: es donde quedan encontrados los activos.' : undefined}
+      >
+        <LocationPicker
+          id="sala"
+          ubicaciones={ubicaciones.data ?? []}
+          cargando={ubicaciones.isPending}
+          valor={sala}
+          onChange={elegir}
+          className="h-control bg-card text-base md:h-control"
+        />
+      </MarcoCampo>
       {ubicaciones.isError && (
-        <p className="flex flex-wrap items-center gap-x-2 text-sm text-destructive">
-          No se pudieron cargar las ubicaciones.
-          <Button variant="link" className="h-11 px-0 md:h-auto" onClick={() => void ubicaciones.refetch()}>
-            Reintentar
-          </Button>
-        </p>
+        <Estado.Error
+          titulo="No se pudieron cargar las ubicaciones."
+          onReintentar={() => void ubicaciones.refetch()}
+          reintentando={ubicaciones.isRefetching}
+        />
       )}
-      {ubicaciones.data && !ubicaciones.data.some((u) => u.activa && u.tipo !== 'sede') && (
-        <p className="text-sm text-muted-foreground">
+      {sinSalas && (
+        <p className="text-etiqueta font-normal text-muted-foreground">
           {rol === 'admin' ? (
             <>
               Aún no hay salas activas.{' '}
-              <Link to="/admin/ubicaciones" className="font-medium text-brand-strong underline underline-offset-4">
+              <Link
+                to="/admin/ubicaciones"
+                className="rounded-sm font-medium text-brand-strong underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+              >
                 Créalas en Ubicaciones
               </Link>
             </>
@@ -72,38 +78,34 @@ function SesionAbierta({ sesion, rol }: { sesion: SesionConteo; rol: string | un
   const conPendientes = (avance?.por_ubicacion ?? []).filter((f) => f.pendientes > 0)
   return (
     <>
-      <div>
-        <p className="text-sm text-muted-foreground">Sesión abierta · corte {fechaCorte(sesion.fecha_corte)}</p>
-        <h1 className="text-[22px] leading-7 font-semibold tracking-tight break-words">{sesion.nombre}</h1>
-      </div>
+      <EncabezadoPagina titulo={sesion.nombre} descripcion={`Sesión abierta · corte ${fechaCorte(sesion.fecha_corte)}`} />
       {avance ? (
-        <div className="flex flex-col gap-2.5 rounded-xl border p-4">
-          <span className="flex items-center justify-between gap-2">
-            <Badge variant="brand">Abierta</Badge>
-            <span className="text-2xl font-semibold tabular-nums">{pct.toLocaleString('es-CO')} %</span>
-          </span>
-          <Progress value={pct} aria-label="Avance del conteo" className="h-2" />
-          <span className="flex justify-between gap-2 text-sm">
-            <span className="text-muted-foreground tabular-nums">
-              <b className="font-semibold text-foreground">{formatEntero(avance.verificados)}</b> de {formatEntero(avance.total)} verificados
+        <Panel>
+          <div className="flex flex-col gap-3">
+            <span className="flex items-center justify-between gap-2">
+              <Insignia tono="info" icono={null}>
+                Abierta
+              </Insignia>
+              <span className="text-cifra tabular-nums">{pct.toLocaleString('es-CO')} %</span>
             </span>
-            <span className="font-medium tabular-nums">{pendientes(avance.pendientes)}</span>
-          </span>
-        </div>
+            <Progreso valor={pct} etiqueta="Avance del conteo" />
+            <span className="flex justify-between gap-2 text-etiqueta font-normal">
+              <span className="text-muted-foreground tabular-nums">
+                <b className="font-semibold text-foreground">{formatEntero(avance.verificados)}</b> de {formatEntero(avance.total)} verificados
+              </span>
+              <span className="font-medium tabular-nums">{pendientes(avance.pendientes)}</span>
+            </span>
+          </div>
+        </Panel>
       ) : detalle.isError ? (
-        <p className="flex flex-wrap items-center gap-x-2 text-sm text-destructive">
-          No se pudo cargar el avance.
-          <Button variant="link" className="h-11 px-0 md:h-auto" onClick={() => void detalle.refetch()}>
-            Reintentar
-          </Button>
-        </p>
+        <Estado.Error titulo="No se pudo cargar el avance." onReintentar={() => void detalle.refetch()} reintentando={detalle.isRefetching} />
       ) : (
-        <Skeleton className="h-28 rounded-xl" />
+        <Estado.Cargando etiqueta="Cargando el avance" filas={2} />
       )}
       <SalaDeTrabajo rol={rol} />
       {conPendientes.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Pendientes por ubicación">
-          <h2 className="text-sm font-medium text-muted-foreground">Pendientes por ubicación</h2>
+          <h2 className="text-titulo-seccion">Pendientes por ubicación</h2>
           <PendingList
             items={conPendientes.map((f) => ({
               ubicacion: f.ubicacion.ruta,
@@ -121,26 +123,20 @@ function SesionAbierta({ sesion, rol }: { sesion: SesionConteo; rol: string | un
 
 function ActivosHoy() {
   const consulta = useIndicadores()
-  if (consulta.isPending) return <Skeleton role="status" aria-label="Cargando los activos de hoy" className="h-16 rounded-xl" />
+  if (consulta.isPending) return <Estado.Cargando etiqueta="Cargando los activos de hoy" filas={1} />
   if (consulta.isError) {
     return (
-      <p className="flex flex-wrap items-center gap-x-2 text-sm text-destructive">
-        No se pudo cargar el total de activos.
-        <Button variant="link" className="h-11 px-0 md:h-auto" onClick={() => void consulta.refetch()}>
-          Reintentar
-        </Button>
-      </p>
+      <Estado.Error titulo="No se pudo cargar el total de activos." onReintentar={() => void consulta.refetch()} reintentando={consulta.isRefetching} />
     )
   }
   const { unidades, en_reparacion } = consulta.data.activos_hoy
   return (
-    <section aria-label="Activos hoy" className="flex items-center justify-between gap-3 rounded-xl border p-4">
-      <span className="flex flex-col">
-        <span className="text-sm text-muted-foreground">Activos hoy</span>
-        <span className="text-xs text-muted-foreground">{en_reparacion > 0 ? `Incluye ${formatEntero(en_reparacion)} en reparación` : 'Ninguno en reparación'}</span>
-      </span>
-      <span className="text-2xl font-semibold tabular-nums">{formatEntero(unidades)}</span>
-    </section>
+    <Cifra
+      region
+      rotulo="Activos hoy"
+      valor={formatEntero(unidades)}
+      contexto={en_reparacion > 0 ? `Incluye ${formatEntero(en_reparacion)} en reparación` : 'Ninguno en reparación'}
+    />
   )
 }
 
@@ -155,46 +151,45 @@ export default function ContarInicio() {
       subtitulo={primerNombre ? `Hola, ${primerNombre}` : undefined}
       menu={<MenuCuenta />}
       estadoRed="en_linea"
-      acciones={
-        <>
-          <Button asChild variant="outline">
-            <Link to="/contar/nuevo">
-              <Plus />
-              Registrar activo nuevo
-            </Link>
-          </Button>
-          <Button asChild className="min-h-14 font-semibold">
-            <Link to="/contar/escanear">
-              <ScanBarcode className="size-5" />
-              {abierta.data ? 'Escanear' : 'Consultar un activo'}
-            </Link>
-          </Button>
-        </>
+      secundaria={
+        <Boton asChild variante="secundario">
+          <Link to="/contar/nuevo">
+            <Plus />
+            Registrar activo nuevo
+          </Link>
+        </Boton>
+      }
+      principal={
+        <Boton asChild tamano="accion">
+          <Link to="/contar/escanear">
+            <ScanBarcode />
+            {abierta.data ? 'Escanear' : 'Consultar un activo'}
+          </Link>
+        </Boton>
       }
     >
       {abierta.isPending ? (
-        <div role="status" aria-label="Cargando el conteo" className="flex flex-col gap-3">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-28 rounded-xl" />
-          <Skeleton className="h-12 rounded-xl" />
-        </div>
+        <Estado.Cargando etiqueta="Cargando el conteo" filas={3} />
       ) : abierta.isError ? (
-        <div className="flex flex-col items-start gap-3 pt-2">
-          <CircleAlert className="size-6 text-destructive" aria-hidden="true" />
-          <h1 className="text-xl font-semibold tracking-tight">No se pudo cargar el conteo</h1>
-          <p className="text-base text-muted-foreground">{mensajeDeError(abierta.error)}</p>
-          <Button variant="outline" className="min-h-11" onClick={() => void abierta.refetch()}>
-            <RefreshCw />
-            Reintentar
-          </Button>
-        </div>
+        <Mensaje
+          tono="peligro"
+          icono={<CircleAlert />}
+          titulo="No se pudo cargar el conteo"
+          accion={
+            <Boton variante="secundario" icono={<RefreshCw />} cargando={abierta.isRefetching} onClick={() => void abierta.refetch()}>
+              Reintentar
+            </Boton>
+          }
+        >
+          <p>{mensajeDeError(abierta.error)}</p>
+        </Mensaje>
       ) : abierta.data ? (
         <SesionAbierta sesion={abierta.data} rol={rol} />
       ) : (
         <>
-          <h1 className="text-xl font-semibold tracking-tight">Conteo</h1>
-          <EmptyState
-            icono={<ClipboardList className="size-5" />}
+          <EncabezadoPagina titulo="Conteo" />
+          <Estado.Vacio
+            icono={<ClipboardList />}
             titulo="No hay una sesión abierta"
             descripcion={
               rol === 'admin'
@@ -203,9 +198,9 @@ export default function ContarInicio() {
             }
             accion={
               rol === 'admin' && (
-                <Button asChild variant="outline">
+                <Boton asChild variante="secundario">
                   <Link to="/admin/sesiones">Ir a Sesiones</Link>
-                </Button>
+                </Boton>
               )
             }
           />

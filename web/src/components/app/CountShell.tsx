@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 
 import { NetworkStatus, type EstadoRed } from '@/components/app/NetworkStatus'
-import { Boton } from '@/components/kit'
+import { BarraAccion, Boton } from '@/components/kit'
 import { useDensidad } from '@/hooks/use-densidad'
 
 // Shell del modo conteo (docs/08 §5, spec 001b T6): móvil primero y a una
@@ -12,6 +12,9 @@ import { useDensidad } from '@/hooks/use-densidad'
 // columna centrada de 480 px (D5).
 // Spec 016, T4 (D1, D6, D8): encabezado y barra en blanco sobre la página, botones del
 // kit con objetivos de 48 px y 8 px entre objetivos.
+// Spec 016, T5 (R4, Deuda T4 g): `principal` y `secundaria` van en la BarraAccion del kit
+// (principal de 56 px abajo, secundaria encima); las pantallas no ponen alturas a mano.
+// `acciones` queda para las pantallas aún no migradas (alta, T6).
 
 export function CountShell({
   titulo,
@@ -19,6 +22,8 @@ export function CountShell({
   volver,
   menu,
   estadoRed,
+  principal,
+  secundaria,
   acciones,
   children,
 }: {
@@ -29,7 +34,11 @@ export function CountShell({
   /** En el inicio (sin retroceso): menú de cuenta en su lugar. */
   menu?: ReactNode
   estadoRed: EstadoRed
-  /** Acción principal (y secundaria encima, si hace falta). */
+  /** La acción principal de la pantalla (una sola), en la zona del pulgar. */
+  principal?: ReactNode
+  /** Acciones secundarias, encima de la principal. */
+  secundaria?: ReactNode
+  /** Barra libre (pantallas aún no migradas al kit): principal y secundaria juntas. */
   acciones?: ReactNode
   children: ReactNode
 }) {
@@ -66,7 +75,9 @@ export function CountShell({
         </div>
       </header>
       <main className="mx-auto flex w-full max-w-[480px] min-w-0 flex-1 flex-col gap-4 p-4">{children}</main>
-      {acciones && (
+      {principal ? (
+        <BarraAccion elemento="footer" principal={principal} secundaria={secundaria} />
+      ) : acciones && (
         <footer className="sticky bottom-0 z-10 border-t bg-card pb-[calc(0.75rem+env(safe-area-inset-bottom))] [&_[data-slot=button]]:min-h-12 [&_[data-slot=button]]:w-full [&_[data-slot=button]]:text-base">
           <div className="mx-auto flex w-full max-w-[480px] flex-col gap-separacion px-4 pt-3">{acciones}</div>
         </footer>

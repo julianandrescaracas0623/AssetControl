@@ -25,6 +25,7 @@ export { ListaDatos, type Dato, type ListaDatosProps, type TipoDato } from './Li
 export { Notificaciones, type NotificacionesProps } from './Notificaciones'
 export { Panel, type PanelProps } from './Panel'
 export { Pestanas, type Pestana, type PestanasProps } from './Pestanas'
+export { Progreso, type ProgresoProps } from './Progreso'
 export {
   TablaDatos,
   type BarraTabla,

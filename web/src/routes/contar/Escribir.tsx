@@ -4,10 +4,7 @@ import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
 import { CountShell } from '@/components/app/CountShell'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Aviso, Boton, Campo, EncabezadoPagina } from '@/components/kit'
 import { useSimulacion } from '@/lib/simulacion'
 import { normalizarCodigo } from '@/lib/activos'
 import { useCabeceraConteo } from '@/lib/conteo'
@@ -15,6 +12,8 @@ import { useCabeceraConteo } from '@/lib/conteo'
 // Entrada manual del código (docs/08 §7.1, CU-VER-05). Con ?estado=error se
 // ve como cámara denegada. Mismo camino que un escaneo: existe → verificar;
 // no existe → alta.
+// Spec 016, T5: el código es el campo protagonista del kit (56 px, mono, centrado) y
+// «Buscar» la acción principal de la barra.
 
 export default function Escribir() {
   const { estado } = useSimulacion()
@@ -44,32 +43,38 @@ export default function Escribir() {
       subtitulo={cabecera.subtitulo}
       volver="/contar/escanear"
       estadoRed="en_linea"
-      acciones={
-        <Button type="submit" form="buscar-codigo" className="min-h-14 font-semibold">
+      principal={
+        <Boton type="submit" form="buscar-codigo" tamano="accion">
           Buscar
-        </Button>
+        </Boton>
       }
     >
-      <h1 className="text-xl font-semibold tracking-tight">Escribir código</h1>
+      <EncabezadoPagina titulo="Escribir código" />
       {estado === 'error' && (
-        <Alert variant="warning">
-          <CameraOff />
-          <AlertTitle>Sin acceso a la cámara</AlertTitle>
-          <AlertDescription className="flex flex-col items-start gap-3">
-            Actívala en los permisos del navegador, o escribe el código del sticker.
-            <Button asChild variant="outline" className="min-h-11">
+        <Aviso
+          tono="aviso"
+          icono={<CameraOff aria-hidden="true" />}
+          titulo="Sin acceso a la cámara"
+          accion={
+            <Boton asChild variante="secundario">
               <Link to="/contar/escanear">
                 <RefreshCw />
                 Reintentar cámara
               </Link>
-            </Button>
-          </AlertDescription>
-        </Alert>
+            </Boton>
+          }
+        >
+          Actívala en los permisos del navegador, o escribe el código del sticker.
+        </Aviso>
       )}
-      <form id="buscar-codigo" onSubmit={buscar} noValidate className="flex flex-col gap-2">
-        <Label htmlFor="codigo" className="text-base">Código del sticker</Label>
-        <Input
+      <form id="buscar-codigo" onSubmit={buscar} noValidate>
+        <Campo
           id="codigo"
+          tipo="codigo"
+          grande
+          etiqueta="Código del sticker"
+          ayuda="Está impreso debajo de las barras del sticker."
+          error={error || undefined}
           value={codigo}
           onChange={(e) => {
             setCodigo(e.target.value)
@@ -77,20 +82,16 @@ export default function Escribir() {
           }}
           autoComplete="off"
           enterKeyHint="search"
-          aria-invalid={Boolean(error)}
-          aria-describedby={error ? 'codigo-error' : 'codigo-ayuda'}
-          className="h-14 text-center font-mono text-2xl tracking-widest md:text-2xl"
         />
-        {error ? (
-          <p id="codigo-error" className="text-sm text-destructive">{error}</p>
-        ) : (
-          <p id="codigo-ayuda" className="text-sm text-muted-foreground">Está impreso debajo de las barras del sticker.</p>
-        )}
       </form>
-      <Button variant="ghost" className="min-h-11 self-center text-brand-strong" onClick={() => toast('Buscar por nombre o serial llega con la spec 004')}>
-        <Search />
+      <Boton
+        variante="fantasma"
+        icono={<Search />}
+        className="self-center text-brand-strong"
+        onClick={() => toast('Buscar por nombre o serial llega con la spec 004')}
+      >
         Buscar por nombre o serial
-      </Button>
+      </Boton>
     </CountShell>
   )
 }

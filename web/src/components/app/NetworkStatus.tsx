@@ -1,41 +1,45 @@
-import { Check, LoaderCircle, TriangleAlert, WifiOff, type LucideIcon } from 'lucide-react'
+import { Check, LoaderCircle, TriangleAlert, WifiOff } from 'lucide-react'
+import type { ReactNode } from 'react'
 
+import { Insignia, type TonoInsignia } from '@/components/kit'
 import { cn } from '@/lib/utils'
 
 // Estado de envío del conteo (docs/08 §3.2, R9 de la spec 001b). Siempre
 // ícono + texto; "No confirmado" se ve distinto de "Guardado" (constitución:
 // el servidor manda). Se anuncia con aria-live.
+// Spec 016, T5 (D7): es una Insignia del kit (fondo suave + borde + ícono + texto), a la
+// altura del encabezado del conteo.
 
 export type EstadoRed = 'en_linea' | 'enviando' | 'guardado' | 'no_confirmado' | 'sin_conexion'
 
-const ESTADOS: Record<EstadoRed, { texto: string; clase: string; icono: LucideIcon | null }> = {
-  en_linea: { texto: 'En línea', clase: 'border-success-border bg-success-soft text-success', icono: null },
-  enviando: { texto: 'Enviando…', clase: 'border-border bg-muted text-muted-foreground', icono: LoaderCircle },
-  guardado: { texto: 'Guardado', clase: 'border-success-border bg-success-soft text-success', icono: Check },
-  no_confirmado: { texto: 'No confirmado', clase: 'border-warning-border bg-warning-soft text-warning', icono: TriangleAlert },
-  sin_conexion: { texto: 'Sin conexión', clase: 'border-destructive-border bg-destructive-soft text-destructive', icono: WifiOff },
+// Punto de «En línea»: dentro de un span para que la Insignia no lo agrande a 12 px.
+const PUNTO = (
+  <span className="inline-flex size-3 items-center justify-center">
+    <svg viewBox="0 0 8 8" className="size-2" aria-hidden="true">
+      <circle cx="4" cy="4" r="4" fill="currentColor" />
+    </svg>
+  </span>
+)
+
+const ESTADOS: Record<EstadoRed, { texto: string; tono: TonoInsignia; icono: ReactNode; clase?: string }> = {
+  en_linea: { texto: 'En línea', tono: 'exito', icono: PUNTO },
+  enviando: { texto: 'Enviando…', tono: 'neutro', icono: <LoaderCircle className="animate-spin" aria-hidden="true" />, clase: 'text-muted-foreground' },
+  guardado: { texto: 'Guardado', tono: 'exito', icono: <Check aria-hidden="true" /> },
+  no_confirmado: { texto: 'No confirmado', tono: 'aviso', icono: <TriangleAlert aria-hidden="true" /> },
+  sin_conexion: { texto: 'Sin conexión', tono: 'error', icono: <WifiOff aria-hidden="true" /> },
 }
 
 export function NetworkStatus({ estado, className }: { estado: EstadoRed; className?: string }) {
-  const { texto, clase, icono: Icono } = ESTADOS[estado]
+  const { texto, tono, icono, clase } = ESTADOS[estado]
   return (
-    <span
+    <Insignia
       role="status"
       aria-live="polite"
-      className={cn(
-        'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium whitespace-nowrap',
-        clase,
-        className,
-      )}
+      tono={tono}
+      icono={icono}
+      className={cn('h-7 gap-1.5 px-2.5 [&>svg]:size-3.5!', clase, className)}
     >
-      {Icono ? (
-        <Icono className={cn('size-3.5', estado === 'enviando' && 'animate-spin')} aria-hidden="true" />
-      ) : (
-        <svg viewBox="0 0 8 8" className="size-2" aria-hidden="true">
-          <circle cx="4" cy="4" r="4" fill="currentColor" />
-        </svg>
-      )}
       {texto}
-    </span>
+    </Insignia>
   )
 }

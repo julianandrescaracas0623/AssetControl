@@ -1,12 +1,13 @@
 import { Flashlight, FlashlightOff, LoaderCircle, VideoOff } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Boton } from '@/components/kit'
 import { type CrearLector, clasificarFallo, crearLectorZxing, type FalloCamara, type Lector } from '@/lib/lector'
 
 // Visor del escáner (docs/08 §7.1; spec 004, T8; R9). Lee solo, sin tocar nada; una
 // lectura repetida del mismo código en menos de 1 s se ignora. Si la cámara falla, lo
 // explica y deja la entrada manual a la mano (la pone quien usa el componente).
+// Spec 016, T5: botones del kit (48 px en conteo) y visor con el radio de tarjeta.
 
 const ANTIRREBOTE_MS = 1000
 
@@ -89,7 +90,7 @@ export function Escaner({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className={`relative flex flex-1 items-center justify-center overflow-hidden rounded-2xl bg-ink text-ink-foreground ${className}`}>
+      <div className={`relative flex flex-1 items-center justify-center overflow-hidden rounded-xl bg-ink text-ink-foreground ${className}`}>
         <video ref={video} className="absolute inset-0 size-full object-cover" muted playsInline aria-hidden="true" />
         {fallo ? (
           <div role="alert" className="relative flex max-w-xs flex-col items-center gap-3 px-6 text-center">
@@ -97,9 +98,15 @@ export function Escaner({
             <p className="font-semibold">{fallo.titulo}</p>
             <p className="text-sm text-ink-foreground/80">{fallo.texto}</p>
             {estado !== 'inseguro' && (
-              <Button variant="secondary" className="min-h-11" onClick={() => { setEstado('iniciando'); setIntento((n) => n + 1) }}>
+              <Boton
+                variante="secundario"
+                onClick={() => {
+                  setEstado('iniciando')
+                  setIntento((n) => n + 1)
+                }}
+              >
                 Reintentar la cámara
-              </Button>
+              </Boton>
             )}
           </div>
         ) : (
@@ -130,10 +137,15 @@ export function Escaner({
         </p>
       </div>
       {lector?.linterna && (
-        <Button variant="outline" className="min-h-11 self-end" aria-pressed={linterna} onClick={() => void cambiarLinterna()}>
-          {linterna ? <FlashlightOff /> : <Flashlight />}
+        <Boton
+          variante="secundario"
+          className="self-end"
+          aria-pressed={linterna}
+          icono={linterna ? <FlashlightOff /> : <Flashlight />}
+          onClick={() => void cambiarLinterna()}
+        >
           {linterna ? 'Apagar linterna' : 'Linterna'}
-        </Button>
+        </Boton>
       )}
     </div>
   )

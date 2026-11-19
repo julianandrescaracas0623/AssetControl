@@ -64,6 +64,12 @@ export function MarcoCampo({ id, etiqueta, ayuda, error, obligatorio, className,
 /** Clases comunes de los controles de una línea. */
 const CONTROL = 'h-control bg-card px-3 text-base shadow-xs disabled:bg-muted md:text-sm'
 
+/**
+ * Campo protagonista: alto de acción en lugar de h-control (tailwind-merge no reconoce
+ * las alturas de la densidad, así que no se ponen las dos) y letra de 24 px.
+ */
+const GRANDE = 'h-accion bg-card px-3 text-center text-2xl tracking-widest shadow-xs disabled:bg-muted md:text-2xl'
+
 type InputNativo = Omit<ComponentProps<'input'>, 'id' | 'className' | 'children'>
 type TextareaNativo = Omit<ComponentProps<'textarea'>, 'id' | 'className' | 'children'>
 
@@ -77,6 +83,11 @@ type CampoEntrada = CampoBase &
      * mucho `size-control` y lleva nombre propio; el texto no queda debajo de él.
      */
     sufijo?: ReactNode
+    /**
+     * El campo protagonista de la pantalla (el código del sticker en «Escribir código»):
+     * alto de acción (56 px), letra de 24 px, centrado. Solo uno por pantalla.
+     */
+    grande?: boolean
   }
 type CampoArea = CampoBase & TextareaNativo & { tipo: 'area' }
 type CampoSeleccion = CampoBase & {
@@ -164,7 +175,7 @@ export function Campo(props: CampoProps) {
     )
   }
 
-  const { tipo = 'texto', sufijo, ...nativo } = resto
+  const { tipo = 'texto', sufijo, grande = false, ...nativo } = resto
   const { clase, inputMode } = ENTRADA[tipo]
   const control = (
     <Input
@@ -175,7 +186,7 @@ export function Campo(props: CampoProps) {
       aria-describedby={describedBy}
       aria-invalid={error ? true : nativo['aria-invalid']}
       aria-required={obligatorio || nativo['aria-required']}
-      className={cn(CONTROL, clase, sufijo !== undefined && 'pr-12')}
+      className={cn(grande ? GRANDE : CONTROL, clase, sufijo !== undefined && 'pr-12')}
     />
   )
   const conSufijo =

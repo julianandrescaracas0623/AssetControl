@@ -1,5 +1,5 @@
 import { EstadoActivoBadge } from '@/components/app/EstadoActivoBadge'
-import { Badge } from '@/components/ui/badge'
+import { Insignia, ListaDatos, Panel } from '@/components/kit'
 import { formatCOP } from '@/lib/format'
 import type { Rol } from '@/lib/api/cliente'
 import type { EstadoActivo } from '@/mocks/datos-ficticios'
@@ -7,6 +7,8 @@ import type { EstadoActivo } from '@/mocks/datos-ficticios'
 // Tarjeta del activo (docs/08 §3.2). El precio solo existe para el admin
 // (P13): para el contador no hay fila, hueco ni marcador. Es presentación; el
 // servidor no envía el precio al contador.
+// Spec 016, T5: título con la escala nombrada, código en mono, categoría y estado como
+// insignias del kit, y los datos en un Panel con ListaDatos (que no pinta lo ausente).
 
 export interface ActivoTarjeta {
   codigo: string
@@ -22,25 +24,21 @@ export function AssetCard({ activo, rol, titulo: Titulo = 'h2' }: { activo: Acti
   return (
     <article className="flex min-w-0 flex-col gap-3">
       <div className="flex min-w-0 flex-col gap-2">
-        <Titulo className="text-[22px] leading-7 font-semibold tracking-tight break-words md:text-lg">{activo.nombre}</Titulo>
+        <Titulo className="text-titulo-pagina break-words">{activo.nombre}</Titulo>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-lg md:text-sm">{activo.codigo}</span>
-          <Badge variant="outline">{activo.categoria}</Badge>
+          <span className="rounded-md border bg-card px-2 py-0.5 font-mono text-codigo">{activo.codigo}</span>
+          <Insignia tono="neutro">{activo.categoria}</Insignia>
           <EstadoActivoBadge estado={activo.estado} />
         </div>
       </div>
-      <dl className="divide-y rounded-xl border px-4">
-        <div className="flex min-h-12 items-center justify-between gap-3 py-2">
-          <dt className="shrink-0 text-sm text-muted-foreground">Ubicación esperada</dt>
-          <dd className="min-w-0 truncate text-right font-medium">{activo.ubicacion}</dd>
-        </div>
-        {verPrecio && (
-          <div className="flex min-h-12 items-center justify-between gap-3 py-2">
-            <dt className="shrink-0 text-sm text-muted-foreground">Precio de referencia</dt>
-            <dd className="font-medium tabular-nums">{formatCOP(activo.precio!)}</dd>
-          </div>
-        )}
-      </dl>
+      <Panel relleno={false} className="px-4">
+        <ListaDatos
+          datos={[
+            { rotulo: 'Ubicación esperada', valor: <span className="block truncate font-medium">{activo.ubicacion}</span> },
+            verPrecio && { rotulo: 'Precio de referencia', valor: formatCOP(activo.precio!), tipo: 'cifra' },
+          ]}
+        />
+      </Panel>
     </article>
   )
 }
