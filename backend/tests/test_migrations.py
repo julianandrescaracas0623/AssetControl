@@ -50,6 +50,7 @@ CIERRE = "0011_cierre_e_informe"
 SUPABASE_FUNCIONES = "0012_funciones_sin_supabase"
 FOTOS = "0013_fotos"
 EMPRESA = "0014_empresa_y_detalle"
+RECUPERACION = "0015_recuperacion_contrasena"
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
 MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
@@ -61,6 +62,7 @@ COUNT_TABLES = ["sesion_conteo", "verificacion"]
 CLOSE_TABLES = ["sesion_desglose", "sesion_no_encontrado"]
 PHOTO_TABLES = ["foto"]
 COMPANY_TABLES = ["empresa", "empresa_logo", "sesion_detalle", "sesion_empresa"]
+RECOVERY_TABLES = ["recuperacion_contrasena"]
 
 APP_URL = "postgresql+psycopg://assetcontrol_app:valor-secreto-app@db.invalid:5432/assetcontrol"
 MIGRATOR_URL = "postgresql+psycopg://postgres:valor-secreto-migr@db.invalid:5432/assetcontrol"
@@ -198,8 +200,9 @@ def test_revision_chain():
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == [EMPRESA]
+    assert script.get_heads() == [RECUPERACION]
     assert [r.revision for r in revisions] == [
+        RECUPERACION,
         EMPRESA,
         FOTOS,
         SUPABASE_FUNCIONES,
@@ -215,20 +218,21 @@ def test_revision_chain():
         ACCESO,
         BASELINE,
     ]
-    assert revisions[0].down_revision == FOTOS
-    assert revisions[1].down_revision == SUPABASE_FUNCIONES
-    assert revisions[2].down_revision == CIERRE
-    assert revisions[3].down_revision == DISCREPANCIAS
-    assert revisions[4].down_revision == CONTEO
-    assert revisions[5].down_revision == CAMBIOS
-    assert revisions[6].down_revision == ACTIVOS
-    assert revisions[7].down_revision == CATALOGO
-    assert revisions[8].down_revision == LIMITE_TASA
-    assert revisions[9].down_revision == FUNCIONES
-    assert revisions[10].down_revision == POLITICAS
-    assert revisions[11].down_revision == ACCESO
-    assert revisions[12].down_revision == BASELINE
-    assert revisions[13].down_revision is None
+    assert revisions[0].down_revision == EMPRESA
+    assert revisions[1].down_revision == FOTOS
+    assert revisions[2].down_revision == SUPABASE_FUNCIONES
+    assert revisions[3].down_revision == CIERRE
+    assert revisions[4].down_revision == DISCREPANCIAS
+    assert revisions[5].down_revision == CONTEO
+    assert revisions[6].down_revision == CAMBIOS
+    assert revisions[7].down_revision == ACTIVOS
+    assert revisions[8].down_revision == CATALOGO
+    assert revisions[9].down_revision == LIMITE_TASA
+    assert revisions[10].down_revision == FUNCIONES
+    assert revisions[11].down_revision == POLITICAS
+    assert revisions[12].down_revision == ACCESO
+    assert revisions[13].down_revision == BASELINE
+    assert revisions[14].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -351,6 +355,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
             *CLOSE_TABLES,
             *PHOTO_TABLES,
             *COMPANY_TABLES,
+            *RECOVERY_TABLES,
         ]
     )
 
@@ -358,7 +363,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [EMPRESA])
+    assert _public_state(migrate_env) == (with_auth, [RECUPERACION])
     assert _schema_exists(migrate_env, "acceso")
 
     command.downgrade(config, "base")
@@ -367,7 +372,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [EMPRESA])
+    assert _public_state(migrate_env) == (with_auth, [RECUPERACION])
     assert _schema_exists(migrate_env, "acceso")
 
 
@@ -660,6 +665,111 @@ def test_0014_up_down_up_touches_only_the_company_and_detail_tables(migrate_env)
 
     command.upgrade(config, EMPRESA)
     assert _public_state(migrate_env) == (sorted([*before, *COMPANY_TABLES]), [EMPRESA])
+
+
+RECOVERY_SCOPES = ("recuperar_ip", "recuperar_cuenta", "restablecer_ip")
+
+
+def _limite_tasa_scope_check(url: URL) -> list[tuple[str, str]]:
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            return [
+                tuple(row)
+                for row in conn.execute(
+                    text(
+                        "select conname, pg_get_constraintdef(oid) from pg_constraint "
+                        "where conrelid = 'public.limite_tasa'::regclass and contype = 'c' "
+                        "and pg_get_constraintdef(oid) like '%ambito%'"
+                    )
+                )
+            ]
+    finally:
+        engine.dispose()
+
+
+def _limite_tasa_scopes(url: URL) -> list[str]:
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            return list(conn.scalars(text("select ambito from limite_tasa order by 1")))
+    finally:
+        engine.dispose()
+
+
+def _count(url: URL, scopes: tuple[str, ...]) -> None:
+    """Siembra un contador reciente por ámbito (el migrador local es superusuario)."""
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.begin() as conn:
+            for scope in scopes:
+                conn.execute(
+                    text(
+                        "insert into limite_tasa (ambito, clave_hash, ventana_inicio, intentos) "
+                        "values (:a, :h, now(), 1)"
+                    ),
+                    {"a": scope, "h": uuid.uuid4().bytes * 2},
+                )
+    finally:
+        engine.dispose()
+
+
+def test_0015_up_down_up_touches_only_the_recovery_table_and_the_scope_check(migrate_env):
+    # Spec 014, T1: 0015 crea recuperacion_contrasena y amplía el CHECK de ambito de
+    # limite_tasa; el downgrade deja todo como en 0014 (sin funciones ni cambios del dueño).
+    config = alembic_config()
+    before = sorted(
+        [
+            "alembic_version",
+            "limite_tasa",
+            *AUTH_TABLES,
+            *CATALOG_TABLES,
+            *ASSET_TABLES,
+            *COUNT_TABLES,
+            *CLOSE_TABLES,
+            *PHOTO_TABLES,
+            *COMPANY_TABLES,
+        ]
+    )
+    command.upgrade(config, EMPRESA)
+    owner_before = _owner_state(migrate_env)
+    funciones_before = _public_functions(migrate_env)
+    acceso_before = _acceso_state(migrate_env)
+    check_before = _limite_tasa_scope_check(migrate_env)
+    assert len(check_before) == 1
+    assert not any(scope in check_before[0][1] for scope in RECOVERY_SCOPES)
+
+    command.upgrade(config, RECUPERACION)
+    assert _public_state(migrate_env) == (sorted([*before, *RECOVERY_TABLES]), [RECUPERACION])
+    assert _policy_names(migrate_env, "recuperacion_contrasena") == ["tenant_isolation"]
+    assert _public_functions(migrate_env) == funciones_before
+    assert _acceso_state(migrate_env) == acceso_before
+    assert _owner_state(migrate_env) == owner_before
+    check_after = _limite_tasa_scope_check(migrate_env)
+    assert [name for name, _ in check_after] == [check_before[0][0]]
+    assert all(scope in check_after[0][1] for scope in RECOVERY_SCOPES)
+
+    command.downgrade(config, EMPRESA)
+    assert _public_state(migrate_env) == (before, [EMPRESA])
+    assert _limite_tasa_scope_check(migrate_env) == check_before
+    assert _owner_state(migrate_env) == owner_before
+
+    command.upgrade(config, RECUPERACION)
+    assert _public_state(migrate_env) == (sorted([*before, *RECOVERY_TABLES]), [RECUPERACION])
+
+
+def test_0015_downgrade_drops_only_the_counters_of_the_new_scopes(migrate_env):
+    # plan.md §3.2: el CHECK anterior no admite los ámbitos nuevos; el downgrade borra
+    # solo esos contadores (infraestructura, sin datos de negocio) y conserva los demás.
+    config = alembic_config()
+    command.upgrade(config, RECUPERACION)
+    _count(migrate_env, ("login_ip", "aceptar_ip", *RECOVERY_SCOPES))
+
+    command.downgrade(config, EMPRESA)
+    assert _limite_tasa_scopes(migrate_env) == ["aceptar_ip", "login_ip"]
+
+    command.upgrade(config, RECUPERACION)
+    assert _limite_tasa_scopes(migrate_env) == ["aceptar_ip", "login_ip"]
 
 
 def _activo_update_columns(url: URL) -> list[str]:

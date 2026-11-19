@@ -83,3 +83,24 @@ class RefreshToken(TenantScoped, Base):
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=FetchedValue()
     )
+
+
+class RecuperacionContrasena(TenantScoped, Base):
+    """Enlace de recuperación de contraseña (spec 014; migración ``0015``).
+
+    Solo describe el esquema: la aplicación no tiene ningún privilegio sobre la tabla
+    (R15) y la opera únicamente por las funciones ``acceso.*`` (T2). ``token_hash`` se
+    mapea diferido con ``raiseload`` para que ningún ``SELECT`` del ORM lo pida.
+    """
+
+    __tablename__ = "recuperacion_contrasena"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, server_default=FetchedValue())
+    usuario_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary, deferred=True, deferred_raiseload=True)
+    expira_en: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    usada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    invalidada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=FetchedValue()
+    )

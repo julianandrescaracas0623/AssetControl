@@ -86,6 +86,7 @@ TENANT_TABLES = frozenset(
         "empresa_logo",
         "sesion_empresa",
         "sesion_detalle",
+        "recuperacion_contrasena",
     }
 )
 
@@ -221,6 +222,15 @@ EXPECTED_POLICIES = {
         ISOLATION_EXPR,
     ),
     ("sesion_detalle", "tenant_isolation"): (
+        "PERMISSIVE",
+        "ALL",
+        "{app}",
+        ISOLATION_EXPR,
+        ISOLATION_EXPR,
+    ),
+    # Spec 014, T1 (0015): la política existe por catálogo y defensa en profundidad; la
+    # aplicación no tiene ningún GRANT sobre la tabla (solo la operan las funciones acceso.*).
+    ("recuperacion_contrasena", "tenant_isolation"): (
         "PERMISSIVE",
         "ALL",
         "{app}",
@@ -505,6 +515,8 @@ EXPECTED_APP_COLUMNS = {
         "SELECT": {*VERIFICACION_INSERT, "recibido_en", "seq"},
         "INSERT": VERIFICACION_INSERT,
     },
+    # Spec 014, T1 (0015): ningún privilegio, ni SELECT (R15).
+    "recuperacion_contrasena": {},
 }
 # Privilegios a nivel de tabla del rol de la aplicación (sin columnas).
 
@@ -529,6 +541,7 @@ EXPECTED_APP_TABLE_PRIVILEGES = {
     "empresa_logo": {"SELECT"},
     "sesion_empresa": {"SELECT"},
     "sesion_detalle": {"SELECT"},
+    "recuperacion_contrasena": set(),
 }
 
 
@@ -700,6 +713,8 @@ EXPECTED_OWNER_COLUMNS = {
     "empresa_logo": {},
     "sesion_empresa": {},
     "sesion_detalle": {},
+    # Spec 014: T1 (0015) no le concede nada; sus GRANT por columna son de T2 (0016).
+    "recuperacion_contrasena": {},
 }
 TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
 COLUMN_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "REFERENCES")
@@ -1440,8 +1455,10 @@ def test_keys_and_checks(conn):
     }
     assert _constraints(conn, "limite_tasa") == {
         "PRIMARY KEY (ambito, clave_hash, ventana_inicio)",
+        # Spec 014, T1 (0015): ámbitos de recuperar y restablecer contraseña.
         "CHECK ((ambito = ANY (ARRAY['login_ip'::text, 'login_cuenta'::text, "
-        "'refresh_ip'::text, 'validar_ip'::text, 'aceptar_ip'::text])))",
+        "'refresh_ip'::text, 'validar_ip'::text, 'aceptar_ip'::text, "
+        "'recuperar_ip'::text, 'recuperar_cuenta'::text, 'restablecer_ip'::text])))",
         "CHECK ((octet_length(clave_hash) = 32))",
         "CHECK ((intentos >= 0))",
     }
@@ -1517,3 +1534,6 @@ def test_models_never_select_the_hash_columns_by_default():
     invitacion_sql = str(select(models.Invitacion))
     assert "password_hash" not in usuario_sql
     assert "token_hash" not in invitacion_sql
+    # Spec 014, T1: la aplicación no tiene privilegios sobre la tabla; el modelo tampoco
+    # pediría el hash.
+    assert "token_hash" not in str(select(models.RecuperacionContrasena))
