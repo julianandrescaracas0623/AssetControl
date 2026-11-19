@@ -95,6 +95,9 @@ def test_access_functions_belong_to_auth_owner_and_only_the_app_runs_them():
         "buscar_login",
         "crear_tenant",
         "validar_invitacion",
+        # Spec 014, T2 (0016).
+        "solicitar_recuperacion",
+        "restablecer_contrasena",
     }
     for nombre, dueno, acl in filas:
         assert dueno == roles.AUTH_OWNER, nombre

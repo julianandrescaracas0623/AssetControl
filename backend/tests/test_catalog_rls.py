@@ -561,6 +561,128 @@ def _uuid_guc(guc: str) -> str:
     return f"CASE WHEN ({setting} ~ '{pattern}'::text) THEN ({setting})::uuid ELSE NULL::uuid END"
 
 
+def _text_guc(guc: str) -> str:
+    """Texto de pg_policies del texto de ``guc`` (``NULLIF(..., '')``, 0003)."""
+    return f"NULLIF(current_setting('{guc}'::text, true), ''::text)"
+
+
+# Spec 014, T2 (0016): políticas del dueño para acceso.solicitar_recuperacion (GUC
+# app.auth_rec_*) y acceso.restablecer_contrasena (GUC app.auth_reset_*), una por comando,
+# nunca FOR ALL. La invalidación no filtra por expiración (M1); el INSERT exige 30 minutos
+# como máximo, sin marcas, y exactamente una membresía activa, la del tenant del enlace; el
+# cambio de contraseña y la revocación exigen un enlace consumido en esta transacción.
+_REC_EMAIL = _text_guc("app.auth_rec_email")
+_REC_USUARIO = _uuid_guc("app.auth_rec_usuario")
+_REC_CLAVE = _key_guc("app.auth_rec_clave")
+_RESET_CLAVE = _key_guc("app.auth_reset_clave")
+_RESET_USUARIO = _uuid_guc("app.auth_reset_usuario")
+_PENDIENTE = "(usada_en IS NULL) AND (invalidada_en IS NULL)"
+
+
+def _consumido(usuario: str) -> str:
+    """``EXISTS`` de un enlace de ``usuario`` consumido en esta transacción con la clave."""
+    return (
+        "(EXISTS ( SELECT 1 FROM recuperacion_contrasena r "  # noqa: S608
+        f"WHERE ((r.usuario_id = {usuario}) AND (r.token_hash = {_RESET_CLAVE}) "
+        "AND (r.usada_en = now()))))"
+    )
+
+
+RECOVERY_OWNER_POLICIES = {
+    ("usuario", "dueno_usuario_recuperar"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"((email = {_REC_EMAIL}) AND activo)",
+        None,
+    ),
+    ("usuario", "dueno_usuario_restablecer"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"(id = {_RESET_USUARIO})",
+        None,
+    ),
+    ("usuario", "dueno_usuario_cambiar_clave"): (
+        "PERMISSIVE",
+        "UPDATE",
+        f"((id = {_RESET_USUARIO}) AND activo AND {_consumido('usuario.id')})",
+        f"((id = {_RESET_USUARIO}) AND activo)",
+    ),
+    ("membresia", "dueno_membresia_recuperar"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"(usuario_id = {_REC_USUARIO})",
+        None,
+    ),
+    ("membresia", "dueno_membresia_restablecer"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"(usuario_id = {_RESET_USUARIO})",
+        None,
+    ),
+    ("recuperacion_contrasena", "dueno_recuperacion_solicitar"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"(usuario_id = {_REC_USUARIO})",
+        None,
+    ),
+    ("recuperacion_contrasena", "dueno_recuperacion_crear"): (
+        "PERMISSIVE",
+        "INSERT",
+        None,
+        f"((usuario_id = {_REC_USUARIO}) AND (token_hash = {_REC_CLAVE}) "  # noqa: S608
+        f"AND {_PENDIENTE} AND (expira_en > now()) "
+        "AND (expira_en <= (now() + '00:30:00'::interval)) "
+        "AND (EXISTS ( SELECT 1 FROM membresia m "
+        "WHERE ((m.tenant_id = recuperacion_contrasena.tenant_id) "
+        "AND (m.usuario_id = recuperacion_contrasena.usuario_id) AND m.activa))) "
+        "AND (NOT (EXISTS ( SELECT 1 FROM membresia m "
+        "WHERE ((m.usuario_id = recuperacion_contrasena.usuario_id) "
+        "AND (m.tenant_id <> recuperacion_contrasena.tenant_id) AND m.activa)))))",
+    ),
+    ("recuperacion_contrasena", "dueno_recuperacion_invalidar"): (
+        "PERMISSIVE",
+        "UPDATE",
+        f"((usuario_id = {_REC_USUARIO}) AND {_PENDIENTE})",
+        "((invalidada_en = now()) AND (usada_en IS NULL))",
+    ),
+    ("recuperacion_contrasena", "dueno_recuperacion_restablecer"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"((token_hash = {_RESET_CLAVE}) OR (usuario_id = {_RESET_USUARIO}))",
+        None,
+    ),
+    ("recuperacion_contrasena", "dueno_recuperacion_consumir"): (
+        "PERMISSIVE",
+        "UPDATE",
+        f"((token_hash = {_RESET_CLAVE}) AND {_PENDIENTE} AND (expira_en > now()))",
+        "((usada_en = now()) AND (invalidada_en IS NULL))",
+    ),
+    ("recuperacion_contrasena", "dueno_recuperacion_invalidar_otros"): (
+        "PERMISSIVE",
+        "UPDATE",
+        f"((usuario_id = {_RESET_USUARIO}) AND {_PENDIENTE})",
+        "((invalidada_en = now()) AND (usada_en IS NULL))",
+    ),
+    ("refresh_token", "dueno_refresh_restablecer"): (
+        "PERMISSIVE",
+        "SELECT",
+        "(EXISTS ( SELECT 1 FROM membresia m "  # noqa: S608
+        "WHERE ((m.id = refresh_token.membresia_id) "
+        "AND (m.tenant_id = refresh_token.tenant_id) "
+        f"AND (m.usuario_id = {_RESET_USUARIO}))))",
+        None,
+    ),
+    ("refresh_token", "dueno_refresh_revocar"): (
+        "PERMISSIVE",
+        "UPDATE",
+        "((revocado_en IS NULL) AND (EXISTS ( SELECT 1 FROM membresia m "  # noqa: S608
+        "WHERE ((m.id = refresh_token.membresia_id) "
+        "AND (m.tenant_id = refresh_token.tenant_id) "
+        f"AND (m.usuario_id = {_RESET_USUARIO}) AND {_consumido('m.usuario_id')}))))",
+        "(revocado_en = now())",
+    ),
+}
+
 # Catálogo cerrado C6 (T3): políticas del dueño (0003) con su texto exacto, tal como lo
 # devuelve pg_policies con los espacios normalizados.
 # (tabla, nombre) -> (permissive, cmd, USING, WITH CHECK).
@@ -636,6 +758,7 @@ EXPECTED_OWNER_POLICIES = {
         f"((id = {_uuid_guc('app.auth_tenant_nuevo')}) AND (creado_en = now()))",
         None,
     ),
+    **RECOVERY_OWNER_POLICIES,
 }
 
 # Catálogo cerrado C6 (T3): funciones de acceso (0004).
@@ -671,12 +794,34 @@ EXPECTED_FUNCTIONS = {
         "d2f0e9fef94935d417a6b7a54ef5048951ace8df125fdcb2628ddc90fcfca589",
         "migrator",
     ),
+    # Spec 014, T2 (0016).
+    "solicitar_recuperacion": (
+        "p_email text, p_clave text",
+        "boolean",
+        {"app.auth_rec_email", "app.auth_rec_usuario", "app.auth_rec_clave"},
+        "5f0948c2c2d9abca3d636a536107bc231e876f00bf0b4433e6e4059bb3ca8797",
+        "app",
+    ),
+    "restablecer_contrasena": (
+        "p_clave text, p_password_hash text",
+        "uuid",
+        {"app.auth_reset_clave", "app.auth_reset_usuario"},
+        # I1 de la revisión de T2 y B1 de la auditoría: formato completo del hash de
+        # argon2-cffi sin barras invertidas y como máximo 255 caracteres. H1: revocación
+        # de refresh repetida hasta NOT FOUND (tope de 10 pasadas).
+        "5c610ef358b4b823cafc24f1a5aaa7e183d404b91518995d52308b172a065b68",
+        "app",
+    ),
 }
 FUNCTION_CALLS = {
     "buscar_login": "select * from acceso.buscar_login('x@ejemplo.test')",
     "validar_invitacion": "select acceso.validar_invitacion('" + "0" * 64 + "')",
     "aceptar_invitacion": "select * from acceso.aceptar_invitacion('" + "0" * 64 + "', 'x', 'h')",
     "crear_tenant": "select acceso.crear_tenant('x', 'x@ejemplo.test', '" + "0" * 64 + "')",
+    "solicitar_recuperacion": (
+        "select acceso.solicitar_recuperacion('x@ejemplo.test', '" + "0" * 64 + "')"
+    ),
+    "restablecer_contrasena": "select acceso.restablecer_contrasena('" + "0" * 64 + "', 'h')",
 }
 # GRANT de auth_owner (0003): tabla -> privilegio -> columnas; nada a nivel de tabla.
 EXPECTED_OWNER_COLUMNS = {
@@ -684,9 +829,12 @@ EXPECTED_OWNER_COLUMNS = {
     # SELECT solo de id y creado_en, y solo de la fila creada en su transacción (I2);
     # creado_en nunca en INSERT.
     "tenant": {"INSERT": {"id", "nombre"}, "SELECT": {"id", "creado_en"}},
+    # Spec 014, T2 (0016): UPDATE solo de password_hash (restablecer_contrasena). El SELECT
+    # de password_hash es el de 0003 (buscar_login); 0016 no añade ningún SELECT.
     "usuario": {
         "SELECT": {"id", "email", "password_hash", "activo"},
         "INSERT": {"id", "email", "nombre", "password_hash"},
+        "UPDATE": {"password_hash"},
     },
     # Sin INSERT de id en membresia ni invitacion (M3): lo pone el DEFAULT.
     "membresia": {
@@ -698,7 +846,9 @@ EXPECTED_OWNER_COLUMNS = {
         "UPDATE": {"usada_en"},
         "INSERT": {"tenant_id", "email", "rol", "token_hash", "expira_en"},
     },
-    "refresh_token": {},
+    # Spec 014, T2 (0016): revocar las familias del usuario que restablece (WHERE de
+    # membresia_id y revocado_en; solo se escribe revocado_en).
+    "refresh_token": {"SELECT": {"membresia_id", "revocado_en"}, "UPDATE": {"revocado_en"}},
     "limite_tasa": {},
     "ubicacion": {},
     "categoria": {},
@@ -713,8 +863,20 @@ EXPECTED_OWNER_COLUMNS = {
     "empresa_logo": {},
     "sesion_empresa": {},
     "sesion_detalle": {},
-    # Spec 014: T1 (0015) no le concede nada; sus GRANT por columna son de T2 (0016).
-    "recuperacion_contrasena": {},
+    # Spec 014, T2 (0016): sin id ni creado_en (los pone el DEFAULT), sin DELETE; solo se
+    # marcan usada_en e invalidada_en.
+    "recuperacion_contrasena": {
+        "SELECT": {
+            "tenant_id",
+            "usuario_id",
+            "token_hash",
+            "expira_en",
+            "usada_en",
+            "invalidada_en",
+        },
+        "INSERT": {"tenant_id", "usuario_id", "token_hash", "expira_en"},
+        "UPDATE": {"usada_en", "invalidada_en"},
+    },
 }
 TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
 COLUMN_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "REFERENCES")

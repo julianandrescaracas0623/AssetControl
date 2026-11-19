@@ -383,7 +383,10 @@ def test_rls_is_enabled_and_forced_with_only_tenant_isolation(db):
             {"t": TABLE},
         ).all()
     assert tuple(flags) == (True, True)
-    assert [tuple(p) for p in policies] == [
+    # Spec 014, T2 (0016): el resto son las políticas del dueño, por comando y nunca
+    # FOR ALL; su texto exacto lo fija el catálogo (test_catalog_rls.py).
+    app_policies = [tuple(p) for p in policies if p[3] != "{" + AUTH_OWNER + "}"]
+    assert app_policies == [
         (
             "tenant_isolation",
             "PERMISSIVE",
@@ -393,9 +396,17 @@ def test_rls_is_enabled_and_forced_with_only_tenant_isolation(db):
             ISOLATION_EXPR,
         )
     ]
+    assert {p[2] for p in policies if p[3] == "{" + AUTH_OWNER + "}"} == {
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+    }
 
 
-def test_nobody_but_the_owner_has_privileges_on_the_table(db):
+def test_nobody_but_the_owner_has_table_privileges_and_the_app_has_none(db):
+    # Spec 014, T2 (0016): auth_owner recibe solo GRANT por columna (su lista exacta está
+    # en test_catalog_rls.py); a nivel de tabla nadie más que el dueño, y la aplicación
+    # nada, ni por columna.
     with rolled_back(db.migrator) as conn:
         acl = conn.execute(
             text(
@@ -406,12 +417,15 @@ def test_nobody_but_the_owner_has_privileges_on_the_table(db):
             ),
             {"t": f"public.{TABLE}"},
         ).all()
-        column_acl = conn.scalar(
-            text(
-                "select count(*) from pg_attribute "
-                "where attrelid = to_regclass(:t) and attacl is not null"
-            ),
-            {"t": f"public.{TABLE}"},
+        column_grantees = set(
+            conn.scalars(
+                text(
+                    "select distinct a.grantee::regrole::text from pg_attribute t "
+                    "cross join lateral aclexplode(t.attacl) a "
+                    "where t.attrelid = to_regclass(:t) and t.attacl is not null"
+                ),
+                {"t": f"public.{TABLE}"},
+            )
         )
         privileges = set()
         for role in (db.app_role, AUTH_OWNER):
@@ -424,8 +438,12 @@ def test_nobody_but_the_owner_has_privileges_on_the_table(db):
                 if conn.scalar(text("select has_any_column_privilege(:r, :t, :p)"), params):
                     privileges.add((role, f"{privilege} (columna)"))
     assert acl == []
-    assert column_acl == 0
-    assert privileges == set()
+    assert column_grantees == {AUTH_OWNER}
+    assert privileges == {
+        (AUTH_OWNER, "SELECT (columna)"),
+        (AUTH_OWNER, "INSERT (columna)"),
+        (AUTH_OWNER, "UPDATE (columna)"),
+    }
 
 
 @pytest.mark.parametrize(
@@ -449,11 +467,14 @@ def test_the_app_is_denied_every_command_even_with_a_tenant(db, statement, tenan
     assert "permission denied" in message
 
 
-def test_auth_owner_has_no_access_yet(db):
-    # T2 (0016) le dará sus políticas por comando; T1 no le concede nada.
+def test_auth_owner_without_its_gucs_sees_nothing_and_cannot_delete(db):
+    # Spec 014, T2 (0016): auth_owner tiene sus políticas por comando, pero sin las GUC
+    # de las funciones acceso.* no ve ninguna fila; DELETE nunca.
     with rolled_back(db.migrator) as conn:
+        insert(conn)
         conn.exec_driver_sql(f'SET LOCAL ROLE "{AUTH_OWNER}"')
-        fails(conn, INSUFFICIENT_PRIVILEGE, f"select count(*) from {TABLE}")  # noqa: S608
+        assert conn.scalar(text(f"select count(usuario_id) from {TABLE}")) == 0  # noqa: S608
+        fails(conn, INSUFFICIENT_PRIVILEGE, f"delete from {TABLE}")  # noqa: S608
 
 
 def test_tenant_isolation_still_isolates_if_a_grant_slipped_in(db):

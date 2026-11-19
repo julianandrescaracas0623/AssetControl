@@ -51,9 +51,11 @@ SUPABASE_FUNCIONES = "0012_funciones_sin_supabase"
 FOTOS = "0013_fotos"
 EMPRESA = "0014_empresa_y_detalle"
 RECUPERACION = "0015_recuperacion_contrasena"
+FUNCIONES_RECUPERACION = "0016_funciones_recuperacion"
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
 MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
+MIGRATION_0016 = BACKEND_DIR / "migrations" / "versions" / "0016_funciones_recuperacion.py"
 APP_ROLE_VAR = "APP_DB_USER"
 AUTH_TABLES = ["invitacion", "membresia", "refresh_token", "tenant", "usuario"]
 CATALOG_TABLES = ["categoria", "ubicacion"]
@@ -200,8 +202,9 @@ def test_revision_chain():
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == [RECUPERACION]
+    assert script.get_heads() == [FUNCIONES_RECUPERACION]
     assert [r.revision for r in revisions] == [
+        FUNCIONES_RECUPERACION,
         RECUPERACION,
         EMPRESA,
         FOTOS,
@@ -218,21 +221,22 @@ def test_revision_chain():
         ACCESO,
         BASELINE,
     ]
-    assert revisions[0].down_revision == EMPRESA
-    assert revisions[1].down_revision == FOTOS
-    assert revisions[2].down_revision == SUPABASE_FUNCIONES
-    assert revisions[3].down_revision == CIERRE
-    assert revisions[4].down_revision == DISCREPANCIAS
-    assert revisions[5].down_revision == CONTEO
-    assert revisions[6].down_revision == CAMBIOS
-    assert revisions[7].down_revision == ACTIVOS
-    assert revisions[8].down_revision == CATALOGO
-    assert revisions[9].down_revision == LIMITE_TASA
-    assert revisions[10].down_revision == FUNCIONES
-    assert revisions[11].down_revision == POLITICAS
-    assert revisions[12].down_revision == ACCESO
-    assert revisions[13].down_revision == BASELINE
-    assert revisions[14].down_revision is None
+    assert revisions[0].down_revision == RECUPERACION
+    assert revisions[1].down_revision == EMPRESA
+    assert revisions[2].down_revision == FOTOS
+    assert revisions[3].down_revision == SUPABASE_FUNCIONES
+    assert revisions[4].down_revision == CIERRE
+    assert revisions[5].down_revision == DISCREPANCIAS
+    assert revisions[6].down_revision == CONTEO
+    assert revisions[7].down_revision == CAMBIOS
+    assert revisions[8].down_revision == ACTIVOS
+    assert revisions[9].down_revision == CATALOGO
+    assert revisions[10].down_revision == LIMITE_TASA
+    assert revisions[11].down_revision == FUNCIONES
+    assert revisions[12].down_revision == POLITICAS
+    assert revisions[13].down_revision == ACCESO
+    assert revisions[14].down_revision == BASELINE
+    assert revisions[15].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -363,7 +367,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [RECUPERACION])
+    assert _public_state(migrate_env) == (with_auth, [FUNCIONES_RECUPERACION])
     assert _schema_exists(migrate_env, "acceso")
 
     command.downgrade(config, "base")
@@ -372,7 +376,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [RECUPERACION])
+    assert _public_state(migrate_env) == (with_auth, [FUNCIONES_RECUPERACION])
     assert _schema_exists(migrate_env, "acceso")
 
 
@@ -772,6 +776,133 @@ def test_0015_downgrade_drops_only_the_counters_of_the_new_scopes(migrate_env):
     assert _limite_tasa_scopes(migrate_env) == ["aceptar_ip", "login_ip"]
 
 
+RECOVERY_OWNER_POLICIES = [
+    ("membresia", "dueno_membresia_recuperar"),
+    ("membresia", "dueno_membresia_restablecer"),
+    ("recuperacion_contrasena", "dueno_recuperacion_consumir"),
+    ("recuperacion_contrasena", "dueno_recuperacion_crear"),
+    ("recuperacion_contrasena", "dueno_recuperacion_invalidar"),
+    ("recuperacion_contrasena", "dueno_recuperacion_invalidar_otros"),
+    ("recuperacion_contrasena", "dueno_recuperacion_restablecer"),
+    ("recuperacion_contrasena", "dueno_recuperacion_solicitar"),
+    ("refresh_token", "dueno_refresh_restablecer"),
+    ("refresh_token", "dueno_refresh_revocar"),
+    ("usuario", "dueno_usuario_cambiar_clave"),
+    ("usuario", "dueno_usuario_recuperar"),
+    ("usuario", "dueno_usuario_restablecer"),
+]
+
+
+def test_0016_up_down_up_touches_only_the_recovery_functions_policies_and_grants(migrate_env):
+    # Spec 014, T2: 0016 crea las dos funciones de acceso, las 13 políticas del dueño y sus
+    # GRANT por columna; no crea tablas. El downgrade deja todo exactamente como en 0015.
+    config = alembic_config()
+    command.upgrade(config, RECUPERACION)
+    tables_before = _public_state(migrate_env)[0]
+    policies_before, grants_before = _owner_state(migrate_env)
+    acceso_before = _acceso_state(migrate_env)
+    funciones_before = _public_functions(migrate_env)
+    assert acceso_before == (FUNCTION_NAMES, False, [])
+
+    command.upgrade(config, FUNCIONES_RECUPERACION)
+    assert _public_state(migrate_env) == (tables_before, [FUNCIONES_RECUPERACION])
+    assert _acceso_state(migrate_env) == (HEAD_FUNCTION_NAMES, False, [])
+    policies, grants = _owner_state(migrate_env)
+    assert sorted(set(policies) - set(policies_before)) == RECOVERY_OWNER_POLICIES
+    assert set(policies_before) <= set(policies)
+    assert grants > grants_before
+    assert _public_functions(migrate_env) == funciones_before
+    assert _policy_names(migrate_env, "recuperacion_contrasena") == sorted(
+        [
+            "tenant_isolation",
+            *(p for t, p in RECOVERY_OWNER_POLICIES if t == "recuperacion_contrasena"),
+        ]
+    )
+
+    command.downgrade(config, RECUPERACION)
+    assert _public_state(migrate_env) == (tables_before, [RECUPERACION])
+    assert _owner_state(migrate_env) == (policies_before, grants_before)
+    assert _acceso_state(migrate_env) == acceso_before
+
+    command.upgrade(config, FUNCIONES_RECUPERACION)
+    assert _owner_state(migrate_env) == (policies, grants)
+    assert _acceso_state(migrate_env) == (HEAD_FUNCTION_NAMES, False, [])
+
+
+def _load_migration_0016():
+    spec = importlib.util.spec_from_file_location("migration_0016_under_test", MIGRATION_0016)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_0016_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration_0016()
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+
+    message = str(excinfo.value)
+    assert "0016" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+@pytest.mark.parametrize("step", ["upgrade", "downgrade"])
+def test_0016_without_auth_owner_fails_with_a_clear_message(
+    migration_database_url, app_database_url, monkeypatch, step
+):
+    migration = _load_migration_0016()
+    monkeypatch.setenv(APP_ROLE_VAR, app_database_url.username)
+    missing = f"auth_owner_falta_{uuid.uuid4().hex[:6]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "AUTH_OWNER", missing)
+                with pytest.raises(RuntimeError) as excinfo:
+                    getattr(migration, step)()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "01-app-role.sh" in str(excinfo.value)
+    assert "0016" not in str(excinfo.value)  # no llegó a ejecutar ninguna sentencia
+
+
+@pytest.mark.parametrize("attribute", ["LOGIN", "BYPASSRLS", "CREATEROLE"])
+def test_0016_upgrade_checks_the_auth_owner_attributes(
+    migration_database_url, app_database_url, temp_roles, monkeypatch, attribute
+):
+    name = temp_roles(attribute)
+    migration = _load_migration_0016()
+    monkeypatch.setenv(APP_ROLE_VAR, app_database_url.username)
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "AUTH_OWNER", name)
+                with pytest.raises(RuntimeError) as excinfo:
+                    migration.upgrade()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert name not in str(excinfo.value)
+    assert attribute in str(excinfo.value)
+    assert "0016" not in str(excinfo.value)
+
+
 def _activo_update_columns(url: URL) -> list[str]:
     engine = create_engine(url, poolclass=NullPool)
     try:
@@ -1046,7 +1177,8 @@ def test_downgrade_0003_removes_only_the_owner_policies_and_grants(migrate_env):
     config = alembic_config()
     command.upgrade(config, "head")
     policies, grants = _owner_state(migrate_env)
-    assert len(policies) == 10
+    # 10 de 0003 y 13 de 0016 (spec 014, T2).
+    assert len(policies) == 23
     assert grants > 0
 
     command.downgrade(config, ACCESO)
@@ -1291,17 +1423,24 @@ def _acceso_state(url: URL) -> tuple[list[str], bool, list[str]]:
 
 
 FUNCTION_NAMES = ["aceptar_invitacion", "buscar_login", "crear_tenant", "validar_invitacion"]
+# Spec 014, T2 (0016): las dos de recuperación de contraseña.
+RECOVERY_FUNCTION_NAMES = ["restablecer_contrasena", "solicitar_recuperacion"]
+HEAD_FUNCTION_NAMES = sorted([*FUNCTION_NAMES, *RECOVERY_FUNCTION_NAMES])
 
 
 def test_0004_creates_the_functions_and_leaves_no_create_nor_membership(migrate_env):
-    command.upgrade(alembic_config(), "head")
+    command.upgrade(alembic_config(), FUNCIONES)
     assert _acceso_state(migrate_env) == (FUNCTION_NAMES, False, [])
+    command.upgrade(alembic_config(), "head")
+    assert _acceso_state(migrate_env) == (HEAD_FUNCTION_NAMES, False, [])
 
 
 def test_downgrade_0004_removes_only_the_functions(migrate_env):
     config = alembic_config()
-    command.upgrade(config, "head")
+    # Las políticas y GRANT del dueño de 0003 (0016 añade las suyas y las quita al bajar).
+    command.upgrade(config, FUNCIONES)
     policies, grants = _owner_state(migrate_env)
+    command.upgrade(config, "head")
 
     command.downgrade(config, POLITICAS)
 
@@ -1312,7 +1451,7 @@ def test_downgrade_0004_removes_only_the_functions(migrate_env):
     assert _public_state(migrate_env) == (with_auth, [POLITICAS])
 
     command.upgrade(config, "head")
-    assert _acceso_state(migrate_env) == (FUNCTION_NAMES, False, [])
+    assert _acceso_state(migrate_env) == (HEAD_FUNCTION_NAMES, False, [])
 
 
 def test_0004_missing_auth_owner_fails_with_a_clear_message(migration_database_url):
