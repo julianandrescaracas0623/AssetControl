@@ -305,3 +305,59 @@ describe('TablaDatos: pie (fila de total)', () => {
     expect(document.querySelector('[data-tabla=pie]')).toBeNull()
   })
 })
+
+// Spec 016, T9 (Categorías, Discrepancias): filas nombradas, encabezado solo para el
+// lector y foco que no se pierde al llegar a la primera o la última página.
+describe('TablaDatos: gestión (T9)', () => {
+  it('nombrarFilas: cada fila (y cada tarjeta) se llama como su columna principal', () => {
+    tabla({ nombrarFilas: true, accionesFila: (f) => <Boton variante="fantasma" soloIcono aria-label={`Renombrar ${f.nombre}`} icono={<span>✎</span>} /> })
+    const fila = screen.getByRole('row', { name: 'Silla ergonómica' })
+    expect(within(fila).getByRole('button', { name: 'Renombrar Silla ergonómica' })).toBeTruthy()
+    // El encabezado no se nombra: solo las filas de datos.
+    expect(screen.getAllByRole('row').filter((r) => r.getAttribute('aria-labelledby'))).toHaveLength(2)
+    cleanup()
+    simularAncho({ movil: true })
+    tabla({ nombrarFilas: true })
+    expect(screen.getByRole('listitem', { name: 'Impresora multifuncional' })).toBeTruthy()
+  })
+
+  it('sin nombrarFilas las filas no llevan aria-labelledby', () => {
+    tabla()
+    expect(screen.getAllByRole('row').some((r) => r.getAttribute('aria-labelledby'))).toBe(false)
+  })
+
+  it('encabezadoOculto: el texto queda solo para el lector (columna de casillas)', () => {
+    const columnas: ColumnaTabla<Fila>[] = [{ id: 'sel', encabezado: 'Seleccionar', encabezadoOculto: true, celda: () => '·' }, ...COLUMNAS]
+    tabla({ columnas })
+    const th = screen.getAllByRole('columnheader')[0]
+    expect(th.textContent).toBe('Seleccionar')
+    expect(th.querySelector('.sr-only')?.textContent).toBe('Seleccionar')
+  })
+
+  it('al llegar a la última página el foco pasa a «‹ Anterior», y a la primera, a «Siguiente ›»', () => {
+    const props = (desde: number, hasta: number) => ({
+      desde,
+      hasta,
+      total: 50,
+      hayAnterior: desde > 1,
+      haySiguiente: hasta < 50,
+      onAnterior: vi.fn(),
+      onSiguiente: vi.fn(),
+    })
+    const { rerender } = tabla({ paginacion: props(1, 25) })
+    const siguiente = screen.getByRole('button', { name: 'Siguiente ›' })
+    siguiente.focus()
+    fireEvent.click(siguiente)
+    const comun = { etiqueta: 'Activos', columnas: COLUMNAS, filas: FILAS, claveFila: (f: Fila) => f.id, vacio: { titulo: 'Vacío' } }
+    rerender(<TablaDatos<Fila> {...comun} paginacion={props(26, 50)} />)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '‹ Anterior' }))
+    fireEvent.click(screen.getByRole('button', { name: '‹ Anterior' }))
+    rerender(<TablaDatos<Fila> {...comun} paginacion={props(1, 25)} />)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Siguiente ›' }))
+  })
+
+  it('la búsqueda no se autocompleta con lo que guardó el navegador', () => {
+    tabla({ barra: { busqueda: { valor: '', onCambio: vi.fn(), etiqueta: 'Buscar activos' } } })
+    expect(screen.getByRole('searchbox', { name: 'Buscar activos' }).getAttribute('autocomplete')).toBe('off')
+  })
+})

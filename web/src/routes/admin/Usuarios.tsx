@@ -1,14 +1,9 @@
 import { useMutation } from '@tanstack/react-query'
-import { CircleAlert, Copy, LoaderCircle, MailPlus, ShieldCheck, TriangleAlert, UserPlus, Users } from 'lucide-react'
+import { Copy, MailPlus, ShieldCheck, TriangleAlert, UserPlus, Users } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { toast } from 'sonner'
 
-import { EncabezadoPagina } from '@/components/app/ConEstado'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Aviso, Boton, Campo, EncabezadoPagina, Panel } from '@/components/kit'
 import { api, ErrorApi, type InvitacionCreada, mensajeDeError, type Rol } from '@/lib/api/cliente'
 import { etiquetaRol, useApiAutenticada } from '@/lib/sesion'
 import { cn } from '@/lib/utils'
@@ -16,6 +11,8 @@ import { cn } from '@/lib/utils'
 // /admin/usuarios (spec 002b, T5; plan §7): invitar con correo y rol. El enlace sale
 // una sola vez (el servidor no lo vuelve a dar) y se copia para enviarlo por un canal
 // privado. La lista de usuarios llega con una spec posterior: aquí no se inventa.
+// Spec 016, T9 (R2, R5): presentación con el kit (Panel, Campo, Aviso, Boton). El rol lo
+// decide el servidor; el enlace no se guarda ni se escribe en ningún registro.
 
 const ROLES: { valor: Rol; descripcion: string; icono: typeof Users }[] = [
   { valor: 'contador', descripcion: 'Cuenta y verifica activos. No ve precios.', icono: Users },
@@ -26,15 +23,15 @@ const fechaHora = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeSt
 
 function SelectorRol({ valor, onCambio }: { valor: Rol; onCambio: (rol: Rol) => void }) {
   return (
-    <fieldset className="flex min-w-0 flex-col gap-2">
-      <legend className="mb-2 text-sm leading-none font-medium">Rol</legend>
-      <div className="grid gap-2 sm:grid-cols-2">
+    <fieldset className="flex min-w-0 flex-col gap-1.5">
+      <legend className="mb-1.5 text-etiqueta text-foreground">Rol</legend>
+      <div className="grid gap-separacion sm:grid-cols-2">
         {ROLES.map(({ valor: rol, descripcion, icono: Icono }) => (
           <label
             key={rol}
             className={cn(
-              'flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background',
-              valor === rol ? 'border-brand-border bg-brand-soft' : 'hover:bg-muted/60',
+              'flex min-h-control cursor-pointer items-start gap-3 rounded-lg border bg-card p-3 shadow-xs transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-card motion-reduce:transition-none',
+              valor === rol ? 'border-brand-border bg-brand-soft' : 'hover:bg-muted',
             )}
           >
             <input
@@ -46,11 +43,11 @@ function SelectorRol({ valor, onCambio }: { valor: Rol; onCambio: (rol: Rol) => 
               className="mt-0.5 size-4 shrink-0 accent-brand"
             />
             <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="flex items-center gap-1.5 text-sm font-medium">
+              <span className="flex items-center gap-1.5 text-cuerpo font-medium">
                 <Icono className="size-4 text-muted-foreground" aria-hidden="true" />
                 {etiquetaRol(rol)}
               </span>
-              <span className="text-xs text-muted-foreground">{descripcion}</span>
+              <span className="text-etiqueta font-normal text-muted-foreground">{descripcion}</span>
             </span>
           </label>
         ))}
@@ -75,42 +72,39 @@ function Resultado({ creada, onOtra }: { creada: InvitacionCreada; onOtra: () =>
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <Alert variant="success">
-        <MailPlus />
-        <AlertTitle>Invitación creada</AlertTitle>
-        <AlertDescription className="flex flex-col gap-0.5">
+    <div className="flex flex-col gap-5">
+      <Aviso tono="exito" icono={<MailPlus aria-hidden="true" />} titulo="Invitación creada">
+        <div className="flex flex-col gap-0.5">
           <span>
             Para <strong className="font-medium break-all">{email}</strong> como {etiquetaRol(rol)}.
           </span>
           <span>Vence: {fechaHora.format(new Date(expira_en))}</span>
-        </AlertDescription>
-      </Alert>
+        </div>
+      </Aviso>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="enlace-invitacion">Enlace de invitación</Label>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Input
+        <div className="flex flex-col gap-separacion sm:flex-row sm:items-end">
+          <Campo
             id="enlace-invitacion"
+            tipo="codigo"
+            etiqueta="Enlace de invitación"
             readOnly
             value={enlace}
             onFocus={(evento) => evento.currentTarget.select()}
-            className="h-11 min-w-0 flex-1 font-mono text-xs md:h-9"
+            className="flex-1"
           />
-          <Button type="button" className="h-11 shrink-0 md:h-9" onClick={() => void copiar()}>
-            <Copy />
+          <Boton icono={<Copy />} className="shrink-0" onClick={() => void copiar()}>
             Copiar enlace
-          </Button>
+          </Boton>
         </div>
-        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-          <TriangleAlert className="mt-px size-3.5 shrink-0 text-warning" aria-hidden="true" />
+        <p className="flex items-start gap-1.5 text-etiqueta font-normal text-muted-foreground">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
           El enlace se muestra una sola vez. Envíalo solo a esa persona por un canal privado; quien lo abra puede crear la
           cuenta.
         </p>
       </div>
-      <Button type="button" variant="outline" className="h-11 self-start md:h-9" onClick={onOtra}>
-        <UserPlus />
+      <Boton variante="secundario" icono={<UserPlus />} className="self-start max-sm:w-full" onClick={onOtra}>
         Invitar a otra persona
-      </Button>
+      </Boton>
     </div>
   )
 }
@@ -147,69 +141,45 @@ export default function Usuarios() {
         descripcion="Invita a las personas de tu clínica. Cada invitación es para un correo y un rol, y vence en 72 horas."
       />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,40rem)_minmax(0,1fr)] lg:items-start">
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              <h2 className="text-base font-semibold">Invitar a una persona</h2>
-            </CardTitle>
-            <CardDescription>La persona crea su cuenta con el enlace: solo escribe su nombre y una contraseña.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {crear.isSuccess ? (
-              <Resultado creada={crear.data} onOtra={otra} />
-            ) : (
-              <form key={formulario} className="flex flex-col gap-5" onSubmit={alEnviar}>
-                {errorGeneral && (
-                  <Alert variant="destructive">
-                    <CircleAlert />
-                    <AlertDescription>{errorGeneral}</AlertDescription>
-                  </Alert>
-                )}
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="invitar-email">Correo de la persona</Label>
-                  <Input
-                    id="invitar-email"
-                    name="email"
-                    type="email"
-                    inputMode="email"
-                    autoComplete="off"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    required
-                    placeholder="nombre@clinica.com"
-                    aria-invalid={errorCorreo ? true : undefined}
-                    aria-describedby={errorCorreo ? 'invitar-email-error' : undefined}
-                    className="h-11 md:h-9"
-                  />
-                  {errorCorreo && (
-                    <p id="invitar-email-error" className="flex items-center gap-1.5 text-xs text-destructive">
-                      <CircleAlert className="size-3.5 shrink-0" aria-hidden="true" />
-                      {errorCorreo}
-                    </p>
-                  )}
-                </div>
-                <SelectorRol valor={rol} onCambio={setRol} />
-                <Button type="submit" className="h-11 self-start md:h-9" disabled={crear.isPending}>
-                  {crear.isPending ? (
-                    <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
-                  ) : (
-                    <MailPlus />
-                  )}
-                  Crear invitación
-                </Button>
-              </form>
-            )}
-          </CardContent>
-        </Card>
-        <section aria-labelledby="personas-titulo" className="flex flex-col gap-2 rounded-xl border border-dashed p-5">
-          <h2 id="personas-titulo" className="flex items-center gap-2 text-sm font-medium">
-            <Users className="size-4 text-muted-foreground" aria-hidden="true" />
-            Personas con acceso
-          </h2>
-          <p className="text-sm text-muted-foreground">
+        <Panel titulo="Invitar a una persona" descripcion="La persona crea su cuenta con el enlace: solo escribe su nombre y una contraseña.">
+          {crear.isSuccess ? (
+            <Resultado creada={crear.data} onOtra={otra} />
+          ) : (
+            <form key={formulario} className="flex flex-col gap-5" onSubmit={alEnviar}>
+              {errorGeneral && <Aviso tono="error" titulo={errorGeneral} />}
+              <Campo
+                id="invitar-email"
+                etiqueta="Correo de la persona"
+                name="email"
+                type="email"
+                inputMode="email"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                required
+                placeholder="nombre@clinica.com"
+                error={errorCorreo ?? undefined}
+              />
+              <SelectorRol valor={rol} onCambio={setRol} />
+              <Boton type="submit" icono={<MailPlus />} cargando={crear.isPending} className="self-start max-sm:w-full">
+                Crear invitación
+              </Boton>
+            </form>
+          )}
+        </Panel>
+        <Panel
+          titulo={
+            <span className="inline-flex items-center gap-2">
+              <Users className="size-4 text-muted-foreground" aria-hidden="true" />
+              Personas con acceso
+            </span>
+          }
+          className="border-dashed shadow-none"
+        >
+          <p className="text-cuerpo text-muted-foreground">
             La lista de personas con acceso llega con una spec posterior, junto con cambiar el rol y dar de baja.
           </p>
-        </section>
+        </Panel>
       </div>
     </div>
   )

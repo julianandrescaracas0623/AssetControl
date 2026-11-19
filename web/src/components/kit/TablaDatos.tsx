@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, Search, X } from 'lucide-react'
-import { useId, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -34,6 +34,8 @@ export type ColumnaTabla<T> = {
   ocultarEnTarjeta?: boolean
   /** Clases de la columna (ancho mínimo, ajuste de línea). */
   clase?: string
+  /** El encabezado queda solo para el lector (columna de casillas o de acciones). */
+  encabezadoOculto?: boolean
 }
 
 /**
@@ -99,6 +101,11 @@ export type TablaDatosProps<T> = {
   movil?: 'tarjetas' | 'desplazar'
   /** Tarjeta propia del teléfono, si la genérica no basta. */
   tarjeta?: (fila: T) => ReactNode
+  /**
+   * Cada fila (y cada tarjeta) se nombra con su columna principal (aria-labelledby): el
+   * lector dice «Silla ergonómica» y no todo el contenido de la fila.
+   */
+  nombrarFilas?: boolean
   className?: string
 }
 
@@ -136,9 +143,12 @@ export function TablaDatos<T>({
   pie,
   movil: formaMovil = 'tarjetas',
   tarjeta,
+  nombrarFilas = false,
   className,
 }: TablaDatosProps<T>) {
   const esMovil = useIsMobile()
+  const idTabla = useId()
+  const idNombre = nombrarFilas ? (fila: T) => `${idTabla}-${claveFila(fila)}` : undefined
   const minuscula = etiqueta.toLocaleLowerCase('es-CO')
 
   let cuerpo: ReactNode
@@ -159,7 +169,15 @@ export function TablaDatos<T>({
   } else if (esMovil && formaMovil === 'tarjetas') {
     cuerpo = (
       <>
-        <Tarjetas etiqueta={etiqueta} columnas={columnas} filas={filas} claveFila={claveFila} accionesFila={accionesFila} tarjeta={tarjeta} />
+        <Tarjetas
+          etiqueta={etiqueta}
+          columnas={columnas}
+          filas={filas}
+          claveFila={claveFila}
+          accionesFila={accionesFila}
+          tarjeta={tarjeta}
+          idNombre={idNombre}
+        />
         {pie && pie.length > 0 && <ResumenPie pie={pie} />}
       </>
     )
@@ -176,6 +194,7 @@ export function TablaDatos<T>({
         accionesFila={accionesFila}
         pie={pie}
         primeraFija={esMovil}
+        idNombre={idNombre}
       />
     )
   }
@@ -210,6 +229,7 @@ function Barra({ barra }: { barra: BarraTabla }) {
             placeholder={busqueda.placeholder}
             value={busqueda.valor}
             maxLength={busqueda.maxLength ?? 120}
+            autoComplete="off"
             onChange={(e) => busqueda.onCambio(e.target.value)}
             className="h-control bg-card pl-9"
           />
@@ -259,6 +279,8 @@ function Encabezado<T>({ columna, orden, onOrdenChange, fija }: { columna: Colum
           {columna.encabezado}
           <Icono aria-hidden="true" className={cn('size-3.5', !activa && 'opacity-60')} />
         </button>
+      ) : columna.encabezadoOculto ? (
+        <span className="sr-only">{columna.encabezado}</span>
       ) : (
         columna.encabezado
       )}
@@ -277,6 +299,7 @@ function Tabla<T>({
   accionesFila,
   pie,
   primeraFija,
+  idNombre,
 }: {
   etiqueta: string
   columnas: readonly ColumnaTabla<T>[]
@@ -288,7 +311,9 @@ function Tabla<T>({
   accionesFila?: (fila: T) => ReactNode
   pie?: readonly CeldaPie[]
   primeraFija: boolean
+  idNombre?: (fila: T) => string
 }) {
+  const nombre = columnas.find((c) => c.principal) ?? columnas[0]
   function dobleClic(fila: T, e: MouseEvent<HTMLTableRowElement>) {
     if (onAbrirFila && !desdeControl(e.target, e.currentTarget)) onAbrirFila(fila)
   }
@@ -316,6 +341,7 @@ function Tabla<T>({
         {filas.map((fila) => (
           <TableRow
             key={claveFila(fila)}
+            aria-labelledby={idNombre?.(fila)}
             tabIndex={onAbrirFila ? 0 : undefined}
             onDoubleClick={onAbrirFila ? (e) => dobleClic(fila, e) : undefined}
             onKeyDown={onAbrirFila ? (e) => tecla(fila, e) : undefined}
@@ -327,6 +353,7 @@ function Tabla<T>({
             {columnas.map((c, i) => (
               <TableCell
                 key={c.id}
+                id={idNombre && c === nombre ? idNombre(fila) : undefined}
                 className={cn(
                   'px-3 first:pl-4',
                   CELDA[c.tipo ?? 'texto'],
@@ -391,6 +418,7 @@ function Tarjetas<T>({
   claveFila,
   accionesFila,
   tarjeta,
+  idNombre,
 }: {
   etiqueta: string
   columnas: readonly ColumnaTabla<T>[]
@@ -398,18 +426,24 @@ function Tarjetas<T>({
   claveFila: (fila: T) => string
   accionesFila?: (fila: T) => ReactNode
   tarjeta?: (fila: T) => ReactNode
+  idNombre?: (fila: T) => string
 }) {
   const principal = columnas.find((c) => c.principal) ?? columnas[0]
   const resto = columnas.filter((c) => c !== principal && !c.ocultarEnTarjeta)
   return (
     <ul aria-label={etiqueta} className="divide-y">
       {filas.map((fila) => (
-        <li key={claveFila(fila)} className="flex items-start gap-2 p-3">
+        <li
+          key={claveFila(fila)}
+          aria-labelledby={idNombre?.(fila)}
+          // Una tarjeta de una sola línea (Categorías) centra el título con su acción.
+          className={cn('flex gap-2 p-3', !tarjeta && resto.length === 0 ? 'items-center' : 'items-start')}
+        >
           {tarjeta ? (
             <div className="min-w-0 flex-1">{tarjeta(fila)}</div>
           ) : (
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div data-tarjeta="titulo" className="text-cuerpo font-medium break-words">
+              <div id={idNombre?.(fila)} data-tarjeta="titulo" className="text-cuerpo font-medium break-words">
                 {principal.celda(fila)}
               </div>
               <ListaDatos
@@ -428,6 +462,17 @@ function Tarjetas<T>({
 
 function Paginacion({ etiqueta, desde, hasta, total, hayAnterior, haySiguiente, onAnterior, onSiguiente, ocupado = false }: PaginacionTabla & { etiqueta: string }) {
   const id = useId()
+  const anterior = useRef<HTMLButtonElement>(null)
+  const siguiente = useRef<HTMLButtonElement>(null)
+  // Si el botón pulsado queda deshabilitado (primera o última página), el foco pasa al
+  // otro en vez de perderse en el documento (spec 015, T6; Categorías).
+  const pulsado = useRef<'anterior' | 'siguiente' | null>(null)
+  useEffect(() => {
+    const cual = pulsado.current
+    if (cual === 'siguiente' && !haySiguiente) anterior.current?.focus()
+    if (cual === 'anterior' && !hayAnterior) siguiente.current?.focus()
+    pulsado.current = null
+  }, [desde, hayAnterior, haySiguiente])
   return (
     <nav aria-labelledby={id} className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
       <span id={id} className="sr-only">
@@ -438,10 +483,26 @@ function Paginacion({ etiqueta, desde, hasta, total, hayAnterior, haySiguiente, 
       </span>
       <div className="flex gap-separacion">
         {/* «‹ Anterior» y «Siguiente ›»: los nombres que ya tenían Activos y Categorías. */}
-        <Boton variante="secundario" disabled={!hayAnterior || ocupado} onClick={onAnterior}>
+        <Boton
+          ref={anterior}
+          variante="secundario"
+          disabled={!hayAnterior || ocupado}
+          onClick={() => {
+            pulsado.current = 'anterior'
+            onAnterior()
+          }}
+        >
           ‹ Anterior
         </Boton>
-        <Boton variante="secundario" disabled={!haySiguiente || ocupado} onClick={onSiguiente}>
+        <Boton
+          ref={siguiente}
+          variante="secundario"
+          disabled={!haySiguiente || ocupado}
+          onClick={() => {
+            pulsado.current = 'siguiente'
+            onSiguiente()
+          }}
+        >
           Siguiente ›
         </Boton>
       </div>

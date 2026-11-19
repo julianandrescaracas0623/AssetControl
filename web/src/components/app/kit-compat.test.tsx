@@ -100,13 +100,17 @@ describe('Campo (CampoFormulario) delega en MarcoCampo', () => {
     expect(document.querySelector('[data-obligatorio]')?.getAttribute('aria-hidden')).toBe('true')
   })
 
-  it('los controles de shadcn que recibe quedan sobre blanco (Deuda T1 d)', () => {
+  // Spec 016, T9 (Deuda T2 f, T6 e): el selector de compatibilidad (bg-card sobre los
+  // controles de shadcn) se retiró porque ya ninguna pantalla usa este envoltorio; la
+  // guardia de kit.node.test.ts lo impide. Lo de «sobre blanco» lo prueban ahora el Campo
+  // del kit (Campo.test.tsx) y gestionKit.test.tsx en las pantallas que lo usaban.
+  it('ya no fuerza el fondo de los controles: sin selector de compatibilidad (Deuda T2 f)', () => {
     render(
       <Campo id="x" etiqueta="X">
         <Input id="x" />
       </Campo>,
     )
-    expect(document.querySelector('[data-kit=campo]')?.getAttribute('data-controles-sobre-blanco')).toBe('true')
+    expect(document.querySelector('[data-kit=campo]')?.getAttribute('data-controles-sobre-blanco')).toBeNull()
   })
 })
 

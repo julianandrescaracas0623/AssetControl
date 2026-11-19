@@ -13,13 +13,6 @@ const ROUTES = path.join(SRC, 'routes')
 
 /** Pantallas que todavía importan components/ui (rutas relativas a src/routes, con /). */
 const EXCEPCIONES: readonly string[] = [
-  // T9: gestión
-  'admin/Categorias.tsx',
-  'admin/Discrepancias.tsx',
-  'admin/Empresa.tsx',
-  'admin/Sesiones.tsx',
-  'admin/Ubicaciones.tsx',
-  'admin/Usuarios.tsx',
   // T10: galería de desarrollo (muestra también piezas de shadcn aún sin envoltorio)
   'dev/Componentes.tsx',
 ]
@@ -77,6 +70,15 @@ describe('guardia del kit (R7)', () => {
       return !existsSync(file) || !importaUi(file)
     })
     expect(vencidas, 'quítalas de EXCEPCIONES: ya están migradas').toEqual([])
+  })
+
+  // Spec 016, T9 (Deuda T2 f, T6 e): los formularios usan el Campo del kit; el envoltorio
+  // CampoFormulario y su selector de compatibilidad (bg-card) ya no tienen pantallas.
+  it('ninguna pantalla usa el Campo de compatibilidad (app/CampoFormulario)', () => {
+    const usan = pantallas(ROUTES)
+      .filter((file) => /['"][^'"]*components\/app\/CampoFormulario['"]/.test(readFileSync(file, 'utf8')))
+      .map(relativa)
+    expect(usan).toEqual([])
   })
 
   it('la lista de excepciones no tiene duplicados', () => {

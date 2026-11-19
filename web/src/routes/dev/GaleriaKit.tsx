@@ -7,6 +7,7 @@ import {
   BarraAccion,
   Boton,
   Campo,
+  Casilla,
   Cifra,
   CifrasCongeladas,
   Confirmar,
@@ -14,6 +15,7 @@ import {
   EncabezadoPagina,
   Filtro,
   Insignia,
+  Interruptor,
   ListaDatos,
   MarcoImagen,
   Menu,
@@ -496,6 +498,52 @@ export function ImagenesKit({ Seccion }: SeccionProps) {
       <Dialogo abierto={abierta} onAbiertoChange={setAbierta} titulo="Foto ampliada (ejemplo)" descripcion="Imagen completa, sin recortar." ancho="ancho">
         <img src={IMAGEN_ENORME} alt="Foto enorme ampliada (ejemplo)" className="mx-auto block max-h-[70dvh] w-auto max-w-full rounded-lg object-contain" />
       </Dialogo>
+    </Seccion>
+  )
+}
+
+// Spec 016, T9 (A7): casilla para elegir varias (discrepancias) e interruptor de una
+// preferencia de la vista (ubicaciones inactivas). El objetivo táctil es el marco entero.
+export function SeleccionKit({ Seccion }: SeccionProps) {
+  const [elegidas, setElegidas] = useState<Set<string>>(new Set(['silla']))
+  const [inactivas, setInactivas] = useState(false)
+  const opciones = [
+    { id: 'silla', nombre: 'Silla ergonómica (ejemplo)' },
+    { id: 'impresora', nombre: 'Impresora multifuncional (ejemplo)' },
+  ]
+  const todas = elegidas.size === opciones.length
+  return (
+    <Seccion title="Selección">
+      <p className="text-cuerpo text-muted-foreground">
+        <span className="font-mono">Casilla</span> mide un control (48 px en teléfono, 36 px en escritorio) aunque la caja sea pequeña;
+        «Seleccionar todas» queda a medias si solo hay algunas. <span className="font-mono">Interruptor</span> para una preferencia de la vista.
+      </p>
+      <div className="flex flex-col gap-1">
+        <Casilla
+          etiqueta="Seleccionar todas"
+          etiquetaVisible
+          marcada={todas ? true : elegidas.size > 0 ? 'indeterminate' : false}
+          onMarcadaChange={(v) => setElegidas(v ? new Set(opciones.map((o) => o.id)) : new Set())}
+        />
+        {opciones.map((o) => (
+          <div key={o.id} className="flex items-center gap-1 text-cuerpo">
+            <Casilla
+              etiqueta={`Seleccionar ${o.nombre}`}
+              marcada={elegidas.has(o.id)}
+              onMarcadaChange={(v) =>
+                setElegidas((actual) => {
+                  const nueva = new Set(actual)
+                  if (v) nueva.add(o.id)
+                  else nueva.delete(o.id)
+                  return nueva
+                })
+              }
+            />
+            {o.nombre}
+          </div>
+        ))}
+      </div>
+      <Interruptor etiqueta="Mostrar inactivas" activo={inactivas} onActivoChange={setInactivas} />
     </Seccion>
   )
 }

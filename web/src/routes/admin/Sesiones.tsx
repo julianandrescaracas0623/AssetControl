@@ -1,23 +1,26 @@
-import { ArrowLeftRight, ChevronRight, CircleAlert, ClipboardList, FileText, Loader2, Lock, Plus, RefreshCw, ScanBarcode } from 'lucide-react'
+import { ArrowLeftRight, ChevronRight, ClipboardList, FileText, Lock, Plus, ScanBarcode } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
-import { Campo, Obligatorio } from '@/components/app/CampoFormulario'
-import { EncabezadoPagina } from '@/components/app/ConEstado'
-import { EmptyState } from '@/components/app/EmptyState'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Progress } from '@/components/ui/progress'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Aviso,
+  Boton,
+  Campo,
+  type ColumnaTabla,
+  Dialogo,
+  EncabezadoPagina,
+  Esqueleto,
+  Estado,
+  Insignia,
+  Panel,
+  Progreso,
+  TablaDatos,
+} from '@/components/kit'
 import { useEsEscritorio } from '@/hooks/use-escritorio'
 import { ErrorApi, mensajeDeError } from '@/lib/api/cliente'
 import { rutaParaContar } from '@/lib/conteo'
-import { useDiscrepancias, usePendientes } from '@/lib/discrepancias'
+import { type Pendiente, useDiscrepancias, usePendientes } from '@/lib/discrepancias'
 import { formatEntero } from '@/lib/format'
 import { useCerrarSesion } from '@/lib/informe'
 import { fechaCorte, hoyISO, nombreSugerido, pendientes, porcentaje, type Avance, type SesionConteo, useAbrirSesion, useDetalleSesion, useSesiones } from '@/lib/sesiones'
@@ -26,8 +29,12 @@ import { fechaCorte, hoyISO, nombreSugerido, pendientes, porcentaje, type Avance
 // abierta por clínica) y ve su avance. Spec 008 (T4; R10, Q2): la cierra con un aviso de
 // lo que falta y las cerradas llevan a su informe congelado. Spec 015 (T9; R10, Q8 = A):
 // la entrada al conteo del admin es «Contar» en la sesión abierta (la única del tenant).
+// Spec 016, T9 (R2, R3, R5): presentación con el kit. Abrir es un Dialogo con Campo; el
+// cierre, un Dialogo con el efecto explícito y la acción de peligro (solo admin; el
+// servidor decide y congela); avance con Progreso (aria-valuenow) y tablas TablaDatos.
 
 const fecha = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' })
+const FORMULARIO_ABRIR = 'abrir-sesion'
 
 function AbrirSesion({ abierto, onAbierto }: { abierto: boolean; onAbierto: (v: boolean) => void }) {
   const abrir = useAbrirSesion()
@@ -55,52 +62,59 @@ function AbrirSesion({ abierto, onAbierto }: { abierto: boolean; onAbierto: (v: 
   }
 
   return (
-    <Dialog
-      open={abierto}
-      onOpenChange={(v) => {
+    <Dialogo
+      abierto={abierto}
+      onAbiertoChange={(v) => {
         setNombre(nombreSugerido())
         setCorte(hoyISO())
         setErrores({})
         onAbierto(v)
       }}
+      titulo="Abrir sesión de conteo"
+      descripcion="Solo puede haber una abierta. El personal podrá verificar activos desde el teléfono o el escritorio."
+      pie={
+        <>
+          <Boton variante="secundario" onClick={() => onAbierto(false)}>
+            Cancelar
+          </Boton>
+          <Boton type="submit" form={FORMULARIO_ABRIR} icono={<Plus />} cargando={abrir.isPending}>
+            Abrir sesión
+          </Boton>
+        </>
+      }
     >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Abrir sesión de conteo</DialogTitle>
-          <DialogDescription>Solo puede haber una abierta. El personal podrá verificar activos desde el teléfono o el escritorio.</DialogDescription>
-        </DialogHeader>
-        <form
-          noValidate
-          className="flex flex-col gap-4"
-          onSubmit={(evento) => {
-            evento.preventDefault()
-            confirmar()
-          }}
-        >
-          {errores.general && (
-            <Alert variant="destructive">
-              <CircleAlert />
-              <AlertDescription>{errores.general}</AlertDescription>
-            </Alert>
-          )}
-          <Campo id="sesion-nombre" etiqueta={<>Nombre <Obligatorio /></>} error={errores.nombre}>
-            <Input id="sesion-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={120} autoComplete="off" aria-invalid={Boolean(errores.nombre)} aria-describedby={errores.nombre ? 'sesion-nombre-error' : undefined} className="max-md:h-11" />
-          </Campo>
-          <Campo id="sesion-corte" etiqueta={<>Fecha de corte <Obligatorio /></>} error={errores.corte} ayuda="La fecha a la que se refiere el informe.">
-            <Input id="sesion-corte" type="date" value={corte} onChange={(e) => setCorte(e.target.value)} aria-invalid={Boolean(errores.corte)} aria-describedby={errores.corte ? 'sesion-corte-error' : 'sesion-corte-ayuda'} className="max-md:h-11" />
-          </Campo>
-          <DialogFooter className="[&_[data-slot=button]]:max-md:min-h-11">
-            <Button type="button" variant="ghost" onClick={() => onAbierto(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={abrir.isPending}>
-              {abrir.isPending && <Loader2 className="animate-spin" aria-hidden="true" />}
-              Abrir sesión
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      <form
+        id={FORMULARIO_ABRIR}
+        noValidate
+        className="flex flex-col gap-4"
+        onSubmit={(evento) => {
+          evento.preventDefault()
+          confirmar()
+        }}
+      >
+        {errores.general && <Aviso tono="error" titulo={errores.general} />}
+        <Campo
+          id="sesion-nombre"
+          etiqueta="Nombre"
+          obligatorio
+          error={errores.nombre}
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          maxLength={120}
+          autoComplete="off"
+        />
+        <Campo
+          id="sesion-corte"
+          etiqueta="Fecha de corte"
+          obligatorio
+          type="date"
+          error={errores.corte}
+          ayuda="La fecha a la que se refiere el informe."
+          value={corte}
+          onChange={(e) => setCorte(e.target.value)}
+        />
+      </form>
+    </Dialogo>
   )
 }
 
@@ -110,71 +124,96 @@ function TarjetaAbierta({ sesion }: { sesion: SesionConteo }) {
   const avance = detalle.data?.avance
   const pct = avance ? porcentaje(avance.verificados, avance.total) : 0
   return (
-    <div className="flex flex-col gap-3 rounded-xl border p-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <span className="flex min-w-0 flex-col">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold break-words">{sesion.nombre}</span>
-            <Badge variant="brand">Abierta</Badge>
-          </span>
-          <span className="text-sm text-muted-foreground">
-            Corte {fechaCorte(sesion.fecha_corte)} · abrió {sesion.abierta_por.nombre}
-          </span>
-        </span>
-        <span className="flex shrink-0 gap-2 [&_[data-slot=button]]:max-md:min-h-11 [&_[data-slot=button]]:max-md:flex-1">
-          <Button asChild variant="outline">
-            <Link to={`/admin/sesiones/${sesion.id}`}>
-              Ver avance
-              <ChevronRight />
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link to={contar}>
-              <ScanBarcode />
-              Contar
-            </Link>
-          </Button>
-        </span>
-      </div>
-      {avance ? (
-        <>
-          <Progress value={pct} aria-label="Avance del conteo" className="h-2" />
-          <span className="flex flex-wrap justify-between gap-2 text-sm">
-            <span className="tabular-nums">
-              <b className="font-semibold">{formatEntero(avance.verificados)}</b> de {formatEntero(avance.total)} verificados · {pct.toLocaleString('es-CO')} %
+    <Panel>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-titulo-seccion break-words">{sesion.nombre}</span>
+              <Insignia tono="info">Abierta</Insignia>
             </span>
-            <span className="font-medium">{pendientes(avance.pendientes)}</span>
-          </span>
-        </>
-      ) : (
-        <Skeleton className="h-8" />
-      )}
-    </div>
+            <span className="text-etiqueta font-normal text-muted-foreground">
+              Corte {fechaCorte(sesion.fecha_corte)} · abrió {sesion.abierta_por.nombre}
+            </span>
+          </div>
+          <div className="flex shrink-0 gap-separacion">
+            <Boton asChild variante="secundario" className="max-md:flex-1">
+              <Link to={`/admin/sesiones/${sesion.id}`}>
+                Ver avance
+                <ChevronRight aria-hidden="true" />
+              </Link>
+            </Boton>
+            <Boton asChild className="max-md:flex-1">
+              <Link to={contar}>
+                <ScanBarcode aria-hidden="true" />
+                Contar
+              </Link>
+            </Boton>
+          </div>
+        </div>
+        {avance ? (
+          <div className="flex flex-col gap-2">
+            <Progreso valor={pct} etiqueta="Avance del conteo" />
+            <span className="flex flex-wrap justify-between gap-2 text-cuerpo">
+              <span className="tabular-nums">
+                <b className="font-semibold">{formatEntero(avance.verificados)}</b> de {formatEntero(avance.total)} verificados · {pct.toLocaleString('es-CO')} %
+              </span>
+              <span className="font-medium">{pendientes(avance.pendientes)}</span>
+            </span>
+          </div>
+        ) : (
+          <Esqueleto className="h-9 rounded-lg" />
+        )}
+      </div>
+    </Panel>
   )
 }
 
 // Sin sesión abierta no hay conteo (006): se explica y se ofrece abrirla (maqueta t9-sin-sesion).
 function SinSesionAbierta({ onAbrir }: { onAbrir: () => void }) {
   return (
-    <section aria-labelledby="titulo-sin-abierta" className="flex flex-col items-start gap-3 rounded-xl border border-dashed p-5 md:flex-row md:items-center">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted" aria-hidden="true">
-        <ScanBarcode className="size-5" />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <h2 id="titulo-sin-abierta" className="font-semibold">
-          No hay una sesión abierta
-        </h2>
-        <span className="text-sm text-muted-foreground">
-          Para contar, abre una sesión: el botón «Contar» aparece aquí y en su detalle. Sin una sesión abierta no se puede contar; solo se pueden consultar y registrar activos.
-        </span>
-      </span>
-      <Button variant="outline" className="max-md:min-h-11" onClick={onAbrir}>
-        <Plus />
-        Abrir sesión
-      </Button>
-    </section>
+    <Panel
+      titulo="No hay una sesión abierta"
+      acciones={
+        <Boton variante="secundario" icono={<Plus />} onClick={onAbrir}>
+          Abrir sesión
+        </Boton>
+      }
+      className="border-dashed shadow-none"
+    >
+      <p className="text-cuerpo text-muted-foreground">
+        Para contar, abre una sesión: el botón «Contar» aparece aquí y en su detalle. Sin una sesión abierta no se puede contar; solo se pueden consultar y registrar activos.
+      </p>
+    </Panel>
   )
 }
+
+/** Rótulo de una sección de la página («En curso», «Cerradas»). */
+function TituloSeccion({ id, children }: { id: string; children: string }) {
+  return (
+    <h2 id={id} className="text-etiqueta text-muted-foreground">
+      {children}
+    </h2>
+  )
+}
+
+const ENLACE = 'rounded-sm hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+
+const COLUMNAS_CERRADAS: ColumnaTabla<SesionConteo>[] = [
+  {
+    id: 'nombre',
+    encabezado: 'Nombre',
+    principal: true,
+    clase: 'whitespace-normal',
+    celda: (s) => (
+      <Link to={`/admin/sesiones/${s.id}/informe`} className={ENLACE}>
+        {s.nombre}
+      </Link>
+    ),
+  },
+  { id: 'corte', encabezado: 'Corte', celda: (s) => fechaCorte(s.fecha_corte) },
+  { id: 'cerrada', encabezado: 'Cerrada', celda: (s) => (s.cerrada_en ? fecha.format(new Date(s.cerrada_en)) : '—') },
+]
 
 export default function Sesiones() {
   const consulta = useSesiones()
@@ -191,44 +230,40 @@ export default function Sesiones() {
         acciones={
           !abierta &&
           consulta.isSuccess && (
-            <Button onClick={() => setAbriendo(true)}>
-              <Plus />
+            <Boton icono={<Plus />} onClick={() => setAbriendo(true)}>
               Abrir sesión
-            </Button>
+            </Boton>
           )
         }
       />
       {consulta.isPending ? (
-        <div role="status" aria-label="Cargando sesiones" className="flex flex-col gap-3">
-          <Skeleton className="h-28 rounded-xl" />
-          <Skeleton className="h-40 rounded-xl" />
-        </div>
+        <Estado.Cargando etiqueta="Cargando sesiones">
+          <Esqueleto className="h-32 rounded-xl" />
+          <Esqueleto className="h-40 rounded-xl" />
+        </Estado.Cargando>
       ) : consulta.isError ? (
-        <Alert variant="destructive" className="items-start">
-          <CircleAlert />
-          <AlertTitle>No se pudieron cargar las sesiones</AlertTitle>
-          <AlertDescription className="flex flex-col items-start gap-3">
-            {mensajeDeError(consulta.error)}
-            <Button variant="outline" size="sm" className="max-md:min-h-11" onClick={() => void consulta.refetch()}>
-              <RefreshCw />
-              Reintentar
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <Estado.Error
+          titulo="No se pudieron cargar las sesiones"
+          descripcion={mensajeDeError(consulta.error)}
+          onReintentar={() => void consulta.refetch()}
+          reintentando={consulta.isFetching}
+        />
       ) : sesiones.length === 0 ? (
-        <EmptyState
-          icono={<ClipboardList className="size-5" />}
+        <Estado.Vacio
+          icono={<ClipboardList />}
           titulo="Aún no hay conteos"
           descripcion="Abre la primera sesión para que el personal empiece a verificar activos."
-          accion={<Button onClick={() => setAbriendo(true)}>Abrir sesión</Button>}
+          accion={
+            <Boton variante="secundario" onClick={() => setAbriendo(true)}>
+              Abrir sesión
+            </Boton>
+          }
         />
       ) : (
         <>
           {abierta ? (
             <section aria-labelledby="titulo-abierta" className="flex flex-col gap-2">
-              <h2 id="titulo-abierta" className="text-sm font-medium text-muted-foreground">
-                En curso
-              </h2>
+              <TituloSeccion id="titulo-abierta">En curso</TituloSeccion>
               <TarjetaAbierta sesion={abierta} />
             </section>
           ) : (
@@ -236,44 +271,22 @@ export default function Sesiones() {
           )}
           {cerradas.length > 0 && (
             <section aria-labelledby="titulo-cerradas" className="flex flex-col gap-2">
-              <h2 id="titulo-cerradas" className="text-sm font-medium text-muted-foreground">
-                Cerradas
-              </h2>
-              <div className="overflow-x-auto rounded-xl border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="pl-4">Nombre</TableHead>
-                      <TableHead>Corte</TableHead>
-                      <TableHead>Cerrada</TableHead>
-                      <TableHead className="pr-4">
-                        <span className="sr-only">Informe</span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cerradas.map((s) => (
-                      <TableRow key={s.id}>
-                        <TableCell className="pl-4 font-medium whitespace-normal">
-                          <Link to={`/admin/sesiones/${s.id}/informe`} className="hover:underline">
-                            {s.nombre}
-                          </Link>
-                        </TableCell>
-                        <TableCell>{fechaCorte(s.fecha_corte)}</TableCell>
-                        <TableCell>{s.cerrada_en ? fecha.format(new Date(s.cerrada_en)) : '—'}</TableCell>
-                        <TableCell className="pr-4 text-right">
-                          <Button asChild variant="ghost" size="sm" className="max-md:min-h-11">
-                            <Link to={`/admin/sesiones/${s.id}/informe`} aria-label={`Ver informe de ${s.nombre}`}>
-                              <FileText />
-                              Informe
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <TituloSeccion id="titulo-cerradas">Cerradas</TituloSeccion>
+              <TablaDatos
+                etiqueta="Sesiones cerradas"
+                columnas={COLUMNAS_CERRADAS}
+                filas={cerradas}
+                claveFila={(s) => s.id}
+                vacio={{ titulo: 'Aún no hay sesiones cerradas' }}
+                accionesFila={(s) => (
+                  <Boton asChild variante="fantasma">
+                    <Link to={`/admin/sesiones/${s.id}/informe`} aria-label={`Ver informe de ${s.nombre}`}>
+                      <FileText aria-hidden="true" />
+                      Informe
+                    </Link>
+                  </Boton>
+                )}
+              />
             </section>
           )}
         </>
@@ -288,60 +301,59 @@ function AvisoDiscrepancias({ sesionId }: { sesionId: string }) {
   const n = consulta.data?.length ?? 0
   if (n === 0) return null
   return (
-    <Link to={`/admin/discrepancias?sesion=${sesionId}`} className="flex min-h-12 items-center gap-3 rounded-xl border border-warning-border bg-warning-soft px-4 py-2 text-sm">
-      <ArrowLeftRight className="size-4 shrink-0 text-warning" aria-hidden="true" />
+    <Link
+      to={`/admin/discrepancias?sesion=${sesionId}`}
+      className="flex min-h-control items-center gap-3 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-cuerpo shadow-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+    >
+      <ArrowLeftRight className="size-5 shrink-0 text-warning" aria-hidden="true" />
       <span className="min-w-0 flex-1">
         <b className="font-semibold">{formatEntero(n)}</b> {n === 1 ? 'activo se vio' : 'activos se vieron'} en otra ubicación
       </span>
-      <span className="font-medium">Revisar</span>
+      <span className="font-medium underline-offset-2 hover:underline">Revisar</span>
       <ChevronRight className="size-4" aria-hidden="true" />
     </Link>
   )
 }
+
+const COLUMNAS_PENDIENTES: ColumnaTabla<Pendiente>[] = [
+  { id: 'codigo', encabezado: 'Código', tipo: 'codigo', celda: (a) => a.codigo },
+  {
+    id: 'nombre',
+    encabezado: 'Nombre',
+    principal: true,
+    clase: 'whitespace-normal',
+    celda: (a) => (
+      <span className="flex flex-wrap items-center gap-2">
+        <Link to={`/admin/activos/${encodeURIComponent(a.codigo)}`} className={`font-medium ${ENLACE}`}>
+          {a.nombre}
+        </Link>
+        {a.estado === 'en_reparacion' && <Insignia tono="aviso">En reparación</Insignia>}
+      </span>
+    ),
+  },
+  { id: 'ubicacion', encabezado: 'Ubicación', clase: 'whitespace-normal text-muted-foreground', celda: (a) => a.ubicacion.ruta },
+]
 
 function ListaPendientes({ sesionId }: { sesionId: string }) {
   const consulta = usePendientes(sesionId, undefined)
   const activos = consulta.data?.pages.flatMap((p) => p.activos) ?? []
   if (consulta.isPending || activos.length === 0) return null
   return (
-    <section aria-labelledby="titulo-pendientes" className="flex flex-col gap-2">
-      <h2 id="titulo-pendientes" className="font-semibold">
+    <section aria-labelledby="titulo-pendientes" className="flex flex-col gap-3">
+      <h2 id="titulo-pendientes" className="text-titulo-seccion">
         Pendientes por verificar
       </h2>
-      <div className="overflow-x-auto rounded-xl border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="pl-4">Código</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead className="pr-4">Ubicación</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {activos.map((a) => (
-              <TableRow key={a.id}>
-                <TableCell className="pl-4 font-mono">{a.codigo}</TableCell>
-                <TableCell className="whitespace-normal">
-                  <Link to={`/admin/activos/${encodeURIComponent(a.codigo)}`} className="font-medium hover:underline">
-                    {a.nombre}
-                  </Link>
-                  {a.estado === 'en_reparacion' && (
-                    <Badge variant="warning" className="ml-2">
-                      En reparación
-                    </Badge>
-                  )}
-                </TableCell>
-                <TableCell className="pr-4 whitespace-normal text-muted-foreground">{a.ubicacion.ruta}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <TablaDatos
+        etiqueta="Pendientes por verificar"
+        columnas={COLUMNAS_PENDIENTES}
+        filas={activos}
+        claveFila={(a) => a.id}
+        vacio={{ titulo: 'No hay pendientes' }}
+      />
       {consulta.hasNextPage && (
-        <Button variant="outline" className="self-start max-md:min-h-11" disabled={consulta.isFetchingNextPage} onClick={() => void consulta.fetchNextPage()}>
-          {consulta.isFetchingNextPage && <Loader2 className="animate-spin" aria-hidden="true" />}
+        <Boton variante="secundario" className="self-start max-md:w-full" cargando={consulta.isFetchingNextPage} onClick={() => void consulta.fetchNextPage()}>
           Ver más
-        </Button>
+        </Boton>
       )}
     </section>
   )
@@ -365,91 +377,87 @@ function CerrarSesion({ sesion, pendientesN }: { sesion: SesionConteo; pendiente
 
   return (
     <>
-      <Button
-        variant="outline"
+      <Boton
+        variante="secundario"
+        icono={<Lock />}
         onClick={() => {
           cerrar.reset()
           setAbierto(true)
         }}
       >
-        <Lock />
         Cerrar sesión
-      </Button>
-      <Dialog open={abierto} onOpenChange={(v) => !cerrar.isPending && setAbierto(v)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>¿Cerrar «{sesion.nombre}»?</DialogTitle>
-            <DialogDescription>
-              Al cerrar se calcula el informe una sola vez y queda congelado. No se puede reabrir ni seguir contando en esta sesión.
-            </DialogDescription>
-          </DialogHeader>
-          <ul className="flex flex-col gap-2 text-sm" aria-label="Lo que queda al cerrar">
-            <li className="rounded-lg border px-3 py-2">
-              {pendientesN === 0 ? (
-                'Todos los activos están verificados.'
-              ) : (
-                <>
-                  <b className="font-semibold tabular-nums">{formatEntero(pendientesN)}</b>{' '}
-                  {pendientesN === 1 ? 'activo sin verificar quedará como no encontrado.' : 'activos sin verificar quedarán como no encontrados.'}
-                </>
-              )}
-            </li>
-            <li className="rounded-lg border px-3 py-2">
-              {discrepancias.isPending ? (
-                <Skeleton className="h-5 w-48" />
-              ) : discrepancias.isError ? (
-                'No se pudieron revisar las discrepancias.'
-              ) : porResolver === 0 ? (
-                'No hay discrepancias por resolver.'
-              ) : (
-                <>
-                  <b className="font-semibold tabular-nums">{formatEntero(porResolver)}</b>{' '}
-                  {porResolver === 1 ? 'discrepancia sigue' : 'discrepancias siguen'} por resolver; se pueden resolver después del cierre.
-                </>
-              )}
-            </li>
-          </ul>
-          {cerrar.isError && (
-            <Alert variant="destructive">
-              <CircleAlert />
-              <AlertDescription>{mensajeDeError(cerrar.error)}</AlertDescription>
-            </Alert>
-          )}
-          <DialogFooter className="[&_[data-slot=button]]:max-md:min-h-11">
-            <Button type="button" variant="ghost" disabled={cerrar.isPending} onClick={() => setAbierto(false)}>
+      </Boton>
+      <Dialogo
+        abierto={abierto}
+        onAbiertoChange={(v) => !cerrar.isPending && setAbierto(v)}
+        titulo={`¿Cerrar «${sesion.nombre}»?`}
+        descripcion="Al cerrar se calcula el informe una sola vez y queda congelado. No se puede reabrir ni seguir contando en esta sesión."
+        pie={
+          <>
+            <Boton variante="secundario" disabled={cerrar.isPending} onClick={() => setAbierto(false)}>
               Seguir contando
-            </Button>
-            <Button type="button" variant="destructive" disabled={cerrar.isPending} onClick={confirmar}>
-              {cerrar.isPending && <Loader2 className="animate-spin" aria-hidden="true" />}
+            </Boton>
+            <Boton variante="peligro" icono={<Lock />} cargando={cerrar.isPending} onClick={confirmar} className="font-semibold">
               Cerrar y ver informe
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </Boton>
+          </>
+        }
+      >
+        <ul className="flex flex-col gap-2 text-cuerpo" aria-label="Lo que queda al cerrar">
+          <li className="rounded-lg border bg-card px-3 py-2.5">
+            {pendientesN === 0 ? (
+              'Todos los activos están verificados.'
+            ) : (
+              <>
+                <b className="font-semibold tabular-nums">{formatEntero(pendientesN)}</b>{' '}
+                {pendientesN === 1 ? 'activo sin verificar quedará como no encontrado.' : 'activos sin verificar quedarán como no encontrados.'}
+              </>
+            )}
+          </li>
+          <li className="rounded-lg border bg-card px-3 py-2.5">
+            {discrepancias.isPending ? (
+              <Esqueleto className="h-5 w-48" />
+            ) : discrepancias.isError ? (
+              'No se pudieron revisar las discrepancias.'
+            ) : porResolver === 0 ? (
+              'No hay discrepancias por resolver.'
+            ) : (
+              <>
+                <b className="font-semibold tabular-nums">{formatEntero(porResolver)}</b>{' '}
+                {porResolver === 1 ? 'discrepancia sigue' : 'discrepancias siguen'} por resolver; se pueden resolver después del cierre.
+              </>
+            )}
+          </li>
+        </ul>
+        {cerrar.isError && <Aviso tono="error" titulo={mensajeDeError(cerrar.error)} />}
+      </Dialogo>
     </>
   )
 }
 
 function SesionCerrada({ sesion }: { sesion: SesionConteo }) {
   return (
-    <section aria-labelledby="titulo-cerrada" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-sidebar p-4">
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <h2 id="titulo-cerrada" className="flex items-center gap-2 font-semibold">
-          <Lock className="size-4" aria-hidden="true" />
+    <Panel
+      titulo={
+        <span className="inline-flex items-center gap-2">
+          <Lock className="size-4 text-muted-foreground" aria-hidden="true" />
           Sesión cerrada
-        </h2>
-        <span className="text-sm text-muted-foreground">
-          {sesion.cerrada_en ? `El ${fecha.format(new Date(sesion.cerrada_en))}` : 'Cerrada'}
-          {sesion.cerrada_por ? ` por ${sesion.cerrada_por.nombre}` : ''}. Sus cifras quedaron congeladas en el informe.
         </span>
-      </span>
-      <Button asChild className="max-md:min-h-11">
-        <Link to={`/admin/sesiones/${sesion.id}/informe`}>
-          <FileText />
-          Ver informe
-        </Link>
-      </Button>
-    </section>
+      }
+      acciones={
+        <Boton asChild className="max-md:w-full">
+          <Link to={`/admin/sesiones/${sesion.id}/informe`}>
+            <FileText aria-hidden="true" />
+            Ver informe
+          </Link>
+        </Boton>
+      }
+    >
+      <p className="text-cuerpo text-muted-foreground">
+        {sesion.cerrada_en ? `El ${fecha.format(new Date(sesion.cerrada_en))}` : 'Cerrada'}
+        {sesion.cerrada_por ? ` por ${sesion.cerrada_por.nombre}` : ''}. Sus cifras quedaron congeladas en el informe.
+      </p>
+    </Panel>
   )
 }
 
@@ -458,32 +466,31 @@ export function DetalleSesion({ id }: { id: string }) {
   const contar = rutaParaContar(useEsEscritorio())
   if (consulta.isPending) {
     return (
-      <div role="status" aria-label="Cargando la sesión" className="flex flex-col gap-3">
-        <Skeleton className="h-8 w-2/3" />
-        <Skeleton className="h-64 rounded-xl" />
-      </div>
+      <Estado.Cargando etiqueta="Cargando la sesión">
+        <Esqueleto className="h-8 w-2/3" />
+        <Esqueleto className="h-64 rounded-xl" />
+      </Estado.Cargando>
     )
   }
   if (consulta.isError) {
     const noExiste = consulta.error instanceof ErrorApi && consulta.error.status === 404
-    return (
-      <Alert variant="destructive" className="items-start">
-        <CircleAlert />
-        <AlertTitle>{noExiste ? 'Esa sesión no existe' : 'No se pudo cargar la sesión'}</AlertTitle>
-        <AlertDescription className="flex flex-col items-start gap-3">
-          {noExiste ? 'Puede que el enlace esté incompleto.' : mensajeDeError(consulta.error)}
-          {noExiste ? (
-            <Button asChild variant="outline" size="sm" className="max-md:min-h-11">
-              <Link to="/admin/sesiones">Ver sesiones</Link>
-            </Button>
-          ) : (
-            <Button variant="outline" size="sm" className="max-md:min-h-11" onClick={() => void consulta.refetch()}>
-              <RefreshCw />
-              Reintentar
-            </Button>
-          )}
-        </AlertDescription>
-      </Alert>
+    return noExiste ? (
+      <Estado.Error
+        titulo="Esa sesión no existe"
+        descripcion="Puede que el enlace esté incompleto."
+        accion={
+          <Boton asChild variante="secundario">
+            <Link to="/admin/sesiones">Ver sesiones</Link>
+          </Boton>
+        }
+      />
+    ) : (
+      <Estado.Error
+        titulo="No se pudo cargar la sesión"
+        descripcion={mensajeDeError(consulta.error)}
+        onReintentar={() => void consulta.refetch()}
+        reintentando={consulta.isFetching}
+      />
     )
   }
   const { sesion, avance } = consulta.data
@@ -493,19 +500,27 @@ export function DetalleSesion({ id }: { id: string }) {
     <div className="flex max-w-4xl flex-col gap-6">
       <EncabezadoPagina
         titulo={sesion.nombre}
-        insignia={abierta ? <Badge variant="brand">Abierta</Badge> : <Badge variant="outline">Cerrada</Badge>}
+        insignia={
+          abierta ? (
+            <Insignia tono="info">Abierta</Insignia>
+          ) : (
+            <Insignia tono="neutro" icono={<Lock aria-hidden="true" />}>
+              Cerrada
+            </Insignia>
+          )
+        }
         descripcion={`Corte ${fechaCorte(sesion.fecha_corte)} · abrió ${sesion.abierta_por.nombre} el ${fecha.format(new Date(sesion.abierta_en))}`}
         claseAcciones={abierta ? 'max-sm:w-full max-sm:flex-col-reverse' : undefined}
         acciones={
           abierta && (
             <>
               <CerrarSesion sesion={sesion} pendientesN={avance.pendientes} />
-              <Button asChild>
+              <Boton asChild>
                 <Link to={contar}>
-                  <ScanBarcode />
+                  <ScanBarcode aria-hidden="true" />
                   Contar esta sesión
                 </Link>
-              </Button>
+              </Boton>
             </>
           )
         }
@@ -522,54 +537,47 @@ export function DetalleSesion({ id }: { id: string }) {
   )
 }
 
+type FilaUbicacion = Avance['por_ubicacion'][number]
+
+const COLUMNAS_AVANCE: ColumnaTabla<FilaUbicacion>[] = [
+  { id: 'ubicacion', encabezado: 'Ubicación', principal: true, clase: 'whitespace-normal', celda: (f) => f.ubicacion.ruta },
+  { id: 'verificados', encabezado: 'Verificados', tipo: 'cifra', celda: (f) => `${formatEntero(f.verificados)} de ${formatEntero(f.total)}` },
+  { id: 'pendientes', encabezado: 'Pendientes', tipo: 'cifra', celda: (f) => formatEntero(f.pendientes) },
+  {
+    id: 'avance',
+    encabezado: 'Avance',
+    encabezadoOculto: true,
+    clase: 'w-40 min-w-28',
+    celda: (f) => <Progreso valor={porcentaje(f.verificados, f.total)} etiqueta={`Avance en ${f.ubicacion.ruta}`} tamano="fino" />,
+  },
+]
+
 // Avance en vivo de una sesión abierta (información de trabajo, no el informe).
 function AvanceEnVivo({ sesion, avance }: { sesion: SesionConteo; avance: Avance }) {
   const pct = porcentaje(avance.verificados, avance.total)
   return (
     <>
-      <section aria-labelledby="titulo-avance" className="flex flex-col gap-3 rounded-xl border p-4">
-        <h2 id="titulo-avance" className="font-semibold">
-          Avance
-        </h2>
-        <Progress value={pct} aria-label="Avance del conteo" className="h-2" />
-        <p className="text-sm tabular-nums">
-          <b className="font-semibold">{formatEntero(avance.verificados)}</b> de {formatEntero(avance.total)} verificados · {pct.toLocaleString('es-CO')} % ·{' '}
-          {pendientes(avance.pendientes)}
-        </p>
-        <p className="text-xs text-muted-foreground">Información de trabajo: no es el informe. El informe se calcula una sola vez, al cerrar.</p>
-      </section>
+      <Panel titulo="Avance">
+        <div className="flex flex-col gap-3">
+          <Progreso valor={pct} etiqueta="Avance del conteo" />
+          <p className="text-cuerpo tabular-nums">
+            <b className="font-semibold">{formatEntero(avance.verificados)}</b> de {formatEntero(avance.total)} verificados · {pct.toLocaleString('es-CO')} % ·{' '}
+            {pendientes(avance.pendientes)}
+          </p>
+          <p className="text-etiqueta font-normal text-muted-foreground">Información de trabajo: no es el informe. El informe se calcula una sola vez, al cerrar.</p>
+        </div>
+      </Panel>
       <AvisoDiscrepancias sesionId={sesion.id} />
       {avance.por_ubicacion.length > 0 ? (
-        <div className="overflow-x-auto rounded-xl border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-4">Ubicación</TableHead>
-                <TableHead className="text-right">Verificados</TableHead>
-                <TableHead className="text-right">Pendientes</TableHead>
-                <TableHead className="w-40 pr-4">
-                  <span className="sr-only">Avance</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {avance.por_ubicacion.map((f) => (
-                <TableRow key={f.ubicacion.id}>
-                  <TableCell className="pl-4 whitespace-normal">{f.ubicacion.ruta}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatEntero(f.verificados)} de {formatEntero(f.total)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatEntero(f.pendientes)}</TableCell>
-                  <TableCell className="pr-4">
-                    <Progress value={porcentaje(f.verificados, f.total)} aria-label={`Avance en ${f.ubicacion.ruta}`} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <TablaDatos
+          etiqueta="Avance por ubicación"
+          columnas={COLUMNAS_AVANCE}
+          filas={avance.por_ubicacion}
+          claveFila={(f) => f.ubicacion.id}
+          vacio={{ titulo: 'No hay activos que contar' }}
+        />
       ) : (
-        <EmptyState titulo="No hay activos que contar" descripcion="Registra activos para verlos aquí por ubicación." />
+        <Estado.Vacio titulo="No hay activos que contar" descripcion="Registra activos para verlos aquí por ubicación." />
       )}
       <ListaPendientes sesionId={sesion.id} />
     </>

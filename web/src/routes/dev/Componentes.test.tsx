@@ -121,4 +121,15 @@ describe('galería de componentes', () => {
     expect(within(imagenes).getByText('Sin foto')).toBeTruthy()
     expect(within(imagenes).getByRole('button', { name: 'Acciones de Silla ergonómica (000457)' })).toBeTruthy()
   })
+
+  // Spec 016, T9 (A7): casillas (selección por lote) e interruptor (preferencia de vista).
+  it('muestra Casilla e Interruptor del kit', () => {
+    render(<Componentes />)
+    const seleccion = screen.getByRole('region', { name: 'Selección' })
+    expect(within(seleccion).getByRole('checkbox', { name: 'Seleccionar todas' }).getAttribute('aria-checked')).toBe('mixed')
+    expect(within(seleccion).getByRole('checkbox', { name: 'Seleccionar Silla ergonómica (ejemplo)' }).getAttribute('aria-checked')).toBe('true')
+    expect(within(seleccion).getByRole('switch', { name: 'Mostrar inactivas' })).toBeTruthy()
+    expect(seleccion.querySelectorAll('[data-kit=casilla]').length).toBeGreaterThanOrEqual(3)
+    expect(seleccion.querySelector('[data-kit=interruptor]')).toBeTruthy()
+  })
 })

@@ -24,7 +24,7 @@ import { Progress } from '@/components/ui/progress'
 import { Switch } from '@/components/ui/switch'
 import { ACTIVOS, RESUMEN, UBICACIONES_API } from '@/mocks/datos-ficticios'
 
-import { CampoClave, CifrasKit, DialogosKit, ImagenesKit, SuperficiesKit, TablasKit } from './GaleriaKit'
+import { CampoClave, CifrasKit, DialogosKit, ImagenesKit, SeleccionKit, SuperficiesKit, TablasKit } from './GaleriaKit'
 
 // Galería del sistema de diseño (spec 001b, T2). Ruta de desarrollo
 // /dev/componentes: equivale a la página "Sistema visual" del lienzo aprobado
@@ -365,6 +365,7 @@ export default function Componentes() {
       <DialogosKit Seccion={Section} />
 
       <ImagenesKit Seccion={Section} />
+      <SeleccionKit Seccion={Section} />
 
       <TablasKit Seccion={Section} />
     </main>

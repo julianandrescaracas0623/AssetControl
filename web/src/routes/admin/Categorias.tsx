@@ -1,26 +1,10 @@
-import { CircleAlert, ListPlus, Pencil, Plus, RefreshCw, Search, Tags } from 'lucide-react'
-import { type FormEvent, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { ListPlus, Pencil, Plus, Tags } from 'lucide-react'
+import { type FormEvent, useDeferredValue, useId, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
-import { EncabezadoPagina } from '@/components/app/ConEstado'
-import { EmptyState } from '@/components/app/EmptyState'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useIsMobile } from '@/hooks/use-mobile'
+import { Aviso, Boton, Campo, type ColumnaTabla, Dialogo, EncabezadoPagina, Esqueleto, Estado, TablaDatos } from '@/components/kit'
 import { type Categoria, ErrorApi, mensajeDeError } from '@/lib/api/cliente'
 import {
   CLAVE_CATEGORIAS,
@@ -36,9 +20,13 @@ import { formatEntero } from '@/lib/format'
 // sugeridas (P8) se cargan con un botón y repetirlo no duplica. No se borran.
 // Spec 015, T6 (R12, Q10 = A): con muchas categorías, búsqueda sin tildes ni mayúsculas y
 // paginación en el cliente (la API devuelve la lista completa); `?q=` y `?pagina=` en la URL.
+// Spec 016, T9 (R2, R3, R5): presentación con el kit. TablaDatos con su búsqueda y su
+// paginación (que también devuelve el foco al otro botón al llegar a un extremo), filas
+// nombradas por la categoría, tarjetas en el teléfono y Dialogo con Campo.
 
 const NOMBRE_MAX = 120
 const POR_PAGINA = 25
+const FORMULARIO = 'formulario-categoria'
 
 function DialogoCategoria({
   categoria,
@@ -72,110 +60,49 @@ function DialogoCategoria({
   }
 
   return (
-    <Dialog open onOpenChange={(abierto) => !abierto && onCerrar()}>
-      <DialogContent className="sm:max-w-md">
-        <form onSubmit={alEnviar} className="flex flex-col gap-4">
-          <DialogHeader>
-            <DialogTitle>{categoria ? 'Renombrar categoría' : 'Nueva categoría'}</DialogTitle>
-            <DialogDescription>
-              {categoria
-                ? 'El cambio se ve en todos los activos de esta categoría.'
-                : 'Úsala para agrupar activos parecidos en el informe.'}
-            </DialogDescription>
-          </DialogHeader>
-          {errorGeneral && (
-            <Alert variant="destructive">
-              <CircleAlert />
-              <AlertDescription>{errorGeneral}</AlertDescription>
-            </Alert>
-          )}
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`${id}-nombre`}>Nombre</Label>
-            <Input
-              id={`${id}-nombre`}
-              name="nombre"
-              required
-              maxLength={NOMBRE_MAX}
-              autoComplete="off"
-              defaultValue={categoria?.nombre ?? ''}
-              aria-invalid={errorCampo ? true : undefined}
-              aria-describedby={errorCampo ? `${id}-error` : undefined}
-              className="h-11 md:h-9"
-            />
-            {errorCampo && (
-              <p id={`${id}-error`} className="flex items-center gap-1.5 text-xs text-destructive">
-                <CircleAlert className="size-3.5 shrink-0" aria-hidden="true" />
-                {errorCampo}
-              </p>
-            )}
-          </div>
-          <DialogFooter className="[&_[data-slot=button]]:max-md:min-h-11">
-            <Button type="button" variant="outline" onClick={onCerrar}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={mutacion.isPending}>
-              {categoria ? 'Guardar' : 'Crear'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function BotonRenombrar({ categoria, onRenombrar }: { categoria: Categoria; onRenombrar: () => void }) {
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="size-11 shrink-0 md:size-8"
-      aria-label={`Renombrar ${categoria.nombre}`}
-      onClick={onRenombrar}
+    <Dialogo
+      abierto
+      onAbiertoChange={(abierto) => !abierto && onCerrar()}
+      titulo={categoria ? 'Renombrar categoría' : 'Nueva categoría'}
+      descripcion={categoria ? 'El cambio se ve en todos los activos de esta categoría.' : 'Úsala para agrupar activos parecidos en el informe.'}
+      pie={
+        <>
+          <Boton variante="secundario" onClick={onCerrar}>
+            Cancelar
+          </Boton>
+          <Boton type="submit" form={FORMULARIO} cargando={mutacion.isPending}>
+            {categoria ? 'Guardar' : 'Crear'}
+          </Boton>
+        </>
+      }
     >
-      <Pencil />
-    </Button>
-  )
-}
-
-function FilaCategoria({ categoria, onRenombrar }: { categoria: Categoria; onRenombrar: () => void }) {
-  const id = useId()
-  return (
-    <li aria-labelledby={id} className="flex min-h-12 items-center gap-3 border-t py-1.5 pr-1 pl-4 first:border-t-0">
-      <span id={id} className="min-w-0 flex-1 truncate text-sm">
-        {categoria.nombre}
-      </span>
-      <BotonRenombrar categoria={categoria} onRenombrar={onRenombrar} />
-    </li>
-  )
-}
-
-function FilaTabla({ categoria, onRenombrar }: { categoria: Categoria; onRenombrar: () => void }) {
-  const id = useId()
-  return (
-    <TableRow aria-labelledby={id}>
-      <TableCell id={id} className="max-w-0 truncate pl-4">
-        {categoria.nombre}
-      </TableCell>
-      <TableCell className="w-12 py-1 pr-2 text-right">
-        <BotonRenombrar categoria={categoria} onRenombrar={onRenombrar} />
-      </TableCell>
-    </TableRow>
+      <form id={FORMULARIO} onSubmit={alEnviar} className="flex flex-col gap-4">
+        {errorGeneral && <Aviso tono="error" titulo={errorGeneral} />}
+        <Campo
+          id={`${id}-nombre`}
+          etiqueta="Nombre"
+          name="nombre"
+          required
+          maxLength={NOMBRE_MAX}
+          autoComplete="off"
+          defaultValue={categoria?.nombre ?? ''}
+          error={errorCampo ?? undefined}
+        />
+      </form>
+    </Dialogo>
   )
 }
 
 const plural = (n: number) => (n === 1 ? 'categoría' : 'categorías')
 
+const COLUMNAS: ColumnaTabla<Categoria>[] = [{ id: 'nombre', encabezado: 'Nombre', principal: true, clase: 'max-w-0 truncate', celda: (c) => c.nombre }]
+
 export default function Categorias() {
-  const movil = useIsMobile()
   const consulta = useCategorias()
   const sugeridas = useCargarSugeridas()
   const [edicion, setEdicion] = useState<{ categoria: Categoria | null } | null>(null)
   const [params, setParams] = useSearchParams()
   const cliente = useQueryClient()
-  const anterior = useRef<HTMLButtonElement>(null)
-  const siguienteBoton = useRef<HTMLButtonElement>(null)
-  // Si el botón pulsado queda deshabilitado (primera o última página), el foco pasa al otro.
-  const enfocar = useRef<'anterior' | 'siguiente' | null>(null)
   // El campo guarda lo que se escribe; la URL lo refleja para volver con el mismo filtro.
   const [texto, setTexto] = useState(() => params.get('q') ?? '')
   const filtro = normalizarBusqueda(useDeferredValue(texto))
@@ -192,12 +119,6 @@ export default function Categorias() {
   const desde = encontradas.length > 0 ? (pagina - 1) * POR_PAGINA + 1 : 0
   const hasta = desde + visibles.length - (visibles.length > 0 ? 1 : 0)
 
-  useEffect(() => {
-    const destino = enfocar.current === 'anterior' ? anterior.current : enfocar.current === 'siguiente' ? siguienteBoton.current : null
-    enfocar.current = null
-    destino?.focus()
-  }, [pagina])
-
   function buscar(valor: string) {
     setTexto(valor)
     const siguiente = new URLSearchParams(params)
@@ -209,8 +130,6 @@ export default function Categorias() {
   }
 
   function irA(destino: number) {
-    if (destino <= 1) enfocar.current = 'siguiente'
-    else if (destino >= paginas) enfocar.current = 'anterior'
     const siguiente = new URLSearchParams(params)
     if (destino > 1) siguiente.set('pagina', String(destino))
     else siguiente.delete('pagina')
@@ -246,7 +165,6 @@ export default function Categorias() {
   const nueva = () => setEdicion({ categoria: null })
   const total = todas?.length ?? 0
   const hay = total > 0
-  const renombrar = (categoria: Categoria) => () => setEdicion({ categoria })
 
   return (
     <div className="flex flex-col gap-6">
@@ -256,138 +174,94 @@ export default function Categorias() {
         acciones={
           <>
             {hay && (
-              <Button variant="outline" onClick={cargarSugeridas} disabled={sugeridas.isPending}>
-                <ListPlus />
+              <Boton variante="secundario" icono={<ListPlus />} onClick={cargarSugeridas} cargando={sugeridas.isPending}>
                 Cargar sugeridas
-              </Button>
+              </Boton>
             )}
-            <Button onClick={nueva}>
-              <Plus />
+            <Boton icono={<Plus />} onClick={nueva}>
               Nueva categoría
-            </Button>
+            </Boton>
           </>
         }
       />
 
       {consulta.isPending ? (
-        <div role="status" aria-label="Cargando categorías" className="flex flex-col gap-2">
-          <Skeleton className="h-48 rounded-xl" />
-        </div>
+        <Estado.Cargando etiqueta="Cargando categorías" className="max-w-2xl">
+          <Esqueleto className="h-48 rounded-xl" />
+        </Estado.Cargando>
       ) : consulta.isError ? (
-        <Alert variant="destructive" className="items-start">
-          <CircleAlert />
-          <AlertTitle>No se pudieron cargar las categorías</AlertTitle>
-          <AlertDescription className="flex flex-col items-start gap-3">
-            {mensajeDeError(consulta.error)}
-            <Button variant="outline" size="sm" className="max-md:min-h-11" onClick={() => void consulta.refetch()}>
-              <RefreshCw />
-              Reintentar
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <Estado.Error
+          titulo="No se pudieron cargar las categorías"
+          descripcion={mensajeDeError(consulta.error)}
+          onReintentar={() => void consulta.refetch()}
+          reintentando={consulta.isFetching}
+        />
       ) : !hay ? (
-        <EmptyState
-          icono={<Tags className="size-5" />}
+        <Estado.Vacio
+          icono={<Tags />}
           titulo="Aún no hay categorías"
           descripcion="Empieza con las 6 sugeridas (Mobiliario, Electrónica, CPU, Periféricos, Electrodomésticos y Biomédicos) o crea las tuyas."
           accion={
             <>
-              <Button onClick={cargarSugeridas} disabled={sugeridas.isPending}>
-                <ListPlus />
+              <Boton icono={<ListPlus />} onClick={cargarSugeridas} cargando={sugeridas.isPending}>
                 Cargar las 6 sugeridas
-              </Button>
-              <Button variant="outline" onClick={nueva}>
+              </Boton>
+              <Boton variante="secundario" onClick={nueva}>
                 Crear una
-              </Button>
+              </Boton>
             </>
           }
         />
       ) : (
-        <section aria-label="Lista de categorías" className="max-w-2xl min-w-0 overflow-hidden rounded-xl border bg-card">
-          <div className="flex flex-col gap-2 border-b p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative min-w-0 sm:w-72">
-              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              <Input
-                type="search"
-                aria-label="Buscar categorías"
-                placeholder="Buscar por nombre"
-                value={texto}
-                maxLength={NOMBRE_MAX}
-                autoComplete="off"
-                onChange={(e) => buscar(e.target.value)}
-                className="pl-8 max-md:h-11"
-              />
-            </div>
-            <p role="status" className="text-sm text-muted-foreground tabular-nums">
-              <span>
-                {filtro
-                  ? `${formatEntero(encontradas.length)} de ${formatEntero(total)} ${plural(total)}`
-                  : `${formatEntero(total)} ${plural(total)}`}
-              </span>
-              {paginas > 1 && <span className="sr-only">{`. Página ${pagina} de ${paginas}`}</span>}
-            </p>
-          </div>
-
-          {encontradas.length === 0 ? (
-            <div className="p-4">
-              <EmptyState
-                titulo="Ninguna categoría coincide"
-                descripcion="Prueba con otra parte del nombre. No importan las mayúsculas ni las tildes."
-                accion={
-                  <Button variant="outline" className="max-md:min-h-11" onClick={() => buscar('')}>
-                    Limpiar búsqueda
-                  </Button>
+        <TablaDatos
+          etiqueta="Categorías"
+          className="max-w-2xl"
+          columnas={COLUMNAS}
+          filas={visibles}
+          claveFila={(c) => c.id}
+          nombrarFilas
+          barra={{
+            busqueda: { valor: texto, onCambio: buscar, etiqueta: 'Buscar categorías', placeholder: 'Buscar por nombre', maxLength: NOMBRE_MAX },
+            filtros: (
+              <p role="status" className="text-etiqueta font-normal text-muted-foreground tabular-nums">
+                <span>
+                  {filtro
+                    ? `${formatEntero(encontradas.length)} de ${formatEntero(total)} ${plural(total)}`
+                    : `${formatEntero(total)} ${plural(total)}`}
+                </span>
+                {paginas > 1 && <span className="sr-only">{`. Página ${pagina} de ${paginas}`}</span>}
+              </p>
+            ),
+          }}
+          vacio={{
+            titulo: 'Ninguna categoría coincide',
+            descripcion: 'Prueba con otra parte del nombre. No importan las mayúsculas ni las tildes.',
+            accion: (
+              <Boton variante="secundario" onClick={() => buscar('')}>
+                Limpiar búsqueda
+              </Boton>
+            ),
+          }}
+          accionesFila={(c) => (
+            <Boton variante="fantasma" soloIcono aria-label={`Renombrar ${c.nombre}`} icono={<Pencil />} onClick={() => setEdicion({ categoria: c })} />
+          )}
+          paginacion={
+            paginas > 1
+              ? {
+                  desde,
+                  hasta,
+                  total: encontradas.length,
+                  hayAnterior: pagina > 1,
+                  haySiguiente: pagina < paginas,
+                  onAnterior: () => irA(pagina - 1),
+                  onSiguiente: () => irA(pagina + 1),
                 }
-              />
-            </div>
-          ) : movil ? (
-            <ul>
-              {visibles.map((categoria) => (
-                <FilaCategoria key={categoria.id} categoria={categoria} onRenombrar={renombrar(categoria)} />
-              ))}
-            </ul>
-          ) : (
-            <Table className="table-fixed">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="pl-4">Nombre</TableHead>
-                  <TableHead className="w-12 pr-2">
-                    <span className="sr-only">Acciones</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visibles.map((categoria) => (
-                  <FilaTabla key={categoria.id} categoria={categoria} onRenombrar={renombrar(categoria)} />
-                ))}
-              </TableBody>
-            </Table>
-          )}
-
-          {paginas > 1 && (
-            <nav
-              aria-label="Páginas de categorías"
-              className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm"
-            >
-              <span className="text-muted-foreground tabular-nums">
-                {formatEntero(desde)}–{formatEntero(hasta)} de {formatEntero(encontradas.length)}
-              </span>
-              <div className="flex gap-2 [&_[data-slot=button]]:max-md:min-h-11">
-                <Button ref={anterior} variant="outline" size="sm" disabled={pagina <= 1} onClick={() => irA(pagina - 1)}>
-                  ‹ Anterior
-                </Button>
-                <Button ref={siguienteBoton} variant="outline" size="sm" disabled={pagina >= paginas} onClick={() => irA(pagina + 1)}>
-                  Siguiente ›
-                </Button>
-              </div>
-            </nav>
-          )}
-        </section>
+              : undefined
+          }
+        />
       )}
 
-      {edicion && (
-        <DialogoCategoria categoria={edicion.categoria} onCerrar={() => setEdicion(null)} onCreada={alCrear} />
-      )}
+      {edicion && <DialogoCategoria categoria={edicion.categoria} onCerrar={() => setEdicion(null)} onCreada={alCrear} />}
     </div>
   )
 }

@@ -234,7 +234,8 @@ describe('/admin/categorias con muchas categorías (spec 015, T6)', () => {
     expect(screen.queryByRole('table')).toBeNull()
     expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(25)
     const boton = within(item).getByRole('button', { name: 'Renombrar Categoría 001' })
-    expect(boton.className).toContain('size-11')
+    // Spec 016, T9: selector de clase visual size-11 → size-control (48 px en el teléfono, D6).
+    expect(boton.className).toContain('size-control')
     fireEvent.click(boton)
     const dialogo = await screen.findByRole('dialog')
     fireEvent.change(within(dialogo).getByLabelText('Nombre'), { target: { value: 'Sillas' } })
