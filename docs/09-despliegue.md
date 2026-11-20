@@ -93,7 +93,6 @@ uv run flask --app app create-tenant "<Nombre de la clínica>" "<correo del prim
 | `ALMACEN` | `s3` (spec 012). Sin esta variable la app arranca con las **fotos desactivadas** (responden `503`) y lo avisa en el registro; `carpeta` no se admite en producción (el contenedor no guarda archivos). |
 | `S3_ENDPOINT_URL`, `S3_REGION`, `S3_BUCKET` | Los de la sección 3, paso 4 (`S3_BUCKET=fotos`). |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Las llaves S3 de Supabase, como **secretos** de la plataforma. Si falta alguna con `ALMACEN=s3`, la app no arranca y dice cuál. |
-
 | `CORREO_MODO` | `smtp` (spec 014). Sin esta variable la app arranca con la **recuperación de contraseña desactivada** y lo avisa una vez en el registro: `/auth/recuperar` responde el mismo `202` sin tocar la base ni enviar nada. `carpeta` no se admite en producción (la app se niega a arrancar). |
 | `CORREO_REMITENTE` | Obligatoria con `smtp`: `Nombre <correo@dominio>` o `correo@dominio`, de un dominio verificado en el proveedor (SPF y DKIM). |
 | `SMTP_HOST` | Obligatoria con `smtp`: el servidor del proveedor. |
