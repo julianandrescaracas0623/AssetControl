@@ -52,6 +52,11 @@ Está ordenado en seis bloques comentados:
 | `ENVIRONMENT` | Modo | `development` |
 | `TRUSTED_PROXY_HOPS` | Proxies delante | `0` en tu PC |
 | `RATE_LIMIT_*`, `ARGON2_MAX_CONCURRENCY` | Opcionales | vacías |
+| `CORREO_MODO` | Recuperar contraseña por correo (spec 014): `carpeta` o `smtp`; vacía = recuperación desactivada | `carpeta` |
+| `URL_PUBLICA` | Base del enlace del correo (sin `/` final, sin `?` ni `#`) | `http://localhost:5173` |
+| `CORREO_CARPETA` | Dónde se escriben los correos en modo `carpeta` | vacía (usa `backend\.buzon\`) |
+| `CORREO_REMITENTE` | Remitente del correo | vacía (usa `AssetControl <no-responder@assetcontrol.invalid>`) |
+| `SMTP_HOST`, `SMTP_PUERTO`, `SMTP_CIFRADO`, `SMTP_USUARIO`, `SMTP_CLAVE` | Solo con `CORREO_MODO=smtp` | vacías |
 
 Reglas que evitan el 90 % de los errores:
 
@@ -154,6 +159,13 @@ La primera vez, abre `http://localhost:5173/invitacion#<lo que copiaste en el pa
 > **Fotos (spec 012):** en tu PC se guardan en `backend\.almacen\` (ignorada por git; no hace falta configurar nada). Para empezar de cero, borra esa carpeta junto con la base.
 >
 > **Datos de la empresa (spec 013):** antes de cerrar un conteo, entra a **Ajustes → Empresa** y completa nombre, dirección y, si quieres, NIT, teléfono, correo y logo. Salen en el Excel y el PDF de los informes que cierres **desde ese momento**; los ya cerrados conservan lo que tenían. El logo se guarda en la misma carpeta de las fotos.
+>
+> **Recuperar contraseña (spec 014):** con `CORREO_MODO=carpeta` y `URL_PUBLICA=http://localhost:5173` en `.env` (solo con `ENVIRONMENT=development`; en producción la app se niega a arrancar con `carpeta`), «¿Olvidaste tu contraseña?» en `/login` no envía nada: escribe un archivo `.eml` por correo en `backend\.buzon\` (ignorada por git y por la imagen de Docker). Ábrelo con el Bloc de notas o con un cliente de correo (doble clic) y copia el enlace `http://localhost:5173/restablecer#…`: vale 30 minutos y sirve una sola vez; si pides otro, el anterior deja de servir. El nombre del archivo no lleva el correo. **Borra los `.eml` al terminar** (`Remove-Item backend\.buzon\*.eml`): mientras no venzan, sus enlaces cambian la contraseña de esa cuenta. Usa solo correos de prueba, nunca los de la clínica.
+>
+> - **Hoy `docker-compose.yml` no pasa `CORREO_*` ni `URL_PUBLICA` al contenedor `api`**: con `.\scripts\dev.ps1` la recuperación queda desactivada aunque estén en `.env`. Para probarla, apaga la API del compose (`docker compose stop api`) y enciéndela fuera de Docker en el mismo puerto: `cd backend; uv run --env-file ../.env flask --app app run --port 5000` (la web de Vite no cambia).
+> - Sin `CORREO_MODO` la app arranca con la recuperación **desactivada** (lo avisa una vez en el registro): `/auth/recuperar` responde el mismo `202` («Si existe una cuenta con ese correo…»), pero no toca la base ni escribe ningún correo.
+> - Solo reciben enlace los usuarios activos con **exactamente una** membresía activa y un correo que sea una dirección simple en ASCII: uno con `%`, `!`, parte local entre comillas dobles o caracteres no ASCII recibe la misma respuesta y ningún enlace.
+> - Para probar SMTP real en tu PC, pon `CORREO_MODO=smtp` y las variables `SMTP_*` de un buzón de pruebas (ver `docs/09`, sección 5); `SMTP_CIFRADO` vale `starttls` por defecto en development, nunca texto plano.
 >
 > **Atajo en el teléfono:** abre la app en el teléfono (ver abajo) → Chrome: menú ⋮ → *Agregar a la pantalla principal* (o *Instalar app*); iPhone: Safari → Compartir → *Agregar a inicio*. Queda el ícono de AssetControl y abre directo en Conteo, sin barra del navegador. Necesita conexión: no funciona sin internet.
 >
