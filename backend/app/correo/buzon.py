@@ -20,7 +20,10 @@ class Buzon:
         self.carpeta = Path(carpeta).resolve()
 
     def entregar(self, mensaje: EmailMessage) -> Path:
-        self.carpeta.mkdir(parents=True, exist_ok=True)
+        # B-3 de T3 (T8): la carpeta que se crea queda solo para el dueño (los ``.eml``
+        # llevan enlaces válidos). Una carpeta que ya existe no se toca.
+        self.carpeta.parent.mkdir(parents=True, exist_ok=True)
+        self.carpeta.mkdir(mode=0o700, exist_ok=True)
         marca = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
         ruta = self.carpeta / f"{marca}-{secrets.token_hex(8)}.eml"
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)

@@ -59,6 +59,7 @@ from app.db import (
     contar_intentos,
     contar_y_solicitar_recuperacion,
     devolver_intentos,
+    error_summary,
 )
 from app.errors import ServiceUnavailableError, TooManyRequestsError, current_request_id
 
@@ -138,12 +139,6 @@ def increment_attempts(
     return _counters(items, rows)
 
 
-def _error_summary(exc: BaseException) -> tuple[str, str]:
-    orig = getattr(exc, "orig", None)
-    sqlstate = getattr(orig, "sqlstate", None) or getattr(exc, "sqlstate", None)
-    return type(exc).__name__, sqlstate if isinstance(sqlstate, str) else "desconocido"
-
-
 def _unavailable(failure: tuple[str, str]) -> ServiceUnavailableError:
     current_app.logger.error(
         "Límite de tasa no disponible; se responde 503 (request_id=%s, tipo=%s, sqlstate=%s)",
@@ -159,7 +154,7 @@ def _enforce(items: Sequence[tuple[str, bytes, int]], limits: RateLimits) -> lis
     try:
         counters = increment_attempts(items, limits.window_seconds)
     except Exception as exc:  # noqa: BLE001 - falla cerrado ante cualquier error
-        failure = _error_summary(exc)
+        failure = error_summary(exc)
     if failure is not None:
         # Fuera del except: sin causa ni contexto que arrastren SQL, parámetros o valores.
         raise _unavailable(failure)
@@ -253,9 +248,10 @@ def limit_recover_and_request(email: str, destino: str, clave: str) -> bool:
         return not any(counter.exceeded for counter in _counters(items, rows))
 
     failure: tuple[str, str] | None = None
-    result: tuple[list[CounterRow], bool | None] | None = None
+    rows: list[CounterRow] = []
+    created: bool | None = None
     try:
-        result = contar_y_solicitar_recuperacion(
+        rows, created = contar_y_solicitar_recuperacion(
             [(ambito, clave_hash) for ambito, clave_hash, _ in items],
             limits.window_seconds,
             permitido,
@@ -264,9 +260,8 @@ def limit_recover_and_request(email: str, destino: str, clave: str) -> bool:
         )
     except CounterUnavailableError as exc:
         failure = (exc.tipo, exc.sqlstate)
-    if failure is not None or result is None:
-        raise _unavailable(failure or ("desconocido", "desconocido"))
-    rows, created = result
+    if failure is not None:
+        raise _unavailable(failure)
     _check(_counters(items, rows), limits)
     return created is True
 
@@ -281,7 +276,7 @@ def give_back(counters: Sequence[Counter]) -> None:
     try:
         devolver_intentos([(c.ambito, c.clave_hash, c.ventana_inicio) for c in counters])
     except Exception as exc:  # noqa: BLE001 - la petición ya terminó bien
-        failure = _error_summary(exc)
+        failure = error_summary(exc)
     if failure is not None:
         current_app.logger.warning(
             "No se pudo devolver el intento al límite de tasa (request_id=%s, tipo=%s, "

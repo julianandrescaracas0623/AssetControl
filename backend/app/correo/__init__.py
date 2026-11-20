@@ -3,9 +3,11 @@
 Interfaz mínima para T4:
 
 - ``correo_activo(app)``: ``False`` si falta ``CORREO_MODO`` (recuperación desactivada).
-- ``get_correo(app).enviar_recuperacion(destino, token)``: se llama **después** del
-  ``COMMIT``; vuelve de inmediato y nunca lanza. Compone y entrega en un hilo
-  ``daemon`` acotado por un ``BoundedSemaphore``; sin cupo, el envío se descarta.
+- ``get_correo(app).enviar_recuperacion(destino, token, request_id=None)``: se llama
+  **después** del ``COMMIT`` (la ruta lo hace al cerrar la respuesta, sin contexto de
+  petición, y pasa el ``request_id``); vuelve de inmediato y nunca lanza. Compone y
+  entrega en un hilo ``daemon`` acotado por un ``BoundedSemaphore``; sin cupo, el envío
+  se descarta, se cuenta en ``descartados`` y se registra con ese total.
 
 Sin colas ni reintentos (ADR-002). Un fallo se registra solo con su tipo y el
 ``request_id``: nunca el destinatario, el host, el token, el enlace, el cuerpo ni el
@@ -73,6 +75,7 @@ class Correo:
         self._cupo = threading.BoundedSemaphore(max_concurrencia)
         self._hilos: set[threading.Thread] = set()
         self._hilos_lock = threading.Lock()
+        self.descartados = 0
 
     def __repr__(self) -> str:
         modo = self._config.modo if self._config is not None else "desactivado"
@@ -82,15 +85,24 @@ class Correo:
     def activo(self) -> bool:
         return self._config is not None and self.transporte is not None
 
-    def enviar_recuperacion(self, destino: str, token: str) -> None:
-        """Programa el envío y vuelve sin esperar. Sin configuración no hace nada."""
+    def enviar_recuperacion(self, destino: str, token: str, request_id: str | None = None) -> None:
+        """Programa el envío y vuelve sin esperar. Sin configuración no hace nada.
+
+        ``request_id``: el de la petición que lo pidió; si falta, el de la petición en curso.
+        """
         if not self.activo:
             return None
-        request_id = _request_id()
+        if request_id is None:
+            request_id = _request_id()
         if not self._cupo.acquire(blocking=False):
+            with self._hilos_lock:
+                self.descartados += 1
+                descartados = self.descartados
             logger.warning(
-                "Correo de recuperación descartado: sin cupo de envío (request_id=%s)",
+                "Correo de recuperación descartado: sin cupo de envío (request_id=%s, "
+                "descartados=%s)",
                 request_id,
+                descartados,
             )
             return None
         hilo = threading.Thread(

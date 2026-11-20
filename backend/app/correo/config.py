@@ -20,6 +20,8 @@ MODOS = ("carpeta", "smtp")
 CIFRADOS = ("starttls", "ssl")
 PUERTO_POR_CIFRADO = {"starttls": 587, "ssl": 465}
 SMTP_TIMEOUT_SEGUNDOS = 10
+# M-1 de T3 (T8): plazo total de una entrega SMTP (conexión, TLS, autenticación y envío).
+SMTP_PLAZO_TOTAL_SEGUNDOS = 45
 BUZON_POR_DEFECTO = Path(__file__).resolve().parents[2] / ".buzon"
 REMITENTE_DESARROLLO = "AssetControl <no-responder@assetcontrol.invalid>"
 # Entornos donde se admite el buzón en carpeta y una ``URL_PUBLICA`` con ``http``
@@ -29,8 +31,13 @@ URL_MAX = 2048
 
 _ENTERO = re.compile(r"[0-9]{1,5}")
 # Dirección simple ``local@dominio`` en ASCII imprimible, sin espacios ni separadores
-# de lista o de nombre: lo que sí admite es una sola dirección, nunca varias.
-_DIRECCION = r"[!#$%&'*+\-/=?^_`{|}~.0-9A-Za-z]+@[0-9A-Za-z](?:[0-9A-Za-z\-.]*[0-9A-Za-z])?"
+# de lista o de nombre: lo que sí admite es una sola dirección, nunca varias. B-1 de T3
+# (T8): parte local *dot-atom* (sin «..» ni punto al inicio o al final, máx. 64, sin «%» ni
+# «!», que algunos servidores interpretan como enrutamiento) y dominio por etiquetas
+# (letras, dígitos y «-», sin empezar ni terminar en «-», separadas por un solo «.»).
+_ATEXT = r"[#$&'*+\-/=?^_`{|}~0-9A-Za-z]"
+_ETIQUETA = r"[0-9A-Za-z](?:[0-9A-Za-z\-]*[0-9A-Za-z])?"
+_DIRECCION = rf"(?=[^@]{{1,64}}@){_ATEXT}+(?:\.{_ATEXT}+)*@{_ETIQUETA}(?:\.{_ETIQUETA})*"
 _DIRECCION_SIMPLE = re.compile(_DIRECCION)
 _REMITENTE = re.compile(rf"(?:[0-9A-Za-z][0-9A-Za-z .\-]{{0,62}} <{_DIRECCION}>|{_DIRECCION})")
 _URL_PERMITIDA = re.compile(r"[\x21-\x7e]+")

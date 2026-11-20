@@ -489,7 +489,12 @@ class CounterUnavailableError(Exception):
         super().__init__("Límite de tasa no disponible.")
 
 
-def _resumen_error(exc: BaseException) -> tuple[str, str]:
+def error_summary(exc: BaseException) -> tuple[str, str]:
+    """``(tipo, sqlstate)`` de un error de base, sin mensaje, SQL ni parámetros.
+
+    Única versión para ``app.db`` y ``app.auth.limits`` (T8); ``sqlstate`` es
+    ``"desconocido"`` si el error no trae uno.
+    """
     orig = getattr(exc, "orig", None)
     sqlstate = getattr(orig, "sqlstate", None) or getattr(exc, "sqlstate", None)
     return type(exc).__name__, sqlstate if isinstance(sqlstate, str) else "desconocido"
@@ -530,7 +535,7 @@ def contar_y_solicitar_recuperacion(
             try:
                 rows = _sumar_intentos(connection, items, window_seconds)
             except Exception as exc:
-                fallo_conteo = _resumen_error(exc)
+                fallo_conteo = error_summary(exc)
                 raise
             if not permitido(rows):
                 transaction.commit()

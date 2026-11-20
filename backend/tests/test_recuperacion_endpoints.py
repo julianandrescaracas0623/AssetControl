@@ -44,7 +44,7 @@ from acceso_db import (
     dispose,
     temporary_acceso_db,
 )
-from flask import Flask
+from flask import Flask, has_request_context
 from sqlalchemy import event, text
 
 from app import create_app
@@ -142,18 +142,24 @@ class Envios:
 
     En el momento de la llamada comprueba, desde otra conexión (el migrador), si el enlace
     del token ya está confirmado en la base: así se prueba que el envío ocurre tras el
-    ``COMMIT``.
+    ``COMMIT``. También anota si aún había contexto de petición (I1 de T4, T8: el envío se
+    programa con ``call_on_close``, cuando la respuesta ya salió y el contexto se cerró) y
+    el ``request_id`` que recibió.
     """
 
     def __init__(self, db: AccesoDb, original) -> None:
         self.db = db
         self.original = original
         self.llamadas: list[tuple[str, str, bool]] = []
+        self.en_peticion: list[bool] = []
+        self.request_ids: list[str | None] = []
 
-    def __call__(self, destino: str, token: str) -> None:
+    def __call__(self, destino: str, token: str, request_id: str | None = None) -> None:
         confirmado = enlace(self.db, token) is not None
         self.llamadas.append((destino, token, confirmado))
-        return self.original(destino, token)
+        self.en_peticion.append(has_request_context())
+        self.request_ids.append(request_id)
+        return self.original(destino, token, request_id=request_id)
 
 
 @pytest.fixture
@@ -255,6 +261,9 @@ def contadores(db: AccesoDb) -> dict[str, int]:
 
 
 def recuperar(client, email, ip=IP, headers=None, **kwargs):
+    # ``buffered``: como un servidor WSGI real, se lee el cuerpo y se cierra la respuesta,
+    # lo que ejecuta los ``call_on_close`` (ahí se programa el correo, I1 de T4).
+    kwargs.setdefault("buffered", True)
     return client.post(
         RECUPERAR,
         json={"email": email},
@@ -489,7 +498,7 @@ def test_recover_does_not_depend_on_the_mail_module_failing(client, rec_db, rec_
     elegible = crear_cuenta(rec_db)
     referencia = comparable(recuperar(client, "nadie.mas@ejemplo.test"))
 
-    def falla(destino, token):
+    def falla(destino, token, **kwargs):
         raise RuntimeError(f"fallo sintético {destino} {token}")
 
     monkeypatch.setattr(get_correo(rec_app), "enviar_recuperacion", falla)
@@ -507,6 +516,10 @@ def test_mail_is_sent_after_commit_with_normalized_email_and_fresh_token(client,
     [(destino, token, confirmado)] = envios.llamadas
     assert destino == cuenta.email
     assert confirmado, "el correo se programó antes del COMMIT"
+    # I1 de T4: se programa al cerrar la respuesta, sin contexto de petición, con el
+    # ``request_id`` de la petición capturado antes.
+    assert envios.en_peticion == [False]
+    assert envios.request_ids == [response.headers["X-Request-ID"]]
     fila = enlace(rec_db, token)
     assert fila is not None and fila["usuario_id"] == cuenta.usuario_id
     assert fila["usada_en"] is None and fila["invalidada_en"] is None
@@ -695,6 +708,8 @@ def test_reset_ip_limit_is_429_before_argon2(limited_app, rec_db):
     response = restablecer(client, "x" * 43)
     assert response.status_code == 429
     assert error_of(response) == RATE_LIMITED
+    # T8 (pendiente de T7): ``Retry-After`` constante (la ventana) de punta a punta.
+    assert response.headers["Retry-After"] == "900"
     assert contadores(rec_db) == {"restablecer_ip": 3}
 
 
@@ -1012,6 +1027,30 @@ def test_rejected_reset_writes_no_audit_record(client, rec_db, envios, caplog):
     with caplog.at_level(logging.INFO):
         assert restablecer(client, "B" * 43).status_code == 400
     assert not [r for r in caplog.records if "restablecida" in r.getMessage()]
+
+
+def test_rejected_link_is_a_warning_with_only_the_request_id(client, rec_db, envios, caplog):
+    """T8 (notas de T4): cada rechazo de enlace deja un ``WARNING`` sin datos del enlace."""
+    cuenta = crear_cuenta(rec_db)
+    token = token_por_correo(client, envios, cuenta)
+    assert restablecer(client, token).status_code == 204
+    caplog.clear()
+
+    with caplog.at_level(logging.DEBUG):
+        respuestas = [restablecer(client, t) for t in (token, "C" * 43, "")]
+
+    avisos = [r for r in caplog.records if "Enlace de recuperación rechazado" in r.getMessage()]
+    assert [r.levelno for r in avisos] == [logging.WARNING] * 3
+    for registro, response in zip(avisos, respuestas, strict=True):
+        assert response.status_code == 400
+        assert registro.getMessage() == (
+            f"Enlace de recuperación rechazado (request_id={response.headers['X-Request-ID']})"
+        )
+        assert registro.exc_info is None
+    texto = log_text(caplog)
+    for secreto in (token, token_key(token), token_storage_hash(token).hex(), "C" * 43):
+        assert secreto not in texto
+    assert cuenta.email not in texto and str(cuenta.usuario_id) not in texto
 
 
 def test_routes_module_exposes_the_new_codes():

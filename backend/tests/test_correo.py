@@ -35,9 +35,11 @@ from app.correo import (
 from app.correo.buzon import Buzon
 from app.correo.config import (
     BUZON_POR_DEFECTO,
+    SMTP_PLAZO_TOTAL_SEGUNDOS,
     SMTP_TIMEOUT_SEGUNDOS,
     CorreoConfig,
     CorreoNoValido,
+    es_direccion_simple,
     load_correo,
 )
 from app.correo.plantillas import (
@@ -46,7 +48,7 @@ from app.correo.plantillas import (
     componer_recuperacion,
     enlace_recuperacion,
 )
-from app.correo.smtp import ServidorSmtp, nombre_ehlo
+from app.correo.smtp import ServidorSmtp, _Vigilante, nombre_ehlo
 
 DESTINO = "persona.recupera@ejemplo.test"
 CLAVE_SMTP = "clave-smtp-de-prueba-no-real"
@@ -193,6 +195,16 @@ def test_message_is_plain_spanish_text_with_link_and_fixed_subject():
         " persona@ejemplo.test",
         "persona\x00@ejemplo.test",
         "a" * 250 + "@ejemplo.test",
+        # B-1 de T3 (T8): dot-atom estricto en la parte local y en el dominio.
+        "dos..puntos@ejemplo.test",
+        ".inicio@ejemplo.test",
+        "final.@ejemplo.test",
+        "a" * 65 + "@ejemplo.test",
+        "ruta%otro@ejemplo.test",
+        "bang!otro@ejemplo.test",
+        "persona@ejemplo..test",
+        "persona@-ejemplo.test",
+        "persona@ejemplo-.test",
     ],
 )
 def test_header_injection_and_odd_recipients_are_rejected(destino):
@@ -200,6 +212,21 @@ def test_header_injection_and_odd_recipients_are_rejected(destino):
         componer_recuperacion(REMITENTE, destino, URL, _token())
 
     assert "ejemplo.test" not in str(info.value)
+
+
+@pytest.mark.parametrize(
+    "destino",
+    [
+        "persona@ejemplo.test",
+        "nombre.apellido+etiqueta@sub.ejemplo.test",
+        "a" * 64 + "@ejemplo.test",
+        "o'neil_x-y=z#{1}~@ejemplo.test",
+        "persona@localhost",
+    ],
+)
+def test_simple_dot_atom_recipients_are_accepted(destino):
+    assert es_direccion_simple(destino)
+    assert componer_recuperacion(REMITENTE, destino, URL, _token())["To"] == destino
 
 
 @pytest.mark.parametrize("token", ["", "a" * 20, "con espacio" * 5, "x\r\nBcc: y" * 5, "#" * 43])
@@ -506,6 +533,32 @@ def test_mailbox_file_is_private_to_the_owner(tmp_path):
     assert stat.S_IMODE(ruta.stat().st_mode) == 0o600
 
 
+def test_mailbox_folder_is_created_private_to_the_owner(tmp_path):
+    """B-3 de T3 (T8): la carpeta del buzón se crea con ``0o700`` (en Windows se pide igual)."""
+    carpeta = tmp_path / "nueva" / ".buzon"
+    original = Path.mkdir
+    llamadas = []
+
+    def espiar(self, *args, **kwargs):
+        llamadas.append((Path(self), kwargs.get("mode", args[0] if args else None)))
+        return original(self, *args, **kwargs)
+
+    with mock.patch.object(Path, "mkdir", espiar):
+        Buzon(carpeta).entregar(componer_recuperacion(REMITENTE, DESTINO, URL, _token()))
+
+    assert (carpeta.resolve(), 0o700) in llamadas
+    if sys.platform != "win32":
+        assert stat.S_IMODE(carpeta.stat().st_mode) == 0o700
+
+
+def test_mailbox_folder_is_excluded_from_the_docker_build_context():
+    """B-4 de T3 (T8): el Dockerfile de desarrollo hace ``COPY . .``."""
+    dockerignore = Path(__file__).resolve().parents[1] / ".dockerignore"
+    lineas = {linea.strip() for linea in dockerignore.read_text(encoding="utf-8").splitlines()}
+
+    assert ".buzon/" in lineas
+
+
 # --- SMTP (R7, A13) ---------------------------------------------------------------------
 
 
@@ -528,14 +581,19 @@ def test_starttls_uses_verified_tls_timeout_and_configured_credentials():
 
     clase.assert_called_once()
     clase_ssl.assert_not_called()
-    args, kwargs = clase.call_args
-    assert (args[:2] if args else (kwargs["host"], kwargs["port"])) == (HOST_SMTP, 587)
+    kwargs = clase.call_args.kwargs
+    # Se construye sin conectar (M-1: el vigilante del plazo total ya ve el socket) y luego
+    # se conecta al host y puerto configurados.
+    assert not clase.call_args.args and "host" not in kwargs
+    servidor.connect.assert_called_once_with(HOST_SMTP, 587)
     assert kwargs["timeout"] == SMTP_TIMEOUT_SEGUNDOS == 10
     servidor.starttls.assert_called_once()
     contexto = servidor.starttls.call_args.kwargs["context"]
     assert isinstance(contexto, ssl.SSLContext)
     assert contexto.verify_mode == ssl.CERT_REQUIRED
     assert contexto.check_hostname is True
+    # B-2 de T3 (T8): TLS 1.2 como mínimo, explícito.
+    assert contexto.minimum_version == ssl.TLSVersion.TLSv1_2
     servidor.login.assert_called_once_with(USUARIO_SMTP, CLAVE_SMTP)
     servidor.send_message.assert_called_once_with(mensaje)
     nombres = [c[0] for c in servidor.method_calls]
@@ -554,9 +612,12 @@ def test_ssl_mode_uses_implicit_tls_with_verified_context():
 
     clase.assert_not_called()
     kwargs = clase_ssl.call_args.kwargs
+    assert not clase_ssl.call_args.args and "host" not in kwargs
+    servidor.connect.assert_called_once_with(HOST_SMTP, 465)
     assert kwargs["timeout"] == 10
     assert kwargs["context"].verify_mode == ssl.CERT_REQUIRED
     assert kwargs["context"].check_hostname is True
+    assert kwargs["context"].minimum_version == ssl.TLSVersion.TLSv1_2
     servidor.starttls.assert_not_called()
     servidor.login.assert_called_once_with(USUARIO_SMTP, CLAVE_SMTP)
     servidor.send_message.assert_called_once_with(mensaje)
@@ -702,6 +763,106 @@ def test_silent_server_times_out_without_retry(caplog):
     # ``smtplib`` convierte el tiempo agotado del saludo en ``SMTPServerDisconnected``.
     assert "tipo=SMTPServerDisconnected" in texto or "tipo=TimeoutError" in texto
     _assert_sin_secretos(texto, token)
+
+
+def test_total_deadline_is_45_seconds():
+    assert SMTP_PLAZO_TOTAL_SEGUNDOS == 45
+
+
+def test_dribbling_server_is_cut_by_the_total_deadline(caplog):
+    """M-1 de T3 (T8): un servidor que gotea (nunca agota el timeout por operación) se corta
+    al vencer el plazo total, con el socket cerrado y sin reintentos."""
+    parar = threading.Event()
+    with socket.socket() as oyente:
+        oyente.bind(("127.0.0.1", 0))
+        oyente.listen(1)
+        puerto = oyente.getsockname()[1]
+
+        def gotear():
+            conexion, _ = oyente.accept()
+            with conexion:
+                # Saludo multilínea que nunca termina: una línea cada 50 ms.
+                while not parar.is_set():
+                    try:
+                        conexion.sendall(b"220-sigo aqui\r\n")
+                    except OSError:
+                        return
+                    time.sleep(0.05)
+
+        hilo = threading.Thread(target=gotear, daemon=True)
+        hilo.start()
+        transporte = ServidorSmtp(
+            _smtp_config(smtp_host="127.0.0.1", smtp_puerto=puerto), timeout=2, plazo_total=0.5
+        )
+        correo = Correo(_smtp_config(), transporte=transporte)
+        token = _token()
+        try:
+            with caplog.at_level(logging.DEBUG):
+                inicio = time.monotonic()
+                correo.enviar_recuperacion(DESTINO, token)
+                assert correo.esperar(10)
+                duracion = time.monotonic() - inicio
+        finally:
+            parar.set()
+            hilo.join(5)
+
+    assert 0.5 <= duracion < 2.5
+    texto = _log_text(caplog)
+    assert "tipo=TimeoutError" in texto
+    _assert_sin_secretos(texto, token)
+    assert str(puerto) not in texto
+
+
+def test_late_watchdog_cut_after_exit_touches_nothing():
+    """Hallazgo de seguridad de T8: un ``_cortar`` que llega después de ``__exit__`` (el
+    temporizador ya disparó y su hilo va tarde) no toca el socket, que podría ser ya un
+    descriptor reutilizado, ni marca la entrega como vencida."""
+    izquierda, derecha = socket.socketpair()
+    with izquierda, derecha:
+        conexion = mock.Mock(spec=smtplib.SMTP)
+        conexion.sock = izquierda
+        with _Vigilante(conexion, plazo=60) as vigilante:
+            pass
+        with mock.patch.object(socket.socket, "shutdown") as cortar:
+            vigilante._cortar()
+        cortar.assert_not_called()
+        assert vigilante.vencido is False
+        vigilante.comprobar()
+        # El socket sigue sano en los dos sentidos.
+        izquierda.sendall(b"ok")
+        assert derecha.recv(2) == b"ok"
+
+
+def test_exit_waits_for_a_watchdog_cut_in_progress():
+    """``__exit__`` no vuelve mientras un ``_cortar`` está a mitad: comparten el candado."""
+    conexion = mock.Mock(spec=smtplib.SMTP)
+    dentro = threading.Event()
+    soltar = threading.Event()
+    salio = threading.Event()
+    vigilante = _Vigilante(conexion, plazo=60)
+    vigilante.__enter__()
+
+    def sock_lento():
+        dentro.set()
+        soltar.wait(5)
+        return None
+
+    type(conexion).sock = mock.PropertyMock(side_effect=sock_lento)
+    cortador = threading.Thread(target=vigilante._cortar, daemon=True)
+    cortador.start()
+    assert dentro.wait(5)
+
+    def salir():
+        vigilante.__exit__(None, None, None)
+        salio.set()
+
+    saliendo = threading.Thread(target=salir, daemon=True)
+    saliendo.start()
+    assert not salio.wait(0.2)
+    soltar.set()
+    cortador.join(5)
+    assert salio.wait(5)
+    saliendo.join(5)
 
 
 # --- TLS real contra un servidor SMTP falso (R7, A13) -----------------------------------
@@ -979,6 +1140,19 @@ def test_real_implicit_ssl_rejects_an_untrusted_certificate(certificados):
     assert servidor.datos == b""
 
 
+def test_real_implicit_ssl_rejects_a_trusted_certificate_for_another_name(certificados):
+    _, _, pem = certificados["otro_nombre"]
+    servidor = _SmtpFalso(_contexto_servidor(certificados["otro_nombre"]), implicito=True)
+    try:
+        with _confiar_en(pem), pytest.raises(ssl.SSLCertVerificationError):
+            _entregar_a(servidor.puerto, "ssl")
+    finally:
+        servidor.cerrar()
+
+    assert servidor.comandos == []
+    assert servidor.datos == b""
+
+
 # --- Hilo y semáforo (R8) ---------------------------------------------------------------
 
 
@@ -1031,6 +1205,9 @@ def test_semaphore_caps_concurrency_and_discards_overflow(caplog):
         assert correo.esperar(5)
 
     assert MAX_CONCURRENCIA == 4
+    # M-1 (T8): contador de descartes, también en el log.
+    assert correo.descartados == 2
+    assert "descartados=2" in descartes[-1].getMessage()
     assert registro.maximo <= MAX_CONCURRENCIA
     assert len(registro.mensajes) == MAX_CONCURRENCIA
     texto = _log_text(caplog)
@@ -1071,6 +1248,18 @@ def test_thread_start_failure_releases_slot_and_does_not_propagate(caplog):
     correo.enviar_recuperacion(DESTINO, _token())
     assert correo.esperar(5)
     assert len(registro.mensajes) == 1
+
+
+def test_explicit_request_id_is_used_outside_a_request(caplog):
+    """I1 de T4 (T8): la ruta programa el envío al cerrar la respuesta, sin contexto de
+    petición, y pasa el ``request_id`` capturado antes."""
+    correo = Correo(_smtp_config(), transporte=_Registro(falla=OSError("x")))
+
+    with caplog.at_level(logging.DEBUG):
+        correo.enviar_recuperacion(DESTINO, _token(), request_id="rid-sintetico-14")
+        assert correo.esperar(5)
+
+    assert "request_id=rid-sintetico-14" in _log_text(caplog)
 
 
 def test_threads_are_daemon_and_log_the_request_id(caplog):
