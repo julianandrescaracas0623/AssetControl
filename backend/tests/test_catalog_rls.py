@@ -60,14 +60,28 @@ from app.catalogo import models as catalogo_models  # noqa: F401 - registra ubic
 from app.conteo import models as conteo_models  # noqa: F401 - registra las tablas del conteo
 from app.empresa import models as empresa_models  # noqa: F401 - registra las tablas de 0014
 from app.fotos import models as fotos_models  # noqa: F401 - registra la tabla foto
+from app.plataforma import models as plataforma_models  # noqa: F401 - tablas de 0017
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
 AUTH_OWNER = "auth_owner"
 SUPABASE_ROLES = ("anon", "authenticated", "service_role")
 
+# Spec 017, T1 (0017): tablas de la consola de plataforma, sin tenant_id de aislamiento
+# (plataforma_auditoria tiene uno informativo y nulo). Su catálogo completo (columnas,
+# políticas, GRANT y funciones de plataforma_owner) está en test_plataforma_catalogo.py.
+PLATFORM_TABLES = frozenset({"desarrollador", "plataforma_refresh_token", "plataforma_auditoria"})
+PLATFORM_OWNER = "plataforma_owner"
+PLATFORM_FUNCTIONS = frozenset(
+    {
+        "crear_desarrollador",
+        "restablecer_desarrollador",
+        "cambiar_estado_desarrollador",
+        "plataforma_buscar_login",
+    }
+)
 # Lista cerrada de tablas de public sin tenant_id; cada una tiene su prueba propia.
-EXCEPTIONS = frozenset({"alembic_version", "tenant", "usuario", "limite_tasa"})
+EXCEPTIONS = frozenset({"alembic_version", "tenant", "usuario", "limite_tasa"}) | PLATFORM_TABLES
 TENANT_TABLES = frozenset(
     {
         "membresia",
@@ -394,7 +408,10 @@ VERIFICACION_INSERT = {
     "ocurrido_en",
 }
 EXPECTED_APP_COLUMNS = {
-    "tenant": {"SELECT": {"id", "nombre", "creado_en"}},
+    # Spec 017, T1 (0017): el GRANT SELECT de tabla (0002) cubre las columnas nuevas.
+    "tenant": {
+        "SELECT": {"id", "nombre", "creado_en", "activo", "desactivado_en", "desactivado_por"}
+    },
     "usuario": {"SELECT": {"id", "email", "nombre", "activo"}},
     "membresia": {"SELECT": {"id", "tenant_id", "usuario_id", "rol", "activa"}},
     "invitacion": {
@@ -877,6 +894,10 @@ EXPECTED_OWNER_COLUMNS = {
         "INSERT": {"tenant_id", "usuario_id", "token_hash", "expira_en"},
         "UPDATE": {"usada_en", "invalidada_en"},
     },
+    # Spec 017, T1 (0017): nada para auth_owner en las tablas de plataforma.
+    "desarrollador": {},
+    "plataforma_refresh_token": {},
+    "plataforma_auditoria": {},
 }
 TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER")
 COLUMN_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "REFERENCES")
@@ -995,13 +1016,32 @@ def _rls_flags(conn: Connection, table: str) -> tuple[bool, bool]:
 
 
 def _policies(conn: Connection) -> dict[tuple[str, str], tuple]:
+    # Spec 017, T1: las políticas de las tablas de plataforma y las TO plataforma_owner
+    # forman su propia lista cerrada en test_plataforma_catalogo.py.
     rows = conn.execute(
         text(
             "select tablename, policyname, permissive, cmd, roles::text, qual, with_check "
-            "from pg_policies where schemaname = 'public'"
-        )
+            "from pg_policies where schemaname = 'public' "
+            "and not (tablename = any(:platform)) and roles::text <> :owner"
+        ),
+        {"platform": sorted(PLATFORM_TABLES), "owner": "{" + PLATFORM_OWNER + "}"},
     )
     return {(r[0], r[1]): (r[2], r[3], r[4], r[5], r[6]) for r in rows}
+
+
+def test_platform_policies_are_excluded_only_by_table_or_owner(conn):
+    # La exclusión de _policies no esconde nada más: toda política omitida es de una
+    # tabla de plataforma o de plataforma_owner.
+    rows = conn.execute(
+        text("select tablename, roles::text from pg_policies where schemaname = 'public'")
+    ).all()
+    omitted = [
+        (table, roles)
+        for table, roles in rows
+        if table in PLATFORM_TABLES or roles == "{" + PLATFORM_OWNER + "}"
+    ]
+    assert len(rows) - len(omitted) == len(_policies(conn))
+    assert {table for table, _ in omitted} == set(PLATFORM_TABLES)
 
 
 OWNER_ROLES = "{" + AUTH_OWNER + "}"
@@ -1108,7 +1148,16 @@ def _existing_roles(conn: Connection, names: tuple[str, ...]) -> list[str]:
 
 
 def test_exception_list_is_closed():
-    assert EXCEPTIONS == {"alembic_version", "tenant", "usuario", "limite_tasa"}
+    assert EXCEPTIONS == {
+        "alembic_version",
+        "tenant",
+        "usuario",
+        "limite_tasa",
+        # Spec 017, T1 (0017): con prueba propia en test_plataforma_catalogo.py.
+        "desarrollador",
+        "plataforma_refresh_token",
+        "plataforma_auditoria",
+    }
 
 
 def test_public_tables_are_exactly_the_expected(conn):
@@ -1261,7 +1310,13 @@ def test_app_can_read_only_the_allowed_hash_columns(conn, catalog):
             {"r": catalog.app_role, "t": f"public.{table}", "c": column},
         )
     }
-    assert readable == {("refresh_token", "token_hash"), ("limite_tasa", "clave_hash")}
+    # Spec 017, T1 (0017): plataforma_refresh_token.token_hash, por la misma razón que
+    # refresh_token (rotación con WHERE token_hash; lo guardado es sha256 de la clave).
+    assert readable == {
+        ("refresh_token", "token_hash"),
+        ("limite_tasa", "clave_hash"),
+        ("plataforma_refresh_token", "token_hash"),
+    }
 
 
 def test_app_has_no_insert_or_update_on_tenant_usuario_membresia(conn, catalog):
@@ -1298,7 +1353,15 @@ def test_exception_tenant(conn, catalog):
 def test_exception_usuario(conn, catalog):
     columns = _columns(conn, "usuario")
     assert "tenant_id" not in columns
-    assert set(columns) == {"id", "email", "nombre", "password_hash", "activo"}
+    # Spec 017, T1 (0017): debe_cambiar_password, sin GRANT para la aplicación (T4).
+    assert set(columns) == {
+        "id",
+        "email",
+        "nombre",
+        "password_hash",
+        "activo",
+        "debe_cambiar_password",
+    }
     assert _rls_flags(conn, "usuario") == (True, True)
     usuario_policies = {k: v for k, v in _app_policies(conn).items() if k[0] == "usuario"}
     # Solo lectura acotada a la membresía del tenant fijado; sin INSERT/UPDATE.
@@ -1368,8 +1431,11 @@ def test_acceso_schema_is_owned_by_the_migrator_with_minimal_usage(conn, catalog
             "where n.nspname = 'acceso' and a.grantee <> n.nspowner"
         )
     ).all()
-    assert sorted(acl) == sorted([(catalog.app_role, "USAGE"), (AUTH_OWNER, "USAGE")])
-    for role in (catalog.app_role, AUTH_OWNER):
+    # Spec 017, T1 (0017): plataforma_owner también, para resolver sus funciones.
+    assert sorted(acl) == sorted(
+        [(catalog.app_role, "USAGE"), (AUTH_OWNER, "USAGE"), (PLATFORM_OWNER, "USAGE")]
+    )
+    for role in (catalog.app_role, AUTH_OWNER, PLATFORM_OWNER):
         assert not conn.scalar(
             text("select has_schema_privilege(:r, 'acceso', 'CREATE')"), {"r": role}
         ), role
@@ -1434,7 +1500,12 @@ def _function_acl(conn: Connection, name: str) -> set[tuple[str, str, str, bool]
 
 
 def test_acceso_functions_are_a_closed_list(conn):
-    assert set(_functions(conn)) == set(EXPECTED_FUNCTIONS)
+    # Spec 017, T1: las de plataforma_owner las fija test_plataforma_catalogo.py.
+    functions = _functions(conn)
+    assert set(functions) == set(EXPECTED_FUNCTIONS) | PLATFORM_FUNCTIONS
+    assert {name for name, f in functions.items() if f["owner"] == PLATFORM_OWNER} == (
+        PLATFORM_FUNCTIONS
+    )
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED_FUNCTIONS))
@@ -1588,7 +1659,13 @@ def test_keys_and_checks(conn):
     rol = "CHECK ((rol = ANY (ARRAY['admin'::text, 'contador'::text])))"
     hash32 = "CHECK ((octet_length(token_hash) = 32))"
 
-    assert _constraints(conn, "tenant") == {"PRIMARY KEY (id)"}
+    # Spec 017, T1 (0017): estado de la empresa coherente y autor de la desactivación.
+    assert _constraints(conn, "tenant") == {
+        "PRIMARY KEY (id)",
+        "CHECK ((activo = (desactivado_en IS NULL)))",
+        "CHECK (((NOT activo) OR (desactivado_por IS NULL)))",
+        "FOREIGN KEY (desactivado_por) REFERENCES desarrollador(id)",
+    }
     assert _constraints(conn, "usuario") == {"PRIMARY KEY (id)", normalized}
     assert any("(email)" in idx for idx in _unique_indexes(conn, "usuario"))
     assert _constraints(conn, "membresia") == {
@@ -1620,7 +1697,9 @@ def test_keys_and_checks(conn):
         # Spec 014, T1 (0015): ámbitos de recuperar y restablecer contraseña.
         "CHECK ((ambito = ANY (ARRAY['login_ip'::text, 'login_cuenta'::text, "
         "'refresh_ip'::text, 'validar_ip'::text, 'aceptar_ip'::text, "
-        "'recuperar_ip'::text, 'recuperar_cuenta'::text, 'restablecer_ip'::text])))",
+        "'recuperar_ip'::text, 'recuperar_cuenta'::text, 'restablecer_ip'::text, "
+        # Spec 017, T1 (0017): login de plataforma.
+        "'plat_login_ip'::text, 'plat_login_cuenta'::text])))",
         "CHECK ((octet_length(clave_hash) = 32))",
         "CHECK ((intentos >= 0))",
     }
@@ -1661,11 +1740,15 @@ def test_column_types_and_nullability(conn):
         "nombre": ("text", True),
         "password_hash": ("text", True),
         "activo": ("boolean", True),
+        "debe_cambiar_password": ("boolean", True),
     }
     assert _columns(conn, "tenant") == {
         "id": ("uuid", True),
         "nombre": ("text", True),
         "creado_en": ("timestamp with time zone", True),
+        "activo": ("boolean", True),
+        "desactivado_en": ("timestamp with time zone", False),
+        "desactivado_por": ("uuid", False),
     }
 
 
@@ -1686,7 +1769,7 @@ def test_refresh_token_familia_is_indexed(conn):
 
 def test_models_match_the_migrated_schema(conn):
     tables = {table.name: table for table in models.Base.metadata.sorted_tables}
-    assert set(tables) == {"tenant", "usuario"} | TENANT_TABLES
+    assert set(tables) == {"tenant", "usuario"} | TENANT_TABLES | PLATFORM_TABLES
     for name, table in tables.items():
         assert {c.name for c in table.columns} == set(_columns(conn, name)), name
 

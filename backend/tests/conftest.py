@@ -215,12 +215,15 @@ _SNAPSHOT_POLICIES = text(
 _SNAPSHOT_ROLES = text(
     "select rolname from pg_roles where rolname like :prefix escape '\\' order by rolname"
 )
-# Membresías de auth_owner (en cualquier sentido), como (rol concedido, miembro): son de
-# todo el clúster y sobreviven al borrado de una base temporal.
+# Membresías de auth_owner y plataforma_owner (spec 017; en cualquier sentido), como
+# (rol concedido, miembro): son de todo el clúster y sobreviven al borrado de una base
+# temporal.
+OWNER_ROLES = ("auth_owner", "plataforma_owner")
 _SNAPSHOT_AUTH_OWNER_MEMBERSHIPS = text(
     "select g.rolname, m.rolname from pg_auth_members a "
     "join pg_roles g on g.oid = a.roleid join pg_roles m on m.oid = a.member "
-    "where 'auth_owner' in (g.rolname, m.rolname) "
+    "where g.rolname in ('auth_owner', 'plataforma_owner') "
+    "or m.rolname in ('auth_owner', 'plataforma_owner') "
     "order by 1, 2"
 )
 # Superusuario o BYPASSRLS: solo así el conteo ve todas las filas bajo FORCE RLS.
@@ -330,16 +333,16 @@ def residue_problems(before: dict[str, object], after: dict[str, object]) -> lis
     # Absoluto, no diferencia: también un huérfano de una corrida anterior.
     test_members = sorted(
         {
-            member
+            (granted, member)
             for snapshot in (before, after)
             for granted, member in snapshot.get("memberships", [])
-            if granted == "auth_owner" and member.startswith(RESIDUE_PREFIX)
+            if granted in OWNER_ROLES and member.startswith(RESIDUE_PREFIX)
         }
     )
-    problems += [f"rol de prueba miembro de auth_owner: {name}" for name in test_members]
+    problems += [f"rol de prueba miembro de {owner}: {name}" for owner, name in test_members]
     if before.get("memberships", []) != after.get("memberships", []):
         problems.append(
-            "cambiaron las membresías de auth_owner: antes "
+            "cambiaron las membresías de auth_owner o plataforma_owner: antes "
             f"{before.get('memberships', [])}, después {after.get('memberships', [])}"
         )
     for label, snapshot in (("antes", before), ("después", after)):

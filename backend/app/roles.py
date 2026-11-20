@@ -11,8 +11,9 @@ lo mismo que el script, apto para ese caso:
   servidor la vería. Solo ASCII imprimible (sin SASLprep que pudiera no coincidir).
 - Rol de la aplicación: ``LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE
   NOREPLICATION``; ``CONNECT`` a la base y ``USAGE`` en ``public``, sin ``CREATE``.
-- ``auth_owner``: ``NOLOGIN`` y sin ningún atributo ni ``CREATE``.
-- Membresías de ambos: se revocan todas las que el migrador puede revocar (por ejemplo
+- ``auth_owner`` y ``plataforma_owner`` (spec 017): ``NOLOGIN`` y sin ningún atributo ni
+  ``CREATE``.
+- Membresías de los tres: se revocan todas las que el migrador puede revocar (por ejemplo
   la que ``createrole_self_grant`` le concede con ``INHERIT``/``SET``). La única que puede
   quedar es la del creador con ``ADMIN OPTION`` y **sin** ``INHERIT`` ni ``SET`` (no le da
   los privilegios del rol); cualquier otra detiene el comando.
@@ -31,6 +32,8 @@ import psycopg
 from psycopg import sql
 
 AUTH_OWNER = "auth_owner"
+PLATAFORMA_OWNER = "plataforma_owner"
+OWNERS = (AUTH_OWNER, PLATAFORMA_OWNER)
 SCRAM_ITERACIONES = 4096
 CONTRASENA_MIN = 24
 IDENTIFICADOR = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
@@ -57,8 +60,10 @@ def verificador_scram(
 def validar(app_user: str, contrasena: str, migrador: str) -> None:
     if not IDENTIFICADOR.fullmatch(app_user):
         raise ErrorRoles("APP_DB_USER debe ser un identificador simple: minúsculas, números y _.")
-    if app_user in (migrador, AUTH_OWNER):
-        raise ErrorRoles("APP_DB_USER no puede ser el rol migrador ni auth_owner.")
+    if app_user in (migrador, *OWNERS):
+        raise ErrorRoles(
+            "APP_DB_USER no puede ser el rol migrador, auth_owner ni plataforma_owner."
+        )
     if len(contrasena) < CONTRASENA_MIN or not ASCII_IMPRIMIBLE.fullmatch(contrasena):
         raise ErrorRoles(
             f"APP_DB_PASSWORD debe tener al menos {CONTRASENA_MIN} caracteres ASCII "
@@ -95,7 +100,7 @@ def _membresias(cur: psycopg.Cursor, roles: tuple[str, ...]) -> list[tuple]:
 
 
 def preparar(conninfo: str, app_user: str, contrasena: str) -> Resultado:
-    """Crea o reafirma el rol de la aplicación y ``auth_owner`` en una transacción."""
+    """Crea o reafirma el rol de la aplicación y los dueños en una transacción."""
     with (
         psycopg.connect(conninfo, connect_timeout=5, autocommit=False) as conn,
         conn.cursor() as cur,
@@ -103,7 +108,7 @@ def preparar(conninfo: str, app_user: str, contrasena: str) -> Resultado:
         cur.execute("select current_user, current_database()")
         migrador, base = cur.fetchone()  # type: ignore[misc]
         validar(app_user, contrasena, migrador)
-        app, owner = sql.Identifier(app_user), sql.Identifier(AUTH_OWNER)
+        app = sql.Identifier(app_user)
         clave = sql.Literal(verificador_scram(contrasena))
         # Al crear se fijan todos los atributos. Al alterar, un migrador no superusuario
         # no puede ni nombrar SUPERUSER, REPLICATION o BYPASSRLS (PostgreSQL 16+): se
@@ -119,19 +124,21 @@ def preparar(conninfo: str, app_user: str, contrasena: str) -> Resultado:
                 clave,
             )
         )
-        nuevo_owner = not _existe(cur, AUTH_OWNER)
-        cur.execute(
-            sql.SQL("{} {} NOLOGIN {} PASSWORD NULL").format(
-                sql.SQL("CREATE ROLE" if nuevo_owner else "ALTER ROLE"),
-                owner,
-                crear if nuevo_owner else alterar,
+        for nombre in OWNERS:
+            nuevo_owner = not _existe(cur, nombre)
+            cur.execute(
+                sql.SQL("{} {} NOLOGIN {} PASSWORD NULL").format(
+                    sql.SQL("CREATE ROLE" if nuevo_owner else "ALTER ROLE"),
+                    sql.Identifier(nombre),
+                    crear if nuevo_owner else alterar,
+                )
             )
-        )
+        gestionados = (app_user, *OWNERS)
 
         revocadas = 0
         for _ in range(100):  # cada REVOKE ... CASCADE puede quitar otras: se relee
             pendiente = next(
-                (m for m in _membresias(cur, (app_user, AUTH_OWNER)) if m[2] == migrador),
+                (m for m in _membresias(cur, gestionados) if m[2] == migrador),
                 None,
             )
             if pendiente is None:
@@ -143,12 +150,12 @@ def preparar(conninfo: str, app_user: str, contrasena: str) -> Resultado:
                 )
             )
             revocadas += 1
-        restantes = _membresias(cur, (app_user, AUTH_OWNER))
+        restantes = _membresias(cur, gestionados)
         for concedido, miembro, _otorgante, admin, inherit, set_ in restantes:
             # Solo la del creador sobre el rol que creó, para administrarlo y nada más.
             if not (
                 miembro == migrador
-                and concedido in (app_user, AUTH_OWNER)
+                and concedido in gestionados
                 and admin
                 and not inherit
                 and not set_
@@ -160,16 +167,21 @@ def preparar(conninfo: str, app_user: str, contrasena: str) -> Resultado:
 
         cur.execute(sql.SQL("GRANT CONNECT ON DATABASE {} TO {}").format(sql.Identifier(base), app))
         cur.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(app))
-        for rol in (app, owner):
-            cur.execute(sql.SQL("REVOKE CREATE ON SCHEMA public FROM {}").format(rol))
-        cur.execute(
-            sql.SQL("REVOKE CREATE ON DATABASE {} FROM {}").format(sql.Identifier(base), owner)
-        )
+        for rol in (app_user, *OWNERS):
+            cur.execute(
+                sql.SQL("REVOKE CREATE ON SCHEMA public FROM {}").format(sql.Identifier(rol))
+            )
+        for nombre in OWNERS:
+            cur.execute(
+                sql.SQL("REVOKE CREATE ON DATABASE {} FROM {}").format(
+                    sql.Identifier(base), sql.Identifier(nombre)
+                )
+            )
 
         cur.execute(
             "select rolname, rolsuper or rolbypassrls or rolcreaterole or rolcreatedb "
             "or rolreplication, rolcanlogin from pg_roles where rolname = any(%s)",
-            ([app_user, AUTH_OWNER],),
+            (list(gestionados),),
         )
         for rol, con_atributos, login in cur.fetchall():
             if con_atributos or login != (rol == app_user):

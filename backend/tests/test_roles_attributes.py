@@ -64,3 +64,26 @@ def test_app_role_and_auth_owner_are_not_members_of_each_other(
             text("select pg_has_role(:m, :r, :p)"), {"m": member, "r": role, "p": privilege}
         )
         assert has is False, (member, role, privilege)
+
+
+# Spec 017, T1: plataforma_owner (01-app-role.sh o preparar-roles), igual de inerte y sin
+# membresías cruzadas con la aplicación ni con auth_owner.
+PLATAFORMA_OWNER = "plataforma_owner"
+
+
+def test_plataforma_owner_does_not_skip_rls_and_cannot_log_in(migrator_conn):
+    row = migrator_conn.execute(_ATTRIBUTES, {"r": PLATAFORMA_OWNER}).one()
+    assert row == (False, False, False, False, False, False)
+
+
+@pytest.mark.parametrize("privilege", ["MEMBER", "USAGE", "SET"])
+def test_plataforma_owner_is_not_member_of_the_app_role_nor_auth_owner(
+    migrator_conn, app_database_url, privilege
+):
+    others = (app_database_url.username, AUTH_OWNER)
+    for other in others:
+        for member, role in ((other, PLATAFORMA_OWNER), (PLATAFORMA_OWNER, other)):
+            has = migrator_conn.scalar(
+                text("select pg_has_role(:m, :r, :p)"), {"m": member, "r": role, "p": privilege}
+            )
+            assert has is False, (member, role, privilege)

@@ -52,10 +52,12 @@ FOTOS = "0013_fotos"
 EMPRESA = "0014_empresa_y_detalle"
 RECUPERACION = "0015_recuperacion_contrasena"
 FUNCIONES_RECUPERACION = "0016_funciones_recuperacion"
+PLATAFORMA = "0017_plataforma"
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
 MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
 MIGRATION_0016 = BACKEND_DIR / "migrations" / "versions" / "0016_funciones_recuperacion.py"
+MIGRATION_0017 = BACKEND_DIR / "migrations" / "versions" / "0017_plataforma.py"
 APP_ROLE_VAR = "APP_DB_USER"
 AUTH_TABLES = ["invitacion", "membresia", "refresh_token", "tenant", "usuario"]
 CATALOG_TABLES = ["categoria", "ubicacion"]
@@ -65,6 +67,7 @@ CLOSE_TABLES = ["sesion_desglose", "sesion_no_encontrado"]
 PHOTO_TABLES = ["foto"]
 COMPANY_TABLES = ["empresa", "empresa_logo", "sesion_detalle", "sesion_empresa"]
 RECOVERY_TABLES = ["recuperacion_contrasena"]
+PLATFORM_TABLES = ["desarrollador", "plataforma_auditoria", "plataforma_refresh_token"]
 
 APP_URL = "postgresql+psycopg://assetcontrol_app:valor-secreto-app@db.invalid:5432/assetcontrol"
 MIGRATOR_URL = "postgresql+psycopg://postgres:valor-secreto-migr@db.invalid:5432/assetcontrol"
@@ -202,8 +205,9 @@ def test_revision_chain():
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == [FUNCIONES_RECUPERACION]
+    assert script.get_heads() == [PLATAFORMA]
     assert [r.revision for r in revisions] == [
+        PLATAFORMA,
         FUNCIONES_RECUPERACION,
         RECUPERACION,
         EMPRESA,
@@ -221,22 +225,23 @@ def test_revision_chain():
         ACCESO,
         BASELINE,
     ]
-    assert revisions[0].down_revision == RECUPERACION
-    assert revisions[1].down_revision == EMPRESA
-    assert revisions[2].down_revision == FOTOS
-    assert revisions[3].down_revision == SUPABASE_FUNCIONES
-    assert revisions[4].down_revision == CIERRE
-    assert revisions[5].down_revision == DISCREPANCIAS
-    assert revisions[6].down_revision == CONTEO
-    assert revisions[7].down_revision == CAMBIOS
-    assert revisions[8].down_revision == ACTIVOS
-    assert revisions[9].down_revision == CATALOGO
-    assert revisions[10].down_revision == LIMITE_TASA
-    assert revisions[11].down_revision == FUNCIONES
-    assert revisions[12].down_revision == POLITICAS
-    assert revisions[13].down_revision == ACCESO
-    assert revisions[14].down_revision == BASELINE
-    assert revisions[15].down_revision is None
+    assert revisions[0].down_revision == FUNCIONES_RECUPERACION
+    assert revisions[1].down_revision == RECUPERACION
+    assert revisions[2].down_revision == EMPRESA
+    assert revisions[3].down_revision == FOTOS
+    assert revisions[4].down_revision == SUPABASE_FUNCIONES
+    assert revisions[5].down_revision == CIERRE
+    assert revisions[6].down_revision == DISCREPANCIAS
+    assert revisions[7].down_revision == CONTEO
+    assert revisions[8].down_revision == CAMBIOS
+    assert revisions[9].down_revision == ACTIVOS
+    assert revisions[10].down_revision == CATALOGO
+    assert revisions[11].down_revision == LIMITE_TASA
+    assert revisions[12].down_revision == FUNCIONES
+    assert revisions[13].down_revision == POLITICAS
+    assert revisions[14].down_revision == ACCESO
+    assert revisions[15].down_revision == BASELINE
+    assert revisions[16].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -360,6 +365,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
             *PHOTO_TABLES,
             *COMPANY_TABLES,
             *RECOVERY_TABLES,
+            *PLATFORM_TABLES,
         ]
     )
 
@@ -367,7 +373,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [FUNCIONES_RECUPERACION])
+    assert _public_state(migrate_env) == (with_auth, [PLATAFORMA])
     assert _schema_exists(migrate_env, "acceso")
 
     command.downgrade(config, "base")
@@ -376,7 +382,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [FUNCIONES_RECUPERACION])
+    assert _public_state(migrate_env) == (with_auth, [PLATAFORMA])
     assert _schema_exists(migrate_env, "acceso")
 
 
@@ -806,7 +812,7 @@ def test_0016_up_down_up_touches_only_the_recovery_functions_policies_and_grants
 
     command.upgrade(config, FUNCIONES_RECUPERACION)
     assert _public_state(migrate_env) == (tables_before, [FUNCIONES_RECUPERACION])
-    assert _acceso_state(migrate_env) == (HEAD_FUNCTION_NAMES, False, [])
+    assert _acceso_state(migrate_env) == (RECOVERY_HEAD_FUNCTION_NAMES, False, [])
     policies, grants = _owner_state(migrate_env)
     assert sorted(set(policies) - set(policies_before)) == RECOVERY_OWNER_POLICIES
     assert set(policies_before) <= set(policies)
@@ -826,7 +832,7 @@ def test_0016_up_down_up_touches_only_the_recovery_functions_policies_and_grants
 
     command.upgrade(config, FUNCIONES_RECUPERACION)
     assert _owner_state(migrate_env) == (policies, grants)
-    assert _acceso_state(migrate_env) == (HEAD_FUNCTION_NAMES, False, [])
+    assert _acceso_state(migrate_env) == (RECOVERY_HEAD_FUNCTION_NAMES, False, [])
 
 
 def _load_migration_0016():
@@ -1092,7 +1098,10 @@ def test_upgrade_accepts_an_app_role_with_a_colon_in_its_name(migrate_env, monke
         finally:
             engine.dispose()
         # T10 (0005): la purga de limite_tasa es la única política del migrador.
-        assert sorted(roles) == sorted([name, "auth_owner", migrate_env.username])
+        # Spec 017 (0017): las del dueño de las funciones de plataforma.
+        assert sorted(roles) == sorted(
+            [name, "auth_owner", "plataforma_owner", migrate_env.username]
+        )
     finally:
         # Quita los GRANT y políticas del rol para poder borrarlo en el teardown.
         command.downgrade(config, "base")
@@ -1425,7 +1434,15 @@ def _acceso_state(url: URL) -> tuple[list[str], bool, list[str]]:
 FUNCTION_NAMES = ["aceptar_invitacion", "buscar_login", "crear_tenant", "validar_invitacion"]
 # Spec 014, T2 (0016): las dos de recuperación de contraseña.
 RECOVERY_FUNCTION_NAMES = ["restablecer_contrasena", "solicitar_recuperacion"]
-HEAD_FUNCTION_NAMES = sorted([*FUNCTION_NAMES, *RECOVERY_FUNCTION_NAMES])
+RECOVERY_HEAD_FUNCTION_NAMES = sorted([*FUNCTION_NAMES, *RECOVERY_FUNCTION_NAMES])
+# Spec 017, T1 (0017): las del operador y el login de plataforma (dueña plataforma_owner).
+PLATFORM_FUNCTION_NAMES = [
+    "cambiar_estado_desarrollador",
+    "crear_desarrollador",
+    "plataforma_buscar_login",
+    "restablecer_desarrollador",
+]
+HEAD_FUNCTION_NAMES = sorted([*RECOVERY_HEAD_FUNCTION_NAMES, *PLATFORM_FUNCTION_NAMES])
 
 
 def test_0004_creates_the_functions_and_leaves_no_create_nor_membership(migrate_env):
@@ -1665,3 +1682,342 @@ def test_0004_detects_the_membership_of_a_migrator_with_a_quoted_name(
         engine.dispose()
     assert "C8" in str(excinfo.value)
     assert migrator not in str(excinfo.value)
+
+
+# --- Spec 017, T1: 0017_plataforma ----------------------------------------------------
+
+PLATFORM_SCOPES = ("plat_login_ip", "plat_login_cuenta")
+
+
+def _platform_state(url: URL) -> dict[str, object]:
+    """Lo que toca 0017 fuera de sus tablas: columnas, USAGE del dueño y sus políticas."""
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            columns = sorted(
+                tuple(row)
+                for row in conn.execute(
+                    text(
+                        "select table_name, column_name from information_schema.columns "
+                        "where table_schema = 'public' and table_name in ('tenant', 'usuario')"
+                    )
+                )
+            )
+            usage = conn.scalar(
+                text(
+                    "select exists (select 1 from pg_namespace where nspname = 'acceso') "
+                    "and has_schema_privilege('plataforma_owner', 'acceso', 'USAGE')"
+                )
+            )
+            policies = conn.scalar(
+                text(
+                    "select count(*) from pg_policies "
+                    "where schemaname = 'public' and 'plataforma_owner' = any(roles)"
+                )
+            )
+            members = conn.scalar(
+                text(
+                    "select count(*) from pg_auth_members "
+                    "where roleid = 'plataforma_owner'::regrole"
+                )
+            )
+    finally:
+        engine.dispose()
+    return {"columns": columns, "usage": usage, "policies": policies, "members": members}
+
+
+def test_0017_up_down_up_touches_only_the_platform_objects(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, FUNCIONES_RECUPERACION)
+    tables_before = _public_state(migrate_env)[0]
+    owner_before = _owner_state(migrate_env)
+    platform_before = _platform_state(migrate_env)
+    check_before = _limite_tasa_scope_check(migrate_env)
+    functions_before = _public_functions(migrate_env)
+    assert platform_before["usage"] is False
+    assert platform_before["policies"] == 0
+
+    command.upgrade(config, PLATAFORMA)
+    assert _public_state(migrate_env) == (
+        sorted([*tables_before, *PLATFORM_TABLES]),
+        [PLATAFORMA],
+    )
+    assert _acceso_state(migrate_env) == (HEAD_FUNCTION_NAMES, False, [])
+    assert _owner_state(migrate_env) == owner_before  # auth_owner no cambia
+    assert _public_functions(migrate_env) == functions_before
+    platform = _platform_state(migrate_env)
+    added = sorted(set(platform["columns"]) - set(platform_before["columns"]))
+    assert added == [
+        ("tenant", "activo"),
+        ("tenant", "desactivado_en"),
+        ("tenant", "desactivado_por"),
+        ("usuario", "debe_cambiar_password"),
+    ]
+    assert (platform["usage"], platform["policies"], platform["members"]) == (True, 9, 0)
+    check_after = _limite_tasa_scope_check(migrate_env)
+    assert [name for name, _ in check_after] == [check_before[0][0]]
+    assert all(scope in check_after[0][1] for scope in PLATFORM_SCOPES)
+
+    command.downgrade(config, FUNCIONES_RECUPERACION)
+    assert _public_state(migrate_env) == (tables_before, [FUNCIONES_RECUPERACION])
+    assert _acceso_state(migrate_env) == (RECOVERY_HEAD_FUNCTION_NAMES, False, [])
+    assert _owner_state(migrate_env) == owner_before
+    assert _platform_state(migrate_env) == platform_before
+    assert _limite_tasa_scope_check(migrate_env) == check_before
+
+    command.upgrade(config, PLATAFORMA)
+    assert _platform_state(migrate_env) == platform
+
+
+def test_0017_does_not_change_existing_tenants_nor_users(migrate_env):
+    # R25: la migración no cambia a ningún usuario; las empresas existentes siguen activas.
+    config = alembic_config()
+    command.upgrade(config, FUNCIONES_RECUPERACION)
+    tenant_id, usuario_id = uuid.uuid4(), uuid.uuid4()
+    engine = create_engine(migrate_env, poolclass=NullPool)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("insert into tenant (id, nombre) values (:t, 'Clínica sintética')"),
+                {"t": tenant_id},
+            )
+            conn.execute(
+                text(
+                    "insert into usuario (id, email, nombre, password_hash) "
+                    "values (:u, 'previo@ejemplo.test', 'Previo', 'h')"
+                ),
+                {"u": usuario_id},
+            )
+        command.upgrade(config, PLATAFORMA)
+        with engine.connect() as conn:
+            tenant = conn.execute(
+                text("select activo, desactivado_en, desactivado_por from tenant where id = :t"),
+                {"t": tenant_id},
+            ).one()
+            marca = conn.scalar(
+                text("select debe_cambiar_password from usuario where id = :u"), {"u": usuario_id}
+            )
+    finally:
+        engine.dispose()
+    assert tuple(tenant) == (True, None, None)
+    assert marca is False
+
+
+def test_0017_downgrade_drops_only_the_counters_of_the_platform_scopes(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA)
+    _count(migrate_env, ("login_ip", "recuperar_ip", *PLATFORM_SCOPES))
+
+    command.downgrade(config, FUNCIONES_RECUPERACION)
+    assert _limite_tasa_scopes(migrate_env) == ["login_ip", "recuperar_ip"]
+
+
+def _insert_bypassing_rls(url: URL, table: str, statement: str, params: dict) -> None:
+    """Inserta como dueño (migrador) quitando FORCE RLS solo dentro de la transacción."""
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.begin() as conn:
+            conn.exec_driver_sql(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
+            conn.execute(text(statement), params)
+            conn.exec_driver_sql(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+    finally:
+        engine.dispose()
+
+
+def _seed_tenant(url: URL, *, activo: bool) -> None:
+    _insert_bypassing_rls(
+        url,
+        "tenant",
+        "insert into tenant (id, nombre, activo, desactivado_en) values "
+        "(:id, 'Clínica sintética', :activo, case when :activo then null else now() end)",
+        {"id": uuid.uuid4(), "activo": activo},
+    )
+
+
+@pytest.mark.parametrize(
+    ("seed", "expected"),
+    [
+        ("auditoria", "plataforma_auditoria"),
+        ("tenant_inactivo", "inactiva"),
+    ],
+)
+def test_0017_downgrade_aborts_if_it_would_lose_platform_data(migrate_env, seed, expected):
+    # Hallazgo de seguridad de T1: el downgrade no borra auditoría ni el estado de una
+    # empresa desactivada; aborta con un mensaje claro y no toca nada.
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA)
+    _seed_tenant(migrate_env, activo=True)
+    if seed == "auditoria":
+        _insert_bypassing_rls(
+            migrate_env,
+            "plataforma_auditoria",
+            "insert into plataforma_auditoria (accion, resultado, objeto_id) "
+            "values ('desarrollador_creado', 'ok', :objeto)",
+            {"objeto": uuid.uuid4()},
+        )
+    else:
+        _seed_tenant(migrate_env, activo=False)
+    tables_before = _public_state(migrate_env)
+    platform_before = _platform_state(migrate_env)
+    check_before = _limite_tasa_scope_check(migrate_env)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        command.downgrade(config, FUNCIONES_RECUPERACION)
+
+    message = str(excinfo.value)
+    assert "0017" in message
+    assert "no puede revertirse" in message
+    assert expected in message
+    assert _public_state(migrate_env) == tables_before
+    assert _platform_state(migrate_env) == platform_before
+    assert _limite_tasa_scope_check(migrate_env) == check_before
+    engine = create_engine(migrate_env, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            forced = dict(
+                conn.execute(
+                    text(
+                        "select relname, relforcerowsecurity from pg_class "
+                        "where relname in ('tenant', 'plataforma_auditoria') "
+                        "and relnamespace = 'public'::regnamespace"
+                    )
+                ).all()
+            )
+    finally:
+        engine.dispose()
+    assert forced == {"tenant": True, "plataforma_auditoria": True}
+
+
+def test_0017_downgrade_works_with_only_active_tenants(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA)
+    _seed_tenant(migrate_env, activo=True)
+
+    command.downgrade(config, FUNCIONES_RECUPERACION)
+    assert _public_state(migrate_env)[1] == [FUNCIONES_RECUPERACION]
+    engine = create_engine(migrate_env, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            forced = conn.scalar(
+                text(
+                    "select relforcerowsecurity from pg_class "
+                    "where relname = 'tenant' and relnamespace = 'public'::regnamespace"
+                )
+            )
+    finally:
+        engine.dispose()
+    assert forced is True
+
+
+def _load_migration_0017():
+    spec = importlib.util.spec_from_file_location("migration_0017_under_test", MIGRATION_0017)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_0017_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration_0017()
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+
+    message = str(excinfo.value)
+    assert "0017" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+@pytest.mark.parametrize("step", ["upgrade", "downgrade"])
+def test_0017_without_plataforma_owner_fails_with_a_clear_message(
+    migration_database_url, app_database_url, monkeypatch, step
+):
+    migration = _load_migration_0017()
+    monkeypatch.setenv(APP_ROLE_VAR, app_database_url.username)
+    missing = f"plataforma_owner_falta_{uuid.uuid4().hex[:6]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "PLATAFORMA_OWNER", missing)
+                with pytest.raises(RuntimeError) as excinfo:
+                    getattr(migration, step)()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "01-app-role.sh" in str(excinfo.value)
+    assert "preparar-roles" in str(excinfo.value)
+    assert "0017" not in str(excinfo.value)  # no llegó a ejecutar ninguna sentencia
+
+
+@pytest.mark.parametrize("attribute", ["LOGIN", "BYPASSRLS", "CREATEROLE", "SUPERUSER"])
+def test_0017_upgrade_checks_the_plataforma_owner_attributes(
+    migration_database_url, app_database_url, temp_roles, monkeypatch, attribute
+):
+    name = temp_roles(attribute)
+    migration = _load_migration_0017()
+    monkeypatch.setenv(APP_ROLE_VAR, app_database_url.username)
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "PLATAFORMA_OWNER", name)
+                with pytest.raises(RuntimeError) as excinfo:
+                    migration.upgrade()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert name not in str(excinfo.value)
+    assert attribute in str(excinfo.value)
+    assert "0017" not in str(excinfo.value)
+
+
+def test_0017_rejects_an_app_role_that_is_member_of_plataforma_owner(
+    migration_database_url, temp_roles, monkeypatch
+):
+    owner, app_role = temp_roles(), temp_roles()
+    temp_roles.grant(owner, app_role)
+    migration = _load_migration_0017()
+    monkeypatch.setenv(APP_ROLE_VAR, app_role)
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "PLATAFORMA_OWNER", owner)
+                with pytest.raises(RuntimeError) as excinfo:
+                    migration.upgrade()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    message = str(excinfo.value)
+    assert "miembro" in message
+    assert app_role not in message and owner not in message
+
+
+@pytest.mark.parametrize("name", ["auth_owner", "plataforma_owner"])
+def test_0017_rejects_an_owner_as_app_role(migration_database_url, monkeypatch, name):
+    migration = _load_migration_0017()
+    monkeypatch.setenv(APP_ROLE_VAR, name)
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration._app_role(conn)
+    finally:
+        engine.dispose()
+    assert APP_ROLE_VAR in str(excinfo.value)

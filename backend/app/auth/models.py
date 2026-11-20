@@ -33,6 +33,12 @@ class Tenant(Base):
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=FetchedValue()
     )
+    # Spec 017, T1 (0017): estado de la empresa; solo lo cambia la consola de plataforma.
+    activo: Mapped[bool] = mapped_column(server_default=FetchedValue())
+    desactivado_en: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=FetchedValue()
+    )
+    desactivado_por: Mapped[uuid.UUID | None] = mapped_column(Uuid, server_default=FetchedValue())
 
 
 class Usuario(Base):
@@ -43,6 +49,11 @@ class Usuario(Base):
     nombre: Mapped[str] = mapped_column(Text)
     password_hash: Mapped[str] = mapped_column(Text, deferred=True, deferred_raiseload=True)
     activo: Mapped[bool]
+    # Spec 017, T1 (0017): la aplicación aún no tiene SELECT sobre la columna (lo da T4);
+    # diferida con raiseload para que ningún SELECT del ORM la pida.
+    debe_cambiar_password: Mapped[bool] = mapped_column(
+        server_default=FetchedValue(), deferred=True, deferred_raiseload=True
+    )
 
 
 class Membresia(TenantScoped, Base):

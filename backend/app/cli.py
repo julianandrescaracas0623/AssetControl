@@ -20,13 +20,32 @@ invitación ``admin`` (24 h, ``creada_por`` NULL; Q3, Q17):
   logs; un error de base se informa solo con su tipo y ``sqlstate`` (el mensaje de
   PostgreSQL podría traer valores de fila).
 
-``flask preparar-roles`` (spec 010b, T4; C8) crea o reafirma el rol de la aplicación y
-``auth_owner`` en un PostgreSQL administrado donde el migrador no es superusuario
-(Supabase), con el usuario y la contraseña solo por entorno (``APP_DB_USER``,
-``APP_DB_PASSWORD``) y la contraseña enviada como verificador SCRAM (``app.roles``).
+``flask preparar-roles`` (spec 010b, T4; C8) crea o reafirma el rol de la aplicación,
+``auth_owner`` y ``plataforma_owner`` (spec 017) en un PostgreSQL administrado donde el
+migrador no es superusuario (Supabase), con el usuario y la contraseña solo por entorno
+(``APP_DB_USER``, ``APP_DB_PASSWORD``) y la contraseña enviada como verificador SCRAM
+(``app.roles``).
+
+Cuentas de desarrollador de la consola de plataforma (spec 017, T1; R7–R10; plan.md
+§2.4): ``flask crear-desarrollador <email>``, ``flask restablecer-desarrollador <email>`` y
+``flask desactivar-desarrollador <email> [--reactivar]``.
+
+- Crear pide el **nombre** (``click.prompt``) y la **contraseña** sin eco y con
+  confirmación; restablecer pide solo la contraseña. Con ``--password-stdin`` la contraseña
+  es la siguiente línea de la entrada estándar (en crear, después de la línea del nombre),
+  sin confirmación. Nunca por argumento ni por variable de entorno.
+- La política (14–128 y lista de comunes) y el hash Argon2id se calculan **en el
+  comando** (``app.plataforma.credenciales``): a la base solo llega el hash.
+- Mismo rol migrador y mismas reglas que ``create-tenant`` (``MIGRATION_DATABASE_URL``,
+  falla si es el rol de ``DATABASE_URL``); llaman a ``acceso.crear_desarrollador``,
+  ``acceso.restablecer_desarrollador`` o ``acceso.cambiar_estado_desarrollador``, que
+  auditan con ``desarrollador_id`` nulo.
+- No imprimen ni registran la contraseña, el hash ni el correo; un error de base se
+  informa con tipo y ``sqlstate``; un correo inexistente da un mensaje genérico.
 """
 
 import os
+import sys
 
 import click
 import psycopg
@@ -37,7 +56,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
 from app import conexiones, roles
-from app.auth.credentials import new_token, token_key
+from app.auth.credentials import PasswordPolicyError, new_token, token_key
 from app.config import (
     InvalidDatabaseUrlError,
     MissingConfigError,
@@ -46,6 +65,7 @@ from app.config import (
 )
 from app.invitaciones.service import normalize_invitation_email
 from app.nombres import NOMBRE_MAX_LENGTH, normalize_display_name
+from app.plataforma.credenciales import hash_developer_password
 
 INVITATION_LINK_PREFIX = "/invitacion#"
 CONNECT_TIMEOUT_SECONDS = 5
@@ -192,7 +212,7 @@ def preparar_roles_command() -> None:
         raise click.ClickException(f"No se pudieron preparar los roles: {failure}")
     estado = "creado" if resultado.creado else "actualizado"
     click.echo(
-        f"Rol de la aplicación {estado} y auth_owner listo; "
+        f"Rol de la aplicación {estado}, auth_owner y plataforma_owner listos; "
         f"membresías revocadas: {resultado.revocadas}; conservadas (solo ADMIN del creador): "
         f"{resultado.conservadas}."
     )
@@ -218,9 +238,189 @@ def revisar_conexiones_command() -> None:
         raise SystemExit(1)
 
 
+# --- Cuentas de desarrollador (spec 017, T1) ------------------------------------------
+
+_CREAR_DESARROLLADOR = text("select acceso.crear_desarrollador(:email, :nombre, :hash)")
+_RESTABLECER_DESARROLLADOR = text("select acceso.restablecer_desarrollador(:email, :hash)")
+_CAMBIAR_ESTADO_DESARROLLADOR = text("select acceso.cambiar_estado_desarrollador(:email, :activo)")
+UNIQUE_VIOLATION = "23505"
+NO_DATA_FOUND = "P0002"
+_STDIN_HELP = "Lee la contraseña de la siguiente línea de la entrada estándar (sin confirmación)."
+_DESARROLLADOR_GENERICO = "No se pudo completar la operación: revisa el correo del desarrollador."
+
+
+class _DatabaseFailure(Exception):
+    """Fallo de base resumido: solo tipo y ``sqlstate``, nunca mensaje ni parámetros."""
+
+    def __init__(self, summary: str, sqlstate: str | None) -> None:
+        self.summary = summary
+        self.sqlstate = sqlstate
+        super().__init__(summary)
+
+
+def _developer_email(email: str) -> str:
+    # Mismo normalizador que el resto de correos: su salida cumple el CHECK de la base.
+    normalized = normalize_invitation_email(email)
+    if normalized is None:
+        raise click.ClickException("El correo del desarrollador no es válido.")
+    return normalized
+
+
+def _read_developer_password(password_stdin: bool) -> str:
+    """Contraseña sin eco y con confirmación, o una línea de la entrada estándar."""
+    if password_stdin:
+        line = sys.stdin.readline()
+        password = line.removesuffix("\n").removesuffix("\r")
+        if not password:
+            raise click.ClickException(
+                "No se recibió la contraseña por la entrada estándar (--password-stdin)."
+            )
+        return password
+    return click.prompt(
+        "Contraseña",
+        hide_input=True,
+        confirmation_prompt="Repite la contraseña",
+        show_default=False,
+    )
+
+
+def _developer_hash(password: str) -> str:
+    failure: str | None = None
+    try:
+        return hash_developer_password(password)
+    except PasswordPolicyError as exc:
+        # El mensaje de la política nunca incluye la contraseña.
+        failure = str(exc)
+    raise click.ClickException(failure)
+
+
+def _call_as_migrator(statement, params: dict) -> object:
+    """Ejecuta una función ``acceso.*`` con el rol migrador, en una transacción."""
+    config_error: str | None = None
+    try:
+        url = load_migration_url()
+    except (MissingConfigError, SameDatabaseRoleError, InvalidDatabaseUrlError) as exc:
+        # Los mensajes nombran la variable, nunca su valor.
+        config_error = str(exc)
+    if config_error is not None:
+        raise click.ClickException(config_error)
+    engine = create_engine(
+        url,
+        poolclass=NullPool,
+        hide_parameters=True,
+        connect_args={"connect_timeout": CONNECT_TIMEOUT_SECONDS},
+    )
+    failure: _DatabaseFailure | None = None
+    result = None
+    try:
+        with engine.begin() as conn:
+            result = conn.scalar(statement, params)
+    except (SQLAlchemyError, psycopg.Error) as exc:
+        orig = exc if isinstance(exc, psycopg.Error) else getattr(exc, "orig", None)
+        failure = _DatabaseFailure(_database_error_summary(exc), getattr(orig, "sqlstate", None))
+    finally:
+        engine.dispose()
+    if failure is not None:
+        # Fuera del except: sin causa ni contexto que arrastren SQL o valores.
+        raise failure
+    return result
+
+
+@click.command("crear-desarrollador")
+@click.argument("email")
+@click.option("--password-stdin", "password_stdin", is_flag=True, help=_STDIN_HELP)
+def crear_desarrollador_command(email: str, password_stdin: bool) -> None:
+    """Crea una cuenta de desarrollador de la consola de plataforma.
+
+    Pide el nombre y la contraseña (sin eco, con confirmación) o lee la contraseña de la
+    entrada estándar con --password-stdin. Usa el rol migrador de MIGRATION_DATABASE_URL.
+    """
+    normalized_email = _developer_email(email)
+    nombre = normalize_display_name(click.prompt("Nombre"))
+    if nombre is None:
+        raise click.ClickException(
+            f"El nombre no es válido: de 1 a {NOMBRE_MAX_LENGTH} caracteres, con letras o "
+            "números y sin caracteres invisibles o de control."
+        )
+    password_hash = _developer_hash(_read_developer_password(password_stdin))
+    message: str | None = None
+    try:
+        desarrollador_id = _call_as_migrator(
+            _CREAR_DESARROLLADOR,
+            {"email": normalized_email, "nombre": nombre, "hash": password_hash},
+        )
+    except _DatabaseFailure as exc:
+        if exc.sqlstate == UNIQUE_VIOLATION:
+            message = "Ya existe un desarrollador con ese correo."
+        else:
+            message = f"No se pudo crear el desarrollador ({exc.summary})."
+    if message is not None:
+        raise click.ClickException(message)
+    click.echo(f"Desarrollador creado: {desarrollador_id}")
+
+
+@click.command("restablecer-desarrollador")
+@click.argument("email")
+@click.option("--password-stdin", "password_stdin", is_flag=True, help=_STDIN_HELP)
+def restablecer_desarrollador_command(email: str, password_stdin: bool) -> None:
+    """Fija una contraseña nueva a un desarrollador y cierra todas sus sesiones.
+
+    Pide la contraseña (sin eco, con confirmación) o la lee de la entrada estándar con
+    --password-stdin. Usa el rol migrador de MIGRATION_DATABASE_URL.
+    """
+    normalized_email = _developer_email(email)
+    password_hash = _developer_hash(_read_developer_password(password_stdin))
+    message: str | None = None
+    try:
+        _call_as_migrator(
+            _RESTABLECER_DESARROLLADOR, {"email": normalized_email, "hash": password_hash}
+        )
+    except _DatabaseFailure as exc:
+        if exc.sqlstate == NO_DATA_FOUND:
+            message = _DESARROLLADOR_GENERICO
+        else:
+            message = f"No se pudo restablecer la contraseña ({exc.summary})."
+    if message is not None:
+        raise click.ClickException(message)
+    click.echo("Contraseña restablecida; las sesiones abiertas del desarrollador se cerraron.")
+
+
+@click.command("desactivar-desarrollador")
+@click.argument("email")
+@click.option(
+    "--reactivar", is_flag=True, help="Vuelve a activar la cuenta en lugar de desactivarla."
+)
+def desactivar_desarrollador_command(email: str, reactivar: bool) -> None:
+    """Desactiva (o reactiva con --reactivar) una cuenta de desarrollador.
+
+    Al desactivar se cierran todas sus sesiones. Usa el rol migrador de
+    MIGRATION_DATABASE_URL. No pide contraseña.
+    """
+    normalized_email = _developer_email(email)
+    message: str | None = None
+    try:
+        _call_as_migrator(
+            _CAMBIAR_ESTADO_DESARROLLADOR, {"email": normalized_email, "activo": reactivar}
+        )
+    except _DatabaseFailure as exc:
+        if exc.sqlstate == NO_DATA_FOUND:
+            message = _DESARROLLADOR_GENERICO
+        else:
+            message = f"No se pudo cambiar el estado del desarrollador ({exc.summary})."
+    if message is not None:
+        raise click.ClickException(message)
+    if reactivar:
+        click.echo("Desarrollador reactivado.")
+    else:
+        click.echo("Desarrollador desactivado; sus sesiones abiertas se cerraron.")
+
+
 def register_cli(app: Flask) -> None:
     """Registra los comandos del operador en ``flask``."""
     app.cli.add_command(create_tenant_command)
     app.cli.add_command(purge_rate_limit_command)
     app.cli.add_command(preparar_roles_command)
     app.cli.add_command(revisar_conexiones_command)
+    app.cli.add_command(crear_desarrollador_command)
+    app.cli.add_command(restablecer_desarrollador_command)
+    app.cli.add_command(desactivar_desarrollador_command)

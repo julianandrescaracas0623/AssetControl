@@ -28,6 +28,8 @@ pytestmark = pytest.mark.skipif(
     not (MIGRADOR and APLICACION), reason="C8: sin base preparada como en Supabase"
 )
 APP_USER = os.environ.get("APP_DB_USER", "assetcontrol_app")
+# Spec 017, T1: plataforma_owner se prepara igual que auth_owner.
+ROLES = [APP_USER, roles.AUTH_OWNER, roles.PLATAFORMA_OWNER]
 
 
 def libpq(url: str) -> str:
@@ -46,17 +48,18 @@ def test_the_migrator_is_not_superuser_like_supabase():
     assert superusuario is False
 
 
-def test_app_role_and_auth_owner_have_no_dangerous_attributes():
+def test_app_role_and_owners_have_no_dangerous_attributes():
     filas = consulta(
         MIGRADOR,
         "select rolname, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolreplication, "
         "rolcanlogin from pg_roles where rolname = any(%s) order by rolname",
-        ([APP_USER, roles.AUTH_OWNER],),
+        (ROLES,),
     )
     assert filas == sorted(
         [
             (APP_USER, False, False, False, False, False, True),
             (roles.AUTH_OWNER, False, False, False, False, False, False),
+            (roles.PLATAFORMA_OWNER, False, False, False, False, False, False),
         ]
     )
 
@@ -68,13 +71,13 @@ def test_only_the_creators_admin_membership_remains_and_gives_no_privileges():
         "from pg_auth_members a join pg_roles g on g.oid = a.roleid "
         "join pg_roles m on m.oid = a.member "
         "where g.rolname = any(%s) or m.rolname = any(%s)",
-        ([APP_USER, roles.AUTH_OWNER], [APP_USER, roles.AUTH_OWNER]),
+        (ROLES, ROLES),
     )
     ((migrador,),) = consulta(MIGRADOR, "select current_user")
     assert filas, "PostgreSQL 16+ da al creador ADMIN sobre los roles que crea"
     for concedido, miembro, admin, inherit, set_ in filas:
         assert (miembro, admin, inherit, set_) == (migrador, True, False, False), concedido
-    for rol in (APP_USER, roles.AUTH_OWNER):
+    for rol in ROLES:
         ((usa, cambia),) = consulta(
             MIGRADOR,
             "select pg_has_role(current_user, %s, 'USAGE'), pg_has_role(current_user, %s, 'SET')",
@@ -83,7 +86,16 @@ def test_only_the_creators_admin_membership_remains_and_gives_no_privileges():
         assert (usa, cambia) == (False, False), rol
 
 
-def test_access_functions_belong_to_auth_owner_and_only_the_app_runs_them():
+# Spec 017, T1 (0017): dueña plataforma_owner; solo plataforma_buscar_login es de la app.
+PLATAFORMA = (
+    "crear_desarrollador",
+    "restablecer_desarrollador",
+    "cambiar_estado_desarrollador",
+    "plataforma_buscar_login",
+)
+
+
+def test_access_functions_belong_to_their_owner_and_only_the_app_runs_them():
     filas = consulta(
         MIGRADOR,
         "select p.proname, pg_get_userbyid(p.proowner), p.proacl::text from pg_proc p "
@@ -98,11 +110,14 @@ def test_access_functions_belong_to_auth_owner_and_only_the_app_runs_them():
         # Spec 014, T2 (0016).
         "solicitar_recuperacion",
         "restablecer_contrasena",
+        *PLATAFORMA,
     }
+    del_migrador = {"crear_tenant", *(f for f in PLATAFORMA if f != "plataforma_buscar_login")}
     for nombre, dueno, acl in filas:
-        assert dueno == roles.AUTH_OWNER, nombre
-        concedidos = {e.split("=")[0] for e in acl.strip("{}").split(",")} - {roles.AUTH_OWNER}
-        assert concedidos == ({migrador} if nombre == "crear_tenant" else {APP_USER}), nombre
+        esperado = roles.PLATAFORMA_OWNER if nombre in PLATAFORMA else roles.AUTH_OWNER
+        assert dueno == esperado, nombre
+        concedidos = {e.split("=")[0] for e in acl.strip("{}").split(",")} - {esperado}
+        assert concedidos == ({migrador} if nombre in del_migrador else {APP_USER}), nombre
 
 
 def test_supabase_roles_receive_nothing_despite_default_privileges():
@@ -139,7 +154,7 @@ def test_the_app_role_logs_in_with_its_password_and_cannot_skip_rls():
 def test_prepare_roles_again_changes_nothing_but_the_password():
     contrasena = make_url(APLICACION).password
     resultado = roles.preparar(libpq(MIGRADOR), APP_USER, contrasena)
-    assert (resultado.creado, resultado.revocadas, resultado.conservadas) == (False, 0, 2)
+    assert (resultado.creado, resultado.revocadas, resultado.conservadas) == (False, 0, 3)
 
 
 def test_two_tenants_are_isolated_end_to_end_with_the_app_role():

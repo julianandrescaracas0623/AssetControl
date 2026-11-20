@@ -18,6 +18,10 @@
 #   NOREPLICATION, sin contraseña, sin CREATE en public ni en las bases, no dueño
 #   de nada y sin membresías con ningún rol en ningún sentido (ni con el rol de la
 #   aplicación ni con otros); el script revoca las que encuentre y falla si queda alguna.
+# - Rol plataforma_owner (spec 017, plan.md §3; P35/D12): dueño de las funciones
+#   SECURITY DEFINER de la consola de plataforma (acceso.plataforma_* y las del
+#   operador para desarrolladores). Mismos atributos y controles que auth_owner y
+#   separado de él: sin membresías con ningún rol en ningún sentido.
 # - El usuario y la contraseña llegan a psql por el entorno (\getenv, psql 17) y
 #   se usan como :"app_user" y :'app_password': no van en la línea de comandos
 #   (ps no los muestra), no se interpolan en el texto SQL ni se imprimen (sin set -x).
@@ -51,12 +55,15 @@
   fi
 
   readonly AUTH_OWNER="auth_owner"
+  readonly PLATAFORMA_OWNER="plataforma_owner"
 
-  # auth_owner no puede ser el rol de la aplicación ni el migrador: perdería NOLOGIN.
-  if [ "$APP_DB_USER" = "$AUTH_OWNER" ] || [ "$POSTGRES_USER" = "$AUTH_OWNER" ]; then
-    echo "01-app-role.sh: APP_DB_USER y POSTGRES_USER no pueden llamarse ${AUTH_OWNER}" >&2
-    exit 1
-  fi
+  # Los dueños no pueden ser el rol de la aplicación ni el migrador: perderían NOLOGIN.
+  for owner in "$AUTH_OWNER" "$PLATAFORMA_OWNER"; do
+    if [ "$APP_DB_USER" = "$owner" ] || [ "$POSTGRES_USER" = "$owner" ]; then
+      echo "01-app-role.sh: APP_DB_USER y POSTGRES_USER no pueden llamarse ${owner}" >&2
+      exit 1
+    fi
+  done
 
   readonly TEST_DB="assetcontrol_test"
 
@@ -69,7 +76,8 @@
   }
 
   # Rol de la aplicación y base de pruebas. Idempotente: se puede volver a ejecutar.
-  run_psql "$POSTGRES_DB" -v test_db="$TEST_DB" -v auth_owner="$AUTH_OWNER" <<'EOSQL'
+  run_psql "$POSTGRES_DB" -v test_db="$TEST_DB" -v auth_owner="$AUTH_OWNER" \
+    -v plataforma_owner="$PLATAFORMA_OWNER" <<'EOSQL'
 -- Si una sentencia falla, ni el servidor ni psql muestran su texto (llevaría la contraseña).
 \set VERBOSITY terse
 \getenv app_user APP_DB_USER
@@ -96,8 +104,19 @@ ALTER ROLE :"auth_owner" NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE
   NOREPLICATION PASSWORD NULL;
 \endif
 
--- auth_owner sin membresías con ningún rol, en ningún sentido (R4a): ni con el rol
--- de la aplicación (no podría hacer SET ROLE auth_owner) ni con otros roles
+-- plataforma_owner (spec 017). Idempotente, con los mismos atributos que auth_owner.
+SELECT NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'plataforma_owner')
+  AS create_plataforma_owner \gset
+\if :create_plataforma_owner
+CREATE ROLE :"plataforma_owner" NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE
+  NOREPLICATION PASSWORD NULL;
+\else
+ALTER ROLE :"plataforma_owner" NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE
+  NOREPLICATION PASSWORD NULL;
+\endif
+
+-- auth_owner y plataforma_owner sin membresías con ningún rol, en ningún sentido
+-- (R4a): ni con el rol de la aplicación (no podría hacer SET ROLE) ni con otros roles
 -- (anon, authenticated o service_role si existen, roles predefinidos pg_*, etc.).
 -- Cada concesión se revoca con su propio grantor (GRANTED BY, de
 -- pg_auth_members.grantor): sin él, REVOKE solo quita la que hizo el rol actual y
@@ -105,9 +124,11 @@ ALTER ROLE :"auth_owner" NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE
 -- de ella (dadas con ADMIN OPTION). El catálogo se relee en cada vuelta para no
 -- revocar dos veces lo que ya cayó en cascada (sin avisos). Solo revoca lo que exista.
 SET assetcontrol.auth_owner = :'auth_owner';
+SET assetcontrol.plataforma_owner = :'plataforma_owner';
 DO $$
 DECLARE
   auth_owner_name text := current_setting('assetcontrol.auth_owner');
+  plataforma_owner_name text := current_setting('assetcontrol.plataforma_owner');
   membership record;
 BEGIN
   FOR attempt IN 1..1000 LOOP
@@ -119,6 +140,7 @@ BEGIN
       JOIN pg_roles member ON member.oid = m.member
       JOIN pg_roles grantor ON grantor.oid = m.grantor
      WHERE auth_owner_name IN (granted.rolname, member.rolname)
+        OR plataforma_owner_name IN (granted.rolname, member.rolname)
      ORDER BY m.oid
      LIMIT 1;
     EXIT WHEN NOT FOUND;
@@ -133,41 +155,46 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'test_db') \gexec
 EOSQL
 
   for database in "$POSTGRES_DB" "$TEST_DB"; do
-    run_psql "$database" -v db_name="$database" -v auth_owner="$AUTH_OWNER" <<'EOSQL'
+    run_psql "$database" -v db_name="$database" -v auth_owner="$AUTH_OWNER" \
+      -v plataforma_owner="$PLATAFORMA_OWNER" <<'EOSQL'
 \getenv app_user APP_DB_USER
 GRANT CONNECT ON DATABASE :"db_name" TO :"app_user";
 GRANT USAGE ON SCHEMA public TO :"app_user";
--- auth_owner no crea esquemas ni objetos en public (el CREATE transitorio en acceso
--- lo da y lo quita la migración 0004, plan.md §2.1).
+-- Los dueños no crean esquemas ni objetos en public (el CREATE transitorio en acceso
+-- lo dan y lo quitan las migraciones 0004 y 0017).
 REVOKE CREATE ON DATABASE :"db_name" FROM :"auth_owner";
 REVOKE CREATE ON SCHEMA public FROM :"auth_owner";
+REVOKE CREATE ON DATABASE :"db_name" FROM :"plataforma_owner";
+REVOKE CREATE ON SCHEMA public FROM :"plataforma_owner";
 EOSQL
   done
 
-  # Aserción final: si auth_owner conserva alguna membresía (como rol concedido o
-  # como miembro), RAISE EXCEPTION aborta psql (ON_ERROR_STOP) y el script falla.
+  # Aserción final: si auth_owner o plataforma_owner conserva alguna membresía (como
+  # rol concedido o como miembro), RAISE EXCEPTION aborta psql (ON_ERROR_STOP) y el script falla.
   # Nota para C8 (Supabase): allí el migrador no es superusuario y, al crear el rol,
   # PostgreSQL 16+ le concede auth_owner con ADMIN OPTION (más SET/INHERIT según
   # createrole_self_grant); esa membresía del creador no la puede revocar él mismo,
   # así que esta aserción no aplica tal cual fuera de este contenedor.
-  run_psql "$POSTGRES_DB" -v auth_owner="$AUTH_OWNER" <<'EOSQL'
+  run_psql "$POSTGRES_DB" -v auth_owner="$AUTH_OWNER" -v plataforma_owner="$PLATAFORMA_OWNER" <<'EOSQL'
 \set VERBOSITY terse
 SET assetcontrol.auth_owner = :'auth_owner';
+SET assetcontrol.plataforma_owner = :'plataforma_owner';
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
       FROM pg_auth_members m
       JOIN pg_roles r ON r.oid IN (m.roleid, m.member)
-     WHERE r.rolname = current_setting('assetcontrol.auth_owner')
+     WHERE r.rolname IN (current_setting('assetcontrol.auth_owner'),
+                         current_setting('assetcontrol.plataforma_owner'))
   ) THEN
-    RAISE EXCEPTION '01-app-role.sh: auth_owner conserva membresías de roles';
+    RAISE EXCEPTION '01-app-role.sh: auth_owner o plataforma_owner conserva membresías de roles';
   END IF;
 END
 $$;
 EOSQL
 
-  echo "01-app-role.sh: roles de la aplicación y ${AUTH_OWNER}, y base ${TEST_DB} listos."
+  echo "01-app-role.sh: roles de la aplicación, ${AUTH_OWNER} y ${PLATAFORMA_OWNER}, y base ${TEST_DB} listos."
 ) || {
   echo "01-app-role.sh: la inicialización falló; el contenedor no debe arrancar." >&2
   exit 1

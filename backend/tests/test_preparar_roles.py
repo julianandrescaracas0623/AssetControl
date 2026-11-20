@@ -31,6 +31,7 @@ def test_scram_verifier_has_postgres_format():
         ("App-Rol", "x" * 30, "identificador"),
         ("migrador", "x" * 30, "migrador"),
         ("auth_owner", "x" * 30, "migrador"),
+        ("plataforma_owner", "x" * 30, "plataforma_owner"),
         ("app", "corta", "24"),
         ("app", "ñ" * 30, "ASCII"),
         ("app", "con espacios " * 3, "ASCII"),
