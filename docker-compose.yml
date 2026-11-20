@@ -62,6 +62,19 @@ services:
       RATE_LIMIT_RESET_IP: ${RATE_LIMIT_RESET_IP:-}
       TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-}
       ARGON2_MAX_CONCURRENCY: ${ARGON2_MAX_CONCURRENCY:-}
+      # Recuperación de contraseña (spec 014): sin CORREO_MODO queda desactivada. Con
+      # CORREO_MODO=carpeta y CORREO_CARPETA vacía, los .eml van a /app/.buzon, que es
+      # backend/.buzon del montaje de abajo. CORREO_CARPETA, si se usa, es una ruta del
+      # contenedor (no de Windows). Los valores llegan solo de .env.
+      CORREO_MODO: ${CORREO_MODO:-}
+      CORREO_REMITENTE: ${CORREO_REMITENTE:-}
+      CORREO_CARPETA: ${CORREO_CARPETA:-}
+      URL_PUBLICA: ${URL_PUBLICA:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_CIFRADO: ${SMTP_CIFRADO:-}
+      SMTP_PUERTO: ${SMTP_PUERTO:-}
+      SMTP_USUARIO: ${SMTP_USUARIO:-}
+      SMTP_CLAVE: ${SMTP_CLAVE:-}
     # Código montado para la recarga; el entorno virtual vive en /opt/venv (imagen).
     volumes:
       - ./backend:/app

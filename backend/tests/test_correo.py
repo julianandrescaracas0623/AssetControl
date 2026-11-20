@@ -8,6 +8,7 @@ lleva el token, el correo completo, el host ni la clave SMTP.
 import email
 import email.policy
 import logging
+import re
 import secrets
 import smtplib
 import socket
@@ -1286,3 +1287,34 @@ def test_threads_are_daemon_and_log_the_request_id(caplog):
 
     assert hilos and all(h.daemon for h in hilos)
     assert request_id in _log_text(caplog)
+
+
+# --- docker-compose.yml (hallazgo de la T9) ------------------------------------------
+
+VARIABLES_CORREO = (
+    "CORREO_MODO",
+    "CORREO_REMITENTE",
+    "CORREO_CARPETA",
+    "URL_PUBLICA",
+    "SMTP_HOST",
+    "SMTP_CIFRADO",
+    "SMTP_PUERTO",
+    "SMTP_USUARIO",
+    "SMTP_CLAVE",
+)
+
+
+@pytest.mark.parametrize("name", VARIABLES_CORREO)
+def test_compose_passes_each_correo_variable_to_the_api(name):
+    compose = (Path(__file__).resolve().parents[2] / "docker-compose.yml").read_text("utf-8")
+    api = compose.split("\n  api:", 1)[1].split("\n    volumes:", 1)[0]
+    environment = api.split("\n    environment:", 1)[1]
+
+    # Opcional y sin valor literal: vacía en .env -> recuperación desactivada o valor
+    # por defecto de app/correo/config.py. Nunca una credencial escrita en el compose.
+    assert re.search(rf"^      {name}: \$\{{{name}:-\}}\s*$", environment, re.MULTILINE)
+
+
+def test_all_correo_variables_empty_disable_recovery():
+    # Es lo que recibe la API del compose cuando .env no las define (``${VAR:-}``).
+    assert load_correo(dict.fromkeys(VARIABLES_CORREO, ""), "development") is None
