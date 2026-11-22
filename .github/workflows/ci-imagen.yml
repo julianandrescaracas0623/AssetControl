@@ -61,10 +61,17 @@ jobs:
             -e POSTGRES_USER -e POSTGRES_PASSWORD -e POSTGRES_DB \
             -v /tmp/pgtls:/tls:ro postgres:17 \
             -c ssl=on -c ssl_cert_file=/tls/server.crt -c ssl_key_file=/tls/server.key
-          for _ in $(seq 1 30); do
-            docker exec db pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" && break
+          # Por TCP: durante la inicialización la imagen levanta un servidor temporal solo
+          # en el socket Unix y luego reinicia; preguntar por el socket da «listo» antes
+          # de que exista el puerto 5432.
+          listo=0
+          for _ in $(seq 1 60); do
+            if docker exec db pg_isready -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
+              listo=1; break
+            fi
             sleep 1
           done
+          if [ "$listo" != 1 ]; then docker logs db; exit 1; fi
 
       - name: Roles (mismo script que docker-compose)
         env:

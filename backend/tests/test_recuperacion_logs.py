@@ -45,9 +45,8 @@ class _SmtpCaido:
     def entregar(self, mensaje) -> None:
         with self._lock:
             self.intentos += 1
-        raise ConnectionRefusedError(
-            f"{HOST_SMTP} rechazó {mensaje['To']}: {mensaje.get_content()}"
-        )
+        cuerpo = mensaje.get_body(preferencelist=("plain",)).get_content()
+        raise ConnectionRefusedError(f"{HOST_SMTP} rechazó {mensaje['To']}: {cuerpo}")
 
 
 @pytest.fixture(scope="module")
