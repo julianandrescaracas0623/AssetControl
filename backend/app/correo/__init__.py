@@ -1,4 +1,5 @@
-"""Correo de recuperación de contraseña (spec 014, T3; R6–R8, R16; plan §7).
+"""Correo de recuperación de contraseña (spec 014, T3; R6–R8, R16; plan §7) y aviso de
+contraseña temporal (spec 017, C1d; R61–R64).
 
 Interfaz mínima para T4:
 
@@ -8,6 +9,8 @@ Interfaz mínima para T4:
   petición, y pasa el ``request_id``); vuelve de inmediato y nunca lanza. Compone y
   entrega en un hilo ``daemon`` acotado por un ``BoundedSemaphore``; sin cupo, el envío
   se descarta, se cuenta en ``descartados`` y se registra con ese total.
+- ``get_correo(app).enviar_aviso_restablecimiento(destino, token | None, request_id=None)``
+  (C1d): el mismo mecanismo con la plantilla del aviso; sin ``token`` sale sin enlace.
 
 Sin colas ni reintentos (ADR-002). Un fallo se registra solo con su tipo y el
 ``request_id``: nunca el destinatario, el host, el token, el enlace, el cuerpo ni el
@@ -18,14 +21,16 @@ import logging
 import threading
 import time
 from email.message import EmailMessage
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, NamedTuple, Protocol
 
 from app.correo.buzon import Buzon
 from app.correo.config import CorreoConfig
-from app.correo.plantillas import componer_recuperacion
+from app.correo.plantillas import componer_aviso_restablecimiento, componer_recuperacion
 from app.correo.smtp import ServidorSmtp
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from flask import Flask
 
 __all__ = [
@@ -44,6 +49,17 @@ SIN_PETICION = "-"
 logger = logging.getLogger(__name__)
 
 
+class _Tipo(NamedTuple):
+    """Qué correo es: su nombre en los logs y el del hilo de envío."""
+
+    nombre: str
+    hilo: str
+
+
+_RECUPERACION = _Tipo("de recuperación", "correo-recuperacion")
+_AVISO = _Tipo("de aviso", "correo-aviso")
+
+
 class Transporte(Protocol):
     def entregar(self, mensaje: EmailMessage) -> object: ...
 
@@ -60,7 +76,7 @@ def _request_id() -> str:
 
 
 class Correo:
-    """Envío de correos de recuperación en segundo plano. Nunca propaga errores."""
+    """Envío de correos de recuperación y de aviso en segundo plano. Nunca propaga errores."""
 
     def __init__(
         self,
@@ -90,6 +106,33 @@ class Correo:
 
         ``request_id``: el de la petición que lo pidió; si falta, el de la petición en curso.
         """
+        self._programar(
+            _RECUPERACION,
+            lambda config: componer_recuperacion(
+                config.remitente, destino, config.url_publica, token
+            ),
+            request_id,
+        )
+
+    def enviar_aviso_restablecimiento(
+        self, destino: str, token: str | None, request_id: str | None = None
+    ) -> None:
+        """Aviso de contraseña temporal (spec 017, C1d; R61–R64), con el enlace de la 014 si
+        hay ``token``. Mismo hilo acotado, sin colas ni reintentos; nunca lanza."""
+        self._programar(
+            _AVISO,
+            lambda config: componer_aviso_restablecimiento(
+                config.remitente, destino, config.url_publica, token
+            ),
+            request_id,
+        )
+
+    def _programar(
+        self,
+        tipo: "_Tipo",
+        componer: "Callable[[CorreoConfig], EmailMessage]",
+        request_id: str | None,
+    ) -> None:
         if not self.activo:
             return None
         if request_id is None:
@@ -99,16 +142,16 @@ class Correo:
                 self.descartados += 1
                 descartados = self.descartados
             logger.warning(
-                "Correo de recuperación descartado: sin cupo de envío (request_id=%s, "
-                "descartados=%s)",
+                "Correo %s descartado: sin cupo de envío (request_id=%s, descartados=%s)",
+                tipo.nombre,
                 request_id,
                 descartados,
             )
             return None
         hilo = threading.Thread(
             target=self._enviar,
-            args=(destino, token, request_id),
-            name="correo-recuperacion",
+            args=(tipo, componer, request_id),
+            name=tipo.hilo,
             daemon=True,
         )
         with self._hilos_lock:
@@ -120,29 +163,35 @@ class Correo:
                 self._hilos.discard(hilo)
             self._cupo.release()
             logger.warning(
-                "Correo de recuperación no enviado (request_id=%s, tipo=%s)",
+                "Correo %s no enviado (request_id=%s, tipo=%s)",
+                tipo.nombre,
                 request_id,
                 type(exc).__name__,
             )
         return None
 
-    def _enviar(self, destino: str, token: str, request_id: str) -> None:
+    def _enviar(
+        self,
+        tipo: "_Tipo",
+        componer: "Callable[[CorreoConfig], EmailMessage]",
+        request_id: str,
+    ) -> None:
         try:
             config = self._config
             if config is None or self.transporte is None:
                 raise RuntimeError("correo desactivado")
-            mensaje = componer_recuperacion(config.remitente, destino, config.url_publica, token)
-            self.transporte.entregar(mensaje)
+            self.transporte.entregar(componer(config))
         except Exception as exc:
             # Solo el tipo: el mensaje de la excepción puede traer host, destinatario o
             # respuestas del servidor. Sin ``exc_info`` por la misma razón.
             logger.warning(
-                "Correo de recuperación no enviado (request_id=%s, tipo=%s)",
+                "Correo %s no enviado (request_id=%s, tipo=%s)",
+                tipo.nombre,
                 request_id,
                 type(exc).__name__,
             )
         else:
-            logger.info("Correo de recuperación entregado (request_id=%s)", request_id)
+            logger.info("Correo %s entregado (request_id=%s)", tipo.nombre, request_id)
         finally:
             self._cupo.release()
             with self._hilos_lock:

@@ -307,3 +307,30 @@ Pedido del humano; **revierte Q-A4** (decisión autónoma de «sin restablecer c
 ### 11.5 Pruebas de C1b
 
 Tests primero. Backend: `test_plataforma_usuarios.py` ampliado (A27, A28: `204`, hash cambia, marca y corte de sesión, login anterior `401`, temporal entra y recibe `403 cambio_password_requerido` en todo el `url_map` salvo la lista de R26, `422`/`400`/`404`/`409`/`503`, segunda definición, carrera con desactivar y con dos definiciones, 014 sobre una temporal pendiente, usuario con dos membresías, una desactivada y otra en otra empresa: permitido por Q-P3 y se revocan todas sus sesiones; el único admin: permitido por Q-P1; la aserción `test_only_actualizar_empresa_renames_a_tenant` sigue pasando, RC10); `caplog` y auditoría sin la contraseña, la confirmación ni el hash (se buscan los valores enviados en todas las columnas, en los logs y en la respuesta); catálogo A4/A5/A6 (`void`, sin `SELECT` de `password_hash`, GUC vacía en el pool, `tenant_session` no ejecuta); migraciones up/down/up con datos y un head; `test_openapi.py`; matriz de roles y tokens cruzados (A2, A3). Web: Vitest del diálogo y de `Usuarios` (A29), del aviso del alta y de Actividad; e2e ampliado; capturas a 375 y 1440 px (`browser-qa`); no declarar axe.
+
+## 12. Cambio C1d (2026-11-22): aviso por correo al definir una contraseña temporal
+
+Pedido del humano; **supera a Q-P2** (y a la alternativa descartada de 11.4 «enlace generado por la consola», que ahora no se entrega a mano: va al buzón de la persona). Sin dependencias nuevas y **sin migración**: `acceso.solicitar_recuperacion` (0016) ya crea el enlace con la elegibilidad de la 014, la aplicación ya tiene `EXECUTE`, y el canje (`acceso.restablecer_contrasena`, rehecha en 0024/0026) ya pone `debe_cambiar_password = false` (R59).
+
+### 12.1 Servidor (Flask)
+
+- **Correo de la persona:** dentro de la vista de C1b, en la misma `plataforma_session`, se toma de `plataforma_listar_usuarios` (R29 ya devuelve el correo; sin función nueva) y se normaliza con `recuperacion.destino_de`. Solo se lee si `correo_activo(app)`.
+- **Después del `COMMIT`:** `require_desarrollador` confirma la transacción al salir de la vista; la ruta registra un `after_this_request` que actúa **solo** si la respuesta es `204` (si el `COMMIT` falla, la respuesta es `5xx` y no se pide nada). Ahí, con un token nuevo (`new_token`), llama a un envoltorio nuevo de `app/db.py`, `pedir_enlace_recuperacion(email, clave) -> bool`: conexión propia, transacción corta, `select acceso.solicitar_recuperacion(:email, :clave)`, **sin** `_sumar_intentos` (no toca `recuperar_ip` ni `recuperar_cuenta`). Un error de base se captura y se registra solo con su tipo y el `request_id`; el aviso sale entonces sin enlace.
+- **Envío:** `response.call_on_close` programa `Correo.enviar_aviso_restablecimiento(destino, token | None, request_id)`, con el mismo hilo, semáforo, contador de descartes y logs sin datos que `enviar_recuperacion`. `Correo._enviar` pasa a recibir la función que compone el mensaje (refactor sin cambio de comportamiento para la 014).
+- **Plantilla:** `componer_aviso_restablecimiento(remitente, destino, url_publica, token | None)` en `app/correo/plantillas.py`, con el mismo armazón HTML que la de recuperación (se extrae el marco común; el correo de la 014 no cambia byte a byte, lo fija su prueba actual), asunto y textos de R62/R63.
+- `openapi.yaml`: solo la descripción del `POST …/contrasena` (aviso por correo; la respuesta no cambia).
+
+### 12.2 Web
+
+- `RestablecerContrasena.tsx`: la `Confirmar` añade «Le enviaremos un aviso a su correo.» (R65) y su prueba.
+
+### 12.3 Decisiones de diseño de C1d
+
+- **Sin migración ni función de plataforma nueva:** pedir el enlace con la función de la 014 mantiene una sola regla de elegibilidad y un solo canje. Se descartó una `acceso.plataforma_*` que creara el enlace (más superficie, otra GUC y otra huella de catálogo para lo mismo).
+- **Sin los contadores de la 014:** esos contadores frenan el abuso anónimo de `/auth/recuperar`; aquí la acción ya está autenticada, auditada y limitada por `plat_accion`, y contar la IP del desarrollador lo bloquearía en su propio uso.
+- **Elegibilidad de la 014 tal cual:** con una membresía desactivada o varias activas no hay enlace (el canje tampoco funcionaría); el aviso sale igual, sin enlace (R63), porque su valor principal es la señal ante una toma de cuenta (RC7).
+- **Sin auditoría aparte:** el aviso es consecuencia de `usuario_contrasena_restablecida`; su entrega no es verificable (ADR-002, sin reintentos).
+
+### 12.4 Pruebas de C1d
+
+Tests primero. Backend: `tests/test_plataforma_usuario_aviso.py` con el correo en modo `carpeta` (A30: un mensaje, enlace que canjea y deja la marca en `false`, segunda definición invalida el enlace anterior, membresía desactivada y dos membresías sin enlace, correo apagado sin mensaje, fallo al pedir el enlace y fallo del transporte con el mismo `204`; A31: contraseña, hash, correo, token y enlace ausentes de respuesta, auditoría y `caplog`; contadores de recuperación intactos); `tests/test_correo.py` ampliado (aviso con y sin enlace; el de recuperación sin cambios). Web: prueba de componente de la frase de R65. Sin cambios de catálogo (A4) ni de migraciones: `test_plataforma_catalogo.py` y `test_migrations.py` deben seguir verdes sin tocarlos.

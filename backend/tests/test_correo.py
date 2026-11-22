@@ -45,7 +45,10 @@ from app.correo.config import (
 )
 from app.correo.plantillas import (
     ASUNTO,
+    ASUNTO_AVISO,
     DestinoNoValido,
+    TokenNoValido,
+    componer_aviso_restablecimiento,
     componer_recuperacion,
     enlace_recuperacion,
 )
@@ -289,6 +292,136 @@ def test_malformed_tokens_are_rejected_without_echo(token):
 
     if token:
         assert token not in str(info.value)
+
+
+# --- Plantilla del aviso de contraseña temporal (spec 017, C1d; R62, R63) ---------------
+
+AVISO_CIERRE = "Si no esperabas este cambio, avísale al administrador de tu empresa."
+AVISO_INICIO = (
+    "El equipo de AssetControl definió una contraseña temporal para tu cuenta "
+    "y cerró tus sesiones abiertas."
+)
+
+
+def test_notice_with_link_is_spanish_multipart_with_fixed_subject():
+    token = _token()
+
+    mensaje = componer_aviso_restablecimiento(REMITENTE, DESTINO, URL, token)
+
+    assert (
+        mensaje["Subject"] == ASUNTO_AVISO == "Se restableció el acceso a tu cuenta de AssetControl"
+    )
+    assert mensaje["To"] == DESTINO
+    assert mensaje["From"] == REMITENTE
+    assert mensaje["Auto-Submitted"] == "auto-generated"
+    assert mensaje["Message-ID"].endswith("@ejemplo.test>")
+    assert [p.get_content_type() for p in mensaje.iter_parts()] == ["text/plain", "text/html"]
+    enlace = f"{URL}/restablecer#{token}"
+    texto = mensaje.get_body(preferencelist=("plain",)).get_content()
+    cuerpo = mensaje.get_body(preferencelist=("html",)).get_content()
+    for parte in (texto, cuerpo):
+        assert AVISO_INICIO in parte
+        assert "Vence en 30 minutos y solo sirve una vez" in parte
+        assert "también puedes entrar con ella" in parte
+        assert AVISO_CIERRE in parte
+    assert enlace in texto
+    assert cuerpo.count(f'href="{enlace}"') == 2
+    assert "Elegir mi contraseña" in cuerpo
+
+
+def test_notice_without_link_has_no_link_and_points_to_who_gave_the_password():
+    mensaje = componer_aviso_restablecimiento(REMITENTE, DESTINO, URL, None)
+
+    texto = mensaje.get_body(preferencelist=("plain",)).get_content()
+    cuerpo = mensaje.get_body(preferencelist=("html",)).get_content()
+    for parte in (texto, cuerpo):
+        assert AVISO_INICIO in parte
+        assert "pide la contraseña temporal a quien te la definió" in parte
+        assert AVISO_CIERRE in parte
+        assert "/restablecer" not in parte
+        assert "Vence en 30 minutos" not in parte
+    assert "href=" not in cuerpo
+    assert "http" not in texto
+
+
+@pytest.mark.parametrize("token", [None, "con-enlace"])
+def test_notice_loads_nothing_and_has_no_personal_or_company_data(token):
+    token = _token() if token else None
+
+    mensaje = componer_aviso_restablecimiento(REMITENTE, DESTINO, URL, token)
+
+    for parte in mensaje.iter_parts():
+        cuerpo = parte.get_content().lower()
+        for prohibido in ("<img", "<script", "<link", "<style", "src=", "url(", "@import"):
+            assert prohibido not in cuerpo
+        assert DESTINO.lower() not in cuerpo
+        assert "persona" not in cuerpo
+        assert "clínica" not in cuerpo
+    cuerpo = mensaje.get_body(preferencelist=("html",)).get_content().lower()
+    esperados = set() if token is None else {f"{URL}/restablecer#{token}".lower()}
+    assert set(re.findall(r'href="([^"]*)"', cuerpo)) == esperados
+
+
+def test_notice_escapes_the_link_and_rejects_bad_recipients_and_tokens():
+    token = _token()
+
+    cuerpo = (
+        componer_aviso_restablecimiento(REMITENTE, DESTINO, "https://ejemplo.test/a&b", token)
+        .get_body(preferencelist=("html",))
+        .get_content()
+    )
+    assert f'href="https://ejemplo.test/a&amp;b/restablecer#{token}"' in cuerpo
+    with pytest.raises(DestinoNoValido):
+        componer_aviso_restablecimiento(REMITENTE, "a@ejemplo.test\r\nBcc: b@x.test", URL, None)
+    with pytest.raises(TokenNoValido):
+        componer_aviso_restablecimiento(REMITENTE, DESTINO, URL, "corto")
+
+
+def test_notice_sends_through_the_same_bounded_thread_without_leaking(tmp_path, caplog):
+    registro = []
+
+    class Registro:
+        def entregar(self, mensaje):
+            registro.append(mensaje)
+
+    correo = Correo(
+        CorreoConfig(modo="carpeta", remitente=REMITENTE, url_publica=URL, carpeta=tmp_path),
+        transporte=Registro(),
+    )
+    token = _token()
+    with caplog.at_level(logging.DEBUG):
+        correo.enviar_aviso_restablecimiento(DESTINO, token, request_id="rid-aviso")
+        correo.enviar_aviso_restablecimiento(DESTINO, None, request_id="rid-aviso-2")
+        assert correo.esperar(5)
+
+    assert [m["Subject"] for m in registro] == [ASUNTO_AVISO, ASUNTO_AVISO]
+    assert "Correo de aviso entregado (request_id=rid-aviso)" in caplog.text
+    assert DESTINO not in caplog.text
+    assert token not in caplog.text
+
+
+def test_notice_failure_logs_only_type_and_request_id(tmp_path, caplog):
+    class Falla:
+        def entregar(self, mensaje):
+            raise OSError(f"fallo con {DESTINO}")
+
+    correo = Correo(
+        CorreoConfig(modo="carpeta", remitente=REMITENTE, url_publica=URL, carpeta=tmp_path),
+        transporte=Falla(),
+    )
+    with caplog.at_level(logging.DEBUG):
+        correo.enviar_aviso_restablecimiento(DESTINO, _token(), request_id="rid-falla")
+        assert correo.esperar(5)
+
+    assert "Correo de aviso no enviado (request_id=rid-falla, tipo=OSError)" in caplog.text
+    assert DESTINO not in caplog.text
+
+
+def test_disabled_mail_ignores_the_notice(tmp_path):
+    correo = Correo(None)
+
+    assert correo.enviar_aviso_restablecimiento(DESTINO, _token(), request_id="rid") is None
+    assert correo.esperar(1)
 
 
 # --- Configuración (R7, R18) ------------------------------------------------------------
