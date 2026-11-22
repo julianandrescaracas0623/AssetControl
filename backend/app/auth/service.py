@@ -44,9 +44,18 @@ candado antes de ``acceso.cambiar_password_propio``. La espera la acota
 ``LOCK_TIMEOUT_MEMBRESIAS`` (3 s, local a la transacción y restaurado tras tomarlo): si no
 llega, ``503`` genérico con ``Retry-After``.
 
+**Carrera login frente a cambio de contraseña (spec 017, T17; D48).** El login verifica con
+Argon2 un hash leído en otra transacción. ``issue_session``, tras el candado compartido y en
+la **misma** transacción y conexión donde inserta el refresh, relee ``acceso.buscar_login``
+(``app.db.releer_login``) y no emite nada si no hay filas, si el ``usuario_id`` no es el
+mismo o si el hash difiere del verificado: un cambio confirmado antes de esa relectura
+(consola, cambio propio, 014 o cualquier otra vía, con corte o sin él) deja el login en el
+``401`` genérico. Lo que confirma después no se ve; ver ``issue_session``.
+
 Nada de este módulo registra contraseñas, tokens, hashes ni el email.
 """
 
+import hmac
 import re
 import unicodedata
 import uuid
@@ -72,6 +81,7 @@ from app.db import (
     buscar_login,
     cambiar_password_propio,
     candado_compartido_acotado,
+    releer_login,
     tenant_session,
 )
 from app.errors import ServiceUnavailableError
@@ -184,7 +194,12 @@ def login(email: str, password: str) -> LoginResult | None:
                 account.usuario_id,
             )
         return None
-    return issue_session(account.usuario_id, active[0].tenant_id)
+    return issue_session(
+        account.usuario_id,
+        active[0].tenant_id,
+        verificado_hash=account.password_hash,
+        email=normalized,
+    )
 
 
 # Misma clave que el candado exclusivo de acceso.plataforma_cambiar_estado_membresia (0027).
@@ -221,13 +236,43 @@ def bloquear_membresias(session, tenant_id: uuid.UUID) -> None:
         raise ServiceUnavailableError()
 
 
-def issue_session(usuario_id: uuid.UUID, tenant_id: uuid.UUID) -> LoginResult | None:
+def _mismo_hash(verificado: str, releido: str) -> bool:
+    return hmac.compare_digest(verificado.encode("utf-8"), releido.encode("utf-8"))
+
+
+def issue_session(
+    usuario_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    *,
+    verificado_hash: str | None = None,
+    email: str | None = None,
+) -> LoginResult | None:
     """Acceso y refresh nuevos (familia nueva) para la membresía activa en ``tenant_id``.
 
     Lo usan el login y la aceptación de invitación (T9, después del ``COMMIT`` de
     ``aceptar_invitacion``, R11/A22). Bajo ``tenant_session`` relee ``membresia`` y
     ``usuario.activo``; ``None`` si ya no están activos.
+
+    Spec 017, T17 (D48): el login pasa ``verificado_hash`` (el hash que verificó con Argon2)
+    y ``email`` (normalizado). Tras el candado compartido y ``_load_current_user``, en la
+    **misma** transacción y conexión donde se inserta el refresh, se relee
+    ``acceso.buscar_login(email)``: sin filas, con otro ``usuario_id`` o con un hash distinto
+    (``hmac.compare_digest``), ``None``, la ruta responde el mismo ``401
+    credenciales_invalidas`` y no se crea familia ni JWT. Así no emite sesión un login que
+    verificó una contraseña ya cambiada por un cambio **confirmado** antes de la relectura
+    (consola, cambio propio, 014 o cualquier vía, con o sin corte), sin depender de relojes.
+    La invitación no lo pasa: la cuenta se acaba de crear con esa contraseña.
+
+    Residual (``docs/02``): un cambio que aún no confirmó no se ve. En la consola el candado
+    exclusivo por empresa lo ordena (o espera a este login y luego revoca su refresh, o este
+    espera y ve el hash nuevo). En el cambio propio y la 014 no hay candado común: si el
+    ``INSERT`` del refresh confirma después de la sentencia de revocación del cambio y antes
+    de su ``COMMIT`` (milisegundos), esa familia sobrevive; el ``refresh`` no compara el
+    corte (solo ``load_current_user`` lo hace con el JWT) y el JWT emitido vale hasta 15 min
+    (clase N4).
     """
+    if (verificado_hash is None) != (email is None):
+        raise ValueError("verificado_hash y email van juntos.")
     secret = new_token()
     with tenant_session(tenant_id) as session:
         bloquear_membresias(session, tenant_id)
@@ -235,6 +280,19 @@ def issue_session(usuario_id: uuid.UUID, tenant_id: uuid.UUID) -> LoginResult | 
         if loaded is None:
             return None
         membresia, user = loaded
+        if verificado_hash is not None and email is not None:
+            rows = releer_login(session, email)
+            if (
+                not rows
+                or rows[0].usuario_id != usuario_id
+                or not _mismo_hash(verificado_hash, rows[0].password_hash)
+            ):
+                current_app.logger.info(
+                    "Login rechazado: la contraseña cambió durante la verificación "
+                    "(usuario_id=%s; D48).",
+                    usuario_id,
+                )
+                return None
         session.add(
             RefreshToken(
                 membresia_id=membresia.id,

@@ -381,7 +381,7 @@ class LoginRow:
     """Una fila de ``acceso.buscar_login`` (una por membresía activa, o una sin tenant)."""
 
     usuario_id: uuid.UUID
-    password_hash: str
+    password_hash: str = field(repr=False)
     activo: bool
     tenant_id: uuid.UUID | None
     rol: str | None
@@ -390,6 +390,19 @@ class LoginRow:
 _BUSCAR_LOGIN = text(
     "select usuario_id, password_hash, activo, tenant_id, rol from acceso.buscar_login(:email)"
 )
+
+
+def _login_rows(rows) -> list[LoginRow]:
+    return [
+        LoginRow(
+            usuario_id=row.usuario_id,
+            password_hash=row.password_hash,
+            activo=row.activo,
+            tenant_id=row.tenant_id,
+            rol=row.rol,
+        )
+        for row in rows
+    ]
 
 
 def buscar_login(email: str) -> list[LoginRow]:
@@ -402,16 +415,22 @@ def buscar_login(email: str) -> list[LoginRow]:
     database = _get_database()
     with database.engine.begin() as connection:
         rows = connection.execute(_BUSCAR_LOGIN, {"email": email}).all()
-    return [
-        LoginRow(
-            usuario_id=row.usuario_id,
-            password_hash=row.password_hash,
-            activo=row.activo,
-            tenant_id=row.tenant_id,
-            rol=row.rol,
-        )
-        for row in rows
-    ]
+    return _login_rows(rows)
+
+
+def releer_login(session: Session, email: str) -> list[LoginRow]:
+    """``acceso.buscar_login`` en la conexión y la transacción de ``session`` (spec 017, T17).
+
+    Segunda excepción explícita a la regla del módulo, junto a ``cambiar_password_propio``:
+    ``issue_session`` relee el hash del login **en la misma** ``tenant_session`` donde
+    inserta el refresh (sin otra conexión del pool), después del candado compartido. La
+    función es de solo lectura y ``SECURITY DEFINER``: no depende del tenant de la sesión,
+    así que quien llama debe comprobar que el ``usuario_id`` es el suyo. Nunca registra el
+    hash ni el email.
+    """
+    _session_tenant(session)
+    rows = Session.connection(session).execute(_BUSCAR_LOGIN, {"email": email}).all()
+    return _login_rows(rows)
 
 
 @dataclass(frozen=True)
@@ -725,9 +744,10 @@ def cambiar_password_propio(
 ) -> bool:
     """``acceso.cambiar_password_propio`` dentro de la ``tenant_session`` de la petición.
 
-    Única función ``acceso.*`` que corre dentro de ``tenant_session`` (excepción explícita
-    a la regla del módulo): así el cambio de hash, la marca en ``false``, la revocación de
-    los refresh y la familia nueva que inserta quien llama quedan en **una** transacción
+    Función ``acceso.*`` que corre dentro de ``tenant_session`` (excepción explícita a la
+    regla del módulo; la otra es ``releer_login``, spec 017 T17): así el cambio de hash, la
+    marca en ``false``, la revocación de los refresh y la familia nueva que inserta quien
+    llama quedan en **una** transacción
     (R27). El tenant es siempre el de la sesión, nunca uno que elija quien llama. La
     función va en un ``SAVEPOINT``: si rechaza (``cambio_invalido``) se revierte solo ese
     punto, la sesión sigue sana y se devuelve ``False``. Cualquier otro error se propaga

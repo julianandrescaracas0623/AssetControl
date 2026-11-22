@@ -63,6 +63,7 @@ from app.auth.credentials import (
 from app.auth.http import AUTH_MAX_BODY_BYTES
 from app.config import Config
 from app.db import LoginRow
+from app.db import buscar_login as db_buscar_login
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
@@ -596,14 +597,15 @@ def test_multiple_active_memberships_fail_closed_and_log_without_the_email(clien
 
 
 def _stale_buscar_login(cuenta: Cuenta, tenant: uuid.UUID, rol: str):
-    hasher = argon2.PasswordHasher.from_parameters(ARGON2_TEST_PARAMS)
-    stored = hasher.hash(PASSWORD)
-
     def fake(email: str) -> list[LoginRow]:
+        # El hash es el guardado de verdad: issue_session relee buscar_login y exige el mismo
+        # hash verificado (T17, D48); lo "desactualizado" es solo tenant, rol y activo.
+        (real, *_) = db_buscar_login(email)
+        assert real.usuario_id == cuenta.usuario_id
         return [
             LoginRow(
                 usuario_id=cuenta.usuario_id,
-                password_hash=stored,
+                password_hash=real.password_hash,
                 activo=True,
                 tenant_id=tenant,
                 rol=rol,
@@ -1030,3 +1032,16 @@ def test_sqlalchemy_debug_after_create_app_still_drops_rows(
     secrets = _login_secrets(ok) + _login_secrets(ok_echo)
     assert _leaks(secrets, caplog.text, out, err) == []
     assert "Row " not in caplog.text + out + err
+
+
+def test_login_row_repr_does_not_include_the_password_hash():
+    hash_ = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$no-debe-salir-en-repr"
+    row = LoginRow(
+        usuario_id=uuid.uuid4(), password_hash=hash_, activo=True, tenant_id=None, rol=None
+    )
+
+    texto = repr(row)
+
+    assert hash_ not in texto
+    assert "password_hash" not in texto
+    assert row.password_hash == hash_
