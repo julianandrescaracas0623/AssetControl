@@ -32,7 +32,13 @@ describe('vite.config', () => {
     expect(c.server.host).toBe(true)
   })
 
-  it('el proxy reescribe la ruta de la cookie de refresh', () => {
-    expect(config().server.proxy['/api'].cookiePathRewrite).toEqual({ '/auth': '/api/auth' })
+  it('el proxy reescribe la ruta de la cookie de refresh (clínica y plataforma)', () => {
+    // Spec 017, T8: la cookie de plataforma sale con Path=/plataforma/auth; sin la
+    // regla, el navegador no la manda a /api/plataforma/auth/refresh y recargar la
+    // consola pierde la sesión.
+    expect(config().server.proxy['/api'].cookiePathRewrite).toEqual({
+      '/auth': '/api/auth',
+      '/plataforma/auth': '/api/plataforma/auth',
+    })
   })
 })

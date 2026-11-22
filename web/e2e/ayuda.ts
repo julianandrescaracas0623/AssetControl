@@ -34,5 +34,11 @@ export async function crearCuenta(page: Page, enlace: string, nombre: string, cl
   await page.getByRole('button', { name: 'Crear cuenta y entrar' }).click()
 }
 
+/** Desarrollador de la consola que crea e2e/base.py con la CLI (spec 017, T9). */
+export function desarrolladorE2E(): { email: string; password: string } {
+  const archivo = path.join(import.meta.dirname, '.estado', 'plataforma.json')
+  return JSON.parse(readFileSync(archivo, 'utf8')) as { email: string; password: string }
+}
+
 /** "$ 1.390.000,50" con espacios normales (Intl usa espacios finos). */
 export const texto = (t: string | null) => (t ?? '').replace(/\s/g, ' ')

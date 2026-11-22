@@ -50,4 +50,7 @@ def entorno_e2e() -> dict[str, str]:
         "ENVIRONMENT": "development",
         "SECRET_KEY": valores.get("SECRET_KEY") or "e2e-clave-local-de-al-menos-32-bytes-xx",
         "TRUSTED_PROXY_HOPS": "0",
+        # Spec 017, T9: la consola de plataforma encendida solo en e2e (plataforma.spec.ts).
+        "PLATAFORMA_HABILITADA": "true",
+        "PLATAFORMA_REDES_PERMITIDAS": "",
     }

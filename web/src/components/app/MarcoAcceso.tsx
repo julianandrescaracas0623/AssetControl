@@ -22,15 +22,18 @@ export type MarcoAccesoProps = {
   /** Ícono de una pantalla de sistema (decorativo: el título dice qué pasa). */
   icono?: ReactNode
   tonoIcono?: TonoIconoSistema
+  /** Rótulo junto a la marca (spec 017, T8: «Plataforma» en la consola de desarrolladores). */
+  marca?: ReactNode
   children?: ReactNode
 }
 
-export function MarcoAcceso({ titulo, descripcion, icono, tonoIcono = 'neutro', children }: MarcoAccesoProps) {
+export function MarcoAcceso({ titulo, descripcion, icono, tonoIcono = 'neutro', marca, children }: MarcoAccesoProps) {
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-page px-4 py-10">
       <div className="flex items-center gap-2.5">
         <Logo className="size-9" />
         <span className="text-titulo-seccion tracking-tight">AssetControl</span>
+        {marca}
       </div>
       <Panel relleno={false} className="w-full max-w-[400px]">
         <div className="flex flex-col gap-6 p-6 sm:p-8">

@@ -43,6 +43,22 @@ describe('componentes de shadcn/ui', () => {
     }
   })
 
+  it('los campos de formulario no pintan anillo de foco', () => {
+    const campos = ['input.tsx', 'textarea.tsx', 'select.tsx', 'checkbox.tsx', 'switch.tsx']
+    for (const name of campos) {
+      const source = readFileSync(path.join(UI, name), 'utf8')
+      expect(source, name).not.toMatch(/ring-ring/)
+      expect(source, name).not.toMatch(/border-ring/)
+      expect(source, name).toMatch(/focus-visible:ring-0/)
+      expect(source, name).toMatch(/focus-visible:border-foreground/)
+    }
+    const grupo = readFileSync(path.join(UI, 'input-group.tsx'), 'utf8')
+    expect(grupo).not.toMatch(/ring-ring/)
+    expect(grupo).not.toMatch(/border-ring/)
+    expect(grupo).toMatch(/focus-visible\]:ring-0/)
+    expect(grupo).toMatch(/focus-visible\]:border-foreground/)
+  })
+
   it('el foco es un anillo sólido de 2 px con separación (R14)', () => {
     const problems: string[] = []
     for (const [name, source] of uiSources()) {

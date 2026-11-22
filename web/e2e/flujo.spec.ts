@@ -74,9 +74,9 @@ test('un conteo completo: invitar, verificar en el teléfono, cerrar, informe, e
     await admin.goto('/admin/empresa')
     await admin.getByRole('textbox', { name: /Nombre o razón social/ }).fill('Clínica E2E S.A.S.')
     await admin.getByRole('textbox', { name: /Dirección/ }).fill('Calle 1 # 2-3, Cartago')
-    await admin.getByRole('textbox', { name: /NIT/ }).fill('890903938-8')
+    await admin.getByRole('textbox', { name: /NIT/ }).fill('900123456-8')
     await admin.getByRole('button', { name: 'Guardar datos' }).click()
-    await expect(admin.getByRole('textbox', { name: /NIT/ })).toHaveValue('890.903.938-8')
+    await expect(admin.getByRole('textbox', { name: /NIT/ })).toHaveValue('900.123.456-8')
     await admin.getByTestId('entrada-logo').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: FOTO })
     await expect(admin.getByRole('img', { name: 'Logo de Clínica E2E S.A.S.' })).toBeVisible()
   })
@@ -97,7 +97,7 @@ test('un conteo completo: invitar, verificar en el teléfono, cerrar, informe, e
       'GET',
       `/sesiones/${sesion.id}/informe`,
     )
-    expect(informe.empresa).toMatchObject({ nombre: 'Clínica E2E S.A.S.', nit: '890.903.938-8', vigente: false })
+    expect(informe.empresa).toMatchObject({ nombre: 'Clínica E2E S.A.S.', nit: '900.123.456-8', vigente: false })
     expect(informe.empresa.logo).not.toBeNull()
     expect(informe.detalle_disponible).toBe(true)
   })

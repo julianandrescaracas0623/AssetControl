@@ -89,6 +89,24 @@ describe('Dialogo', () => {
     expect(screen.getByRole('dialog').getAttribute('data-forma')).toBe('inferior')
   })
 
+  // Spec 017, C1 (ajuste T15b): un formulario de edición de la consola es un cuadro centrado
+  // también en el teléfono, con margen alrededor y desplazamiento interno.
+  it('centrado en teléfono: sigue centrado, con margen y altura máxima', () => {
+    simularAncho({ movil: true })
+    render(
+      <Dialogo abierto forma="centrado" centradoEnTelefono titulo="Editar usuario">
+        <p>Formulario</p>
+      </Dialogo>,
+    )
+    const dialogo = screen.getByRole('dialog', { name: 'Editar usuario' })
+    expect(dialogo.getAttribute('data-forma')).toBe('centrado')
+    expect(dialogo.className).toContain('max-h-[calc(100dvh-2rem)]')
+    expect(dialogo.className).toContain('max-w-[calc(100%-2rem)]')
+    // El encabezado queda fijo al desplazar y «Cerrar» va por encima de él.
+    expect(dialogo.querySelector('[data-dialogo=encabezado]')?.className).toContain('sticky')
+    expect(screen.getByRole('button', { name: 'Cerrar' }).className).toContain('z-20')
+  })
+
   it('el foco entra al diálogo y «Cerrar» tiene nombre y tamaño de objetivo táctil', () => {
     render(<Demo />)
     abrir()

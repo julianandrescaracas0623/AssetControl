@@ -66,7 +66,7 @@ export function LocationPicker({
           aria-expanded={abierto}
           aria-label={nombre}
           disabled={cargando}
-          className={cn('h-11 w-full justify-between border-input font-normal md:h-9', className)}
+          className={cn('h-11 w-full justify-between border-input font-normal focus-visible:border-foreground focus-visible:ring-0 focus-visible:ring-offset-0 md:h-9', className)}
         >
           <span className="flex min-w-0 items-center gap-2">
             <MapPin className="text-muted-foreground" aria-hidden="true" />

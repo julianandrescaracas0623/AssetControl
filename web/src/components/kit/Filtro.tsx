@@ -93,7 +93,7 @@ export function Filtro({ etiqueta, opciones, seleccion, onSeleccionChange, unica
                     name={id}
                     checked={marcado}
                     onChange={() => alternar(o.valor, true)}
-                    className="size-4 shrink-0 accent-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+                    className="size-4 shrink-0 accent-primary focus-visible:ring-0 focus-visible:outline-none"
                   />
                 ) : (
                   <Checkbox id={opcionId} checked={marcado} onCheckedChange={(v) => alternar(o.valor, v === true)} />

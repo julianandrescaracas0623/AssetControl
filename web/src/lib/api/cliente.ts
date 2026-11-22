@@ -89,6 +89,11 @@ export interface Opciones<B> {
   /** `If-Match` con la `row_version` leída (cambios sobre un activo, spec 005). */
   version?: number
   signal?: AbortSignal
+  /**
+   * `redirect: 'error'` (spec 017, C1b/T16): una redirección no reenvía el cuerpo a otro
+   * destino; falla como `sin_conexion`, sin reintento. Opt-in: solo la contraseña temporal.
+   */
+  sinRedirecciones?: boolean
 }
 
 function esErrorDeApi(valor: unknown): valor is Esquemas['Error'] {
@@ -150,6 +155,7 @@ export async function pedir<R extends Ruta, M extends MetodoDe<R>>(
         headers,
         body: opciones.cuerpo === undefined ? undefined : JSON.stringify(opciones.cuerpo),
         credentials: 'same-origin',
+        ...(opciones.sinRedirecciones ? { redirect: 'error' as const } : {}),
         signal: opciones.signal ? AbortSignal.any([opciones.signal, plazo.signal]) : plazo.signal,
       })
     } catch (error) {
@@ -221,12 +227,13 @@ export type TamanoFoto = 'completa' | 'mini'
 export const TIEMPO_SUBIDA_MS = 60_000
 
 /**
- * `PUT` multipart (fotos de la spec 012 y logo de la 013) o `DELETE` sin cuerpo. Mismo
- * token y errores que `pedir`; sin `Content-Type` propio (el navegador pone el de
- * multipart con su separador). Las subidas tienen más plazo (redes lentas).
+ * `PUT` multipart (fotos de la spec 012 y logo de la 013), `POST` multipart (logo inicial
+ * de la consola, spec 017 T9) o `DELETE` sin cuerpo. Mismo token y errores que `pedir`;
+ * sin `Content-Type` propio (el navegador pone el de multipart con su separador). Las
+ * subidas tienen más plazo (redes lentas).
  */
-async function enviarMultipart<T>(
-  metodo: 'PUT' | 'DELETE',
+export async function enviarMultipart<T>(
+  metodo: 'POST' | 'PUT' | 'DELETE',
   ruta: string,
   token: string,
   campos?: { id: [string, string]; archivo: Blob; nombre: string },
@@ -282,6 +289,9 @@ export const api = {
   refresh: () => pedir('post', '/auth/refresh', { csrf: true }),
   logout: () => pedir('post', '/auth/logout', { csrf: true }),
   me: (token: string) => pedir('get', '/auth/me', { token }),
+  // Spec 017, T4: cambio de contraseña propio; responde una sesión nueva como el login.
+  cambiarContrasena: (token: string, cuerpo: Esquemas['CambiarContrasenaBody']) =>
+    pedir('post', '/auth/cambiar-contrasena', { token, cuerpo }),
   crearInvitacion: (token: string, cuerpo: Esquemas['InvitarBody']) =>
     pedir('post', '/invitaciones', { token, cuerpo }),
   validarInvitacion: (token: string) => pedir('post', '/invitaciones/validar', { cuerpo: { token } }),

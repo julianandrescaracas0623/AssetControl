@@ -16,6 +16,37 @@ describe('Campo', () => {
     expect(campo.hasAttribute('aria-invalid')).toBe(false)
   })
 
+  it('respeta el type nativo (password, email, number) en la entrada de texto', () => {
+    render(
+      <>
+        <Campo id="clave" etiqueta="Contraseña" type="password" />
+        <Campo id="correo" etiqueta="Correo" type="email" />
+        <Campo id="cantidad" etiqueta="Cantidad" type="number" />
+        <Campo id="libre" etiqueta="Libre" />
+      </>,
+    )
+    expect((screen.getByLabelText('Contraseña') as HTMLInputElement).type).toBe('password')
+    expect((screen.getByLabelText('Correo') as HTMLInputElement).type).toBe('email')
+    expect((screen.getByLabelText('Cantidad') as HTMLInputElement).type).toBe('number')
+    expect((screen.getByLabelText('Libre') as HTMLInputElement).type).toBe('text')
+  })
+
+  it('el foco no pinta anillo azul: solo oscurece el borde', () => {
+    const { rerender } = render(<Campo id="c" etiqueta="Campo" />)
+    const sinAnillo = (clases: string) => {
+      expect(clases).toContain('focus-visible:border-foreground')
+      expect(clases).toContain('focus-visible:ring-0')
+      expect(clases).not.toContain('focus-visible:ring-2')
+      expect(clases).not.toContain('focus-visible:border-ring')
+      expect(clases).not.toContain('focus-visible:ring-ring')
+    }
+    sinAnillo(screen.getByRole('textbox', { name: 'Campo' }).className)
+    rerender(<Campo id="c" etiqueta="Campo" tipo="area" />)
+    sinAnillo(screen.getByRole('textbox', { name: 'Campo' }).className)
+    rerender(<Campo id="c" etiqueta="Campo" tipo="seleccion" opciones={[{ valor: 'a', etiqueta: 'A' }]} />)
+    sinAnillo(screen.getByRole('combobox', { name: 'Campo' }).className)
+  })
+
   it('el control queda sobre blanco (bg-card, Deuda T1 d), con la altura de la densidad y 16 px en móvil', () => {
     render(<Campo id="c" etiqueta="Campo" />)
     const clases = screen.getByRole('textbox', { name: 'Campo' }).classList
@@ -83,6 +114,15 @@ describe('Campo', () => {
   it('código: letra mono', () => {
     render(<Campo id="s" etiqueta="Serial" tipo="codigo" />)
     expect(screen.getByRole('textbox', { name: 'Serial' }).className).toContain('font-mono')
+  })
+
+  it('fecha: calendario del sistema, sin el input nativo del navegador', () => {
+    const { container } = render(<Campo id="compra" etiqueta="Fecha de compra" type="date" value="2026-11-19" onChange={() => {}} />)
+    const campo = screen.getByRole('textbox', { name: 'Fecha de compra' })
+    expect(campo.getAttribute('type')).not.toBe('date')
+    expect(container.querySelector('input[type="date"]')).toBeNull()
+    expect(campo.closest('[data-kit=fecha]')).toBeTruthy()
+    expect(campo.getAttribute('aria-describedby')).toBeNull()
   })
 
   it('área: textarea con etiqueta y fondo blanco', () => {

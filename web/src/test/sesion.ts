@@ -18,6 +18,7 @@ export function sesionDe(rol: Rol, token = `jwt.${rol}`): Sesion {
     usuario: USUARIOS[rol],
     tenant: { id: '00000000-0000-4000-8000-0000000000d1', nombre: 'Clínica Demo' },
     rol,
+    debe_cambiar_password: false,
   }
 }
 

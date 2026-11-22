@@ -124,6 +124,24 @@ describe('TablaDatos: tabla', () => {
     tabla()
     expect(screen.getAllByRole('row')[1].getAttribute('tabindex')).toBeNull()
   })
+
+  // Spec 017, C1 (ajuste T15b): pista «Doble clic para editar» en la fila y el doble clic no
+  // selecciona el texto (el arrastre normal sí, para copiar un correo).
+  it('pista de la fila y el segundo clic no selecciona texto', () => {
+    tabla({ onAbrirFila: vi.fn(), ayudaAbrirFila: 'Doble clic para editar' })
+    const fila = screen.getAllByRole('row')[1]
+    expect(fila.getAttribute('title')).toBe('Doble clic para editar')
+    const celda = within(fila).getByText('Silla ergonómica')
+    expect(fireEvent.mouseDown(celda, { detail: 1 })).toBe(true)
+    expect(fireEvent.mouseDown(celda, { detail: 2 })).toBe(false)
+  })
+
+  it('sin onAbrirFila no hay pista ni se toca la selección', () => {
+    tabla({ ayudaAbrirFila: 'Doble clic para editar' })
+    const fila = screen.getAllByRole('row')[1]
+    expect(fila.getAttribute('title')).toBeNull()
+    expect(fireEvent.mouseDown(within(fila).getByText('Silla ergonómica'), { detail: 2 })).toBe(true)
+  })
 })
 
 describe('TablaDatos: estados (R3)', () => {

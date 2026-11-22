@@ -33,6 +33,22 @@ function importaUi(file: string): boolean {
   return IMPORTA_UI.test(readFileSync(file, 'utf8'))
 }
 
+function fuentes(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const full = path.join(dir, name)
+    if (statSync(full).isDirectory()) return name === 'node_modules' ? [] : fuentes(full)
+    return /\.tsx$/.test(name) && !/\.test\.tsx$/.test(name) ? [full] : []
+  })
+}
+
+describe('campos de formulario', () => {
+  it('ningún input usa el calendario nativo del navegador', () => {
+    const nativo = /<(?:input|Input)\b[^>]*\btype=["']date["']/s
+    const mal = fuentes(SRC).filter((file) => nativo.test(readFileSync(file, 'utf8')))
+    expect(mal.map((file) => path.relative(SRC, file).split(path.sep).join('/'))).toEqual([])
+  })
+})
+
 describe('guardia del kit (R7)', () => {
   it('el detector reconoce las formas de importar components/ui', () => {
     for (const linea of [

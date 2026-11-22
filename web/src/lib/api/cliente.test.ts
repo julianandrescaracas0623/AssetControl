@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { api, ErrorApi, nombreDeArchivo, pedir, TIEMPO_MAXIMO_MS } from './cliente'
+import { apiPlataforma } from './plataforma'
 
 // Spec 002b, T2 (plan §3): cliente tipado con el contrato. Sin red real.
 
@@ -324,5 +325,40 @@ describe('exportarActivos (spec 015, T4)', () => {
       if (original) Object.defineProperty(URLSearchParams.prototype, 'size', original)
       else delete (URLSearchParams.prototype as { size?: number }).size
     }
+  })
+})
+
+describe('sin redirecciones solo al restablecer desde la consola (spec 017, C1b/T16; security-reviewer)', () => {
+  it('restablecerContrasenaUsuario va con redirect: error', async () => {
+    const f = responder(204)
+    await apiPlataforma.restablecerContrasenaUsuario('jwt.sintetico', 'e1', 'u1', { password: 'Sintetica-Prueba-1', password_confirmacion: 'Sintetica-Prueba-1' })
+    const { url, init } = peticion(f)
+    expect(url).toBe('/api/plataforma/empresas/e1/usuarios/u1/contrasena')
+    expect(init.redirect).toBe('error')
+  })
+
+  it('el resto de peticiones no fija redirect (sigue igual)', async () => {
+    const f = responder(200, SESION)
+    await api.login({ email: 'ana@ejemplo.test', password: 'secreto-sintetico' })
+    await api.restablecerContrasena({ token: 't', password: 'x', password_confirmacion: 'x' } as never).catch(() => undefined)
+    await apiPlataforma.listarEmpresas('jwt.sintetico').catch(() => undefined)
+    for (const [, init] of f.mock.calls as unknown as [string, RequestInit][]) {
+      expect('redirect' in init).toBe(false)
+    }
+  })
+
+  it('una redirección es sin_conexion, sin reintento ni segundo POST', async () => {
+    const f = vi.fn(async () => {
+      throw new TypeError('Failed to fetch: redirect mode is set to error')
+    })
+    vi.stubGlobal('fetch', f)
+    const error = await apiPlataforma
+      .restablecerContrasenaUsuario('jwt.sintetico', 'e1', 'u1', { password: 'Sintetica-Prueba-1', password_confirmacion: 'Sintetica-Prueba-1' })
+      .catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(ErrorApi)
+    expect((error as ErrorApi).code).toBe('sin_conexion')
+    expect(JSON.stringify(error)).not.toContain('Sintetica-Prueba-1')
+    expect((error as ErrorApi).message).not.toContain('Sintetica-Prueba-1')
+    expect(f).toHaveBeenCalledTimes(1)
   })
 })

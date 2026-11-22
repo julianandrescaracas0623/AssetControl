@@ -20,6 +20,9 @@ import { Boton } from './Boton'
 // - `lateral`: editar un activo desde la tabla, que sigue visible (sheet derecho).
 // - `inferior`: hoja inferior del teléfono. `auto` (por defecto) es centrado desde md
 //   e inferior por debajo; `lateral` también pasa a inferior en teléfono.
+// - `centradoEnTelefono` (spec 017, C1, ajuste T15b): el centrado sigue centrado en el
+//   teléfono (margen de 16 px y desplazamiento interno), para los formularios de edición
+//   de la consola que se abren desde una tabla.
 // Radix atrapa el foco. Al cerrar, el foco vuelve a quien lo tenía al abrir (o a
 // `devolverFocoA`), también cuando se abre sin disparador de Radix.
 
@@ -37,6 +40,8 @@ export type DialogoProps = {
   forma?: FormaDialogo
   /** Ancho del centrado: `normal` (448 px) o `ancho` (640 px). */
   ancho?: 'normal' | 'ancho'
+  /** Con `centrado` o `auto`: no pasa a hoja inferior en el teléfono. */
+  centradoEnTelefono?: boolean
   /** Dónde poner el foco al cerrar si no es el elemento que lo tenía al abrir. */
   devolverFocoA?: RefObject<HTMLElement | null>
   /** Para casos propios (p. ej. elegir el destino tras guardar); llamar preventDefault() lo anula. */
@@ -54,13 +59,16 @@ export function Dialogo({
   pie,
   forma = 'auto',
   ancho = 'normal',
+  centradoEnTelefono = false,
   devolverFocoA,
   onCloseAutoFocus,
   children,
   className,
 }: DialogoProps) {
   const movil = useIsMobile()
-  const resuelta: Exclude<FormaDialogo, 'auto'> = movil ? 'inferior' : forma === 'auto' ? 'centrado' : forma
+  const centrable = forma === 'auto' || forma === 'centrado'
+  const resuelta: Exclude<FormaDialogo, 'auto'> =
+    movil && !(centradoEnTelefono && centrable) ? 'inferior' : forma === 'auto' ? 'centrado' : forma
   const previo = useRef<HTMLElement | null>(null)
 
   function alCerrar(evento: Event) {
@@ -83,7 +91,9 @@ export function Dialogo({
   const cuerpo = (
     <>
       <div className={cn('flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4 md:px-5 md:pt-5', !pie && 'pb-4 md:pb-5')}>
-        <div className="flex flex-col gap-1 pr-10">
+        {/* Encabezado fijo al desplazar (ajuste T15b): el contenido pasa por debajo y no
+            por debajo de «Cerrar». */}
+        <div data-dialogo="encabezado" className="sticky -top-4 z-10 -mx-4 -mt-4 -mb-2 flex flex-col gap-1 bg-popover px-4 pt-4 pr-14 pb-2 md:-top-5 md:-mx-5 md:-mt-5 md:px-5 md:pt-5 md:pr-15">
           {resuelta === 'centrado' ? (
             <>
               <DialogTitle className="text-titulo-seccion font-semibold">{titulo}</DialogTitle>
@@ -118,7 +128,7 @@ export function Dialogo({
   )
 
   const cerrar = (
-    <Boton variante="fantasma" soloIcono aria-label="Cerrar" icono={<XIcon />} className="absolute top-2 right-2 text-muted-foreground" />
+    <Boton variante="fantasma" soloIcono aria-label="Cerrar" icono={<XIcon />} className="absolute top-2 right-2 z-20 text-muted-foreground" />
   )
   const comunes = {
     'data-kit': 'dialogo',
@@ -135,7 +145,7 @@ export function Dialogo({
           {...comunes}
           showCloseButton={false}
           className={cn(
-            'flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 shadow-lg ring-0 border',
+            'flex max-h-[calc(100dvh-2rem)] max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 shadow-lg ring-0 border',
             ancho === 'ancho' ? 'sm:max-w-xl' : 'sm:max-w-md',
             className,
           )}

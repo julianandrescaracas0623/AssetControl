@@ -93,10 +93,18 @@ export function useRol(): Rol {
   return useSesion().sesion?.rol ?? 'contador'
 }
 
+/** Código del bloqueo central del servidor (spec 017, R26). */
+export const CAMBIO_PASSWORD_REQUERIDO = 'cambio_password_requerido'
+/** Pantalla del cambio de contraseña (obligatorio en el primer ingreso, R26). */
+export const RUTA_CAMBIAR_CONTRASENA = '/cambiar-contrasena'
+
 /**
- * Llama a la API con el token de la sesión. Ante un 401 renueva una vez (una sola
- * renovación compartida) y repite; si la renovación también es 401, la sesión pasa a
- * anónima (las guardas llevan a /login) y el error sube.
+ * Llama a la API con el token de la sesión. Ante un 401 `no_autenticado` renueva una vez
+ * (una sola renovación compartida) y repite; si la renovación también es 401, la sesión
+ * pasa a anónima (las guardas llevan a /login) y el error sube. Otro 401 (p. ej. la
+ * contraseña actual errónea del cambio de contraseña) sube sin renovar ni repetir.
+ * Spec 017 (R26): un 403 `cambio_password_requerido` marca la sesión en memoria; la guarda
+ * lleva entonces a «Cambia tu contraseña».
  */
 export function useApiAutenticada() {
   const cliente = useQueryClient()
@@ -107,7 +115,13 @@ export function useApiAutenticada() {
       try {
         return await llamar(sesion.access_token)
       } catch (error) {
-        if (!(error instanceof ErrorApi && error.status === 401)) throw error
+        if (error instanceof ErrorApi && error.status === 403 && error.code === CAMBIO_PASSWORD_REQUERIDO) {
+          cliente.setQueryData<Sesion | null>(CLAVE_SESION, (actual) =>
+            actual ? { ...actual, debe_cambiar_password: true } : actual,
+          )
+          throw error
+        }
+        if (!(error instanceof ErrorApi && error.status === 401 && error.code === 'no_autenticado')) throw error
         const nueva = await renovarCompartido(cliente)
         if (!nueva) throw error
         return llamar(nueva.access_token)

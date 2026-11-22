@@ -93,6 +93,8 @@ export type TablaDatosProps<T> = {
   onOrdenChange?: (orden: OrdenTabla) => void
   /** Doble clic o Enter sobre la fila (p. ej. abrir la ficha). */
   onAbrirFila?: (fila: T) => void
+  /** Pista breve en la fila (title) cuando se abre con doble clic: «Doble clic para editar». */
+  ayudaAbrirFila?: string
   /** Menú ⋯ u otros botones al final de la fila. */
   accionesFila?: (fila: T) => ReactNode
   barra?: BarraTabla
@@ -139,6 +141,7 @@ export function TablaDatos<T>({
   orden,
   onOrdenChange,
   onAbrirFila,
+  ayudaAbrirFila,
   accionesFila,
   barra,
   paginacion,
@@ -193,6 +196,7 @@ export function TablaDatos<T>({
         orden={orden}
         onOrdenChange={onOrdenChange}
         onAbrirFila={onAbrirFila}
+        ayudaAbrirFila={ayudaAbrirFila}
         accionesFila={accionesFila}
         pie={pie}
         primeraFija={esMovil}
@@ -298,6 +302,7 @@ function Tabla<T>({
   orden,
   onOrdenChange,
   onAbrirFila,
+  ayudaAbrirFila,
   accionesFila,
   pie,
   primeraFija,
@@ -310,6 +315,7 @@ function Tabla<T>({
   orden?: OrdenTabla
   onOrdenChange?: (o: OrdenTabla) => void
   onAbrirFila?: (fila: T) => void
+  ayudaAbrirFila?: string
   accionesFila?: (fila: T) => ReactNode
   pie?: readonly CeldaPie[]
   primeraFija: boolean
@@ -318,6 +324,10 @@ function Tabla<T>({
   const nombre = columnas.find((c) => c.principal) ?? columnas[0]
   function dobleClic(fila: T, e: MouseEvent<HTMLTableRowElement>) {
     if (onAbrirFila && !desdeControl(e.target, e.currentTarget)) onAbrirFila(fila)
+  }
+  // El segundo clic de un doble clic no selecciona la palabra; el arrastre sí (copiar un correo).
+  function sinSeleccion(e: MouseEvent<HTMLTableRowElement>) {
+    if (e.detail > 1 && !desdeControl(e.target, e.currentTarget)) e.preventDefault()
   }
   function tecla(fila: T, e: KeyboardEvent<HTMLTableRowElement>) {
     if (onAbrirFila && e.key === 'Enter' && e.target === e.currentTarget) {
@@ -345,6 +355,8 @@ function Tabla<T>({
             key={claveFila(fila)}
             aria-labelledby={idNombre?.(fila)}
             tabIndex={onAbrirFila ? 0 : undefined}
+            title={onAbrirFila ? ayudaAbrirFila : undefined}
+            onMouseDown={onAbrirFila ? sinSeleccion : undefined}
             onDoubleClick={onAbrirFila ? (e) => dobleClic(fila, e) : undefined}
             onKeyDown={onAbrirFila ? (e) => tecla(fila, e) : undefined}
             className={cn(

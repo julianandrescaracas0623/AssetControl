@@ -562,7 +562,7 @@ describe('caracterización de Empresa (T9): lo que no cambia', () => {
       ),
     ).toBeTruthy()
     expect(screen.getByText('Nombre y dirección son obligatorios; lo demás, si lo tienes.')).toBeTruthy()
-    expect(screen.getByText('Opcional. Sale arriba a la izquierda en el Excel y en el PDF.')).toBeTruthy()
+    expect(screen.getByText('Opcional. Imagen horizontal de 160 × 64 px. Sale arriba a la izquierda en el Excel y en el PDF.')).toBeTruthy()
   })
 
   it('un NIT inválido se marca en su campo, lleva el foco al primer error y no se envía', async () => {
@@ -570,7 +570,7 @@ describe('caracterización de Empresa (T9): lo que no cambia', () => {
     simularAncho({ movil: false })
     render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/admin/empresa'] })} />)
     const nit = (await screen.findByRole('textbox', { name: /NIT/ })) as HTMLInputElement
-    fireEvent.change(nit, { target: { value: '890903938-1' } })
+    fireEvent.change(nit, { target: { value: '900123456-1' } })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar datos' }))
     expect(await screen.findByText(/El NIT no es válido/)).toBeTruthy()
     expect(nit.getAttribute('aria-invalid')).toBe('true')
@@ -583,7 +583,7 @@ describe('caracterización de Empresa (T9): lo que no cambia', () => {
     abrir('/admin/empresa', apiEmpresa())
     await screen.findByRole('button', { name: 'Subir logo' })
     expect(screen.getByTestId('entrada-logo').getAttribute('accept')).toBe('image/png,image/jpeg,image/webp')
-    expect(screen.getByText(/PNG, JPG o WebP de hasta \d+ MB\. Se guarda sin datos ocultos y con fondo transparente si lo tiene\./)).toBeTruthy()
+    expect(screen.getByText(/Horizontal, de 160 × 64 px\. PNG, JPG o WebP de hasta \d+ MB/)).toBeTruthy()
   })
 })
 

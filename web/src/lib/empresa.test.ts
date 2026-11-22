@@ -8,31 +8,31 @@ const BASE = { nombre: 'Clínica Ejemplo', direccion: 'Calle 10 # 5-20', nit: ''
 
 describe('NIT', () => {
   it('calcula el dígito de verificación de la DIAN', () => {
-    expect(digitoVerificacion('890903938')).toBe(8)
+    expect(digitoVerificacion('9001234560')).toBe(1)
     expect(digitoVerificacion('800197268')).toBe(4)
     expect(digitoVerificacion('900123456')).toBe(8)
   })
 
   it.each([
-    ['890903938-8', '890.903.938-8'],
-    ['890.903.938-8', '890.903.938-8'],
-    ['890 903 938 - 8', '890.903.938-8'],
-    ['890903938', '890.903.938'],
+    ['900123456-8', '900.123.456-8'],
+    ['900.123.456-8', '900.123.456-8'],
+    ['900 123 456 - 8', '900.123.456-8'],
+    ['900123456', '900.123.456'],
     ['1094123456', '1.094.123.456'],
   ])('normaliza %s', (entrada, salida) => {
     expect(normalizarNit(entrada)).toBe(salida)
   })
 
-  it.each(['890903938-7', '12-3', 'ABC', '890903938-88', '1234'])('rechaza %s', (nit) => {
+  it.each(['900123456-7', '12-3', 'ABC', '900123456-88', '1234'])('rechaza %s', (nit) => {
     expect(normalizarNit(nit)).toBeNull()
   })
 })
 
 describe('validarEmpresa', () => {
   it('limpia espacios y deja los opcionales vacíos en null', () => {
-    expect(validarEmpresa({ ...BASE, direccion: '  Calle  10 #  5-20 ', nit: '890903938-8' })).toEqual({
+    expect(validarEmpresa({ ...BASE, direccion: '  Calle  10 #  5-20 ', nit: '900123456-8' })).toEqual({
       errores: {},
-      cuerpo: { nombre: 'Clínica Ejemplo', direccion: 'Calle 10 # 5-20', nit: '890.903.938-8', telefono: null, correo: null },
+      cuerpo: { nombre: 'Clínica Ejemplo', direccion: 'Calle 10 # 5-20', nit: '900.123.456-8', telefono: null, correo: null },
     })
   })
 
@@ -40,7 +40,7 @@ describe('validarEmpresa', () => {
     const { errores, cuerpo } = validarEmpresa({
       nombre: ' ',
       direccion: '',
-      nit: '890903938-1',
+      nit: '900123456-1',
       telefono: '123',
       correo: 'a@b',
     })

@@ -1,6 +1,6 @@
-import { ChevronsUpDown, House, LogOut, ScanBarcode, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, House, ScanBarcode, Search } from 'lucide-react'
 import { Fragment, useEffect, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation } from 'react-router'
+import { Link, NavLink, Outlet, useLocation, useNavigate, useNavigationType, type NavigationType } from 'react-router'
 
 import { DatosFicticios } from '@/components/app/DatosFicticios'
 import { GlobalSearch } from '@/components/app/GlobalSearch'
@@ -38,7 +38,6 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
-  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -51,6 +50,9 @@ import { etiquetaRol, iniciales, useCerrarSesion, useSesion } from '@/lib/sesion
 // App shell de administración (docs/08 §4.1, spec 001b T4): barra lateral
 // colapsable a íconos (estado recordado en la cookie de shadcn), menú tipo
 // sheet por debajo de md, migas de pan, buscador y menú de usuario.
+// Pulsar el logo abre y cierra el menú, sin icono. En el encabezado, las
+// flechas < > recorren las rutas ya visitadas. En el teléfono el logo sigue
+// en el encabezado, porque la barra no está en pantalla hasta que se abre.
 // Spec 016, T4 (D1, D6, D8): barra lateral blanca; el ítem activo se marca con fondo
 // --brand-soft, texto cobalto fuerte, peso y una barra de acento (nunca solo el color:
 // también aria-current). Encabezado blanco con borde sobre la página (--page).
@@ -68,6 +70,26 @@ function barraAbierta(): boolean {
   return !document.cookie.split('; ').includes('sidebar_state=false')
 }
 
+/** Pulsar el logo abre o cierra el menú. No lleva icono ni pista visual. */
+function BotonMenu({ className }: { className?: string }) {
+  const { toggleSidebar, isMobile, openMobile, state } = useSidebar()
+  const abierto = isMobile ? openMobile : state === 'expanded'
+  return (
+    <button
+      type="button"
+      onClick={toggleSidebar}
+      aria-expanded={abierto}
+      aria-label="Mostrar u ocultar el menú"
+      className={cn(
+        'inline-flex size-8 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        className,
+      )}
+    >
+      <Logo className="size-8" />
+    </button>
+  )
+}
+
 function BarraLateral() {
   const { pathname } = useLocation()
   const activa = entradaDeRuta(pathname)?.item.ruta
@@ -83,16 +105,16 @@ function BarraLateral() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild size="lg" tooltip="AssetControl" className="gap-2.5">
-              <Link to="/admin" onClick={alElegir}>
-                <Logo className="size-8" />
-                <span className="truncate text-titulo-seccion tracking-tight">AssetControl</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <div className="flex h-12 items-center gap-2.5 px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+          <BotonMenu />
+          <Link
+            to="/admin"
+            onClick={alElegir}
+            className="min-w-0 truncate rounded-sm text-titulo-seccion tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group-data-[collapsible=icon]:hidden"
+          >
+            AssetControl
+          </Link>
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <nav aria-label="Navegación principal">
@@ -181,7 +203,7 @@ function Migas() {
                   <span>{miga.texto}</span>
                 )}
               </BreadcrumbItem>
-              {!ultima && <BreadcrumbSeparator className="hidden md:block" />}
+              {!ultima && <BreadcrumbSeparator className="hidden text-muted-foreground md:block" />}
             </Fragment>
           )
         })}
@@ -223,29 +245,24 @@ function MenuUsuario() {
             <AvatarFallback className="bg-brand-soft text-xs font-semibold text-brand-strong">{iniciales(nombre)}</AvatarFallback>
           </Avatar>
           <span className="hidden max-w-32 truncate text-sm font-medium md:inline" aria-hidden="true">{nombre.trim().split(/\s+/)[0]}</span>
-          <ChevronsUpDown className="hidden size-3.5 text-muted-foreground md:block" aria-hidden="true" />
         </Boton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-60">
-        <DropdownMenuLabel className="flex flex-col gap-0.5 px-2 py-2">
-          <span className="truncate text-cuerpo font-medium text-foreground">{nombre}</span>
-          <span className="truncate text-etiqueta font-normal text-muted-foreground">{email}</span>
-          <span className="text-etiqueta font-normal text-muted-foreground">Rol: {rol}</span>
+      <DropdownMenuContent align="end" className="w-64 p-1.5">
+        <DropdownMenuLabel className="flex flex-col gap-0.5 px-2.5 py-2.5 font-normal">
+          <span className="truncate text-sm font-medium text-foreground">{nombre}</span>
+          <span className="truncate text-etiqueta text-muted-foreground">{email}</span>
+          <span className="mt-1 truncate text-etiqueta text-muted-foreground">{rol}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {!escritorio && (
           <>
-            <DropdownMenuItem asChild className="min-h-control">
-              <Link to="/contar">
-                <ScanBarcode />
-                Ir a contar
-              </Link>
+            <DropdownMenuItem asChild className="min-h-control px-2.5">
+              <Link to="/contar">Ir a contar</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
         )}
-        <DropdownMenuItem className="min-h-control" onSelect={cerrarSesion}>
-          <LogOut />
+        <DropdownMenuItem className="min-h-control px-2.5" onSelect={cerrarSesion}>
           Cerrar sesión
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -257,6 +274,79 @@ function MenuUsuario() {
 const RUTAS_CON_DATOS_REALES = new Set(['/admin/usuarios', '/admin/ubicaciones', '/admin/categorias', '/admin/sesiones', '/admin/discrepancias', '/admin/valor', '/admin/empresa'])
 const conDatosReales = (ruta: string) =>
   ruta === '/admin' || RUTAS_CON_DATOS_REALES.has(ruta) || ruta.startsWith('/admin/activos') || /^\/admin\/sesiones\/[^/]+(\/informe)?$/.test(ruta)
+
+type Pila = { claves: string[]; cursor: number }
+
+/** Ajusta la pila de rutas visitadas en este shell. Una entrada nueva borra el avance. */
+function recorrer(pila: Pila, tipo: NavigationType, clave: string): Pila {
+  if (tipo === 'REPLACE') {
+    if (pila.claves[pila.cursor] === clave) return pila
+    const claves = pila.claves.slice()
+    claves[pila.cursor] = clave
+    return { claves, cursor: pila.cursor }
+  }
+  if (tipo === 'PUSH') {
+    if (pila.claves[pila.cursor] === clave) return pila
+    const claves = pila.claves.slice(0, pila.cursor + 1)
+    claves.push(clave)
+    return { claves, cursor: claves.length - 1 }
+  }
+  const cursor = pila.claves.indexOf(clave)
+  if (cursor < 0 || cursor === pila.cursor) return pila
+  return { claves: pila.claves, cursor }
+}
+
+function useRecorrido() {
+  const navigate = useNavigate()
+  const { key } = useLocation()
+  const tipo = useNavigationType()
+  const [pila, setPila] = useState<Pila>(() => ({ claves: [key], cursor: 0 }))
+  const siguiente = recorrer(pila, tipo, key)
+  if (siguiente !== pila) setPila(siguiente)
+  return {
+    puedeAtras: siguiente.cursor > 0,
+    puedeAdelante: siguiente.cursor < siguiente.claves.length - 1,
+    irAtras: () => void navigate(-1),
+    irAdelante: () => void navigate(1),
+  }
+}
+
+function FlechasRuta() {
+  const { puedeAtras, puedeAdelante, irAtras, irAdelante } = useRecorrido()
+  return (
+    <div className="flex shrink-0 items-center" role="group" aria-label="Recorrido">
+      <Boton variante="fantasma" soloIcono aria-label="Ir atrás" icono={<ChevronLeft />} disabled={!puedeAtras} onClick={irAtras} />
+      <Boton variante="fantasma" soloIcono aria-label="Ir adelante" icono={<ChevronRight />} disabled={!puedeAdelante} onClick={irAdelante} />
+    </div>
+  )
+}
+
+function Cabecera({ pathname, onBuscar }: { pathname: string; onBuscar: () => void }) {
+  const { isMobile } = useSidebar()
+  return (
+    <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-1 border-b bg-card px-2 md:gap-2 md:px-6">
+      {isMobile && (
+        <>
+          <BotonMenu />
+          <div className="mr-1 h-5 w-px bg-border" aria-hidden="true" />
+        </>
+      )}
+      <FlechasRuta />
+      <div className="mr-1 hidden h-5 w-px bg-border md:block" aria-hidden="true" />
+      {pathname !== '/admin' && (
+        <Boton asChild variante="fantasma" className="size-control shrink-0 p-0 md:hidden">
+          <Link to="/admin" aria-label="Ir al inicio">
+            <House />
+          </Link>
+        </Boton>
+      )}
+      <Migas />
+      <div className="flex-1" />
+      <BotonBuscar onAbrir={onBuscar} />
+      <MenuUsuario />
+    </header>
+  )
+}
 
 export default function AdminShell() {
   const { pathname } = useLocation()
@@ -283,21 +373,7 @@ export default function AdminShell() {
       <BarraLateral />
       <SidebarInset className="min-w-0 bg-page">
         {!conDatosReales(pathname) && <DatosFicticios />}
-        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-1 border-b bg-card px-2 md:gap-2 md:px-6">
-          <SidebarTrigger className="size-control text-muted-foreground hover:text-foreground" aria-label="Mostrar u ocultar el menú" />
-          <div className="mr-1 hidden h-5 w-px bg-border md:block" aria-hidden="true" />
-          {pathname !== '/admin' && (
-            <Boton asChild variante="fantasma" className="size-control shrink-0 p-0 md:hidden">
-              <Link to="/admin" aria-label="Ir al inicio">
-                <House />
-              </Link>
-            </Boton>
-          )}
-          <Migas />
-          <div className="flex-1" />
-          <BotonBuscar onAbrir={() => setBuscando(true)} />
-          <MenuUsuario />
-        </header>
+        <Cabecera pathname={pathname} onBuscar={() => setBuscando(true)} />
         {/* Spec 016, T10: div (no main): SidebarInset ya es el único landmark main. */}
         <div id={ID_CONTENIDO} tabIndex={-1} className="mx-auto flex w-full max-w-[1320px] min-w-0 flex-1 flex-col p-4 outline-none md:p-8">
           <Outlet />

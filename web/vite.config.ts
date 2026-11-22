@@ -34,7 +34,8 @@ export default defineConfig(({ mode }) => {
           rewrite: (requestPath) => requestPath.replace(/^\/api/, ''),
           // La cookie de refresh sale con Path=/auth; el navegador la pide en /api/auth.
           // Producción necesita la misma regla en su reverse proxy (spec 002b, plan §4).
-          cookiePathRewrite: { '/auth': '/api/auth' },
+          // Spec 017, T8: la de la consola de plataforma sale con Path=/plataforma/auth.
+          cookiePathRewrite: { '/auth': '/api/auth', '/plataforma/auth': '/api/plataforma/auth' },
         },
       },
     },

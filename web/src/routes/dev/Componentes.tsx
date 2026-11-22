@@ -119,6 +119,7 @@ export default function Componentes() {
   const [reintentando, setReintentando] = useState(false)
   const [coincide, setCoincide] = useState(true)
   const [varias, setVarias] = useState(true)
+  const [fecha, setFecha] = useState('2026-11-19')
   // Demostración: «Reintentar» queda ocupado un momento, como mientras llega la respuesta.
   function reintentar() {
     setReintentando(true)
@@ -228,6 +229,14 @@ export default function Componentes() {
           <Campo id="g-cargando" etiqueta="Ubicación" tipo="seleccion" cargando opciones={[]} placeholder="Elige una ubicación" />
           <Campo id="g-deshabilitado" etiqueta="Serial" tipo="codigo" disabled defaultValue="SN-4471" />
           <CampoClave />
+          <Campo
+            id="g-fecha"
+            etiqueta="Fecha de compra"
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+            ayuda="Calendario del sistema."
+          />
           <Campo id="g-nota" etiqueta="Nota" tipo="area" placeholder="Opcional" className="sm:col-span-2" ayuda="Hasta 120 caracteres." />
           <Casilla etiqueta="Revisé que coincide con el sticker" etiquetaVisible marcada={coincide} onMarcadaChange={setCoincide} />
           <Interruptor etiqueta="Registrar varias unidades iguales" activo={varias} onActivoChange={setVarias} />

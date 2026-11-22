@@ -20,13 +20,26 @@ type CampoContrasenaProps = {
   ref?: ComponentProps<'input'>['ref']
   autoFocus?: boolean
   disabled?: boolean
+  /** Marca «*» del kit (spec 017, T16). */
+  obligatorio?: boolean
+  /**
+   * Pide a los gestores de contraseñas (1Password, Bitwarden, LastPass, Dashlane) no
+   * guardarla ni autocompletarla (spec 017, C1b/T16). Opt-in: solo la contraseña temporal
+   * que define el desarrollador; en login, invitación y cambio propio el gestor sí ayuda.
+   */
+  sinGestor?: boolean
 }
 
-export function CampoContrasena({ queMostrar = 'contraseña', ayuda, ...props }: CampoContrasenaProps) {
+export function CampoContrasena({ queMostrar = 'contraseña', ayuda, sinGestor = false, ...props }: CampoContrasenaProps) {
   const [visible, setVisible] = useState(false)
+  const gestor = sinGestor ? 'true' : undefined
   return (
     <Campo
       {...props}
+      data-1p-ignore={gestor}
+      data-bwignore={gestor}
+      data-lpignore={gestor}
+      data-form-type={sinGestor ? 'other' : undefined}
       type={visible ? 'text' : 'password'}
       autoComplete="new-password"
       autoCapitalize="none"

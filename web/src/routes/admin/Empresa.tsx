@@ -181,8 +181,8 @@ function Logo({ empresa }: { empresa: Empresa }) {
         )}
       </div>
       <p className="text-etiqueta font-normal text-muted-foreground">
-        PNG, JPG o WebP de hasta {LOGO_MAX_BYTES / 1024 / 1024} MB. Se guarda sin datos ocultos y con fondo transparente si lo
-        tiene.
+        Horizontal, de 160 × 64 px. PNG, JPG o WebP de hasta {LOGO_MAX_BYTES / 1024 / 1024} MB. Si es más grande o de otra
+        proporción, se encoge a esa medida sin deformarse. Se guarda sin datos ocultos y con fondo transparente si lo tiene.
       </p>
       {subir.isError && (
         <Aviso
@@ -252,7 +252,7 @@ export default function EmpresaPagina() {
               </Estado.Cargando>
             )}
           </Panel>
-          <Panel titulo="Logo" descripcion="Opcional. Sale arriba a la izquierda en el Excel y en el PDF.">
+          <Panel titulo="Logo" descripcion="Opcional. Imagen horizontal de 160 × 64 px. Sale arriba a la izquierda en el Excel y en el PDF.">
             {empresa.data ? <Logo empresa={empresa.data} /> : <Esqueleto className="h-16 w-40 max-w-full rounded-lg" />}
           </Panel>
         </div>

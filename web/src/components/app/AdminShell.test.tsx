@@ -65,6 +65,53 @@ describe('AdminShell en computador', () => {
     expect(within(nav).getByRole('link', { name: 'Sesiones' }).getAttribute('data-active')).toBe('true')
   })
 
+  it('abre y cierra el menú desde el logo, y el encabezado lleva las flechas de la ruta', async () => {
+    renderAt('/admin/activos')
+    await screen.findByRole('navigation', { name: 'Navegación principal' })
+    const barra = document.querySelector('[data-slot="sidebar"]') as HTMLElement
+    const logo = within(barra).getByRole('button', { name: 'Mostrar u ocultar el menú' })
+    expect(logo.getAttribute('aria-expanded')).toBe('true')
+    expect(logo.querySelectorAll('svg')).toHaveLength(1)
+    const encabezado = screen.getByRole('banner')
+    expect(within(encabezado).queryByRole('button', { name: 'Mostrar u ocultar el menú' })).toBeNull()
+    const migas = within(encabezado).getByRole('navigation', { name: 'Migas de pan' })
+    expect(migas.querySelectorAll('[data-slot="breadcrumb-separator"] svg')).toHaveLength(1)
+    fireEvent.click(logo)
+    expect(barra.getAttribute('data-state')).toBe('collapsed')
+    expect(logo.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('las flechas recorren la ruta hacia atrás y hacia adelante', async () => {
+    renderAt('/admin')
+    const flecha = (nombre: string) => screen.getByRole('button', { name: nombre }) as HTMLButtonElement
+    await screen.findByRole('heading', { level: 1, name: 'Resumen' })
+    expect(flecha('Ir atrás').disabled).toBe(true)
+    expect(flecha('Ir adelante').disabled).toBe(true)
+
+    const nav = screen.getByRole('navigation', { name: 'Navegación principal' })
+    fireEvent.click(within(nav).getByRole('link', { name: 'Activos' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Activos' })).toBeTruthy()
+    expect(flecha('Ir atrás').disabled).toBe(false)
+    expect(flecha('Ir adelante').disabled).toBe(true)
+
+    fireEvent.click(flecha('Ir atrás'))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Resumen' })).toBeTruthy()
+    expect(flecha('Ir atrás').disabled).toBe(true)
+    expect(flecha('Ir adelante').disabled).toBe(false)
+
+    fireEvent.click(flecha('Ir adelante'))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Activos' })).toBeTruthy()
+    expect(flecha('Ir adelante').disabled).toBe(true)
+
+    fireEvent.click(flecha('Ir atrás'))
+    await screen.findByRole('heading', { level: 1, name: 'Resumen' })
+    fireEvent.click(within(nav).getByRole('link', { name: 'Ubicaciones' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Ubicaciones' })).toBeTruthy()
+    expect(flecha('Ir adelante').disabled).toBe(true)
+    fireEvent.click(flecha('Ir atrás'))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Resumen' })).toBeTruthy()
+  })
+
   it('colapsa la barra a íconos y lo recuerda al recargar', async () => {
     renderAt('/admin')
     fireEvent.click(await screen.findByRole('button', { name: 'Mostrar u ocultar el menú' }))
@@ -75,10 +122,16 @@ describe('AdminShell en computador', () => {
     expect(document.querySelector('[data-slot="sidebar"]')?.getAttribute('data-state')).toBe('collapsed')
   })
 
-  it('tiene menú de usuario con cerrar sesión', async () => {
+  it('tiene menú de usuario con cerrar sesión, sin iconos', async () => {
     renderAt('/admin')
-    fireEvent.keyDown(await screen.findByRole('button', { name: /Menú de usuario/ }), { key: 'Enter' })
-    expect(await screen.findByRole('menuitem', { name: 'Cerrar sesión' })).toBeTruthy()
+    const disparador = await screen.findByRole('button', { name: /Menú de usuario/ })
+    expect(disparador.querySelector('svg')).toBeNull()
+    fireEvent.keyDown(disparador, { key: 'Enter' })
+    const cerrar = await screen.findByRole('menuitem', { name: 'Cerrar sesión' })
+    expect(cerrar.querySelector('svg')).toBeNull()
+    const menu = screen.getByRole('menu')
+    expect(within(menu).getByText('Ana Torres')).toBeTruthy()
+    expect(within(menu).getByText('ana.torres@ejemplo.test')).toBeTruthy()
   })
 
   it('el valor actual ya es una pantalla real, sin banda de maqueta (spec 008)', async () => {

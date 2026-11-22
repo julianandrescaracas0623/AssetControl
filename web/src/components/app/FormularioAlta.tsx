@@ -7,7 +7,7 @@ import { CampoFoto } from '@/components/app/CampoFoto'
 import { CopiarDeParecido } from '@/components/app/CopiarDeParecido'
 import { Escaner } from '@/components/app/Escaner'
 import { InputSugerido } from '@/components/app/InputSugerido'
-import { Aviso, Boton, Dialogo, Insignia, ListaDatos, MarcaObligatorio, MarcoCampo, Panel, Tecla } from '@/components/kit'
+import { Aviso, Boton, Dialogo, Fecha, Insignia, ListaDatos, MarcaObligatorio, MarcoCampo, Panel, Tecla } from '@/components/kit'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -263,7 +263,7 @@ export function MasDatos({
       </MarcoCampo>
       {!soloSerial && (
         <MarcoCampo id="fecha" etiqueta="Fecha de compra" error={errores.fecha}>
-          <Input id="fecha" type="date" value={campos.fecha} onChange={(e) => alta.cambiar('fecha', e.target.value)} aria-invalid={Boolean(errores.fecha)} aria-describedby={errores.fecha ? 'fecha-error' : undefined} className={claseControlAlta(alta, 'fecha')} />
+          <Fecha id="fecha" value={campos.fecha} onChange={(e) => alta.cambiar('fecha', e.target.value)} aria-invalid={Boolean(errores.fecha)} aria-describedby={errores.fecha ? 'fecha-error' : undefined} className={claseControlAlta(alta, 'fecha')} />
         </MarcoCampo>
       )}
     </>

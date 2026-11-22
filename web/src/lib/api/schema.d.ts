@@ -96,10 +96,30 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Usuario, tenant y rol de la sesión (leídos de la base en cada petición) */
+        /** Usuario, tenant, rol y debe_cambiar_password de la sesión (leídos de la base en cada petición) */
         get: operations["me"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/cambiar-contrasena": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cambiar la contraseña propia (obligatorio en el primer ingreso; también voluntario)
+         * @description Pide la contraseña actual, la nueva (política vigente, distinta de la actual) y su confirmación. Si cambia, quita debe_cambiar_password, cierra las demás sesiones de la persona y responde una sesión nueva (cookie de refresh nueva), como el login. Todo token de acceso emitido antes del cambio deja de servir (401 no_autenticado); el de la sesión nueva sí sirve. Restablecer la contraseña por correo corta igual los tokens anteriores. Cuenta en el mismo límite que el login.
+         */
+        post: operations["cambiarContrasena"];
         delete?: never;
         options?: never;
         head?: never;
@@ -792,7 +812,7 @@ export interface paths {
         get: operations["verEmpresa"];
         /**
          * Guardar los datos de la empresa (solo admin)
-         * @description Nombre y dirección obligatorios. NIT opcional: si trae dígito de verificación debe ser el de la DIAN; se guarda como 890.903.938-8. Vacío o null borra un opcional. Si un campo no es válido, el error lo nombra en campo.
+         * @description Nombre y dirección obligatorios. NIT opcional: si trae dígito de verificación debe ser el de la DIAN; se guarda como 900.123.456-8. Vacío o null borra un opcional. Si un campo no es válido, el error lo nombra en campo.
          */
         put: operations["guardarEmpresa"];
         post?: never;
@@ -860,6 +880,263 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plataforma/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Iniciar sesión como desarrollador (consola de plataforma) */
+        post: operations["plataformaLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plataforma/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Renovar la sesión de plataforma con su cookie de refresh (la rota) */
+        post: operations["plataformaRefresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plataforma/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cerrar la sesión de plataforma (revoca la familia y su token de acceso) */
+        post: operations["plataformaLogout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plataforma/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Desarrollador de la sesión (activo y con la sesión vigente, en cada petición) */
+        get: operations["plataformaMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plataforma/modulos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Módulos habilitados de la consola, del registro del servidor */
+        get: operations["plataformaModulos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plataforma/empresas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Empresas con su estado, si tienen logo y sus conteos (módulo Empresas)
+         * @description Solo identidad de la empresa y conteos de membresías; ningún dato de negocio. q filtra por nombre sin distinguir mayúsculas; estado, por activas, desactivadas o todas (por defecto).
+         */
+        get: operations["plataformaListarEmpresas"];
+        put?: never;
+        /**
+         * Crear una empresa con su ficha y su primer admin (idempotente por id)
+         * @description En una transacción crea el tenant activo, su ficha (sin logo), el usuario admin con debe_cambiar_password y su membresía admin; sin invitación. La contraseña se valida con la política vigente y su confirmación en el servidor, se guarda solo con Argon2id y nunca se devuelve. Si un dato no es válido, el error lo nombra en campo.
+         */
+        post: operations["plataformaCrearEmpresa"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plataforma/empresas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Desactivar o reactivar una empresa (idempotente; no borra nada)
+         * @description Desactivada, sus usuarios no inician sesión, no renuevan la sesión y sus tokens vigentes dan 401; reactivarla restaura el acceso.
+         */
+        patch: operations["plataformaCambiarEstadoEmpresa"];
+        trace?: never;
+    };
+    "/plataforma/empresas/{id}/usuarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Usuarios de una empresa con su rol y el estado de su membresía (módulo Usuarios)
+         * @description Una fila por membresía: id del usuario, nombre, correo, rol, si la membresía está activa y si el cambio de contraseña sigue pendiente. Nunca hash, token ni datos de negocio.
+         */
+        get: operations["plataformaListarUsuarios"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plataforma/empresas/{id}/usuarios/{usuario_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Editar el nombre y el rol de un usuario de una empresa (sin cambios, 200 sin escribir)
+         * @description Exactamente nombre y rol; cualquier otra clave (correo, contraseña, activa...) da 400: el correo, la contraseña y el estado no se editan por esta ruta. El nombre se normaliza como el de cualquier usuario (máximo 120 caracteres) y el rol es admin o contador (422 con campo, sin cambios). Cambia solo el nombre del usuario (que es suyo en todas sus empresas) y el rol de su membresía en esta empresa, y escribe usuario_editado sin valores en la misma transacción. Si cambia el rol, se revocan las sesiones renovables de esa membresía: la persona vuelve a entrar con el rol nuevo, y su acceso vigente ya actúa con él (un admin degradado recibe 403 en su siguiente petición). Cambiar solo el nombre no cierra ninguna sesión. Si nada cambia, responde 200 sin escribir, revocar ni auditar. Una membresía desactivada se puede editar. Orden de los rechazos, sin cambiar nada: (1) 404 si la empresa no existe; (2) 404 si el usuario no es de esa empresa; (3) 409 empresa_inactiva; (4) 409 ultimo_admin si quitaría el rol admin al último admin activo; (5) 503 si otro cambio de usuarios de la misma empresa retiene su candado más de 5 s. Cuenta en plat_accion antes de validar.
+         */
+        put: operations["plataformaEditarUsuario"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Desactivar o reactivar la membresía de un usuario (idempotente; no borra nada)
+         * @description Cambia solo si la membresía está activa. Al desactivarla se revocan sus sesiones renovables y el usuario recibe 401 al entrar, al renovar y con su token vigente. No se puede desactivar al último admin activo ni cambiar usuarios de una empresa desactivada. Un usuario que no es de esa empresa da 404. Idempotente: repetir el estado actual responde 200 con ese estado, no cambia nada y no escribe auditoría (solo se audita un cambio real). Orden de los rechazos, y el primero que aplica es el que se responde, sin cambiar nada: (1) 404 si la empresa no existe; (2) 404 si el usuario no es de esa empresa; (3) 409 empresa_inactiva (en los dos sentidos); (4) 409 ultimo_admin (solo al desactivar; repetir la desactivación de un admin ya inactivo es idempotente y no da ultimo_admin). Si otro cambio de membresías de la misma empresa retiene su candado más de 5 s (lock_timeout), o la base aborta la transacción por interbloqueo o fallo de serialización, 503 servicio_no_disponible sin cambios; se puede reintentar.
+         */
+        patch: operations["plataformaCambiarEstadoUsuario"];
+        trace?: never;
+    };
+    "/plataforma/empresas/{id}/usuarios/{usuario_id}/contrasena": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Definir una contraseña temporal para un usuario de una empresa (no idempotente)
+         * @description Exactamente password y password_confirmacion; cualquier otra clave da 400. La contraseña cumple la misma política que la del primer admin del alta (10 a 128 caracteres y no común) y la confirmación se compara en el servidor (422 con campo, sin cambios). El servidor calcula el hash Argon2id y, en una sola transacción, guarda el hash, marca que la persona debe cambiarla al entrar, corta sus accesos vigentes (401 con el token anterior), revoca todas sus sesiones renovables en todas sus empresas y escribe usuario_contrasena_restablecida sin valores. Responde 204 sin cuerpo: la contraseña y su hash nunca se devuelven. Aplica a cualquier usuario de la empresa, también al único admin, a una membresía desactivada y a quien tiene membresías en otras empresas. No se avisa por correo. Cada llamada válida define otra contraseña, revoca y audita de nuevo. Orden de los rechazos, sin cambiar nada: (1) 404 si la empresa no existe; (2) 404 si el usuario no es de esa empresa (sin decir si existe en otra); (3) 409 empresa_inactiva; (4) 503 si otro cambio de usuarios de una de sus empresas retiene su candado más de 5 s. Cuenta en plat_accion antes de validar.
+         */
+        post: operations["plataformaRestablecerContrasenaUsuario"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plataforma/empresas/{id}/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Subir o reemplazar el logo de una empresa (alta o edición de la empresa)
+         * @description multipart/form-data con exactamente logo_id (UUID canónico del cliente) y archivo, con las reglas de la spec 013: PNG, JPEG o WebP hasta 2 MB; se guarda en PNG ≤ 600 px con transparencia y sin metadatos, en el almacén con la clave del tenant. En una transacción, con la ficha de la empresa bloqueada, registra el logo (subido por el admin de la empresa) y lo deja como vigente; si la empresa no tenía logo escribe empresa_logo_subido y, si tenía otro, lo reemplaza y escribe empresa_logo_reemplazado (201 en los dos casos). El logo anterior (fila y archivo) se conserva: los informes cerrados lo siguen usando. Si la transacción falla, el archivo nuevo se borra. Repetir con el logo_id vigente responde 200 sin cambiar nada. Cuenta en plat_accion antes de validar.
+         */
+        post: operations["plataformaSubirLogoEmpresa"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plataforma/empresas/{id}/ficha": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ficha vigente de una empresa, para editarla (módulo Empresas)
+         * @description Exactamente nombre, dirección, NIT, teléfono, correo y si tiene logo; nada más de la empresa (ni quién la actualizó ni el id del logo). Solo lectura: no cuenta en plat_accion ni escribe auditoría.
+         */
+        get: operations["plataformaLeerFichaEmpresa"];
+        /**
+         * Editar la ficha de una empresa (sin cambios, 200 sin escribir)
+         * @description Los cinco campos de la ficha, siempre todos (nit, telefono y correo pueden ser null o vacíos para quitarlos); cualquier otra clave da 400. Mismas validaciones que la pantalla Empresa de la clínica (422 con campo, sin cambios). Con la ficha bloqueada, cambia solo esas cinco columnas y la fecha de actualización (no quién la actualizó) y, si cambia el nombre, también el nombre de la empresa en la consola y en las listas; escribe empresa_editada sin valores en la misma transacción. Si ningún valor cambia, responde 200 sin escribir ni auditar. Los informes cerrados no cambian (guardan su copia de la empresa). Sin If-Match: si el admin edita a la vez, gana la última escritura. Se permite también con la empresa desactivada. Cuenta en plat_accion antes de validar.
+         */
+        put: operations["plataformaEditarFichaEmpresa"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/plataforma/actividad": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Auditoría de la consola, de la más reciente a la más antigua (módulo Actividad)
+         * @description Solo lectura (consultarla no escribe auditoría). Paginada por cursor: se pide la primera página sin cursor y las siguientes con el siguiente de la anterior; el cursor es estable aunque lleguen registros nuevos. Orden por fecha y, a igual fecha, por id, los dos descendentes. Filtros opcionales y combinables: empresa, acción y rango de fechas (las dos inclusive, en la hora de Colombia, UTC−5). Por registro: id, fecha, acción, resultado, nombre del desarrollador («Operador» si la hizo el operador por CLI), id y nombre de la empresa (nulos si no aplica) e id del objeto. Los nombres se leen al consultar (no están en la auditoría). Nunca correos, IP, hashes ni texto libre. Cualquier otro parámetro, uno repetido o un valor fuera de formato da 400.
+         */
+        get: operations["plataformaActividad"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -868,7 +1145,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "enlace_invalido" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta" | "fotos_no_disponibles" | "sin_foto" | "foto_id_en_uso" | "empresa_sin_datos" | "sin_logo" | "logo_id_en_uso" | "foto_existente" | "imagen_demasiado_grande" | "tipo_no_admitido" | "imagen_invalida" | "exportacion_demasiado_grande";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "enlace_invalido" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta" | "fotos_no_disponibles" | "sin_foto" | "foto_id_en_uso" | "empresa_sin_datos" | "sin_logo" | "logo_id_en_uso" | "foto_existente" | "imagen_demasiado_grande" | "tipo_no_admitido" | "imagen_invalida" | "exportacion_demasiado_grande" | "campo_invalido" | "contrasenas_distintas" | "empresa_existente" | "email_en_uso" | "cambio_password_requerido" | "contrasena_repetida" | "empresa_inactiva" | "ultimo_admin" | "empresa_sin_admin" | "logos_no_disponibles";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -898,6 +1175,8 @@ export interface components {
             usuario: components["schemas"]["Usuario"];
             tenant: components["schemas"]["Tenant"];
             rol: components["schemas"]["Rol"];
+            /** @description Si es true, solo se puede cambiar la contraseña (el resto responde 403 cambio_password_requerido). */
+            debe_cambiar_password: boolean;
         };
         Sesion: {
             /** @description JWT de acceso; solo en memoria. */
@@ -909,6 +1188,201 @@ export interface components {
             usuario: components["schemas"]["Usuario"];
             tenant: components["schemas"]["Tenant"];
             rol: components["schemas"]["Rol"];
+            /** @description Si es true, la web lleva a «Cambia tu contraseña» antes de cualquier otra pantalla. */
+            debe_cambiar_password: boolean;
+        };
+        Desarrollador: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            email: string;
+            nombre: string;
+        };
+        DesarrolladorActual: {
+            desarrollador: components["schemas"]["Desarrollador"];
+        };
+        SesionPlataforma: {
+            /** @description JWT de acceso de plataforma; solo en memoria. */
+            access_token: string;
+            /** @constant */
+            token_type: "Bearer";
+            /** @description Segundos de vida del token. */
+            expires_in: number;
+            desarrollador: components["schemas"]["Desarrollador"];
+        };
+        ModuloPlataforma: {
+            id: string;
+            titulo: string;
+            orden: number;
+        };
+        ModulosPlataforma: {
+            modulos: components["schemas"]["ModuloPlataforma"][];
+        };
+        EmpresaPlataforma: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+            activa: boolean;
+            /** Format: date-time */
+            creado_en: string;
+            tiene_logo: boolean;
+            n_membresias_activas: number;
+            n_admins_activos: number;
+        };
+        ListaEmpresasPlataforma: {
+            empresas: components["schemas"]["EmpresaPlataforma"][];
+        };
+        AdminInicialBody: {
+            nombre: string;
+            email: string;
+            /** Format: password */
+            password: string;
+            /** Format: password */
+            password_confirmacion: string;
+        };
+        CrearEmpresaBody: {
+            /**
+             * Format: uuid
+             * @description UUID del cliente (idempotencia).
+             */
+            id: string;
+            /** @description Nombre o razón social; también el del tenant. */
+            nombre: string;
+            direccion: string;
+            nit?: string | null;
+            telefono?: string | null;
+            correo?: string | null;
+            admin: components["schemas"]["AdminInicialBody"];
+        };
+        EmpresaCreada: {
+            /** Format: uuid */
+            empresa_id: string;
+            /** Format: uuid */
+            admin_id: string;
+        };
+        EstadoEmpresaBody: {
+            activa: boolean;
+        };
+        EstadoEmpresa: {
+            /** Format: uuid */
+            id: string;
+            activa: boolean;
+        };
+        UsuarioPlataforma: {
+            /**
+             * Format: uuid
+             * @description Id del usuario.
+             */
+            id: string;
+            nombre: string;
+            email: string;
+            rol: components["schemas"]["Rol"];
+            /** @description Si su membresía en esta empresa está activa. */
+            activa: boolean;
+            /** @description Cambio de contraseña pendiente (primer admin creado desde la consola o contraseña temporal definida desde Usuarios). */
+            debe_cambiar_password: boolean;
+        };
+        ListaUsuariosPlataforma: {
+            usuarios: components["schemas"]["UsuarioPlataforma"][];
+        };
+        EstadoUsuarioBody: {
+            activa: boolean;
+        };
+        EditarUsuarioBody: {
+            /** @description Nombre visible; se recortan los espacios y se normaliza. */
+            nombre: string;
+            rol: components["schemas"]["Rol"];
+        };
+        UsuarioEditado: {
+            /**
+             * Format: uuid
+             * @description Id del usuario.
+             */
+            id: string;
+            nombre: string;
+            rol: components["schemas"]["Rol"];
+        };
+        ContrasenaTemporalBody: {
+            /**
+             * Format: password
+             * @description Contraseña temporal; la persona debe cambiarla al entrar.
+             */
+            password: string;
+            /**
+             * Format: password
+             * @description Debe ser igual a password (se compara en el servidor).
+             */
+            password_confirmacion: string;
+        };
+        /** @description La ficha de la empresa que la consola puede leer (nada más de la empresa). */
+        FichaEmpresaPlataforma: {
+            nombre: string;
+            direccion: string;
+            /** @description Con puntos y, si lo tiene, -dígito. */
+            nit: string | null;
+            telefono: string | null;
+            correo: string | null;
+            tiene_logo: boolean;
+        };
+        FichaEmpresaPlataformaBody: {
+            /** @description Nombre o razón social; también el del tenant. */
+            nombre: string;
+            direccion: string;
+            nit: string | null;
+            telefono: string | null;
+            correo: string | null;
+        };
+        LogoPlataforma: {
+            logo: {
+                /**
+                 * Format: uuid
+                 * @description Id del logo vigente.
+                 */
+                id: string;
+            };
+        };
+        EstadoUsuario: {
+            /**
+             * Format: uuid
+             * @description Id del usuario.
+             */
+            id: string;
+            activa: boolean;
+        };
+        /**
+         * @description Lista cerrada de acciones auditadas de la consola y del operador (R33).
+         * @enum {string}
+         */
+        AccionAuditoria: "login_ok" | "empresa_creada" | "empresa_desactivada" | "empresa_reactivada" | "empresa_logo_subido" | "usuario_desactivado" | "usuario_reactivado" | "desarrollador_creado" | "desarrollador_restablecido" | "desarrollador_desactivado" | "desarrollador_reactivado" | "empresa_editada" | "empresa_logo_reemplazado" | "usuario_editado" | "usuario_contrasena_restablecida";
+        RegistroActividad: {
+            /**
+             * Format: uuid
+             * @description Id del registro de auditoría.
+             */
+            id: string;
+            /**
+             * Format: date-time
+             * @description Instante en UTC.
+             */
+            fecha: string;
+            accion: components["schemas"]["AccionAuditoria"];
+            /** @enum {string} */
+            resultado: "ok" | "rechazado";
+            /** @description Nombre del desarrollador, u «Operador» si la hizo el operador por CLI. */
+            desarrollador_nombre: string;
+            /** Format: uuid */
+            empresa_id: string | null;
+            empresa_nombre: string | null;
+            /**
+             * Format: uuid
+             * @description Id del objeto de la acción (empresa, usuario o desarrollador; en empresa_logo_subido y empresa_logo_reemplazado, el id del logo nuevo; nulo en empresa_editada). En las acciones del operador por CLI sobre un desarrollador (desarrollador_nombre «Operador») puede ser el id del desarrollador objetivo.
+             */
+            objeto_id: string | null;
+        };
+        ActividadPlataforma: {
+            actividad: components["schemas"]["RegistroActividad"][];
+            /** @description Cursor de la página siguiente; nulo si no hay más. */
+            siguiente: string | null;
         };
         LoginBody: {
             email: string;
@@ -929,6 +1403,14 @@ export interface components {
             nombre: string;
             /** Format: password */
             password: string;
+        };
+        CambiarContrasenaBody: {
+            /** Format: password */
+            actual: string;
+            /** Format: password */
+            nueva: string;
+            /** Format: password */
+            confirmacion: string;
         };
         RecuperarBody: {
             email: string;
@@ -1625,6 +2107,17 @@ export interface components {
         };
     };
     responses: {
+        /** @description Sesión de plataforma emitida; deja la cookie de refresh de plataforma (HttpOnly, SameSite=Lax). */
+        SesionPlataformaIniciada: {
+            headers: {
+                /** @description Cookie de refresh de plataforma nueva. */
+                "Set-Cookie": string;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["SesionPlataforma"];
+            };
+        };
         /** @description Sesión emitida; deja la cookie de refresh (HttpOnly, SameSite=Lax). */
         SesionIniciada: {
             headers: {
@@ -1739,7 +2232,7 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description No se pudo contar el intento o el servidor está saturado. */
+        /** @description No se pudo contar el intento, el servidor está saturado o el candado de membresías de la empresa sigue ocupado (un cambio de la consola en curso; espera máxima 3 s en login, refresh, aceptar invitación y cambio de contraseña). No cambia nada. */
         ServicioNoDisponible: {
             headers: {
                 /** @description Segundos sugeridos antes de reintentar. */
@@ -1804,6 +2297,15 @@ export interface components {
                 "application/json": components["schemas"]["EmpresaRespuesta"];
             };
         };
+        /** @description El logo vigente de la empresa (201 nuevo o reemplazo; 200 si ya era el vigente con ese logo_id). */
+        LogoPlataformaGuardado: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["LogoPlataforma"];
+            };
+        };
         /** @description El logo guardado (201 nuevo; 200 si ya era el vigente con ese logo_id). */
         LogoGuardado: {
             headers: {
@@ -1832,6 +2334,8 @@ export interface components {
         Csrf: "1";
         /** @description Cookie HttpOnly de refresh (__Secure-refresh fuera de desarrollo), Path=/auth. */
         RefreshCookie: string;
+        /** @description Cookie HttpOnly de refresh de plataforma (__Secure-plat-refresh fuera de desarrollo), Path=/plataforma/auth; 8 horas. */
+        PlataformaRefreshCookie: string;
     };
     requestBodies: never;
     headers: never;
@@ -1996,6 +2500,44 @@ export interface operations {
                 };
             };
             401: components["responses"]["NoAutenticado"];
+        };
+    };
+    cambiarContrasena: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambiarContrasenaBody"];
+            };
+        };
+        responses: {
+            200: components["responses"]["SesionIniciada"];
+            400: components["responses"]["SolicitudInvalida"];
+            /** @description Sin sesión (no_autenticado) o la contraseña actual no es correcta (credenciales_invalidas). No cambia nada. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            /** @description La nueva no cumple la política (contrasena_*), es igual a la actual (contrasena_repetida) o la confirmación no coincide (contrasenas_distintas). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["DemasiadasSolicitudes"];
+            503: components["responses"]["ServicioNoDisponible"];
         };
     };
     solicitarRecuperacion: {
@@ -3559,6 +4101,601 @@ export interface operations {
             };
             401: components["responses"]["NoAutenticado"];
             403: components["responses"]["Prohibido"];
+        };
+    };
+    plataformaLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginBody"];
+            };
+        };
+        responses: {
+            200: components["responses"]["SesionPlataformaIniciada"];
+            400: components["responses"]["SolicitudInvalida"];
+            /** @description Credenciales incorrectas: mismo mensaje para correo inexistente, contraseña errónea o desarrollador inactivo. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            429: components["responses"]["DemasiadasSolicitudes"];
+            503: components["responses"]["ServicioNoDisponible"];
+        };
+    };
+    plataformaRefresh: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Debe valer 1; además la petición debe venir del mismo sitio. */
+                "X-AssetControl-CSRF": components["parameters"]["Csrf"];
+            };
+            path?: never;
+            cookie?: {
+                /** @description Cookie HttpOnly de refresh de plataforma (__Secure-plat-refresh fuera de desarrollo), Path=/plataforma/auth; 8 horas. */
+                "plat-refresh"?: components["parameters"]["PlataformaRefreshCookie"];
+            };
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["SesionPlataformaIniciada"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            429: components["responses"]["DemasiadasSolicitudes"];
+            503: components["responses"]["ServicioNoDisponible"];
+        };
+    };
+    plataformaLogout: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Debe valer 1; además la petición debe venir del mismo sitio. */
+                "X-AssetControl-CSRF": components["parameters"]["Csrf"];
+            };
+            path?: never;
+            cookie?: {
+                /** @description Cookie HttpOnly de refresh de plataforma (__Secure-plat-refresh fuera de desarrollo), Path=/plataforma/auth; 8 horas. */
+                "plat-refresh"?: components["parameters"]["PlataformaRefreshCookie"];
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sesión cerrada, haya o no una cookie válida. */
+            204: {
+                headers: {
+                    /** @description Borra la cookie de refresh de plataforma. */
+                    "Set-Cookie": string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Prohibido"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+        };
+    };
+    plataformaMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Desarrollador actual. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesarrolladorActual"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+        };
+    };
+    plataformaModulos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Módulos ordenados (la web muestra solo los que también conoce). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModulosPlataforma"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+        };
+    };
+    plataformaListarEmpresas: {
+        parameters: {
+            query?: {
+                q?: string;
+                estado?: "activas" | "desactivadas" | "todas";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Empresas, de la más reciente a la más antigua. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaEmpresasPlataforma"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+        };
+    };
+    plataformaCrearEmpresa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrearEmpresaBody"];
+            };
+        };
+        responses: {
+            /** @description Empresa y primer admin creados. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmpresaCreada"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            /** @description Ya existe una empresa con ese id (doble envío) o el correo del admin ya es de otro usuario (sin decir de qué empresa). No se crea nada. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            /** @description Un dato de la ficha, del admin o de la contraseña no es válido. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["DemasiadasSolicitudes"];
+            503: components["responses"]["ServicioNoDisponible"];
+        };
+    };
+    plataformaCambiarEstadoEmpresa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EstadoEmpresaBody"];
+            };
+        };
+        responses: {
+            /** @description Estado resultante. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoEmpresa"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            429: components["responses"]["DemasiadasSolicitudes"];
+            503: components["responses"]["ServicioNoDisponible"];
+        };
+    };
+    plataformaListarUsuarios: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usuarios de la empresa, por nombre. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaUsuariosPlataforma"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
+        };
+    };
+    plataformaEditarUsuario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                usuario_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditarUsuarioBody"];
+            };
+        };
+        responses: {
+            /** @description El nombre y el rol resultantes (los mismos de antes si no cambió nada). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsuarioEditado"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description La empresa está desactivada (empresa_inactiva) o el cambio quitaría el rol admin al último admin activo de la empresa (ultimo_admin). Si aplican los dos, gana empresa_inactiva; un 404 va antes que ambos. empresa_inactiva se evalúa con el estado serializado (bajo el candado por empresa): con el candado ocupado puede responderse 503 en su lugar. No cambia nada. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            /** @description El nombre o el rol no son válidos (en campo, cuál). No cambia nada. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["DemasiadasSolicitudes"];
+            /** @description No se pudo contar el intento (plat_accion), otro cambio de usuarios de la misma empresa retuvo su candado más de 5 s (lock_timeout) o la base abortó la transacción (interbloqueo o fallo de serialización). No cambia nada; se puede reintentar. */
+            503: {
+                headers: {
+                    /** @description Segundos sugeridos antes de reintentar. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    plataformaCambiarEstadoUsuario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                usuario_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EstadoUsuarioBody"];
+            };
+        };
+        responses: {
+            /** @description Estado resultante de la membresía. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoUsuario"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description La empresa está desactivada (empresa_inactiva; primero se reactiva) o es el último admin activo de la empresa (ultimo_admin). Si aplican los dos, gana empresa_inactiva; un 404 va antes que ambos. No cambia nada. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            429: components["responses"]["DemasiadasSolicitudes"];
+            /** @description No se pudo contar el intento (plat_accion), otro cambio de membresías de la misma empresa retuvo su candado más de 5 s (lock_timeout) o la base abortó la transacción (interbloqueo o fallo de serialización). No cambia nada. */
+            503: {
+                headers: {
+                    /** @description Segundos sugeridos antes de reintentar. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    plataformaRestablecerContrasenaUsuario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                usuario_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContrasenaTemporalBody"];
+            };
+        };
+        responses: {
+            /** @description Contraseña temporal definida; sin cuerpo. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description La empresa está desactivada (empresa_inactiva; primero se reactiva). Un 404 va antes. empresa_inactiva se evalúa con el estado serializado (bajo el candado por empresa): con el candado ocupado puede responderse 503 en su lugar. No cambia nada. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            /** @description La contraseña no cumple la política (contrasena_*, campo password) o la confirmación no coincide (contrasenas_distintas, campo password_confirmacion). No cambia nada. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["DemasiadasSolicitudes"];
+            /** @description No se pudo contar el intento (plat_accion), otro cambio de usuarios de una de las empresas de la persona retuvo su candado más de 5 s (lock_timeout) o la base abortó la transacción (interbloqueo o fallo de serialización). No cambia nada; se puede reintentar. */
+            503: {
+                headers: {
+                    /** @description Segundos sugeridos antes de reintentar. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    plataformaSubirLogoEmpresa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["SubirLogoBody"];
+            };
+        };
+        responses: {
+            200: components["responses"]["LogoPlataformaGuardado"];
+            201: components["responses"]["LogoPlataformaGuardado"];
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description El logo_id ya se usó, en esta u otra empresa (logo_id_en_uso), el tenant no tiene sus datos de empresa (empresa_sin_datos) o no tiene ninguna membresía admin (empresa_sin_admin). No cambia nada ni deja archivo. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["FotoDemasiadoGrande"];
+            415: components["responses"]["FotoTipoNoAdmitido"];
+            422: components["responses"]["FotoInvalida"];
+            429: components["responses"]["DemasiadasSolicitudes"];
+            /** @description El almacén de imágenes no está configurado (logos_no_disponibles; la empresa ya existe y el paso se puede saltar), no se pudo contar el intento (plat_accion), la ficha de la empresa siguió bloqueada más de 5 s (lock_timeout) o la base abortó la transacción (servicio_no_disponible, con Retry-After). No cambia nada ni deja archivo. */
+            503: {
+                headers: {
+                    /** @description Segundos sugeridos antes de reintentar (solo servicio_no_disponible). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    plataformaLeerFichaEmpresa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La ficha vigente. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FichaEmpresaPlataforma"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description El tenant no tiene sus datos de empresa (empresa_sin_datos; p. ej. creado por el comando create-tenant): los completa su admin desde su pantalla Empresa. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    plataformaEditarFichaEmpresa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FichaEmpresaPlataformaBody"];
+            };
+        };
+        responses: {
+            /** @description La ficha resultante (la misma de antes si no cambió nada). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FichaEmpresaPlataforma"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            404: components["responses"]["NoEncontrado"];
+            /** @description El tenant no tiene sus datos de empresa (empresa_sin_datos); la consola no los crea. No cambia nada. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["CuerpoDemasiadoGrande"];
+            /** @description Un dato de la ficha no es válido (en campo, cuál). No cambia nada. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["DemasiadasSolicitudes"];
+            /** @description No se pudo contar el intento (plat_accion), la ficha de la empresa siguió bloqueada más de 5 s (lock_timeout) o la base abortó la transacción (interbloqueo o fallo de serialización). No cambia nada; se puede reintentar. */
+            503: {
+                headers: {
+                    /** @description Segundos sugeridos antes de reintentar. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    plataformaActividad: {
+        parameters: {
+            query?: {
+                /** @description Id de la empresa (UUID en minúsculas; no el UUID nulo). */
+                empresa_id?: string;
+                accion?: components["schemas"]["AccionAuditoria"];
+                /** @description Primer día incluido (AAAA-MM-DD, hora de Colombia). */
+                desde?: string;
+                /** @description Último día incluido (AAAA-MM-DD, hora de Colombia); no antes de desde. */
+                hasta?: string;
+                /** @description Registros por página, de 1 a 100 (por defecto 50). */
+                limite?: number;
+                /** @description Valor opaco; el siguiente de la página anterior. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Una página de la auditoría. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActividadPlataforma"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
         };
     };
 }

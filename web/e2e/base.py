@@ -4,6 +4,9 @@
 2. Migra con Alembic hasta la cabeza.
 3. Crea el tenant «Clínica E2E» y guarda **solo** el token de la invitación del primer
    admin en ``e2e/.estado/tenant.json`` (ignorado por git).
+4. Spec 017, T9: crea un desarrollador de la consola con la CLI de T1
+   (``flask crear-desarrollador --password-stdin``) y una contraseña aleatoria de esta
+   corrida, guardada solo en ``e2e/.estado/plataforma.json`` (ignorado por git).
 
 Se ejecuta con el entorno de uv del backend: ``uv run --project ../backend python e2e/base.py``.
 Nunca muestra URL ni contraseñas.
@@ -12,6 +15,7 @@ Nunca muestra URL ni contraseñas.
 import json
 import os
 import re
+import secrets
 import subprocess
 import sys
 
@@ -49,7 +53,26 @@ def main() -> None:
         raise SystemExit("e2e: create-tenant no devolvió el enlace de invitación.")
     ESTADO.mkdir(exist_ok=True)
     (ESTADO / "tenant.json").write_text(json.dumps({"token": token.group(1)}), encoding="utf-8")
+    crear_desarrollador(entorno)
     print(f"e2e: base {BASE_E2E} lista y migrada.")
+
+
+DESARROLLADOR = "dev@e2e.ejemplo.test"
+
+
+def crear_desarrollador(entorno: dict[str, str]) -> None:
+    """Desarrollador de e2e por la CLI (nombre y contraseña por la entrada estándar)."""
+    clave = f"E2e-Plataforma-{secrets.token_urlsafe(12)}"
+    subprocess.run(
+        [sys.executable, "-m", "flask", "--app", "app", "crear-desarrollador", DESARROLLADOR, "--password-stdin"],
+        cwd=BACKEND,
+        env=entorno,
+        input=f"Dev E2E\n{clave}\n",
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    (ESTADO / "plataforma.json").write_text(json.dumps({"email": DESARROLLADOR, "password": clave}), encoding="utf-8")
 
 
 if __name__ == "__main__":

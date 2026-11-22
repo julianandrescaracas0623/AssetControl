@@ -38,7 +38,7 @@ function conPuntos(base: string): string {
   return base.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
-/** `890903938-8` → `890.903.938-8`; `null` si no es válido. Sin guion, sin dígito. */
+/** `900123456-8` → `900.123.456-8`; `null` si no es válido. Sin guion, sin dígito. */
 export function normalizarNit(valor: string): string | null {
   const coincide = /^(\d[\d. ]*\d)(?:\s*-\s*(\d+))?$/.exec(valor.trim())
   if (!coincide) return null

@@ -2,6 +2,8 @@ import { CircleAlert } from 'lucide-react'
 import type { ComponentProps, ReactNode } from 'react'
 
 import { Input } from '@/components/ui/input'
+
+import { Fecha } from './Fecha'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
@@ -182,13 +184,33 @@ export function Campo(props: CampoProps) {
     )
   }
 
-  const { tipo = 'texto', sufijo, grande = false, ...nativo } = resto
+  const { tipo = 'texto', sufijo, grande = false, type, ...nativo } = resto
+  if (type === 'date') {
+    return (
+      <MarcoCampo {...marco}>
+        <Fecha
+          id={id}
+          name={typeof nativo.name === 'string' ? nativo.name : undefined}
+          value={typeof nativo.value === 'string' ? nativo.value : ''}
+          onChange={nativo.onChange}
+          disabled={nativo.disabled}
+          readOnly={nativo.readOnly}
+          min={typeof nativo.min === 'string' ? nativo.min : undefined}
+          max={typeof nativo.max === 'string' ? nativo.max : undefined}
+          aria-invalid={error ? true : nativo['aria-invalid'] === true || nativo['aria-invalid'] === 'true' ? true : undefined}
+          aria-describedby={describedBy}
+          aria-required={obligatorio || nativo['aria-required'] === true || undefined}
+        />
+      </MarcoCampo>
+    )
+  }
   const { clase, inputMode } = ENTRADA[tipo]
   const control = (
     <Input
       inputMode={inputMode}
       spellCheck={tipo === 'codigo' ? false : undefined}
       {...nativo}
+      type={type}
       id={id}
       aria-describedby={describedBy}
       aria-invalid={error ? true : nativo['aria-invalid']}

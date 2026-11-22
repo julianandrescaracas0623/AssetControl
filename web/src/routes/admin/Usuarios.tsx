@@ -30,7 +30,7 @@ function SelectorRol({ valor, onCambio }: { valor: Rol; onCambio: (rol: Rol) => 
           <label
             key={rol}
             className={cn(
-              'flex min-h-control cursor-pointer items-start gap-3 rounded-lg border bg-card p-3 shadow-xs transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-card motion-reduce:transition-none',
+              'flex min-h-control cursor-pointer items-start gap-3 rounded-lg border bg-card p-3 shadow-xs transition-colors has-[:focus-visible]:border-foreground motion-reduce:transition-none',
               valor === rol ? 'border-brand-border bg-brand-soft' : 'hover:bg-muted',
             )}
           >
