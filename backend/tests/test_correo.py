@@ -172,13 +172,65 @@ def test_message_is_plain_spanish_text_with_link_and_fixed_subject():
     assert mensaje["From"] == REMITENTE
     assert mensaje["Auto-Submitted"] == "auto-generated"
     assert mensaje["Message-ID"]
-    assert mensaje.get_content_type() == "text/plain"
-    assert mensaje.get_content_charset() == "utf-8"
-    cuerpo = mensaje.get_content()
+    assert mensaje.get_content_type() == "multipart/alternative"
+    partes = [parte.get_content_type() for parte in mensaje.iter_parts()]
+    # El texto plano va primero: los clientes muestran la última alternativa que entienden.
+    assert partes == ["text/plain", "text/html"]
+    texto = mensaje.get_body(preferencelist=("plain",))
+    assert texto.get_content_charset() == "utf-8"
+    cuerpo = texto.get_content()
     assert f"{URL}/restablecer#{token}" in cuerpo
     assert "Vence en 30 minutos y solo sirve una vez" in cuerpo
     assert "Si no lo pediste, ignora este mensaje; tu contraseña no cambia" in cuerpo
     assert "?" not in enlace_recuperacion(URL, token)
+
+
+def test_html_alternative_has_brand_button_and_fallback_link():
+    token = _token()
+
+    mensaje = componer_recuperacion(REMITENTE, DESTINO, URL, token)
+
+    parte = mensaje.get_body(preferencelist=("html",))
+    assert parte.get_content_type() == "text/html"
+    assert parte.get_content_charset() == "utf-8"
+    cuerpo = parte.get_content()
+    enlace = f"{URL}/restablecer#{token}"
+    assert '<html lang="es">' in cuerpo
+    assert "Elegir nueva contraseña" in cuerpo
+    # El botón y el enlace de respaldo apuntan al mismo enlace, y se muestra en texto.
+    assert cuerpo.count(f'href="{enlace}"') == 2
+    assert f">{enlace}</a>" in cuerpo
+    assert "Vence en 30 minutos y solo sirve una vez" in cuerpo
+    assert "Si no lo pediste, ignora este mensaje; tu contraseña no cambia" in cuerpo
+    # Marca del producto (docs/08-diseno-visual.md): botón neutro oscuro, cobalto.
+    assert "#18181B" in cuerpo
+    assert "#2B50E0" in cuerpo
+
+
+def test_html_alternative_loads_nothing_and_has_no_personal_data():
+    token = _token()
+
+    mensaje = componer_recuperacion(REMITENTE, DESTINO, URL, token)
+
+    cuerpo = mensaje.get_body(preferencelist=("html",)).get_content().lower()
+    for prohibido in ("<img", "<script", "<link", "<style", "src=", "url(", "@import"):
+        assert prohibido not in cuerpo
+    # El único destino de red es el enlace de recuperación (R5, R6).
+    assert set(re.findall(r'href="([^"]*)"', cuerpo)) == {f"{URL}/restablecer#{token}".lower()}
+    assert re.findall(r"https?://[^\s\"<]+", cuerpo) == [f"{URL}/restablecer#{token}".lower()] * 3
+    assert DESTINO.lower() not in cuerpo
+    assert "persona" not in cuerpo
+
+
+def test_html_alternative_escapes_the_link():
+    token = _token()
+    url_rara = "https://ejemplo.test/a&b"
+
+    mensaje = componer_recuperacion(REMITENTE, DESTINO, url_rara, token)
+
+    cuerpo = mensaje.get_body(preferencelist=("html",)).get_content()
+    assert f'href="https://ejemplo.test/a&amp;b/restablecer#{token}"' in cuerpo
+    assert "a&b/" not in cuerpo
 
 
 @pytest.mark.parametrize(
@@ -509,8 +561,10 @@ def test_folder_mode_writes_utf8_eml_with_link_and_safe_name(tmp_path, caplog):
     assert mensaje["Subject"] == ASUNTO
     assert mensaje["To"] == DESTINO
     assert mensaje["From"] == REMITENTE
-    assert mensaje.get_content_charset() == "utf-8"
-    assert f"http://localhost:5173/restablecer#{token}" in mensaje.get_content()
+    texto = mensaje.get_body(preferencelist=("plain",))
+    assert texto.get_content_charset() == "utf-8"
+    assert f"http://localhost:5173/restablecer#{token}" in texto.get_content()
+    assert mensaje.get_body(preferencelist=("html",)) is not None
     _assert_sin_secretos(_log_text(caplog), token)
 
 
