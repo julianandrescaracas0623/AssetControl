@@ -94,6 +94,22 @@ PLATAFORMA = (
     "plataforma_buscar_login",
 )
 
+# Spec 017, T2–T9 (0027–0032): dueña plataforma_owner y EXECUTE solo para la app
+# (ninguna del migrador). Son de la app, no de PLATAFORMA: el migrador no las ejecuta.
+PLATAFORMA_APP = (
+    "plataforma_actualizar_empresa",
+    "plataforma_cambiar_estado_membresia",
+    "plataforma_cambiar_estado_tenant",
+    "plataforma_cambiar_usuario",
+    "plataforma_crear_tenant",
+    "plataforma_leer_empresa",
+    "plataforma_listar_auditoria",
+    "plataforma_listar_tenants",
+    "plataforma_listar_usuarios",
+    "plataforma_registrar_logo",
+    "plataforma_restablecer_password_usuario",
+)
+
 
 def test_access_functions_belong_to_their_owner_and_only_the_app_runs_them():
     filas = consulta(
@@ -110,11 +126,16 @@ def test_access_functions_belong_to_their_owner_and_only_the_app_runs_them():
         # Spec 014, T2 (0016).
         "solicitar_recuperacion",
         "restablecer_contrasena",
+        # Spec 017 (0024/0026): dueña auth_owner.
+        "cambiar_password_propio",
         *PLATAFORMA,
+        *PLATAFORMA_APP,
     }
     del_migrador = {"crear_tenant", *(f for f in PLATAFORMA if f != "plataforma_buscar_login")}
     for nombre, dueno, acl in filas:
-        esperado = roles.PLATAFORMA_OWNER if nombre in PLATAFORMA else roles.AUTH_OWNER
+        esperado = (
+            roles.PLATAFORMA_OWNER if nombre in (*PLATAFORMA, *PLATAFORMA_APP) else roles.AUTH_OWNER
+        )
         assert dueno == esperado, nombre
         concedidos = {e.split("=")[0] for e in acl.strip("{}").split(",")} - {esperado}
         assert concedidos == ({migrador} if nombre in del_migrador else {APP_USER}), nombre

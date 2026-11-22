@@ -438,9 +438,7 @@ def test_a_logo_set_by_the_admin_is_replaced_and_kept(client, headers, logo_db, 
     assert f"{empresa.id}/{del_admin}.png" in _archivos(carpeta, empresa.id)
 
 
-def test_after_the_admin_removes_the_logo_the_upload_is_audited_as_subido(
-    client, headers, logo_db
-):
+def test_after_the_admin_removes_the_logo_the_upload_is_audited_as_subido(client, headers, logo_db):
     empresa = _empresa(client, headers)
     primero = uuid.uuid4()
     assert _subir(client, headers, empresa.id, _png(), primero).status_code == 201
