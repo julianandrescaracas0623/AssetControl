@@ -219,6 +219,8 @@ describe('el diálogo (R58, R60, R39)', () => {
     expect(texto).toContain('Se cerrarán todas sus sesiones abiertas, también en otras empresas')
     expect(texto).toContain('deberá cambiar esta contraseña al entrar')
     expect(texto).toContain('No se vuelve a mostrar')
+    // C1d (R65): la persona recibe un aviso por correo.
+    expect(texto).toContain('Le enviaremos un aviso a su correo.')
     expect(texto).not.toContain(CLAVE)
     fireEvent.click(within(confirmar).getByRole('button', { name: 'Cancelar' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())

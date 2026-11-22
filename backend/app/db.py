@@ -723,6 +723,23 @@ def restablecer_contrasena(clave: str, password_hash: str) -> uuid.UUID | None:
     return usuario
 
 
+def pedir_enlace_recuperacion(email: str, clave: str) -> bool:
+    """``acceso.solicitar_recuperacion`` en una transacción propia y corta, **sin** los
+    contadores de la 014 (spec 017, C1d, R61; plan §12.1).
+
+    Solo para el aviso de una contraseña temporal recién definida desde la consola: esa
+    acción ya está autenticada, auditada y limitada por ``plat_accion``. ``email`` ya
+    normalizado y ``clave = sha256(token)`` en hex. La elegibilidad es la de 0016 (usuario
+    activo con exactamente una membresía activa). Devuelve ``True`` solo si la función
+    creó el enlace. Nunca se llama dentro de ``tenant_session`` ni de la
+    ``plataforma_session``; los errores de base se propagan sin leer su mensaje.
+    """
+    database = _get_database()
+    with database.engine.connect() as connection, connection.begin():
+        creado = connection.scalar(_SOLICITAR_RECUPERACION, {"email": email, "clave": clave})
+    return creado is True
+
+
 # --- Cambio de contraseña propio (spec 017, T4; R27; plan.md §2.6) ----------------------
 
 _CAMBIAR_PASSWORD_PROPIO = text(

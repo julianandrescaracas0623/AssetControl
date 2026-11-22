@@ -289,6 +289,7 @@ export function RestablecerContrasena({ empresa, usuario, onCerrar }: Props) {
             <>
               Vas a definir una contraseña temporal para <strong>{usuario.nombre}</strong> en <strong>{empresa.nombre}</strong>. Se cerrarán todas sus
               sesiones abiertas, también en otras empresas donde tenga acceso, y deberá cambiar esta contraseña al entrar. No se vuelve a mostrar.
+              Le enviaremos un aviso a su correo.
             </>
           }
           textoConfirmar="Sí, definir la contraseña"
