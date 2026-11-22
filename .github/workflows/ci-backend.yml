@@ -62,6 +62,27 @@ jobs:
         with:
           python-version: "3.12"
 
+      # El servicio postgres de GitHub viene sin TLS. La prueba de sslmode=require
+      # (test_revisar_conexiones) necesita que el servidor lo ofrezca: se genera un
+      # certificado autofirmado solo para esta base desechable de CI.
+      - name: Habilitar TLS en el PostgreSQL de servicio (solo CI)
+        run: |
+          set -euo pipefail
+          cid=$(docker ps --filter "ancestor=postgres:17" --format '{{.ID}}' | head -1)
+          test -n "$cid"
+          openssl req -new -x509 -days 1 -nodes -subj "/CN=localhost" \
+            -keyout "$RUNNER_TEMP/server.key" -out "$RUNNER_TEMP/server.crt" 2>/dev/null
+          docker cp "$RUNNER_TEMP/server.key" "$cid:/var/lib/postgresql/data/server.key"
+          docker cp "$RUNNER_TEMP/server.crt" "$cid:/var/lib/postgresql/data/server.crt"
+          docker exec -u root "$cid" sh -c 'chown postgres:postgres /var/lib/postgresql/data/server.key /var/lib/postgresql/data/server.crt && chmod 600 /var/lib/postgresql/data/server.key'
+          docker exec -u postgres "$cid" psql -X -v ON_ERROR_STOP=1 -U assetcontrol_admin -d postgres -c "ALTER SYSTEM SET ssl = on"
+          docker restart "$cid" >/dev/null
+          for _ in $(seq 1 30); do
+            if docker exec "$cid" pg_isready -U assetcontrol_admin -d assetcontrol_test >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          docker exec -u postgres "$cid" psql -X -tA -U assetcontrol_admin -d postgres -c "SHOW ssl" | grep -qx on
+
       # Misma versión de uv que backend/Dockerfile.
       - name: Instalar uv
         run: |
