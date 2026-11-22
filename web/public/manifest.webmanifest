@@ -1,0 +1,17 @@
+{
+  "name": "AssetControl",
+  "short_name": "AssetControl",
+  "description": "Inventario de activos: contar, verificar y registrar con el teléfono.",
+  "lang": "es-CO",
+  "start_url": "/contar",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#18181B",
+  "icons": [
+    { "src": "/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icono-mascara-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,115 @@
+"""Application factory de AssetControl.
+
+No abre conexiones al importar ni al crear la app: el engine de base de datos
+se crea en ``create_app`` (``init_db``) y la primera conexión se abre al usarlo.
+"""
+
+from flask import Flask
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+from app.activos.routes import bp as activos_bp
+from app.activos.valor import bp as valor_bp
+from app.auth.credentials import init_credentials
+from app.auth.http import register_auth_http_policy
+from app.auth.routes import bp as auth_bp
+from app.catalogo.routes import categorias_bp, ubicaciones_bp
+from app.cli import register_cli
+from app.config import CONFIG_EXTENSION_KEY, Config, load_config
+from app.conteo.routes import bp as sesiones_bp
+from app.correo import EXTENSION_KEY as CORREO_EXTENSION_KEY
+from app.correo import crear as crear_correo
+from app.db import init_db
+from app.empresa.routes import bp as empresa_bp
+from app.errors import register_error_handlers
+from app.fotos import almacen as fotos_almacen
+from app.fotos.routes import bp as fotos_bp
+from app.inicio.routes import bp as inicio_bp
+from app.invitaciones.routes import bp as invitaciones_bp
+from app.meta.routes import bp as meta_bp
+from app.plataforma import register_plataforma
+from app.version import __version__
+
+__all__ = ["__version__", "create_app"]
+
+
+def create_app(config: Config | None = None) -> Flask:
+    """Crea una instancia aislada de la aplicación.
+
+    Si no se pasa ``config``, se lee del entorno y falla con
+    ``MissingConfigError`` si falta una variable obligatoria o con
+    ``WeakSecretKeyError`` si ``SECRET_KEY`` es corta fuera de pruebas,
+    ``InvalidEnvironmentError`` fuera de la lista cerrada y
+    ``UnsafeTestEnvironmentError`` con ``ENVIRONMENT=test`` fuera de pytest.
+    Calcula aquí el hash simulado de contraseñas (una vez por app).
+    """
+    if config is None:
+        config = load_config()
+
+    # Sin carpeta estática: la API no sirve archivos y la ruta ``static`` quedaría fuera
+    # del catálogo de roles (H7 de T8).
+    app = Flask(__name__, static_folder=None)
+    app.config.update(config.to_flask())
+    app.extensions[CONFIG_EXTENSION_KEY] = config
+    if config.is_test:
+        app.logger.warning(
+            "ENVIRONMENT=test: SECRET_KEY corta admitida y Argon2 de bajo costo; solo para pruebas."
+        )
+    init_db(app)
+    init_credentials(app)
+    # Spec 012 (Q3): almacenamiento de fotos; ``None`` = fotos desactivadas (503).
+    app.extensions[fotos_almacen.EXTENSION_KEY] = fotos_almacen.crear(config.almacen)
+    if config.almacen is None and not config.is_test:
+        app.logger.warning(
+            "Fotos desactivadas: falta ALMACEN=s3 y sus variables S3_* (docs/09-despliegue.md)."
+        )
+    # Spec 014 (R7): correo de recuperación; sin ``CORREO_MODO`` queda desactivada.
+    app.extensions[CORREO_EXTENSION_KEY] = crear_correo(config.correo)
+    if config.correo is None and not config.is_test:
+        app.logger.warning(
+            "Recuperación de contraseña desactivada: falta CORREO_MODO (carpeta en "
+            "development o smtp con TLS; docs/10-entorno-local.md)."
+        )
+    register_error_handlers(app)
+    register_auth_http_policy(app)
+    app.register_blueprint(meta_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(invitaciones_bp)
+    app.register_blueprint(ubicaciones_bp)
+    app.register_blueprint(categorias_bp)
+    app.register_blueprint(activos_bp)
+    app.register_blueprint(sesiones_bp)
+    app.register_blueprint(valor_bp)
+    app.register_blueprint(inicio_bp)
+    app.register_blueprint(empresa_bp)
+    app.register_blueprint(fotos_bp)
+    # Spec 017 (R1): consola de plataforma; sin PLATAFORMA_HABILITADA=true no registra nada.
+    register_plataforma(app)
+    register_cli(app)
+    if config.environment == "production" and not config.trusted_proxy_hops:
+        # Deuda (e) de la spec 002 / spec 010b (R3): detrás del proxy de la plataforma,
+        # sin saltos de confianza todas las peticiones parecen venir de la IP del proxy
+        # y el límite de tasa las cuenta juntas.
+        app.logger.warning(
+            "ENVIRONMENT=production con TRUSTED_PROXY_HOPS=0: detrás de un proxy, fija "
+            "TRUSTED_PROXY_HOPS (normalmente 1) o el límite de tasa tratará a todos como uno."
+        )
+    if (
+        config.environment == "production"
+        and config.plataforma.redes_permitidas
+        and not config.trusted_proxy_hops
+    ):
+        # Spec 017 (T2): la restricción por red compara ``remote_addr``; detrás de un proxy
+        # sin saltos de confianza es la IP del proxy. No se registran las redes.
+        app.logger.warning(
+            "ENVIRONMENT=production con PLATAFORMA_REDES_PERMITIDAS y TRUSTED_PROXY_HOPS=0: "
+            "la restricción por red de la consola depende de TRUSTED_PROXY_HOPS; detrás de "
+            "un proxy compara la IP del proxy, no la del cliente."
+        )
+    if config.trusted_proxy_hops:
+        # T10: la IP del cliente para el límite de tasa sale de X-Forwarded-For solo con
+        # saltos de proxy de confianza explícitos; nada más (Host, esquema, puerto, prefijo)
+        # se toma de cabeceras reenviadas: lo usa la comprobación de mismo sitio (Q14).
+        app.wsgi_app = ProxyFix(  # type: ignore[method-assign]
+            app.wsgi_app, x_for=config.trusted_proxy_hops, x_proto=0, x_host=0, x_port=0, x_prefix=0
+        )
+    return app

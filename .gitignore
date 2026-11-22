@@ -1,7 +1,62 @@
+# Entornos y secretos
+.env
+.env.*
+!.env.example
+
+# Datos de la clínica: nunca se versionan
+datos/
+*.xlsx
+*.xls
+*.xlsm
+*.xlsb
+*.ods
+*.csv
+*.sql
+
+# Python (backend)
 __pycache__/
 *.pyc
 .venv/
-.env
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node / web
 node_modules/
-.expo/
-*.sqlite
+dist/
+# Pruebas e2e (spec 010c): informes, rastros y el token del tenant de e2e.
+web/playwright-report/
+web/test-results/
+web/e2e/.estado/
+web/e2e/__pycache__/
+build/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# Editores / SO
+.DS_Store
+.vscode/
+.idea/
+
+# Utilidades locales
+*.bundle
+
+# Arneses y configuración local de asistentes (NO se publican, ADR-004)
+.claude/
+.cursor/
+.agents/
+skills-lock.json
+AGENTS.md
+CLAUDE.md
+MEMORY.md
+/postgres/
+/pgadmin/
+
+# Spec 012: fotos guardadas en la carpeta local de desarrollo (nunca al repo).
+backend/.almacen/
+
+# Spec 014: correos de desarrollo (.eml con enlaces válidos; nunca al repo).
+backend/.buzon/

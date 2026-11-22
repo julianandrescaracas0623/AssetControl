@@ -1,0 +1,303 @@
+name: CI backend
+
+# Corre en todo PR hacia develop, main y las ramas encadenadas (feat/**, docs/**).
+# Sin filtro de rutas: un check obligatorio que no corre deja el PR bloqueado o,
+# peor, en verde sin haberse ejecutado (riesgo de T10).
+on:
+  pull_request:
+    branches: [main, develop, "feat/**", "docs/**"]
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-backend-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      # Superusuario del servicio = rol migrador (dueño del esquema), como en docker-compose.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: assetcontrol_admin
+          POSTGRES_PASSWORD: ci-migrador-efimera
+          POSTGRES_DB: assetcontrol_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U assetcontrol_admin -d assetcontrol_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Contraseñas efímeras del servicio desechable de CI: no son secretos ni datos reales.
+      POSTGRES_USER: assetcontrol_admin
+      POSTGRES_PASSWORD: ci-migrador-efimera
+      POSTGRES_DB: assetcontrol_test
+      APP_DB_USER: assetcontrol_app
+      APP_DB_PASSWORD: ci-app-efimera
+      # La app y las pruebas usan el rol de la aplicación (sin SUPERUSER ni BYPASSRLS).
+      DATABASE_URL: postgresql+psycopg://assetcontrol_app:ci-app-efimera@localhost:5432/assetcontrol_test
+      TEST_DATABASE_URL: postgresql+psycopg://assetcontrol_app:ci-app-efimera@localhost:5432/assetcontrol_test
+      # Solo para crear y eliminar esquema: rol migrador.
+      MIGRATION_DATABASE_URL: postgresql+psycopg://assetcontrol_admin:ci-migrador-efimera@localhost:5432/assetcontrol_test
+      TEST_MIGRATION_DATABASE_URL: postgresql+psycopg://assetcontrol_admin:ci-migrador-efimera@localhost:5432/assetcontrol_test
+      SECRET_KEY: ci-clave-efimera
+      ENVIRONMENT: test
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # Misma versión de uv que backend/Dockerfile.
+      - name: Instalar uv
+        run: |
+          python -m pip install "uv==0.13.7"
+          uv --version
+
+      - name: Instalar dependencias (uv)
+        run: uv sync --locked --group dev
+
+      - name: Lint (ruff)
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      # Mismo script de init de T3 que usa docker-compose; usa bashismos: siempre con bash.
+      - name: Crear rol de la aplicación
+        working-directory: .
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGPASSWORD: ci-migrador-efimera
+        run: |
+          psql --version
+          bash docker/postgres/init/01-app-role.sh
+
+      # Spec 002, P0 (A0): el script deja auth_owner NOLOGIN, sin contraseña, sin
+      # SUPERUSER, BYPASSRLS, CREATEROLE, CREATEDB ni REPLICATION, sin membresías
+      # con ningún rol, sin CREATE en esquemas ni bases y sin dependencias
+      # compartidas (pg_shdepend: dueño o ACL en cualquier base). Además repara un
+      # auth_owner manipulado y es idempotente.
+      # Debe ejecutarse antes de las migraciones (tras 0004 auth_owner será dueño de funciones).
+      - name: Rol auth_owner seguro, reparable e init idempotente
+        working-directory: .
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGPASSWORD: ci-migrador-efimera
+        run: |
+          set -euo pipefail
+          # login|super|bypassrls|createrole|createdb|replication|sin_password|
+          # membresias|create_esquemas|create_bases|shdepend
+          expected="f|f|f|f|f|f|t|0|0|0|0"
+          migrator_psql() {
+            psql -X -qtA -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" "$@"
+          }
+          auth_owner_state() {
+            # pg_authid (no pg_roles) para leer rolpassword; pg_database y pg_shdepend son
+            # catálogos compartidos: cubren todas las bases del clúster.
+            migrator_psql <<'EOSQL'
+          SELECT concat_ws('|',
+            a.rolcanlogin, a.rolsuper, a.rolbypassrls,
+            a.rolcreaterole, a.rolcreatedb, a.rolreplication,
+            a.rolpassword IS NULL,
+            (SELECT count(*) FROM pg_auth_members m WHERE a.oid IN (m.roleid, m.member)),
+            (SELECT count(*) FROM pg_namespace n WHERE has_schema_privilege(a.oid, n.oid, 'CREATE')),
+            (SELECT count(*) FROM pg_database d WHERE has_database_privilege(a.oid, d.oid, 'CREATE')),
+            (SELECT count(*) FROM pg_shdepend s
+              WHERE s.refclassid = 'pg_authid'::regclass AND s.refobjid = a.oid))
+          FROM pg_authid a WHERE a.rolname = 'auth_owner';
+          EOSQL
+          }
+          assert_state() {
+            local result
+            result=$(auth_owner_state)
+            if [ "$result" != "$expected" ]; then
+              echo "::error::auth_owner falta o es inseguro ($1): '${result}', se esperaba '${expected}'."
+              exit 1
+            fi
+          }
+          app_url="${DATABASE_URL/+psycopg/}"
+
+          # 1. Estado tras la primera ejecución (paso anterior).
+          assert_state "primera ejecución"
+
+          # 2. Manipulación como migrador: LOGIN, CREATEROLE, contraseña, membresías en
+          #    ambos sentidos con otros roles (también con otro grantor y con un rol
+          #    predefinido) y CREATE en el esquema y la base.
+          migrator_psql -v app_user="$APP_DB_USER" -v db_name="$POSTGRES_DB" <<'EOSQL'
+          ALTER ROLE auth_owner LOGIN CREATEROLE PASSWORD 'ci-auth-owner-efimera';
+          CREATE ROLE ci_otro_grantor NOLOGIN;
+          GRANT auth_owner TO ci_otro_grantor WITH ADMIN OPTION;
+          GRANT auth_owner TO :"app_user";
+          GRANT auth_owner TO :"app_user" GRANTED BY ci_otro_grantor;
+          GRANT pg_read_all_data TO auth_owner;
+          GRANT CREATE ON SCHEMA public TO auth_owner;
+          GRANT CREATE ON DATABASE :"db_name" TO auth_owner;
+          EOSQL
+          # La manipulación surte efecto: la aplicación puede asumir auth_owner.
+          psql "$app_url" -X -qtA -v ON_ERROR_STOP=1 -c 'SET ROLE auth_owner' >/dev/null
+          if [ "$(auth_owner_state)" = "$expected" ]; then
+            echo "::error::La manipulación de auth_owner no cambió su estado: la prueba no es válida."
+            exit 1
+          fi
+
+          # 3. Reejecución: el script repara todo.
+          bash docker/postgres/init/01-app-role.sh
+          assert_state "tras reparar"
+          if out=$(psql "$app_url" -X -qtA -v ON_ERROR_STOP=1 -c 'SET ROLE auth_owner' 2>&1); then
+            echo "::error::El rol de la aplicación todavía puede hacer SET ROLE auth_owner."
+            exit 1
+          fi
+          case "$out" in
+            *"permission denied to set role"*) ;;
+            *) echo "::error::SET ROLE auth_owner falló por otro motivo: ${out}"; exit 1 ;;
+          esac
+
+          # 3b. Sentido inverso (auth_owner miembro del rol de la aplicación). Va aparte:
+          #     PostgreSQL rechaza la membresía circular junto con la del paso 2.
+          echo 'GRANT :"app_user" TO auth_owner;' | migrator_psql -v app_user="$APP_DB_USER"
+          if [ "$(auth_owner_state)" = "$expected" ]; then
+            echo "::error::La membresía inversa no cambió el estado de auth_owner: la prueba no es válida."
+            exit 1
+          fi
+          bash docker/postgres/init/01-app-role.sh
+          assert_state "tras reparar el sentido inverso"
+
+          # 4. Idempotente: otra ejecución no cambia nada ni emite avisos.
+          rerun_err=$(mktemp)
+          bash docker/postgres/init/01-app-role.sh 2>"$rerun_err"
+          if grep -q 'WARNING' "$rerun_err"; then
+            cat "$rerun_err"
+            echo "::error::La reejecución del script emitió avisos."
+            exit 1
+          fi
+          assert_state "reejecución"
+          echo "auth_owner seguro, reparado tras manipularlo e init idempotente sin avisos."
+
+      # TEST_DATABASE_URL nunca puede ser el superusuario del servicio ni el migrador.
+      - name: Rol de pruebas sin SUPERUSER ni BYPASSRLS
+        run: |
+          url="${TEST_DATABASE_URL/+psycopg/}"
+          # El nombre del migrador va como variable de psql (:'migrator'), no interpolado en el SQL.
+          result=$(echo "SELECT current_user <> :'migrator' AND NOT rolsuper AND NOT rolbypassrls FROM pg_roles WHERE rolname = current_user" |
+            psql "$url" -X -qtA -v ON_ERROR_STOP=1 -v migrator="$POSTGRES_USER")
+          if [ "$result" != "t" ]; then
+            echo "::error::TEST_DATABASE_URL usa un rol superusuario, con BYPASSRLS o el migrador."
+            exit 1
+          fi
+          echo "TEST_DATABASE_URL usa el rol de la aplicación sin SUPERUSER ni BYPASSRLS."
+
+      - name: Migraciones con el rol migrador (subir, bajar, subir)
+        run: |
+          uv run alembic upgrade head
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+
+      # Una prueba "bloqueada" (falta base o rol) nunca cuenta como verde.
+      - name: Pruebas (pytest)
+        run: |
+          set -o pipefail
+          status=0
+          uv run pytest -q 2>&1 | tee pytest.log || status=$?
+          # El resumen corto trunca el motivo; se busca el mensaje completo en todo el log.
+          if grep -q 'bloqueado:' pytest.log; then
+            echo "::error::Hay pruebas bloqueadas: falta la base de pruebas o el rol de la aplicación."
+            exit 1
+          fi
+          exit "$status"
+
+  # Spec 010b, T4 (C8 de la spec 002): la base preparada como en Supabase, donde el rol
+  # migrador ("postgres") NO es superusuario y PostgreSQL 16+ le concede ADMIN sobre los
+  # roles que crea. Aquí el superusuario del servicio hace de superusuario del proveedor
+  # (supabase_admin) y solo crea el entorno; roles, migraciones y pruebas los hace "postgres".
+  c8:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: supabase_admin
+          POSTGRES_PASSWORD: ci-proveedor-efimera
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U supabase_admin -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Valores efímeros de este servicio desechable: no son secretos ni datos reales.
+      APP_DB_USER: assetcontrol_app
+      APP_DB_PASSWORD: ci-app-supabase-efimera-0123456789
+      MIGRATION_DATABASE_URL: postgresql+psycopg://postgres:ci-postgres-efimera@localhost:5432/assetcontrol
+      DATABASE_URL: postgresql+psycopg://assetcontrol_app:ci-app-supabase-efimera-0123456789@localhost:5432/assetcontrol
+      C8_MIGRATION_DATABASE_URL: postgresql+psycopg://postgres:ci-postgres-efimera@localhost:5432/assetcontrol
+      C8_DATABASE_URL: postgresql+psycopg://assetcontrol_app:ci-app-supabase-efimera-0123456789@localhost:5432/assetcontrol
+      SECRET_KEY: ci-clave-efimera-de-al-menos-32-bytes-xx
+      ENVIRONMENT: development
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Instalar uv
+        run: python -m pip install "uv==0.13.7"
+
+      - name: Instalar dependencias (uv)
+        run: uv sync --locked --group dev
+
+      - name: Entorno como Supabase (lo hace el superusuario del proveedor)
+        env:
+          PGHOST: localhost
+          PGUSER: supabase_admin
+          PGPASSWORD: ci-proveedor-efimera
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -d postgres \
+            -c "CREATE ROLE postgres LOGIN CREATEROLE CREATEDB REPLICATION BYPASSRLS NOSUPERUSER PASSWORD 'ci-postgres-efimera'" \
+            -c "ALTER ROLE postgres SET createrole_self_grant = 'set, inherit'" \
+            -c "CREATE ROLE anon NOLOGIN" -c "CREATE ROLE authenticated NOLOGIN" \
+            -c "CREATE ROLE service_role NOLOGIN BYPASSRLS" \
+            -c "GRANT anon, authenticated, service_role TO postgres WITH ADMIN OPTION" \
+            -c "CREATE DATABASE assetcontrol OWNER postgres"
+          # Como Supabase: todo lo que "postgres" cree en public queda concedido a sus roles.
+          psql -X -v ON_ERROR_STOP=1 -d assetcontrol -c "ALTER SCHEMA public OWNER TO postgres" \
+            -c "GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role" \
+            -c "ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role" \
+            -c "ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role" \
+            -c "ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role"
+
+      - name: Roles con el migrador no superusuario (flask preparar-roles)
+        run: uv run flask --app app preparar-roles
+
+      - name: Migraciones con el migrador no superusuario
+        run: |
+          uv run alembic upgrade head
+          uv run alembic current
+
+      - name: Pruebas C8
+        run: uv run pytest -q -p no:randomly tests/test_c8_supabase.py tests/test_preparar_roles.py -rs

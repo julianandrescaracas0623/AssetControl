@@ -1,0 +1,281 @@
+# 10 — Entorno local, paso a paso
+
+> **Spec 010c.** Para dejar AssetControl funcionando en tu PC con Windows desde cero, conectarte a la base y correr las pruebas. Cada paso dice qué escribir y qué deberías ver. Si algo no sale igual, mira la sección 14.
+>
+> Todos los comandos son de **PowerShell**. Donde dice `<algo>`, reemplázalo completo (sin los `< >`).
+
+## 0. Lo que vas a tener al final
+
+- La base PostgreSQL en Docker, con dos usuarios: el **migrador** (dueño, crea tablas) y el de **la app** (solo lo que la app necesita).
+- La API en `http://localhost:5000` y la web en `http://localhost:5173`.
+- Un cliente gráfico (TablePlus o pgAdmin) conectado a la base.
+- Las pruebas del backend, de la web y las de navegador (Playwright) en verde.
+
+## 1. Programas que necesitas (una sola vez)
+
+| Programa | Para qué | Cómo saber si ya lo tienes |
+|---|---|---|
+| Git | El código | `git --version` |
+| Docker Desktop | La base de datos | Abre Docker Desktop: abajo a la izquierda dice *Engine running* |
+| uv | Python y las dependencias del backend | `uv --version` |
+| Node.js 24 | La web | `node --version` → `v24.x` |
+| VS Code | Editar | Extensiones: **Python**, **Pylance**, **ESLint** |
+| TablePlus o pgAdmin | Ver la base | Ya los tienes |
+
+## 2. El archivo `.env` (las conexiones)
+
+`.env` está en la raíz del proyecto (`C:\Users\VICTUS16\Proyectos\AssetControl\.env`). **Nunca se sube a GitHub** (el repo es público). Ábrelo con VS Code.
+
+Está ordenado en seis bloques comentados:
+
+1. **Base local (Docker):** el superusuario del contenedor.
+2. **App:** la conexión que usa Flask para **todo**, tanto el panel admin como la vista móvil del contador. No hay credenciales distintas para cada vista: las dos son la misma web y solo hablan con Flask; el navegador nunca se conecta a la base.
+3. **Migrador:** solo para `alembic` y `preparar-roles`.
+4. **Pruebas:** las bases de `pytest`.
+5. **Flask:** modo, clave de sesiones y opcionales.
+6. **Supabase (producción):** solo las lee `revisar-conexiones`; la app local nunca las usa. El panel web de Supabase se abre con tu cuenta y no va en `.env`.
+
+> Nunca pongas una contraseña dentro de un comentario (`# …`): las herramientas que muestran el archivo también muestran los comentarios.
+
+| Variable | Qué es | Valor en tu PC |
+|---|---|---|
+| `POSTGRES_USER` | Usuario **migrador** (dueño de la base) | p. ej. `assetcontrol_admin` |
+| `POSTGRES_PASSWORD` | Su contraseña | una larga, sin espacios |
+| `POSTGRES_DB` | Nombre de la base | `assetcontrol` |
+| `APP_DB_USER` | Usuario **de la app** | `assetcontrol_app` (distinto del migrador) |
+| `APP_DB_PASSWORD` | Su contraseña | otra larga, sin espacios |
+| `DATABASE_URL` | Cómo entra la app | `postgresql+psycopg://<APP_DB_USER>:<APP_DB_PASSWORD>@127.0.0.1:5432/<POSTGRES_DB>` |
+| `MIGRATION_DATABASE_URL` | Cómo entra el migrador | `postgresql+psycopg://<POSTGRES_USER>:<POSTGRES_PASSWORD>@127.0.0.1:5432/<POSTGRES_DB>` |
+| `TEST_DATABASE_URL` | La app, en la base de pruebas | igual que `DATABASE_URL` pero terminando en `/assetcontrol_test` |
+| `TEST_MIGRATION_DATABASE_URL` | El migrador, en la base de pruebas | igual que `MIGRATION_DATABASE_URL` pero terminando en `/assetcontrol_test` |
+| `SECRET_KEY` | Firma las sesiones | 48 caracteres o más al azar |
+| `ENVIRONMENT` | Modo | `development` |
+| `TRUSTED_PROXY_HOPS` | Proxies delante | `0` en tu PC |
+| `RATE_LIMIT_*`, `ARGON2_MAX_CONCURRENCY` | Opcionales | vacías |
+| `CORREO_MODO` | Recuperar contraseña por correo (spec 014): `carpeta` o `smtp`; vacía = recuperación desactivada | `carpeta` |
+| `URL_PUBLICA` | Base del enlace del correo (sin `/` final, sin `?` ni `#`) | `http://localhost:5173` |
+| `CORREO_CARPETA` | Dónde se escriben los correos en modo `carpeta` | vacía (usa `backend\.buzon\`) |
+| `CORREO_REMITENTE` | Remitente del correo | vacía (usa `AssetControl <no-responder@assetcontrol.invalid>`) |
+| `SMTP_HOST`, `SMTP_PUERTO`, `SMTP_CIFRADO`, `SMTP_USUARIO`, `SMTP_CLAVE` | Solo con `CORREO_MODO=smtp` | vacías |
+
+Reglas que evitan el 90 % de los errores:
+
+1. Usa `127.0.0.1`, no `localhost` (en Windows, `localhost` intenta primero IPv6 y tarda ~10 s).
+2. Si una contraseña tiene `@ : / ? # %`, dentro de las URL va codificada (`@` → `%40`, `#` → `%23`). Más fácil: genera contraseñas sin esos símbolos:
+   ```powershell
+   cd C:\Users\VICTUS16\Proyectos\AssetControl\backend
+   uv run python -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+3. Las contraseñas de `POSTGRES_PASSWORD` y `APP_DB_PASSWORD` se graban en la base **la primera vez** que Docker la crea. Si las cambias después en `.env`, la base no se entera (sección 14, «contraseña incorrecta»).
+
+> Tu `.env` ya quedó revisado y ordenado (2026-11-15): las cuatro URL locales coinciden con los usuarios y contraseñas y usan `127.0.0.1`. Las copias anteriores están en `.env.respaldo-2026-11-15` y `.env.respaldo-2026-11-15b`; **bórralas** cuando confirmes que todo funciona, porque la segunda tiene la contraseña de Supabase en un comentario.
+
+## 3. Encender la base
+
+```powershell
+cd C:\Users\VICTUS16\Proyectos\AssetControl
+docker compose up -d db
+docker compose ps
+```
+
+Deberías ver `assetcontrol-db-1 ... healthy`. Si dice `starting`, espera 10 s y repite `docker compose ps`.
+
+## 4. Instalar las dependencias
+
+```powershell
+cd C:\Users\VICTUS16\Proyectos\AssetControl\backend
+uv sync
+cd ..\web
+npm ci
+```
+
+## 5. Migrar la base (crear o actualizar tablas)
+
+```powershell
+cd C:\Users\VICTUS16\Proyectos\AssetControl\backend
+uv run --env-file ../.env alembic upgrade head
+uv run --env-file ../.env alembic current
+```
+
+La última línea debe terminar en `0012_funciones_sin_supabase (head)`.
+
+> **Siempre** `--env-file ../.env`: `uv run` no lee el `.env` solo. Sin eso sale «Faltan variables de entorno obligatorias».
+
+## 6. Revisar que todas las conexiones estén bien
+
+```powershell
+uv run --env-file ../.env flask --app app revisar-conexiones
+```
+
+Debe salir así (los nombres pueden variar):
+
+```text
+Migraciones del repo: 0012_funciones_sin_supabase
+  OK  DATABASE_URL: bien (rol assetcontrol_app, base assetcontrol, TLS no, migración (la lee el migrador))
+  OK  MIGRATION_DATABASE_URL: bien (rol assetcontrol_admin, base assetcontrol, TLS no, migración 0012_funciones_sin_supabase)
+  OK  TEST_DATABASE_URL: bien (...)
+  OK  TEST_MIGRATION_DATABASE_URL: bien (...)
+  ·  SUPABASE_DATABASE_URL: no configurada
+```
+
+Cada `MAL` dice el motivo en español (contraseña, base apagada, migraciones atrasadas…). El comando **nunca** muestra contraseñas ni direcciones.
+
+## 7. Crear tu clínica de prueba (una vez)
+
+```powershell
+uv run --env-file ../.env flask --app app create-tenant "Clínica de prueba" "tu-correo@ejemplo.com"
+```
+
+Copia la línea que empieza por `/invitacion#…`. La usarás en el paso 8 (vence en 24 h; si vence, repite este paso).
+
+## 8. Encender la app
+
+**Con un solo comando** (recomendado). Abre Docker Desktop, espera a que diga *Engine running* y en PowerShell:
+
+```powershell
+cd C:\Users\VICTUS16\Proyectos\AssetControl
+.\scripts\dev.ps1
+```
+
+El script hace todo en orden y se detiene en el primer problema con un mensaje claro: revisa Docker, uv, Node 24 y el `.env`; enciende la base y espera a que esté sana; instala las dependencias (`uv sync`); aplica las migraciones pendientes; revisa las conexiones; construye y enciende la API y espera a que responda; instala las dependencias de la web si cambiaron y abre Vite. Cuando diga *ready*, abre `http://localhost:5173`.
+
+- `.\scripts\dev.ps1 -SinWeb`: solo base, migraciones y API.
+- `.\scripts\dev.ps1 -Parar`: apaga la base y la API (los datos se conservan).
+- Si Windows dice que no puede ejecutar scripts, una sola vez: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+**A mano**, si prefieres:
+
+```powershell
+cd C:\Users\VICTUS16\Proyectos\AssetControl
+docker compose up -d db
+cd backend; uv sync; uv run --env-file ../.env alembic upgrade head; cd ..
+docker compose up -d --build api
+cd web
+npm run dev
+```
+
+La primera vez, abre `http://localhost:5173/invitacion#<lo que copiaste en el paso 7>` → crea tu cuenta → llegas al **Resumen**. Para dejar de usarla: `Ctrl + C` en la ventana de `npm run dev` y `.\scripts\dev.ps1 -Parar` (o `docker compose stop`).
+
+> **Fotos (spec 012):** en tu PC se guardan en `backend\.almacen\` (ignorada por git; no hace falta configurar nada). Para empezar de cero, borra esa carpeta junto con la base.
+>
+> **Datos de la empresa (spec 013):** antes de cerrar un conteo, entra a **Ajustes → Empresa** y completa nombre, dirección y, si quieres, NIT, teléfono, correo y logo. Salen en el Excel y el PDF de los informes que cierres **desde ese momento**; los ya cerrados conservan lo que tenían. El logo se guarda en la misma carpeta de las fotos.
+>
+> **Recuperar contraseña (spec 014):** con `CORREO_MODO=carpeta` y `URL_PUBLICA=http://localhost:5173` en `.env` (solo con `ENVIRONMENT=development`; en producción la app se niega a arrancar con `carpeta`), «¿Olvidaste tu contraseña?» en `/login` no envía nada: escribe un archivo `.eml` por correo en `backend\.buzon\` (ignorada por git y por la imagen de Docker). Ábrelo con el Bloc de notas o con un cliente de correo (doble clic) y copia el enlace `http://localhost:5173/restablecer#…`: vale 30 minutos y sirve una sola vez; si pides otro, el anterior deja de servir. El nombre del archivo no lleva el correo. **Borra los `.eml` al terminar** (`Remove-Item backend\.buzon\*.eml`): mientras no venzan, sus enlaces cambian la contraseña de esa cuenta. Usa solo correos de prueba, nunca los de la clínica.
+>
+> - `docker-compose.yml` pasa `CORREO_*`, `SMTP_*` y `URL_PUBLICA` de `.env` al contenedor `api`: funciona igual con `.\scripts\dev.ps1`. Si cambias esas variables, recrea la API (`docker compose up -d api`; un `restart` no relee `.env`). Dentro del contenedor el buzón por defecto es `backend\.buzon\` (código montado); deja `CORREO_CARPETA` vacía: una ruta de Windows no existe dentro del contenedor.
+> - Sin `CORREO_MODO` la app arranca con la recuperación **desactivada** (lo avisa una vez en el registro): `/auth/recuperar` responde el mismo `202` (con el mensaje genérico «Si el correo está registrado, te enviamos un enlace…»; la pantalla lo ignora y muestra el suyo, «Si existe una cuenta con ese correo…»), pero no toca la base ni escribe ningún correo.
+> - Solo reciben enlace los usuarios activos con **exactamente una** membresía activa y un correo que sea una dirección simple en ASCII: uno con `%`, `!`, parte local entre comillas dobles, caracteres no ASCII o cualquier correo que no sea una dirección dot-atom simple (p. ej. `..`, punto inicial o final, parte local de más de 64 caracteres) recibe la misma respuesta y ningún enlace.
+> - Para probar SMTP real en tu PC, pon `CORREO_MODO=smtp` y las variables `SMTP_*` de un buzón de pruebas (ver `docs/09`, sección 5); `SMTP_CIFRADO` vale `starttls` por defecto en development, nunca texto plano.
+>
+> **Atajo en el teléfono:** abre la app en el teléfono (ver abajo) → Chrome: menú ⋮ → *Agregar a la pantalla principal* (o *Instalar app*); iPhone: Safari → Compartir → *Agregar a inicio*. Queda el ícono de AssetControl y abre directo en Conteo, sin barra del navegador. Necesita conexión: no funciona sin internet.
+>
+> **Usar la app en el teléfono (con cámara):** la cámara solo funciona con HTTPS. Enciende con `.\scripts\dev.ps1 -Movil` (o, a mano, `$env:VITE_HTTPS = "1"; npm run dev`), abre en el teléfono, con el mismo Wi-Fi, la dirección `https://<IP de tu PC>:5173` que muestra el script y acepta el aviso del certificado de desarrollo. Si Windows pregunta por el firewall, permite **Redes privadas**. Para invitar a un contador que va a entrar desde el teléfono, crea la invitación con la app abierta en `https://<IP de tu PC>:5173` (el enlace usa la dirección desde la que lo creas; con `localhost` no abre en el teléfono).
+
+## 9. Conectarte a la base con un cliente gráfico
+
+### TablePlus
+
+1. *Create a new connection* → **PostgreSQL**.
+2. Rellena:
+   - **Name:** `AssetControl local`
+   - **Host:** `127.0.0.1` · **Port:** `5432`
+   - **User:** el valor de `POSTGRES_USER` · **Password:** el de `POSTGRES_PASSWORD`
+   - **Database:** el de `POSTGRES_DB`
+   - **SSL mode:** *Disable* (solo en local)
+3. *Test* → *Connect*.
+
+### pgAdmin
+
+*Register → Server*: pestaña **General** → Name `AssetControl local`; pestaña **Connection** → Host `127.0.0.1`, Port `5432`, Maintenance database = `POSTGRES_DB`, Username = `POSTGRES_USER`, Password = `POSTGRES_PASSWORD` → *Save*.
+
+### Qué vas a ver
+
+- Con el **migrador** (`POSTGRES_USER`) ves todas las tablas y todas las filas: en tu PC es superusuario. **Úsalo para mirar, no para editar**: un `UPDATE` o `DELETE` a mano se salta las reglas de la app (por ejemplo, los informes congelados).
+- Con el **usuario de la app** (`APP_DB_USER`) verás las tablas **vacías**. Es lo correcto: el RLS solo deja ver las filas de una clínica cuando la app fija cuál es. Esa es la protección entre clínicas.
+- Tablas principales: `tenant` (clínicas), `usuario`, `membresia`, `ubicacion`, `categoria`, `activo`, `activo_evento` (historial), `sesion_conteo`, `verificacion`, `sesion_desglose` y `sesion_no_encontrado` (informes congelados).
+
+## 10. VS Code sin `import` en rojo
+
+1. Abre la **carpeta raíz** del proyecto (`AssetControl`), no `backend` ni `web` por separado.
+2. `Ctrl + Shift + P` → **Python: Select Interpreter** → elige `backend\.venv\Scripts\python.exe`.
+3. Abre cualquier `.tsx` → `Ctrl + Shift + P` → **TypeScript: Select TypeScript Version** → **Use Workspace Version**.
+4. `Ctrl + Shift + P` → **Developer: Reload Window**.
+
+Ya están `pyrightconfig.json` (en el repo) y `.vscode/settings.json` (solo en tu PC) con esa configuración. Si un `import` sigue en rojo, corre `uv sync` y `npm ci` (sección 4) y recarga.
+
+## 11. Pruebas
+
+```powershell
+# Backend (usa la base de pruebas; crea y borra bases temporales)
+cd C:\Users\VICTUS16\Proyectos\AssetControl\backend
+uv run --env-file ../.env pytest -q
+uv run ruff check .
+
+# Web
+cd ..\web
+npm test
+npm run lint
+npm run typecheck
+```
+
+## 12. Pruebas en el navegador (Playwright)
+
+La primera vez, instala el navegador de pruebas:
+
+```powershell
+cd C:\Users\VICTUS16\Proyectos\AssetControl\web
+npx playwright install chromium
+```
+
+Con la base encendida (sección 3):
+
+| Comando | Qué hace |
+|---|---|
+| `npm run e2e` | Corre todo sin ventana (~15 s) |
+| `npm run e2e:ver` | Igual, pero ves el navegador moverse |
+| `npm run e2e:ui` | Modo interactivo: eliges la prueba y la ves paso a paso, con la línea de tiempo |
+| `npm run e2e:informe` | Abre el informe de la última corrida (con capturas y video si algo falló) |
+
+Las pruebas crean y usan su **propia base** (`assetcontrol_e2e`), su propia API (puerto 5011) y su propia web (puerto 5174): **no tocan** tus datos de desarrollo. Necesitan libres esos dos puertos.
+
+## 13. Supabase
+
+### 13.1 Crear el proyecto y obtener las conexiones
+
+1. Entra a [supabase.com](https://supabase.com) → *New project* → nombre `assetcontrol` → región del este de EE. UU. → guarda la **contraseña de la base** en tu gestor de contraseñas.
+2. En el proyecto: botón **Connect** → **Session pooler** (no *Direct* ni *Transaction*). Copia la cadena; se parece a `postgresql://postgres.<ref>:[YOUR-PASSWORD]@aws-0-us-east-1.pooler.supabase.com:5432/postgres`.
+3. Conviértela al formato de AssetControl: cambia `postgresql://` por `postgresql+psycopg://`, pon tu contraseña y agrega `?sslmode=require` al final.
+4. En `.env`, quita el `#` de las dos líneas `SUPABASE_…` y pon:
+   - `SUPABASE_MIGRATION_DATABASE_URL` = la cadena con el usuario `postgres.<ref>`.
+   - `SUPABASE_DATABASE_URL` = la misma con el usuario `assetcontrol_app.<ref>` y la contraseña de la app de producción (existe después de `preparar-roles`, `docs/09-despliegue.md` §4).
+5. Comprueba: `uv run --env-file ../.env flask --app app revisar-conexiones` → las líneas `SUPABASE_…` deben decir `OK` y `TLS sí`.
+
+> **Ojo:** la dirección `https://<ref>.supabase.co` (*Project URL*) **no** es una conexión a la base; es la API web de Supabase y AssetControl no la usa. Las dos variables `SUPABASE_…` empiezan por `postgresql+psycopg://`.
+>
+> Mientras el proyecto de Supabase no esté migrado, `revisar-conexiones` dirá `MAL … base sin migrar` en `SUPABASE_MIGRATION_DATABASE_URL`: es lo esperado. Las migraciones de producción se aplican con el flujo `migrar.yml` (`docs/09-despliegue.md`).
+
+> Las variables `SUPABASE_…` solo las usa `revisar-conexiones`. La app local **siempre** usa `DATABASE_URL` (tu Docker): así nunca escribes en producción por error.
+
+### 13.2 Ver Supabase en TablePlus
+
+Igual que la sección 9, con: Host = el del pooler (`aws-0-…pooler.supabase.com`), Port `5432`, User `postgres.<ref>`, Password = la de Supabase, Database `postgres`, **SSL mode: Require**. Ponle un color rojo a la conexión en TablePlus: es **producción**.
+
+### 13.3 Conectar Supabase a Claude (MCP)
+
+En el chat te dejé la tarjeta del conector **Supabase**. Pulsa *Connect*, inicia sesión en Supabase y autoriza **solo la organización del proyecto**. Si el conector ofrece modo de **solo lectura**, actívalo: así Claude puede revisar tablas, políticas y registros sin poder cambiar nada. Cuando esté conectado, avísame en el chat.
+
+## 14. Problemas comunes
+
+| Mensaje | Causa | Solución |
+|---|---|---|
+| `Faltan variables de entorno obligatorias: …` | Faltó `--env-file ../.env` | Repite el comando con `--env-file ../.env` |
+| `usuario o contraseña incorrectos` | La contraseña de `.env` no es la que tiene la base | Si la base de Docker no tiene datos importantes: `docker compose down -v` y `docker compose up -d db` (**borra la base local**) y vuelve a la sección 5 |
+| `no se pudo conectar (¿Docker apagado…?)` | Docker Desktop o el contenedor apagados | Abre Docker Desktop y `docker compose up -d db` |
+| `port is already allocated` (5432) | Otro PostgreSQL usa el puerto | Detén el otro servicio, o cambia el puerto en `docker-compose.yml` y en las URL |
+| `migraciones atrasadas` | Hay migraciones nuevas | Sección 5 |
+| La web dice «No se pudo conectar» (en la consola, `/api/…` responde 502) | La web (Vite) está encendida pero la API no | `.\scripts\dev.ps1 -SinWeb`; si la API no arranca, el script muestra sus últimos mensajes (o `docker compose logs api --tail 50`) |
+| `.\scripts\dev.ps1 no se puede cargar … ejecución de scripts` | PowerShell bloquea scripts locales | Una sola vez: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
+| Carpetas vacías `AssetControl;C` o `AssetControl;R` junto al proyecto | Un comando recibió una lista de rutas separada por `;` (típico de Docker en Git Bash con `-v "$(pwd):…"`) | Bórralas; usa PowerShell o `docker compose`, que arma las rutas bien |
+| `imports` en rojo | Intérprete o TypeScript de VS Code | Sección 10 |
+| `npm run e2e`: `Executable doesn't exist` | Falta el Chromium de Playwright | `npx playwright install chromium` |
+| `npm run e2e`: puerto 5011 o 5174 ocupado | Quedó un servidor de una corrida anterior | Cierra esa ventana o reinicia la terminal |

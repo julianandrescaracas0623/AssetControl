@@ -1,0 +1,4125 @@
+# Contrato de la API de AssetControl (spec 002b, T1; R17).
+#
+# Escrito a mano. tests/test_openapi.py lo ata al backend: rutas de Flask iguales a
+# `paths`, respuestas reales validadas contra estos esquemas y la lista de códigos
+# de error igual a la del backend. La web genera sus tipos de este archivo
+# (`cd web && npm run api:types`). Si cambias un endpoint, cambia aquí y regenera.
+#
+# En desarrollo la web llama a estas rutas con el prefijo /api (proxy de Vite).
+openapi: 3.1.0
+info:
+  title: AssetControl API
+  version: 0.1.0
+  description: >-
+    API de AssetControl. Toda respuesta lleva la cabecera X-Request-ID; los errores
+    tienen la forma {error: {code, message, request_id}}. /auth y /invitaciones
+    responden Cache-Control no-store y Referrer-Policy no-referrer y aceptan
+    cuerpos de hasta 4 KB. /plataforma (consola de desarrolladores, spec 017) solo
+    existe con PLATAFORMA_HABILITADA=true (si no, 404), lleva las mismas cabeceras y
+    el mismo tope, y usa su propio token y su propia cookie de refresh. Spec 017 (T4):
+    mientras la cuenta tenga debe_cambiar_password, todo endpoint con bearerAuth responde
+    403 cambio_password_requerido (comprobación central, leída de la base en cada
+    petición), salvo GET /auth/me y POST /auth/cambiar-contrasena; login, refresh y
+    logout siguen sirviendo.
+
+tags:
+  - name: meta
+  - name: auth
+  - name: invitaciones
+  - name: catalogo
+  - name: activos
+  - name: empresa
+  - name: plataforma
+
+paths:
+  /health:
+    get:
+      tags: [meta]
+      operationId: health
+      summary: Estado de la API y de la base
+      responses:
+        "200":
+          description: La base responde.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: La base no responde.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  /ready:
+    get:
+      tags: [meta]
+      operationId: ready
+      summary: Lista para recibir tráfico (resultado guardado unos segundos)
+      responses:
+        "200":
+          description: Lista.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ready" }
+        "503":
+          description: No lista.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ready" }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Iniciar sesión con email y contraseña
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/SesionIniciada"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          description: Credenciales incorrectas (mismo mensaje para cualquier causa).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [credenciales_invalidas]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refresh
+      summary: Renovar la sesión con la cookie de refresh (la rota)
+      parameters:
+        - $ref: "#/components/parameters/Csrf"
+        - $ref: "#/components/parameters/RefreshCookie"
+      responses:
+        "200":
+          $ref: "#/components/responses/SesionIniciada"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Cerrar sesión (revoca el refresh y borra la cookie)
+      parameters:
+        - $ref: "#/components/parameters/Csrf"
+        - $ref: "#/components/parameters/RefreshCookie"
+      responses:
+        "204":
+          description: Sesión cerrada, haya o no una cookie válida.
+          headers:
+            Set-Cookie:
+              description: Borra la cookie de refresh.
+              required: true
+              schema: { type: string }
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /auth/me:
+    get:
+      tags: [auth]
+      operationId: me
+      summary: Usuario, tenant, rol y debe_cambiar_password de la sesión (leídos de la base en cada petición)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Usuario actual.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UsuarioActual" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /auth/cambiar-contrasena:
+    post:
+      tags: [auth]
+      operationId: cambiarContrasena
+      summary: Cambiar la contraseña propia (obligatorio en el primer ingreso; también voluntario)
+      description: >-
+        Pide la contraseña actual, la nueva (política vigente, distinta de la actual) y su
+        confirmación. Si cambia, quita debe_cambiar_password, cierra las demás sesiones de
+        la persona y responde una sesión nueva (cookie de refresh nueva), como el login. Todo
+        token de acceso emitido antes del cambio deja de servir (401 no_autenticado); el de
+        la sesión nueva sí sirve. Restablecer la contraseña por correo corta igual los
+        tokens anteriores. Cuenta en el mismo límite que el login.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CambiarContrasenaBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/SesionIniciada"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          description: >-
+            Sin sesión (no_autenticado) o la contraseña actual no es correcta
+            (credenciales_invalidas). No cambia nada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [no_autenticado, credenciales_invalidas]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: >-
+            La nueva no cumple la política (contrasena_*), es igual a la actual
+            (contrasena_repetida) o la confirmación no coincide (contrasenas_distintas).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos:
+            - contrasena_invalida
+            - contrasena_corta
+            - contrasena_larga
+            - contrasena_comun
+            - contrasena_repetida
+            - contrasenas_distintas
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /auth/recuperar:
+    post:
+      tags: [auth]
+      operationId: solicitarRecuperacion
+      summary: Pedir un enlace para restablecer la contraseña (público, sin sesión)
+      description: >-
+        Responde siempre el mismo 202, exista o no la cuenta, esté o no activa y haya o no
+        correo configurado. El enlace (30 minutos, un solo uso) llega por correo solo si la
+        cuenta está activa y tiene exactamente una membresía activa.
+      parameters:
+        - $ref: "#/components/parameters/Csrf"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RecuperarBody" }
+      responses:
+        "202":
+          description: Solicitud recibida (mismo cuerpo para cualquier correo).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecuperacionSolicitada" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /auth/restablecer:
+    post:
+      tags: [auth]
+      operationId: restablecerContrasena
+      summary: Cambiar la contraseña con el token del enlace (público; no inicia sesión)
+      description: >-
+        Si cambia, cierra todas las sesiones de la persona y no emite cookies: entra con
+        el login. Vencido, usado, invalidado, inexistente o mal formado dan el mismo 400
+        enlace_invalido.
+      parameters:
+        - $ref: "#/components/parameters/Csrf"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RestablecerBody" }
+      responses:
+        "204":
+          description: Contraseña cambiada; sin cuerpo y sin Set-Cookie.
+        "400":
+          description: >-
+            Cuerpo no válido (solicitud_invalida), contraseña fuera de la política
+            (contrasena_*) o enlace no canjeable (enlace_invalido, mismo mensaje para
+            cualquier causa).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos:
+            - solicitud_invalida
+            - contrasena_invalida
+            - contrasena_corta
+            - contrasena_larga
+            - contrasena_comun
+            - enlace_invalido
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /invitaciones:
+    post:
+      tags: [invitaciones]
+      operationId: crearInvitacion
+      summary: Invitar a una persona (solo admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvitarBody" }
+      responses:
+        "201":
+          description: >-
+            Invitación creada. El enlace sale solo en esta respuesta y vence en 72 horas.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitacionCreada" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /invitaciones/validar:
+    post:
+      tags: [invitaciones]
+      operationId: validarInvitacion
+      summary: Saber si un token de invitación está vigente (no lo consume)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ValidarBody" }
+      responses:
+        "200":
+          description: Vencida, usada, inexistente o mal formada dan el mismo false.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Vigencia" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /invitaciones/aceptar:
+    post:
+      tags: [invitaciones]
+      operationId: aceptarInvitacion
+      summary: Aceptar la invitación con nombre y contraseña (sin email)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AceptarBody" }
+      responses:
+        "201":
+          $ref: "#/components/responses/SesionIniciada"
+        "400":
+          description: >-
+            Cuerpo o nombre no válidos (solicitud_invalida), contraseña fuera de la
+            política (contrasena_*) o invitación no vigente (invitacion_invalida,
+            mismo mensaje para cualquier causa).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos:
+            - solicitud_invalida
+            - contrasena_invalida
+            - contrasena_corta
+            - contrasena_larga
+            - contrasena_comun
+            - invitacion_invalida
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "500":
+          description: >-
+            La cuenta se creó pero no se pudo emitir la sesión: la persona entra con
+            el login.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [error_interno]
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /ubicaciones:
+    get:
+      tags: [catalogo]
+      operationId: listarUbicaciones
+      summary: Ubicaciones del tenant (el contador recibe solo las activas)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Ordenadas por tipo (sede, sala, box) y nombre.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaUbicaciones" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+    post:
+      tags: [catalogo]
+      operationId: crearUbicacion
+      summary: Crear una sede, sala o box (solo admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CrearUbicacionBody" }
+      responses:
+        "201":
+          description: Creada y activa.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UbicacionRespuesta" }
+        "400":
+          description: Cuerpo o nombre no válidos, o tipo y padre que no encajan.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [solicitud_invalida, jerarquia_invalida]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: Nombre repetido entre hermanas o padre inactivo.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [nombre_duplicado, padre_inactivo]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /ubicaciones/{id}:
+    patch:
+      tags: [catalogo]
+      operationId: actualizarUbicacion
+      summary: Renombrar, desactivar o reactivar (solo admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ActualizarUbicacionBody" }
+      responses:
+        "200":
+          description: Actualizada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UbicacionRespuesta" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: >-
+            Nombre repetido, hijas activas o activos al desactivar (D2 de la spec 004) o
+            padre inactivo al reactivar.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [nombre_duplicado, tiene_hijas_activas, padre_inactivo, tiene_activos]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /categorias:
+    get:
+      tags: [catalogo]
+      operationId: listarCategorias
+      summary: Categorías del tenant, por nombre
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista cerrada de la clínica.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaCategorias" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+    post:
+      tags: [catalogo]
+      operationId: crearCategoria
+      summary: Crear una categoría (solo admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NombreBody" }
+      responses:
+        "201":
+          description: Creada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CategoriaRespuesta" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "409":
+          $ref: "#/components/responses/NombreDuplicado"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /categorias/{id}:
+    patch:
+      tags: [catalogo]
+      operationId: renombrarCategoria
+      summary: Renombrar una categoría (solo admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NombreBody" }
+      responses:
+        "200":
+          description: Renombrada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CategoriaRespuesta" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/NombreDuplicado"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /categorias/sugeridas:
+    post:
+      tags: [catalogo]
+      operationId: cargarCategoriasSugeridas
+      summary: Crear las 6 categorías sugeridas que falten (idempotente; solo admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista completa y cuántas se crearon ahora.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SugeridasCargadas" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+
+  /activos:
+    get:
+      tags: [activos]
+      operationId: buscarActivos
+      summary: Buscar por código, nombre o serial; 25 por página, lo más reciente primero
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 120 } }
+        - { name: estado, in: query, required: false, schema: { $ref: "#/components/schemas/EstadoActivo" } }
+        - name: ubicacion_id
+          in: query
+          required: false
+          description: Solo los activos de esa ubicación exacta (spec 005, R10).
+          schema: { type: string, format: uuid }
+        - { name: pagina, in: query, required: false, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Página de resultados (precio solo para el admin).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaActivos" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+    post:
+      tags: [activos]
+      operationId: crearActivo
+      summary: Dar de alta o duplicar un activo (admin y contador; idempotente por id)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/CrearActivoBody"
+                - $ref: "#/components/schemas/DuplicarActivoBody"
+      responses:
+        "200":
+          description: Reintento con el mismo id y código; devuelve el ya guardado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActivoRespuesta" }
+        "201":
+          description: Creado con su evento "creado".
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActivoRespuesta" }
+        "400":
+          description: Cuerpo, código, precio o ubicación no válidos.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [solicitud_invalida, codigo_invalido, precio_invalido, ubicacion_invalida]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: El código ya es de otro activo; se devuelve ese activo para abrirlo.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CodigoExistente" }
+          x-codigos: [codigo_existente]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /activos/exportar:
+    get:
+      tags: [activos]
+      operationId: exportarActivos
+      summary: La lista de activos con los filtros vigentes, en Excel (solo admin)
+      description: >-
+        Spec 015 (R1, R1a; Q2–Q4). Mismos filtros, filas y orden que GET /activos, sin
+        paginar. Una hoja «Activos» con código, nombre, categoría, ubicación (ruta),
+        estado, serial, marca, modelo, subtipo, fecha de compra, precio de compra (número
+        COP) y fecha de registro; sin fila de total; ningún texto es fórmula. Con cero
+        resultados trae solo el encabezado. Nombre fijo activos-AAAAMMDD.xlsx.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 120 } }
+        - { name: estado, in: query, required: false, schema: { $ref: "#/components/schemas/EstadoActivo" } }
+        - name: ubicacion_id
+          in: query
+          required: false
+          description: Solo los activos de esa ubicación exacta.
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Archivo de la lista (adjunto).
+          headers:
+            Content-Disposition:
+              required: true
+              description: attachment con filename ASCII fijo y filename* UTF-8.
+              schema: { type: string }
+            Cache-Control:
+              required: true
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          description: >-
+            Más filas que el tope técnico (5.000, Q4); hay que filtrar por búsqueda,
+            estado o ubicación.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [exportacion_demasiado_grande]
+
+  /activos/sugerencias:
+    get:
+      tags: [activos]
+      operationId: sugerenciasActivos
+      summary: Valores ya registrados de un campo, los más usados primero (hasta 8)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: campo
+          in: query
+          required: true
+          schema: { type: string, enum: [nombre, marca, modelo, subtipo] }
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 120 } }
+      responses:
+        "200":
+          description: Valores distintos.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Sugerencias" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /activos/por-codigo:
+    get:
+      tags: [activos]
+      operationId: resolverCodigo
+      summary: El activo de un código de sticker (se normaliza a mayúsculas)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: codigo
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Existe en este tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActivoRespuesta" }
+        "400":
+          description: El texto no tiene el formato de un código.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [codigo_invalido]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /activos/{id}:
+    get:
+      tags: [activos]
+      operationId: fichaActivo
+      summary: Ficha de solo lectura de un activo
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: El activo (con precio solo para el admin).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActivoRespuesta" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+    patch:
+      tags: [activos]
+      operationId: editarActivo
+      summary: Editar un activo (solo admin; cada cambio deja su evento)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EditarActivoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/ActivoCambiado"
+        "400":
+          description: Cuerpo o precio no válidos, o se intentó cambiar el código.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [solicitud_invalida, precio_invalido, codigo_inmutable]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/ActivoDadoDeBaja"
+        "412":
+          $ref: "#/components/responses/VersionDesactualizada"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "428":
+          $ref: "#/components/responses/FaltaVersion"
+
+  /activos/{id}/historial:
+    get:
+      tags: [activos]
+      operationId: historialActivo
+      summary: Línea de tiempo del activo, lo más reciente primero (50 por página)
+      description: >-
+        Al contador se le omiten los eventos precio_cambiado y toda clave de precio de los
+        demás (P13).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: antes_de
+          in: query
+          required: false
+          description: El valor de "siguiente" de la página anterior.
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Una página de eventos.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Historial" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /activos/{id}/mover:
+    post:
+      tags: [activos]
+      operationId: moverActivo
+      summary: Mover a otra sala o box activos (solo admin; evento ubicacion_cambiada)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MoverActivoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/ActivoCambiado"
+        "400":
+          description: Cuerpo no válido.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [solicitud_invalida, ubicacion_invalida]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/ActivoDadoDeBaja"
+        "412":
+          $ref: "#/components/responses/VersionDesactualizada"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "428":
+          $ref: "#/components/responses/FaltaVersion"
+
+  /activos/{id}/estado:
+    post:
+      tags: [activos]
+      operationId: cambiarEstadoActivo
+      summary: Activo ↔ en reparación, o reactivar un dado de baja con motivo (solo admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EstadoActivoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/ActivoCambiado"
+        "400":
+          description: Cuerpo no válido.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [solicitud_invalida, motivo_invalido]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/ActivoDadoDeBaja"
+        "412":
+          $ref: "#/components/responses/VersionDesactualizada"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "428":
+          $ref: "#/components/responses/FaltaVersion"
+
+  /activos/{id}/baja:
+    post:
+      tags: [activos]
+      operationId: darDeBajaActivo
+      summary: Dar de baja con motivo (solo admin; evento dado_de_baja)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BajaActivoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/ActivoCambiado"
+        "400":
+          description: Cuerpo no válido.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [solicitud_invalida, motivo_invalido]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/ActivoDadoDeBaja"
+        "412":
+          $ref: "#/components/responses/VersionDesactualizada"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "428":
+          $ref: "#/components/responses/FaltaVersion"
+
+  /activos/{id}/foto:
+    put:
+      tags: [fotos]
+      operationId: subirFotoActivo
+      summary: Crear o cambiar la foto principal (admin y contador; spec 012)
+      description: >-
+        multipart/form-data con foto_id (UUID del cliente: reintentar con el mismo no
+        duplica) y archivo (JPEG, PNG o WebP, hasta 10 MB). El servidor la vuelve a
+        codificar en JPEG sin metadatos (lado ≤ 1600 px y miniatura de 320). Si ya había
+        una principal, queda retirada y su imagen se borra (evento foto_cambiada).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/SubirFotoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/FotoGuardada"
+        "201":
+          $ref: "#/components/responses/FotoGuardada"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: Activo dado de baja o foto_id ya usado en otro activo.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [activo_dado_de_baja, foto_id_en_uso]
+        "413":
+          $ref: "#/components/responses/FotoDemasiadoGrande"
+        "415":
+          $ref: "#/components/responses/FotoTipoNoAdmitido"
+        "422":
+          $ref: "#/components/responses/FotoInvalida"
+        "503":
+          $ref: "#/components/responses/FotosNoDisponibles"
+    delete:
+      tags: [fotos]
+      operationId: quitarFotoActivo
+      summary: Quitar la foto principal (admin y contador; su imagen se borra)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Foto quitada (evento foto_retirada).
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          description: El activo no existe o no tiene foto.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [no_encontrado, sin_foto]
+        "503":
+          $ref: "#/components/responses/FotosNoDisponibles"
+
+  /sesiones/{sid}/verificaciones/{vid}/foto:
+    put:
+      tags: [fotos]
+      operationId: subirFotoVerificacion
+      summary: Foto opcional de una verificación (quien verificó o un admin; sesión abierta)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: sid, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: vid, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/SubirFotoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/FotoGuardada"
+        "201":
+          $ref: "#/components/responses/FotoGuardada"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: Sesión cerrada, la verificación ya tiene foto o foto_id usado en otra.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [sesion_cerrada, foto_existente, foto_id_en_uso]
+        "413":
+          $ref: "#/components/responses/FotoDemasiadoGrande"
+        "415":
+          $ref: "#/components/responses/FotoTipoNoAdmitido"
+        "422":
+          $ref: "#/components/responses/FotoInvalida"
+        "503":
+          $ref: "#/components/responses/FotosNoDisponibles"
+
+  /fotos/{id}:
+    get:
+      tags: [fotos]
+      operationId: verFoto
+      summary: La imagen de una foto vigente del tenant (JPEG; privada)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: tamano
+          in: query
+          required: false
+          schema: { type: string, enum: [completa, mini] }
+      responses:
+        "200":
+          description: La imagen. Una foto nunca cambia (cambiarla crea otra con otro id).
+          headers:
+            Cache-Control:
+              required: true
+              schema: { type: string, enum: ["private, max-age=86400"] }
+            X-Content-Type-Options:
+              required: true
+              schema: { type: string, enum: [nosniff] }
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          description: No existe, es de otro tenant o se retiró.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [sin_foto]
+        "503":
+          $ref: "#/components/responses/FotosNoDisponibles"
+
+  /sesiones:
+    get:
+      tags: [conteo]
+      operationId: listarSesiones
+      summary: Sesiones de conteo; la abierta primero y luego las más recientes
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Todas las sesiones del tenant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaSesiones" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+    post:
+      tags: [conteo]
+      operationId: abrirSesion
+      summary: Abrir una sesión de conteo (solo admin; una abierta por clínica)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AbrirSesionBody" }
+      responses:
+        "201":
+          description: Abierta.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SesionConteoRespuesta" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "409":
+          description: Ya hay una sesión de conteo abierta.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [sesion_abierta_existente]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /sesiones/abierta:
+    get:
+      tags: [conteo]
+      operationId: sesionAbierta
+      summary: La sesión de conteo abierta, o null si no hay
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: La abierta o null.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SesionAbierta" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /sesiones/{id}:
+    get:
+      tags: [conteo]
+      operationId: detalleSesion
+      summary: Sesión y avance por ubicación (sin precios; no es el informe)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: La sesión y su avance.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DetalleSesion" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /sesiones/{id}/verificaciones:
+    get:
+      tags: [conteo]
+      operationId: ultimaVerificacion
+      summary: La verificación vigente (mayor seq) de un activo en la sesión, o null
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: activo_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: La última verificación o null.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UltimaVerificacion" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+    post:
+      tags: [conteo]
+      operationId: verificarActivo
+      summary: Verificar un activo (ambos roles; idempotente por id)
+      description: >-
+        Copia del activo el precio, la categoría y la ubicación de ese momento. Un
+        reintento con el mismo id devuelve la guardada (200), aunque la sesión se haya
+        cerrado después.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerificarBody" }
+      responses:
+        "200":
+          description: Reintento; la verificación ya guardada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VerificacionRespuesta" }
+        "201":
+          description: Guardada con su evento "verificado".
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VerificacionRespuesta" }
+        "400":
+          description: Cuerpo no válido o la ubicación encontrada no es una sala o box activos.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [solicitud_invalida, ubicacion_invalida]
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: La sesión no está abierta o el activo está dado de baja.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [sesion_cerrada, activo_dado_de_baja]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /sesiones/{id}/discrepancias:
+    get:
+      tags: [conteo]
+      operationId: listarDiscrepancias
+      summary: Activos vistos en otra ubicación según su verificación vigente (solo admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: estado
+          in: query
+          required: false
+          description: por_resolver (pendientes y desfasadas; por defecto), resueltas o todas.
+          schema: { type: string, enum: [por_resolver, resueltas, todas] }
+      responses:
+        "200":
+          description: Las discrepancias, la más reciente primero.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaDiscrepancias" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /sesiones/{id}/discrepancias/aplicar:
+    post:
+      tags: [conteo]
+      operationId: aplicarDiscrepancias
+      summary: Mover cada activo a donde se vio (solo admin; también en sesiones cerradas)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AplicarDiscrepanciasBody" }
+      responses:
+        "200":
+          description: Un resultado por verificación, en el mismo orden.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResultadosDiscrepancias" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /sesiones/{id}/discrepancias/descartar:
+    post:
+      tags: [conteo]
+      operationId: descartarDiscrepancias
+      summary: Descartar diferencias sin mover los activos (solo admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DescartarDiscrepanciasBody" }
+      responses:
+        "200":
+          description: Un resultado por verificación, en el mismo orden.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResultadosDiscrepancias" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /sesiones/{id}/pendientes:
+    get:
+      tags: [conteo]
+      operationId: listarPendientes
+      summary: Activos activo o en_reparacion sin verificación en la sesión (sin precios)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - name: ubicacion_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - { name: pagina, in: query, required: false, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Una página de 50.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaPendientes" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /sesiones/{id}/cerrar:
+    post:
+      tags: [conteo]
+      operationId: cerrarSesion
+      summary: Cerrar la sesión y congelar el informe (solo admin; repetirlo devuelve el informe)
+      description: >-
+        Calcula una vez el universo del cierre y guarda, en la misma transacción, las tres
+        cifras, el desglose por categoría y ubicación y la lista de no encontrados.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: El informe congelado (también si ya estaba cerrada).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Informe" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /sesiones/{id}/informe:
+    get:
+      tags: [conteo]
+      operationId: informeSesion
+      summary: Informe congelado de una sesión cerrada (solo admin; no recalcula nada)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Las tres cifras, el desglose y los no encontrados del cierre.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Informe" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: La sesión sigue abierta.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [sesion_abierta]
+
+  /sesiones/{id}/informe/excel:
+    get:
+      tags: [conteo]
+      operationId: exportarInformeExcel
+      summary: Informe congelado en Excel (solo admin)
+      description: >-
+        Mismas cifras que GET /sesiones/{id}/informe (lee lo congelado al cierre; no
+        recalcula). Se descarga como adjunto con Cache-Control no-store.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Archivo del informe (adjunto).
+          headers:
+            Content-Disposition:
+              required: true
+              description: attachment con filename ASCII y filename* UTF-8.
+              schema: { type: string }
+            Cache-Control:
+              required: true
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: La sesión sigue abierta.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [sesion_abierta]
+  /sesiones/{id}/informe/pdf:
+    get:
+      tags: [conteo]
+      operationId: exportarInformePdf
+      summary: Informe congelado en PDF, Carta horizontal (solo admin)
+      description: >-
+        Mismas cifras que GET /sesiones/{id}/informe (lee lo congelado al cierre; no
+        recalcula). Se descarga como adjunto con Cache-Control no-store.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Archivo del informe (adjunto).
+          headers:
+            Content-Disposition:
+              required: true
+              description: attachment con filename ASCII y filename* UTF-8.
+              schema: { type: string }
+            Cache-Control:
+              required: true
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: La sesión sigue abierta.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [sesion_abierta]
+  /inicio:
+    get:
+      tags: [inicio]
+      operationId: inicio
+      summary: Indicadores del Inicio según el rol (el contador no recibe dinero)
+      description: >-
+        Ambos roles reciben activos_hoy y sesion_abierta. Solo el admin recibe
+        valor_actual, discrepancias, danados y ultimo_informe (P13): para el contador
+        esas claves no existen.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Indicadores.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Inicio" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /inicio/actividad:
+    get:
+      tags: [inicio]
+      operationId: actividadInicio
+      summary: Actividad reciente del tenant, lo más reciente primero (20 por página)
+      description: >-
+        Mismo filtro que el historial: al contador se le omiten los eventos
+        precio_cambiado y toda clave de precio de los demás (P13).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: antes_de
+          in: query
+          required: false
+          description: El valor de "siguiente" de la página anterior.
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Una página de eventos con su activo.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Actividad" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /inicio/evolucion:
+    get:
+      tags: [inicio]
+      operationId: evolucionInicio
+      summary: Evolución entre conteos cerrados, leída de lo congelado (solo admin)
+      description: >-
+        Hasta los 12 conteos cerrados más recientes en orden cronológico (P22); % encontrado
+        en unidades con un decimal (P24). Una categoría sin fila en una sesión no tiene punto.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Puntos por sesión y por categoría.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Evolucion" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+
+  /empresa:
+    get:
+      tags: [empresa]
+      operationId: verEmpresa
+      summary: Datos de la empresa (solo admin; spec 013)
+      description: >-
+        Sin datos guardados: el nombre del tenant, el resto en null y completa false.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/EmpresaActual"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+    put:
+      tags: [empresa]
+      operationId: guardarEmpresa
+      summary: Guardar los datos de la empresa (solo admin)
+      description: >-
+        Nombre y dirección obligatorios. NIT opcional: si trae dígito de verificación debe
+        ser el de la DIAN; se guarda como 900.123.456-8. Vacío o null borra un opcional.
+        Si un campo no es válido, el error lo nombra en campo.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GuardarEmpresaBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/EmpresaActual"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /empresa/logo:
+    put:
+      tags: [empresa]
+      operationId: subirLogo
+      summary: Cambiar el logo de la empresa (solo admin)
+      description: >-
+        multipart/form-data con logo_id (UUID del cliente) y archivo (PNG, JPEG o WebP,
+        hasta 2 MB). Se guarda en PNG ≤ 600 px con transparencia y sin metadatos. El logo
+        anterior no se borra: los informes congelados lo siguen usando.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/SubirLogoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/LogoGuardado"
+        "201":
+          $ref: "#/components/responses/LogoGuardado"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "409":
+          description: Faltan los datos de la empresa o el logo_id ya se usó.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [empresa_sin_datos, logo_id_en_uso]
+        "413":
+          $ref: "#/components/responses/FotoDemasiadoGrande"
+        "415":
+          $ref: "#/components/responses/FotoTipoNoAdmitido"
+        "422":
+          $ref: "#/components/responses/FotoInvalida"
+        "503":
+          $ref: "#/components/responses/FotosNoDisponibles"
+    delete:
+      tags: [empresa]
+      operationId: quitarLogo
+      summary: Quitar el logo de la empresa (solo admin; el archivo se conserva)
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: La empresa queda sin logo.
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/SinLogo"
+
+  /empresa/logo/{id}:
+    get:
+      tags: [empresa]
+      operationId: verLogo
+      summary: El PNG de un logo del tenant, vigente o de un informe congelado (solo admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: El logo. Un logo nunca cambia (cambiarlo crea otro con otro id).
+          headers:
+            Cache-Control:
+              required: true
+              schema: { type: string, enum: ["private, max-age=86400"] }
+            X-Content-Type-Options:
+              required: true
+              schema: { type: string, enum: [nosniff] }
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/SinLogo"
+        "503":
+          $ref: "#/components/responses/FotosNoDisponibles"
+
+  /valor-actual:
+    get:
+      tags: [activos]
+      operationId: valorActual
+      summary: Valor actual del inventario en vivo (solo admin; no es un informe)
+      description: >-
+        Suma en vivo de activo y en_reparacion (dado_de_baja no cuenta). Sigue los
+        cambios al instante y nunca lee el desglose congelado de una sesión.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Total, unidades, valor en reparación y desglose con nombres actuales.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ValorActual" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+
+  /plataforma/auth/login:
+    post:
+      tags: [plataforma]
+      operationId: plataformaLogin
+      summary: Iniciar sesión como desarrollador (consola de plataforma)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/SesionPlataformaIniciada"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          description: >-
+            Credenciales incorrectas: mismo mensaje para correo inexistente, contraseña
+            errónea o desarrollador inactivo.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [credenciales_invalidas]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /plataforma/auth/refresh:
+    post:
+      tags: [plataforma]
+      operationId: plataformaRefresh
+      summary: Renovar la sesión de plataforma con su cookie de refresh (la rota)
+      parameters:
+        - $ref: "#/components/parameters/Csrf"
+        - $ref: "#/components/parameters/PlataformaRefreshCookie"
+      responses:
+        "200":
+          $ref: "#/components/responses/SesionPlataformaIniciada"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /plataforma/auth/logout:
+    post:
+      tags: [plataforma]
+      operationId: plataformaLogout
+      summary: Cerrar la sesión de plataforma (revoca la familia y su token de acceso)
+      parameters:
+        - $ref: "#/components/parameters/Csrf"
+        - $ref: "#/components/parameters/PlataformaRefreshCookie"
+      responses:
+        "204":
+          description: Sesión cerrada, haya o no una cookie válida.
+          headers:
+            Set-Cookie:
+              description: Borra la cookie de refresh de plataforma.
+              required: true
+              schema: { type: string }
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+
+  /plataforma/auth/me:
+    get:
+      tags: [plataforma]
+      operationId: plataformaMe
+      summary: Desarrollador de la sesión (activo y con la sesión vigente, en cada petición)
+      security:
+        - plataformaAuth: []
+      responses:
+        "200":
+          description: Desarrollador actual.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DesarrolladorActual" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /plataforma/modulos:
+    get:
+      tags: [plataforma]
+      operationId: plataformaModulos
+      summary: Módulos habilitados de la consola, del registro del servidor
+      security:
+        - plataformaAuth: []
+      responses:
+        "200":
+          description: Módulos ordenados (la web muestra solo los que también conoce).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModulosPlataforma" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /plataforma/empresas:
+    get:
+      tags: [plataforma]
+      operationId: plataformaListarEmpresas
+      summary: Empresas con su estado, si tienen logo y sus conteos (módulo Empresas)
+      description: >-
+        Solo identidad de la empresa y conteos de membresías; ningún dato de negocio. q
+        filtra por nombre sin distinguir mayúsculas; estado, por activas, desactivadas o
+        todas (por defecto).
+      security:
+        - plataformaAuth: []
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 120 } }
+        - name: estado
+          in: query
+          required: false
+          schema: { type: string, enum: [activas, desactivadas, todas] }
+      responses:
+        "200":
+          description: Empresas, de la más reciente a la más antigua.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaEmpresasPlataforma" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+    post:
+      tags: [plataforma]
+      operationId: plataformaCrearEmpresa
+      summary: Crear una empresa con su ficha y su primer admin (idempotente por id)
+      description: >-
+        En una transacción crea el tenant activo, su ficha (sin logo), el usuario admin con
+        debe_cambiar_password y su membresía admin; sin invitación. La contraseña se valida
+        con la política vigente y su confirmación en el servidor, se guarda solo con
+        Argon2id y nunca se devuelve. Si un dato no es válido, el error lo nombra en campo.
+      security:
+        - plataformaAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CrearEmpresaBody" }
+      responses:
+        "201":
+          description: Empresa y primer admin creados.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EmpresaCreada" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "409":
+          description: >-
+            Ya existe una empresa con ese id (doble envío) o el correo del admin ya es de
+            otro usuario (sin decir de qué empresa). No se crea nada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [empresa_existente, email_en_uso]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: Un dato de la ficha, del admin o de la contraseña no es válido.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos:
+            - campo_invalido
+            - contrasenas_distintas
+            - contrasena_invalida
+            - contrasena_corta
+            - contrasena_larga
+            - contrasena_comun
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /plataforma/empresas/{id}:
+    patch:
+      tags: [plataforma]
+      operationId: plataformaCambiarEstadoEmpresa
+      summary: Desactivar o reactivar una empresa (idempotente; no borra nada)
+      description: >-
+        Desactivada, sus usuarios no inician sesión, no renuevan la sesión y sus tokens
+        vigentes dan 401; reactivarla restaura el acceso.
+      security:
+        - plataformaAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EstadoEmpresaBody" }
+      responses:
+        "200":
+          description: Estado resultante.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EstadoEmpresa" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /plataforma/empresas/{id}/usuarios:
+    get:
+      tags: [plataforma]
+      operationId: plataformaListarUsuarios
+      summary: Usuarios de una empresa con su rol y el estado de su membresía (módulo Usuarios)
+      description: >-
+        Una fila por membresía: id del usuario, nombre, correo, rol, si la membresía está
+        activa y si el cambio de contraseña sigue pendiente. Nunca hash, token ni datos de
+        negocio.
+      security:
+        - plataformaAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Usuarios de la empresa, por nombre.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaUsuariosPlataforma" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /plataforma/empresas/{id}/usuarios/{usuario_id}:
+    patch:
+      tags: [plataforma]
+      operationId: plataformaCambiarEstadoUsuario
+      summary: Desactivar o reactivar la membresía de un usuario (idempotente; no borra nada)
+      description: >-
+        Cambia solo si la membresía está activa. Al desactivarla se revocan sus sesiones
+        renovables y el usuario recibe 401 al entrar, al renovar y con su token vigente.
+        No se puede desactivar al último admin activo ni cambiar usuarios de una empresa
+        desactivada. Un usuario que no es de esa empresa da 404. Idempotente: repetir el
+        estado actual responde 200 con ese estado, no cambia nada y no escribe auditoría
+        (solo se audita un cambio real). Orden de los rechazos, y el primero que aplica es
+        el que se responde, sin cambiar nada: (1) 404 si la empresa no existe; (2) 404 si
+        el usuario no es de esa empresa; (3) 409 empresa_inactiva (en los dos sentidos);
+        (4) 409 ultimo_admin (solo al desactivar; repetir la desactivación de un admin ya
+        inactivo es idempotente y no da ultimo_admin). Si otro cambio de membresías de la
+        misma empresa retiene su candado más de 5 s (lock_timeout), o la base aborta la
+        transacción por interbloqueo o fallo de serialización, 503 servicio_no_disponible
+        sin cambios; se puede reintentar.
+      security:
+        - plataformaAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: usuario_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EstadoUsuarioBody" }
+      responses:
+        "200":
+          description: Estado resultante de la membresía.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EstadoUsuario" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: >-
+            La empresa está desactivada (empresa_inactiva; primero se reactiva) o es el
+            último admin activo de la empresa (ultimo_admin). Si aplican los dos, gana
+            empresa_inactiva; un 404 va antes que ambos. No cambia nada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [empresa_inactiva, ultimo_admin]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          description: >-
+            No se pudo contar el intento (plat_accion), otro cambio de membresías de la
+            misma empresa retuvo su candado más de 5 s (lock_timeout) o la base abortó la
+            transacción (interbloqueo o fallo de serialización). No cambia nada.
+          headers:
+            Retry-After:
+              description: Segundos sugeridos antes de reintentar.
+              required: true
+              schema: { type: integer }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [servicio_no_disponible]
+    put:
+      tags: [plataforma]
+      operationId: plataformaEditarUsuario
+      summary: Editar el nombre y el rol de un usuario de una empresa (sin cambios, 200 sin escribir)
+      description: >-
+        Exactamente nombre y rol; cualquier otra clave (correo, contraseña, activa...) da
+        400: el correo, la contraseña y el estado no se editan por esta ruta. El nombre se
+        normaliza como el de cualquier usuario (máximo 120 caracteres) y el rol es admin o
+        contador (422 con campo, sin cambios). Cambia solo el nombre del usuario (que es
+        suyo en todas sus empresas) y el rol de su membresía en esta empresa, y escribe
+        usuario_editado sin valores en la misma transacción. Si cambia el rol, se revocan
+        las sesiones renovables de esa membresía: la persona vuelve a entrar con el rol
+        nuevo, y su acceso vigente ya actúa con él (un admin degradado recibe 403 en su
+        siguiente petición). Cambiar solo el nombre no cierra ninguna sesión. Si nada
+        cambia, responde 200 sin escribir, revocar ni auditar. Una membresía desactivada se
+        puede editar. Orden de los rechazos, sin cambiar nada: (1) 404 si la empresa no
+        existe; (2) 404 si el usuario no es de esa empresa; (3) 409 empresa_inactiva; (4)
+        409 ultimo_admin si quitaría el rol admin al último admin activo; (5) 503 si otro
+        cambio de usuarios de la misma empresa retiene su candado más de 5 s. Cuenta en
+        plat_accion antes de validar.
+      security:
+        - plataformaAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: usuario_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EditarUsuarioBody" }
+      responses:
+        "200":
+          description: El nombre y el rol resultantes (los mismos de antes si no cambió nada).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UsuarioEditado" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: >-
+            La empresa está desactivada (empresa_inactiva) o el cambio quitaría el rol admin
+            al último admin activo de la empresa (ultimo_admin). Si aplican los dos, gana
+            empresa_inactiva; un 404 va antes que ambos. empresa_inactiva se evalúa con el
+            estado serializado (bajo el candado por empresa): con el candado ocupado puede
+            responderse 503 en su lugar. No cambia nada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [empresa_inactiva, ultimo_admin]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: El nombre o el rol no son válidos (en campo, cuál). No cambia nada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [campo_invalido]
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          description: >-
+            No se pudo contar el intento (plat_accion), otro cambio de usuarios de la misma
+            empresa retuvo su candado más de 5 s (lock_timeout) o la base abortó la
+            transacción (interbloqueo o fallo de serialización). No cambia nada; se puede
+            reintentar.
+          headers:
+            Retry-After:
+              description: Segundos sugeridos antes de reintentar.
+              required: true
+              schema: { type: integer }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [servicio_no_disponible]
+
+  /plataforma/empresas/{id}/usuarios/{usuario_id}/contrasena:
+    post:
+      tags: [plataforma]
+      operationId: plataformaRestablecerContrasenaUsuario
+      summary: Definir una contraseña temporal para un usuario de una empresa (no idempotente)
+      description: >-
+        Exactamente password y password_confirmacion; cualquier otra clave da 400. La
+        contraseña cumple la misma política que la del primer admin del alta (10 a 128
+        caracteres y no común) y la confirmación se compara en el servidor (422 con campo,
+        sin cambios). El servidor calcula el hash Argon2id y, en una sola transacción, guarda
+        el hash, marca que la persona debe cambiarla al entrar, corta sus accesos vigentes
+        (401 con el token anterior), revoca todas sus sesiones renovables en todas sus
+        empresas y escribe usuario_contrasena_restablecida sin valores. Responde 204 sin
+        cuerpo: la contraseña y su hash nunca se devuelven. Aplica a cualquier usuario de la
+        empresa, también al único admin, a una membresía desactivada y a quien tiene
+        membresías en otras empresas. No se avisa por correo. Cada llamada válida define otra
+        contraseña, revoca y audita de nuevo. Orden de los rechazos, sin cambiar nada: (1)
+        404 si la empresa no existe; (2) 404 si el usuario no es de esa empresa (sin decir si
+        existe en otra); (3) 409 empresa_inactiva; (4) 503 si otro cambio de usuarios de una
+        de sus empresas retiene su candado más de 5 s. Cuenta en plat_accion antes de
+        validar.
+      security:
+        - plataformaAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: usuario_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContrasenaTemporalBody" }
+      responses:
+        "204":
+          description: Contraseña temporal definida; sin cuerpo.
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: >-
+            La empresa está desactivada (empresa_inactiva; primero se reactiva). Un 404 va
+            antes. empresa_inactiva se evalúa con el estado serializado (bajo el candado por
+            empresa): con el candado ocupado puede responderse 503 en su lugar. No cambia nada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [empresa_inactiva]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: >-
+            La contraseña no cumple la política (contrasena_*, campo password) o la
+            confirmación no coincide (contrasenas_distintas, campo password_confirmacion). No
+            cambia nada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos:
+            - contrasena_invalida
+            - contrasena_corta
+            - contrasena_larga
+            - contrasena_comun
+            - contrasenas_distintas
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          description: >-
+            No se pudo contar el intento (plat_accion), otro cambio de usuarios de una de las
+            empresas de la persona retuvo su candado más de 5 s (lock_timeout) o la base
+            abortó la transacción (interbloqueo o fallo de serialización). No cambia nada; se
+            puede reintentar.
+          headers:
+            Retry-After:
+              description: Segundos sugeridos antes de reintentar.
+              required: true
+              schema: { type: integer }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [servicio_no_disponible]
+
+  /plataforma/empresas/{id}/logo:
+    post:
+      tags: [plataforma]
+      operationId: plataformaSubirLogoEmpresa
+      summary: Subir o reemplazar el logo de una empresa (alta o edición de la empresa)
+      description: >-
+        multipart/form-data con exactamente logo_id (UUID canónico del cliente) y archivo,
+        con las reglas de la spec 013: PNG, JPEG o WebP hasta 2 MB; se guarda en PNG ≤ 600
+        px con transparencia y sin metadatos, en el almacén con la clave del tenant. En una
+        transacción, con la ficha de la empresa bloqueada, registra el logo (subido por el
+        admin de la empresa) y lo deja como vigente; si la empresa no tenía logo escribe
+        empresa_logo_subido y, si tenía otro, lo reemplaza y escribe
+        empresa_logo_reemplazado (201 en los dos casos). El logo anterior (fila y archivo)
+        se conserva: los informes cerrados lo siguen usando. Si la transacción falla, el
+        archivo nuevo se borra. Repetir con el logo_id vigente responde 200 sin cambiar
+        nada. Cuenta en plat_accion antes de validar.
+      security:
+        - plataformaAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/SubirLogoBody" }
+      responses:
+        "200":
+          $ref: "#/components/responses/LogoPlataformaGuardado"
+        "201":
+          $ref: "#/components/responses/LogoPlataformaGuardado"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: >-
+            El logo_id ya se usó, en esta u otra empresa (logo_id_en_uso), el tenant no
+            tiene sus datos de empresa (empresa_sin_datos) o no tiene ninguna membresía
+            admin (empresa_sin_admin). No cambia nada ni deja archivo.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [logo_id_en_uso, empresa_sin_datos, empresa_sin_admin]
+        "413":
+          $ref: "#/components/responses/FotoDemasiadoGrande"
+        "415":
+          $ref: "#/components/responses/FotoTipoNoAdmitido"
+        "422":
+          $ref: "#/components/responses/FotoInvalida"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          description: >-
+            El almacén de imágenes no está configurado (logos_no_disponibles; la empresa ya
+            existe y el paso se puede saltar), no se pudo contar el intento (plat_accion), la
+            ficha de la empresa siguió bloqueada más de 5 s (lock_timeout) o la base abortó
+            la transacción (servicio_no_disponible, con Retry-After). No cambia nada ni deja
+            archivo.
+          headers:
+            Retry-After:
+              description: Segundos sugeridos antes de reintentar (solo servicio_no_disponible).
+              required: false
+              schema: { type: integer }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [logos_no_disponibles, servicio_no_disponible]
+
+  /plataforma/empresas/{id}/ficha:
+    get:
+      tags: [plataforma]
+      operationId: plataformaLeerFichaEmpresa
+      summary: Ficha vigente de una empresa, para editarla (módulo Empresas)
+      description: >-
+        Exactamente nombre, dirección, NIT, teléfono, correo y si tiene logo; nada más de
+        la empresa (ni quién la actualizó ni el id del logo). Solo lectura: no cuenta en
+        plat_accion ni escribe auditoría.
+      security:
+        - plataformaAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: La ficha vigente.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FichaEmpresaPlataforma" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: >-
+            El tenant no tiene sus datos de empresa (empresa_sin_datos; p. ej. creado por el
+            comando create-tenant): los completa su admin desde su pantalla Empresa.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [empresa_sin_datos]
+    put:
+      tags: [plataforma]
+      operationId: plataformaEditarFichaEmpresa
+      summary: Editar la ficha de una empresa (sin cambios, 200 sin escribir)
+      description: >-
+        Los cinco campos de la ficha, siempre todos (nit, telefono y correo pueden ser null
+        o vacíos para quitarlos); cualquier otra clave da 400. Mismas validaciones que la
+        pantalla Empresa de la clínica (422 con campo, sin cambios). Con la ficha
+        bloqueada, cambia solo esas cinco columnas y la fecha de actualización (no quién
+        la actualizó) y, si cambia el nombre, también el nombre de la empresa en la
+        consola y en las listas; escribe empresa_editada sin valores en la misma
+        transacción. Si ningún valor cambia, responde 200 sin escribir ni auditar. Los
+        informes cerrados no cambian (guardan su copia de la empresa). Sin If-Match: si el
+        admin edita a la vez, gana la última escritura. Se permite también con la empresa
+        desactivada. Cuenta en plat_accion antes de validar.
+      security:
+        - plataformaAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FichaEmpresaPlataformaBody" }
+      responses:
+        "200":
+          description: La ficha resultante (la misma de antes si no cambió nada).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FichaEmpresaPlataforma" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: >-
+            El tenant no tiene sus datos de empresa (empresa_sin_datos); la consola no los
+            crea. No cambia nada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [empresa_sin_datos]
+        "413":
+          $ref: "#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: Un dato de la ficha no es válido (en campo, cuál). No cambia nada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [campo_invalido]
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          description: >-
+            No se pudo contar el intento (plat_accion), la ficha de la empresa siguió
+            bloqueada más de 5 s (lock_timeout) o la base abortó la transacción
+            (interbloqueo o fallo de serialización). No cambia nada; se puede reintentar.
+          headers:
+            Retry-After:
+              description: Segundos sugeridos antes de reintentar.
+              required: true
+              schema: { type: integer }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+          x-codigos: [servicio_no_disponible]
+
+  /plataforma/actividad:
+    get:
+      tags: [plataforma]
+      operationId: plataformaActividad
+      summary: Auditoría de la consola, de la más reciente a la más antigua (módulo Actividad)
+      description: >-
+        Solo lectura (consultarla no escribe auditoría). Paginada por cursor: se pide la
+        primera página sin cursor y las siguientes con el siguiente de la anterior; el
+        cursor es estable aunque lleguen registros nuevos. Orden por fecha y, a igual fecha,
+        por id, los dos descendentes. Filtros opcionales y combinables: empresa, acción y
+        rango de fechas (las dos inclusive, en la hora de Colombia, UTC−5). Por registro:
+        id, fecha, acción, resultado, nombre del desarrollador («Operador» si la hizo el
+        operador por CLI), id y nombre de la empresa (nulos si no aplica) e id del objeto.
+        Los nombres se leen al consultar (no están en la auditoría). Nunca correos, IP,
+        hashes ni texto libre. Cualquier otro parámetro, uno repetido o un valor fuera de
+        formato da 400.
+      security:
+        - plataformaAuth: []
+      parameters:
+        - name: empresa_id
+          in: query
+          required: false
+          description: Id de la empresa (UUID en minúsculas; no el UUID nulo).
+          schema: { type: string, format: uuid }
+        - name: accion
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/AccionAuditoria" }
+        - name: desde
+          in: query
+          required: false
+          description: Primer día incluido (AAAA-MM-DD, hora de Colombia).
+          schema: { type: string, format: date }
+        - name: hasta
+          in: query
+          required: false
+          description: Último día incluido (AAAA-MM-DD, hora de Colombia); no antes de desde.
+          schema: { type: string, format: date }
+        - name: limite
+          in: query
+          required: false
+          description: Registros por página, de 1 a 100 (por defecto 50).
+          schema: { type: integer, minimum: 1, maximum: 100 }
+        - name: cursor
+          in: query
+          required: false
+          description: Valor opaco; el siguiente de la página anterior.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Una página de la auditoría.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActividadPlataforma" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de acceso (15 minutos). Guárdalo solo en memoria.
+    plataformaAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        Token de acceso de plataforma (10 minutos; no sirve en las rutas de una clínica,
+        ni el de una clínica aquí). Guárdalo solo en memoria.
+
+  parameters:
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: 'row_version del activo leído, "3" o 3; si no coincide, 412.'
+      schema: { type: string }
+    Id:
+      name: id
+      in: path
+      required: true
+      description: Un id de otro tenant responde 404, igual que uno inexistente.
+      schema: { type: string, format: uuid }
+    Csrf:
+      name: X-AssetControl-CSRF
+      in: header
+      required: true
+      description: Debe valer 1; además la petición debe venir del mismo sitio.
+      schema: { type: string, const: "1" }
+    RefreshCookie:
+      name: refresh
+      in: cookie
+      required: false
+      description: >-
+        Cookie HttpOnly de refresh (__Secure-refresh fuera de desarrollo), Path=/auth.
+      schema: { type: string }
+
+    PlataformaRefreshCookie:
+      name: plat-refresh
+      in: cookie
+      required: false
+      description: >-
+        Cookie HttpOnly de refresh de plataforma (__Secure-plat-refresh fuera de
+        desarrollo), Path=/plataforma/auth; 8 horas.
+      schema: { type: string }
+
+  responses:
+    SesionPlataformaIniciada:
+      description: >-
+        Sesión de plataforma emitida; deja la cookie de refresh de plataforma (HttpOnly,
+        SameSite=Lax).
+      headers:
+        Set-Cookie:
+          description: Cookie de refresh de plataforma nueva.
+          required: true
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/SesionPlataforma" }
+    SesionIniciada:
+      description: Sesión emitida; deja la cookie de refresh (HttpOnly, SameSite=Lax).
+      headers:
+        Set-Cookie:
+          description: Cookie de refresh nueva.
+          required: true
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Sesion" }
+    SolicitudInvalida:
+      description: El cuerpo no es JSON válido o le faltan campos.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [solicitud_invalida]
+    NoAutenticado:
+      description: Sin sesión válida.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [no_autenticado]
+    NoEncontrado:
+      description: No existe en este tenant (o es de otro).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [no_encontrado]
+    NombreDuplicado:
+      description: Ya existe una con ese nombre (sin distinguir mayúsculas ni tildes).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [nombre_duplicado]
+    Prohibido:
+      description: Rol insuficiente o petición de otro sitio (sin cabecera CSRF).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [prohibido]
+    ActivoDadoDeBaja:
+      description: El activo está dado de baja; solo se puede reactivar.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [activo_dado_de_baja]
+    FaltaVersion:
+      description: Falta If-Match o no tiene la forma "N".
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [falta_version]
+    VersionDesactualizada:
+      description: La versión no coincide; no se guardó nada. Trae el activo vigente con su foto.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/VersionDesactualizada" }
+      x-codigos: [version_desactualizada]
+    ActivoCambiado:
+      description: Guardado (o sin cambios); el activo con precio, foto y su versión.
+      headers:
+        ETag:
+          description: La versión nueva entre comillas, para el próximo If-Match.
+          required: true
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ActivoRespuesta" }
+    CuerpoDemasiadoGrande:
+      description: El cuerpo supera 4 KB.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [cuerpo_demasiado_grande]
+    DemasiadasSolicitudes:
+      description: Límite de tasa superado (igual exista o no la cuenta).
+      headers:
+        Retry-After:
+          description: Segundos de la ventana del límite.
+          required: true
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [demasiadas_solicitudes]
+    ServicioNoDisponible:
+      description: >-
+        No se pudo contar el intento, el servidor está saturado o el candado de membresías
+        de la empresa sigue ocupado (un cambio de la consola en curso; espera máxima 3 s en
+        login, refresh, aceptar invitación y cambio de contraseña). No cambia nada.
+      headers:
+        Retry-After:
+          description: Segundos sugeridos antes de reintentar.
+          required: true
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [servicio_no_disponible]
+
+    FotoGuardada:
+      description: La foto guardada (201 nueva; 200 si ya existía con ese foto_id).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/FotoRespuesta" }
+    FotoDemasiadoGrande:
+      description: La foto o el cuerpo superan el límite.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [imagen_demasiado_grande, cuerpo_demasiado_grande]
+    FotoTipoNoAdmitido:
+      description: El archivo no es JPEG, PNG ni WebP (se mira el contenido).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [tipo_no_admitido]
+    FotoInvalida:
+      description: La imagen está dañada o es demasiado grande en píxeles.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [imagen_invalida]
+    FotosNoDisponibles:
+      description: El almacenamiento de fotos no está configurado.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [fotos_no_disponibles]
+    EmpresaActual:
+      description: Los datos de la empresa.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/EmpresaRespuesta" }
+    LogoPlataformaGuardado:
+      description: >-
+        El logo vigente de la empresa (201 nuevo o reemplazo; 200 si ya era el vigente con
+        ese logo_id).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/LogoPlataforma" }
+    LogoGuardado:
+      description: El logo guardado (201 nuevo; 200 si ya era el vigente con ese logo_id).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/LogoRespuesta" }
+    SinLogo:
+      description: No hay logo (o es de otro tenant).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [sin_logo]
+
+  schemas:
+    ErrorCode:
+      type: string
+      description: Código estable del error; el texto para la persona va en message.
+      enum:
+        - solicitud_invalida
+        - no_autenticado
+        - prohibido
+        - no_encontrado
+        - metodo_no_permitido
+        - cuerpo_demasiado_grande
+        - tipo_no_soportado
+        - error_http
+        - error_interno
+        - servicio_no_disponible
+        - demasiadas_solicitudes
+        - credenciales_invalidas
+        - invitacion_invalida
+        - enlace_invalido
+        - contrasena_invalida
+        - contrasena_corta
+        - contrasena_larga
+        - contrasena_comun
+        - jerarquia_invalida
+        - nombre_duplicado
+        - tiene_hijas_activas
+        - padre_inactivo
+        - tiene_activos
+        - codigo_invalido
+        - precio_invalido
+        - ubicacion_invalida
+        - codigo_existente
+        - falta_version
+        - version_desactualizada
+        - codigo_inmutable
+        - activo_dado_de_baja
+        - motivo_invalido
+        - sesion_abierta_existente
+        - sesion_cerrada
+        - sesion_abierta
+        - fotos_no_disponibles
+        - sin_foto
+        - foto_id_en_uso
+        - empresa_sin_datos
+        - sin_logo
+        - logo_id_en_uso
+        - foto_existente
+        - imagen_demasiado_grande
+        - tipo_no_admitido
+        - imagen_invalida
+        - exportacion_demasiado_grande
+        - campo_invalido
+        - contrasenas_distintas
+        - empresa_existente
+        - email_en_uso
+        - cambio_password_requerido
+        - contrasena_repetida
+        - empresa_inactiva
+        - ultimo_admin
+        - empresa_sin_admin
+        - logos_no_disponibles
+    Error:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          additionalProperties: false
+          properties:
+            code: { $ref: "#/components/schemas/ErrorCode" }
+            message: { type: string, description: Texto en español para mostrar. }
+            request_id: { type: string, format: uuid }
+            campo:
+              type: string
+              description: Campo del cuerpo que no es válido, cuando el error es de uno solo.
+
+    Rol:
+      type: string
+      enum: [admin, contador]
+    Usuario:
+      type: object
+      required: [id, email, nombre]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        nombre: { type: string }
+    Tenant:
+      type: object
+      required: [id, nombre]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+    UsuarioActual:
+      type: object
+      required: [usuario, tenant, rol, debe_cambiar_password]
+      additionalProperties: false
+      properties:
+        usuario: { $ref: "#/components/schemas/Usuario" }
+        tenant: { $ref: "#/components/schemas/Tenant" }
+        rol: { $ref: "#/components/schemas/Rol" }
+        debe_cambiar_password:
+          type: boolean
+          description: >-
+            Si es true, solo se puede cambiar la contraseña (el resto responde 403
+            cambio_password_requerido).
+    Sesion:
+      type: object
+      required: [access_token, token_type, expires_in, usuario, tenant, rol, debe_cambiar_password]
+      additionalProperties: false
+      properties:
+        access_token: { type: string, description: JWT de acceso; solo en memoria. }
+        token_type: { type: string, const: Bearer }
+        expires_in: { type: integer, minimum: 1, description: Segundos de vida del token. }
+        usuario: { $ref: "#/components/schemas/Usuario" }
+        tenant: { $ref: "#/components/schemas/Tenant" }
+        rol: { $ref: "#/components/schemas/Rol" }
+        debe_cambiar_password:
+          type: boolean
+          description: >-
+            Si es true, la web lleva a «Cambia tu contraseña» antes de cualquier otra
+            pantalla.
+
+    Desarrollador:
+      type: object
+      required: [id, email, nombre]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        nombre: { type: string }
+    DesarrolladorActual:
+      type: object
+      required: [desarrollador]
+      additionalProperties: false
+      properties:
+        desarrollador: { $ref: "#/components/schemas/Desarrollador" }
+    SesionPlataforma:
+      type: object
+      required: [access_token, token_type, expires_in, desarrollador]
+      additionalProperties: false
+      properties:
+        access_token: { type: string, description: JWT de acceso de plataforma; solo en memoria. }
+        token_type: { type: string, const: Bearer }
+        expires_in: { type: integer, minimum: 1, description: Segundos de vida del token. }
+        desarrollador: { $ref: "#/components/schemas/Desarrollador" }
+    ModuloPlataforma:
+      type: object
+      required: [id, titulo, orden]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        titulo: { type: string }
+        orden: { type: integer }
+    ModulosPlataforma:
+      type: object
+      required: [modulos]
+      additionalProperties: false
+      properties:
+        modulos:
+          type: array
+          items: { $ref: "#/components/schemas/ModuloPlataforma" }
+    EmpresaPlataforma:
+      type: object
+      required: [id, nombre, activa, creado_en, tiene_logo, n_membresias_activas, n_admins_activos]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        activa: { type: boolean }
+        creado_en: { type: string, format: date-time }
+        tiene_logo: { type: boolean }
+        n_membresias_activas: { type: integer, minimum: 0 }
+        n_admins_activos: { type: integer, minimum: 0 }
+    ListaEmpresasPlataforma:
+      type: object
+      required: [empresas]
+      additionalProperties: false
+      properties:
+        empresas:
+          type: array
+          items: { $ref: "#/components/schemas/EmpresaPlataforma" }
+    AdminInicialBody:
+      type: object
+      required: [nombre, email, password, password_confirmacion]
+      additionalProperties: false
+      properties:
+        nombre: { type: string }
+        email: { type: string }
+        password: { type: string, format: password }
+        password_confirmacion: { type: string, format: password }
+    CrearEmpresaBody:
+      type: object
+      required: [id, nombre, direccion, admin]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid, description: UUID del cliente (idempotencia). }
+        nombre: { type: string, description: Nombre o razón social; también el del tenant. }
+        direccion: { type: string }
+        nit: { type: [string, "null"] }
+        telefono: { type: [string, "null"] }
+        correo: { type: [string, "null"] }
+        admin: { $ref: "#/components/schemas/AdminInicialBody" }
+    EmpresaCreada:
+      type: object
+      required: [empresa_id, admin_id]
+      additionalProperties: false
+      properties:
+        empresa_id: { type: string, format: uuid }
+        admin_id: { type: string, format: uuid }
+    EstadoEmpresaBody:
+      type: object
+      required: [activa]
+      additionalProperties: false
+      properties:
+        activa: { type: boolean }
+    EstadoEmpresa:
+      type: object
+      required: [id, activa]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        activa: { type: boolean }
+    UsuarioPlataforma:
+      type: object
+      required: [id, nombre, email, rol, activa, debe_cambiar_password]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid, description: Id del usuario. }
+        nombre: { type: string }
+        email: { type: string }
+        rol: { $ref: "#/components/schemas/Rol" }
+        activa: { type: boolean, description: Si su membresía en esta empresa está activa. }
+        debe_cambiar_password:
+          type: boolean
+          description: Cambio de contraseña pendiente (primer admin creado desde la consola o contraseña temporal definida desde Usuarios).
+    ListaUsuariosPlataforma:
+      type: object
+      required: [usuarios]
+      additionalProperties: false
+      properties:
+        usuarios:
+          type: array
+          items: { $ref: "#/components/schemas/UsuarioPlataforma" }
+    EstadoUsuarioBody:
+      type: object
+      required: [activa]
+      additionalProperties: false
+      properties:
+        activa: { type: boolean }
+    EditarUsuarioBody:
+      type: object
+      required: [nombre, rol]
+      additionalProperties: false
+      properties:
+        nombre:
+          type: string
+          maxLength: 120
+          description: Nombre visible; se recortan los espacios y se normaliza.
+        rol: { $ref: "#/components/schemas/Rol" }
+    UsuarioEditado:
+      type: object
+      required: [id, nombre, rol]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid, description: Id del usuario. }
+        nombre: { type: string }
+        rol: { $ref: "#/components/schemas/Rol" }
+    ContrasenaTemporalBody:
+      type: object
+      required: [password, password_confirmacion]
+      additionalProperties: false
+      properties:
+        password:
+          type: string
+          format: password
+          minLength: 10
+          maxLength: 128
+          description: Contraseña temporal; la persona debe cambiarla al entrar.
+        password_confirmacion:
+          type: string
+          format: password
+          description: Debe ser igual a password (se compara en el servidor).
+    FichaEmpresaPlataforma:
+      type: object
+      description: La ficha de la empresa que la consola puede leer (nada más de la empresa).
+      required: [nombre, direccion, nit, telefono, correo, tiene_logo]
+      additionalProperties: false
+      properties:
+        nombre: { type: string }
+        direccion: { type: string }
+        nit: { type: [string, "null"], description: "Con puntos y, si lo tiene, -dígito." }
+        telefono: { type: [string, "null"] }
+        correo: { type: [string, "null"] }
+        tiene_logo: { type: boolean }
+    FichaEmpresaPlataformaBody:
+      type: object
+      required: [nombre, direccion, nit, telefono, correo]
+      additionalProperties: false
+      properties:
+        nombre: { type: string, description: Nombre o razón social; también el del tenant. }
+        direccion: { type: string }
+        nit: { type: [string, "null"] }
+        telefono: { type: [string, "null"] }
+        correo: { type: [string, "null"] }
+    LogoPlataforma:
+      type: object
+      required: [logo]
+      additionalProperties: false
+      properties:
+        logo:
+          type: object
+          required: [id]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid, description: Id del logo vigente. }
+    EstadoUsuario:
+      type: object
+      required: [id, activa]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid, description: Id del usuario. }
+        activa: { type: boolean }
+    AccionAuditoria:
+      type: string
+      description: Lista cerrada de acciones auditadas de la consola y del operador (R33).
+      enum:
+        - login_ok
+        - empresa_creada
+        - empresa_desactivada
+        - empresa_reactivada
+        - empresa_logo_subido
+        - usuario_desactivado
+        - usuario_reactivado
+        - desarrollador_creado
+        - desarrollador_restablecido
+        - desarrollador_desactivado
+        - desarrollador_reactivado
+        - empresa_editada
+        - empresa_logo_reemplazado
+        - usuario_editado
+        - usuario_contrasena_restablecida
+    RegistroActividad:
+      type: object
+      required:
+        - id
+        - fecha
+        - accion
+        - resultado
+        - desarrollador_nombre
+        - empresa_id
+        - empresa_nombre
+        - objeto_id
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid, description: Id del registro de auditoría. }
+        fecha: { type: string, format: date-time, description: Instante en UTC. }
+        accion: { $ref: "#/components/schemas/AccionAuditoria" }
+        resultado: { type: string, enum: [ok, rechazado] }
+        desarrollador_nombre:
+          type: string
+          description: Nombre del desarrollador, u «Operador» si la hizo el operador por CLI.
+        empresa_id: { type: [string, "null"], format: uuid }
+        empresa_nombre: { type: [string, "null"] }
+        objeto_id:
+          type: [string, "null"]
+          format: uuid
+          description: >-
+            Id del objeto de la acción (empresa, usuario o desarrollador; en
+            empresa_logo_subido y empresa_logo_reemplazado, el id del logo nuevo; nulo en
+            empresa_editada). En las acciones del operador por CLI sobre
+            un desarrollador (desarrollador_nombre «Operador») puede ser el id del
+            desarrollador objetivo.
+    ActividadPlataforma:
+      type: object
+      required: [actividad, siguiente]
+      additionalProperties: false
+      properties:
+        actividad:
+          type: array
+          items: { $ref: "#/components/schemas/RegistroActividad" }
+        siguiente:
+          type: [string, "null"]
+          description: Cursor de la página siguiente; nulo si no hay más.
+
+    LoginBody:
+      type: object
+      required: [email, password]
+      additionalProperties: false
+      properties:
+        email: { type: string }
+        password: { type: string, format: password }
+    InvitarBody:
+      type: object
+      required: [email, rol]
+      additionalProperties: false
+      properties:
+        email: { type: string }
+        rol: { $ref: "#/components/schemas/Rol" }
+    ValidarBody:
+      type: object
+      required: [token]
+      additionalProperties: false
+      properties:
+        token: { type: string, description: Token del fragmento del enlace. }
+    AceptarBody:
+      type: object
+      required: [token, nombre, password]
+      additionalProperties: false
+      properties:
+        token: { type: string }
+        nombre:
+          type: string
+          maxLength: 120
+          description: >-
+            Nombre visible: se guarda en NFC y sin espacios en los extremos; necesita una
+            letra o un número y no admite caracteres invisibles o de control.
+        password:
+          type: string
+          format: password
+          minLength: 10
+          maxLength: 128
+    CambiarContrasenaBody:
+      type: object
+      required: [actual, nueva, confirmacion]
+      additionalProperties: false
+      properties:
+        actual: { type: string, format: password }
+        nueva: { type: string, format: password, minLength: 10, maxLength: 128 }
+        confirmacion: { type: string, format: password }
+    RecuperarBody:
+      type: object
+      required: [email]
+      additionalProperties: false
+      properties:
+        email: { type: string }
+    RecuperacionSolicitada:
+      type: object
+      required: [mensaje]
+      additionalProperties: false
+      properties:
+        mensaje: { type: string, description: Texto genérico en español para mostrar. }
+    RestablecerBody:
+      type: object
+      required: [token, password]
+      additionalProperties: false
+      properties:
+        token:
+          type: string
+          description: >-
+            Token del fragmento del enlace (/restablecer#token); va solo en el cuerpo,
+            nunca en la URL.
+        password:
+          type: string
+          format: password
+          minLength: 10
+          maxLength: 128
+
+    Invitacion:
+      type: object
+      required: [id, email, rol, expira_en]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        rol: { $ref: "#/components/schemas/Rol" }
+        expira_en: { type: string, format: date-time }
+    InvitacionCreada:
+      type: object
+      required: [invitacion, enlace]
+      additionalProperties: false
+      properties:
+        invitacion: { $ref: "#/components/schemas/Invitacion" }
+        enlace:
+          type: string
+          description: Ruta relativa /invitacion#<token>; se muestra una sola vez.
+    Vigencia:
+      type: object
+      required: [vigente]
+      additionalProperties: false
+      properties:
+        vigente: { type: boolean }
+
+    NombreVisible:
+      type: string
+      maxLength: 120
+      description: >-
+        Se guarda en NFC y sin espacios en los extremos; necesita una letra o un número
+        y no admite caracteres invisibles o de control.
+    TipoUbicacion:
+      type: string
+      enum: [sede, sala, box]
+    Ubicacion:
+      type: object
+      required: [id, nombre, tipo, padre_id, activa]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        tipo: { $ref: "#/components/schemas/TipoUbicacion" }
+        padre_id:
+          type: [string, "null"]
+          format: uuid
+          description: Null solo en una sede.
+        activa: { type: boolean }
+    UbicacionRespuesta:
+      type: object
+      required: [ubicacion]
+      additionalProperties: false
+      properties:
+        ubicacion: { $ref: "#/components/schemas/Ubicacion" }
+    ListaUbicaciones:
+      type: object
+      required: [ubicaciones]
+      additionalProperties: false
+      properties:
+        ubicaciones:
+          type: array
+          items: { $ref: "#/components/schemas/Ubicacion" }
+    CrearUbicacionBody:
+      type: object
+      required: [nombre, tipo]
+      additionalProperties: false
+      properties:
+        nombre: { $ref: "#/components/schemas/NombreVisible" }
+        tipo: { $ref: "#/components/schemas/TipoUbicacion" }
+        padre_id:
+          type: string
+          format: uuid
+          description: Obligatorio para sala (una sede) y box (una sala); prohibido en sede.
+    ActualizarUbicacionBody:
+      type: object
+      additionalProperties: false
+      description: Al menos uno de los dos campos.
+      properties:
+        nombre: { $ref: "#/components/schemas/NombreVisible" }
+        activa: { type: boolean }
+
+    Categoria:
+      type: object
+      required: [id, nombre]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+    CategoriaRespuesta:
+      type: object
+      required: [categoria]
+      additionalProperties: false
+      properties:
+        categoria: { $ref: "#/components/schemas/Categoria" }
+    ListaCategorias:
+      type: object
+      required: [categorias]
+      additionalProperties: false
+      properties:
+        categorias:
+          type: array
+          items: { $ref: "#/components/schemas/Categoria" }
+    SugeridasCargadas:
+      type: object
+      required: [categorias, creadas]
+      additionalProperties: false
+      properties:
+        categorias:
+          type: array
+          items: { $ref: "#/components/schemas/Categoria" }
+        creadas: { type: integer, minimum: 0 }
+    NombreBody:
+      type: object
+      required: [nombre]
+      additionalProperties: false
+      properties:
+        nombre: { $ref: "#/components/schemas/NombreVisible" }
+
+    Precio:
+      type: string
+      description: >-
+        Decimal en texto canónico ("1390000.50"), mayor o igual a 0 y con hasta dos
+        decimales. Nunca un número JSON.
+    EstadoActivo:
+      type: string
+      enum: [activo, en_reparacion, dado_de_baja]
+    TextoOpcional:
+      type: [string, "null"]
+      maxLength: 120
+    Activo:
+      type: object
+      required:
+        [id, codigo, nombre, categoria, ubicacion, serial, marca, modelo, subtipo, fecha_compra, estado, row_version, creado_en]
+      additionalProperties: false
+      description: precio_compra solo existe en las respuestas al admin (P13).
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string }
+        nombre: { type: string }
+        categoria: { $ref: "#/components/schemas/Categoria" }
+        ubicacion: { $ref: "#/components/schemas/UbicacionDeActivo" }
+        serial: { $ref: "#/components/schemas/TextoOpcional" }
+        marca: { $ref: "#/components/schemas/TextoOpcional" }
+        modelo: { $ref: "#/components/schemas/TextoOpcional" }
+        subtipo: { $ref: "#/components/schemas/TextoOpcional" }
+        fecha_compra: { type: [string, "null"], format: date }
+        estado: { $ref: "#/components/schemas/EstadoActivo" }
+        row_version:
+          type: integer
+          minimum: 1
+          description: Versión para If-Match al cambiar el activo (spec 005).
+        creado_en: { type: string, format: date-time }
+        precio_compra: { $ref: "#/components/schemas/Precio" }
+        foto:
+          description: >-
+            Foto principal vigente (spec 012); viene en la ficha, en por-codigo y en la
+            respuesta de editar, mover, estado, baja y su 412 (spec 015, R4). No viene en la
+            búsqueda ni en el alta.
+          oneOf:
+            - { $ref: "#/components/schemas/Foto" }
+            - { type: "null" }
+    Foto:
+      type: object
+      required: [id, creada_en, ancho, alto]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        creada_en: { type: string, format: date-time }
+        ancho: { type: integer, minimum: 1 }
+        alto: { type: integer, minimum: 1 }
+    FotoRespuesta:
+      type: object
+      required: [foto]
+      additionalProperties: false
+      properties:
+        foto: { $ref: "#/components/schemas/Foto" }
+    SubirFotoBody:
+      type: object
+      required: [foto_id, archivo]
+      additionalProperties: false
+      properties:
+        foto_id: { type: string, format: uuid }
+        archivo: { type: string, description: "Archivo de imagen (binario)." }
+    Empresa:
+      type: object
+      required: [nombre, direccion, nit, telefono, correo, logo, completa]
+      additionalProperties: false
+      properties:
+        nombre: { type: string }
+        direccion: { type: [string, "null"] }
+        nit: { type: [string, "null"], description: "Con puntos y, si lo tiene, -dígito." }
+        telefono: { type: [string, "null"] }
+        correo: { type: [string, "null"] }
+        logo:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [id]
+              additionalProperties: false
+              properties:
+                id: { type: string, format: uuid }
+        completa: { type: boolean, description: "false hasta guardar nombre y dirección." }
+    EmpresaDelInforme:
+      type: object
+      description: >-
+        Datos de la empresa congelados al cerrar (spec 013). vigente true: la sesión se
+        cerró antes de guardarlos y se muestran los de hoy.
+      required: [nombre, direccion, nit, telefono, correo, logo, vigente]
+      additionalProperties: false
+      properties:
+        nombre: { type: string }
+        direccion: { type: [string, "null"] }
+        nit: { type: [string, "null"] }
+        telefono: { type: [string, "null"] }
+        correo: { type: [string, "null"] }
+        logo:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [id]
+              additionalProperties: false
+              properties:
+                id: { type: string, format: uuid }
+        vigente: { type: boolean }
+    EmpresaRespuesta:
+      type: object
+      required: [empresa]
+      additionalProperties: false
+      properties:
+        empresa: { $ref: "#/components/schemas/Empresa" }
+    GuardarEmpresaBody:
+      type: object
+      required: [nombre, direccion]
+      additionalProperties: false
+      properties:
+        nombre: { type: string }
+        direccion: { type: string }
+        nit: { type: [string, "null"] }
+        telefono: { type: [string, "null"] }
+        correo: { type: [string, "null"] }
+    SubirLogoBody:
+      type: object
+      required: [logo_id, archivo]
+      additionalProperties: false
+      properties:
+        logo_id: { type: string, format: uuid }
+        archivo: { type: string, description: "Archivo de imagen (binario)." }
+    LogoRespuesta:
+      type: object
+      required: [logo]
+      additionalProperties: false
+      properties:
+        logo:
+          type: object
+          required: [id, ancho, alto]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            ancho: { type: integer }
+            alto: { type: integer }
+    UbicacionDeActivo:
+      type: object
+      required: [id, nombre, ruta]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        ruta: { type: string, description: '"Sala › Box" o el nombre de la sala.' }
+    ListaActivos:
+      type: object
+      required: [activos, total, pagina, por_pagina]
+      additionalProperties: false
+      properties:
+        activos:
+          type: array
+          items: { $ref: "#/components/schemas/Activo" }
+        total: { type: integer, minimum: 0 }
+        pagina: { type: integer, minimum: 1 }
+        por_pagina: { type: integer, minimum: 1 }
+    Sugerencias:
+      type: object
+      required: [valores]
+      additionalProperties: false
+      properties:
+        valores:
+          type: array
+          items: { type: string }
+    ActivoRespuesta:
+      type: object
+      required: [activo]
+      additionalProperties: false
+      properties:
+        activo: { $ref: "#/components/schemas/Activo" }
+    ActivoResumen:
+      type: object
+      required: [id, codigo, nombre]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string }
+        nombre: { type: string }
+    CodigoExistente:
+      type: object
+      required: [error, activo]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          additionalProperties: false
+          properties:
+            code: { $ref: "#/components/schemas/ErrorCode" }
+            message: { type: string }
+            request_id: { type: string, format: uuid }
+        activo: { $ref: "#/components/schemas/ActivoResumen" }
+    VersionDesactualizada:
+      type: object
+      required: [error, activo]
+      additionalProperties: false
+      description: El activo cambió desde que se leyó; trae el vigente (con precio, solo admin).
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          additionalProperties: false
+          properties:
+            code: { $ref: "#/components/schemas/ErrorCode" }
+            message: { type: string }
+            request_id: { type: string, format: uuid }
+        activo: { $ref: "#/components/schemas/Activo" }
+    EditarActivoBody:
+      type: object
+      additionalProperties: false
+      description: >-
+        Solo los campos que cambian; null o "" borra un opcional. El código no se puede
+        cambiar (400 codigo_inmutable).
+      properties:
+        nombre: { $ref: "#/components/schemas/NombreVisible" }
+        categoria_id: { type: string, format: uuid }
+        precio_compra: { $ref: "#/components/schemas/Precio" }
+        serial: { $ref: "#/components/schemas/TextoOpcional" }
+        marca: { $ref: "#/components/schemas/TextoOpcional" }
+        modelo: { $ref: "#/components/schemas/TextoOpcional" }
+        subtipo: { $ref: "#/components/schemas/TextoOpcional" }
+        fecha_compra: { type: [string, "null"], format: date, description: No futura. }
+    Autor:
+      type: object
+      required: [id, nombre]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+    SesionConteo:
+      type: object
+      required: [id, nombre, tipo, estado, fecha_corte, abierta_por, abierta_en, cerrada_por, cerrada_en]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        tipo: { type: string, enum: [conteo, importacion] }
+        estado: { type: string, enum: [abierta, cerrada] }
+        fecha_corte: { type: string, format: date }
+        abierta_por: { $ref: "#/components/schemas/Autor" }
+        abierta_en: { type: string, format: date-time }
+        cerrada_por:
+          oneOf:
+            - { $ref: "#/components/schemas/Autor" }
+            - { type: "null" }
+        cerrada_en: { type: [string, "null"], format: date-time }
+    SesionConteoRespuesta:
+      type: object
+      required: [sesion]
+      additionalProperties: false
+      properties:
+        sesion: { $ref: "#/components/schemas/SesionConteo" }
+    SesionAbierta:
+      type: object
+      required: [sesion]
+      additionalProperties: false
+      properties:
+        sesion:
+          oneOf:
+            - { $ref: "#/components/schemas/SesionConteo" }
+            - { type: "null" }
+    ListaSesiones:
+      type: object
+      required: [sesiones]
+      additionalProperties: false
+      properties:
+        sesiones:
+          type: array
+          items: { $ref: "#/components/schemas/SesionConteo" }
+    AbrirSesionBody:
+      type: object
+      required: [nombre, fecha_corte]
+      additionalProperties: false
+      properties:
+        nombre: { $ref: "#/components/schemas/NombreVisible" }
+        fecha_corte: { type: string, format: date, description: Fecha a la que se refiere el informe. }
+    AvanceUbicacion:
+      type: object
+      required: [ubicacion, total, verificados, pendientes]
+      additionalProperties: false
+      properties:
+        ubicacion:
+          type: object
+          required: [id, ruta]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            ruta: { type: string }
+        total: { type: integer, minimum: 0 }
+        verificados: { type: integer, minimum: 0 }
+        pendientes: { type: integer, minimum: 0 }
+    Avance:
+      type: object
+      required: [total, verificados, pendientes, por_ubicacion]
+      additionalProperties: false
+      description: >-
+        Activos activo o en_reparacion por su ubicación vigente y cuántos tienen
+        verificación en la sesión. Información de trabajo; no es el informe.
+      properties:
+        total: { type: integer, minimum: 0 }
+        verificados: { type: integer, minimum: 0 }
+        pendientes: { type: integer, minimum: 0 }
+        por_ubicacion:
+          type: array
+          items: { $ref: "#/components/schemas/AvanceUbicacion" }
+    DetalleSesion:
+      type: object
+      required: [sesion, avance]
+      additionalProperties: false
+      properties:
+        sesion: { $ref: "#/components/schemas/SesionConteo" }
+        avance: { $ref: "#/components/schemas/Avance" }
+    UbicacionRuta:
+      type: object
+      required: [id, ruta]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        ruta: { type: string }
+    Verificacion:
+      type: object
+      required:
+        [id, sesion_id, activo, ubicacion_esperada, ubicacion_encontrada, estado_fisico, nota, verificado_por, ocurrido_en, recibido_en, seq, foto_id]
+      additionalProperties: false
+      description: precio_al_contar solo existe en las respuestas al admin (P13).
+      properties:
+        id: { type: string, format: uuid }
+        sesion_id: { type: string, format: uuid }
+        activo: { $ref: "#/components/schemas/ActivoResumen" }
+        ubicacion_esperada: { $ref: "#/components/schemas/UbicacionRuta" }
+        ubicacion_encontrada: { $ref: "#/components/schemas/UbicacionRuta" }
+        estado_fisico: { $ref: "#/components/schemas/EstadoFisico" }
+        nota: { $ref: "#/components/schemas/NotaMotivo" }
+        verificado_por: { $ref: "#/components/schemas/Autor" }
+        ocurrido_en: { type: [string, "null"], format: date-time }
+        recibido_en: { type: string, format: date-time }
+        seq: { type: integer, minimum: 1 }
+        foto_id:
+          type: [string, "null"]
+          format: uuid
+          description: Foto opcional de esta verificación (spec 012).
+        precio_al_contar: { $ref: "#/components/schemas/Precio" }
+    EstadoFisico:
+      type: string
+      enum: [ok, danado]
+    VerificacionRespuesta:
+      type: object
+      required: [verificacion]
+      additionalProperties: false
+      properties:
+        verificacion: { $ref: "#/components/schemas/Verificacion" }
+    UltimaVerificacion:
+      type: object
+      required: [verificacion]
+      additionalProperties: false
+      properties:
+        verificacion:
+          oneOf:
+            - { $ref: "#/components/schemas/Verificacion" }
+            - { type: "null" }
+    VerificarBody:
+      type: object
+      required: [id, activo_id, ubicacion_encontrada_id, estado_fisico]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid, description: Lo genera el cliente; reintentar con el mismo id no duplica. }
+        activo_id: { type: string, format: uuid }
+        ubicacion_encontrada_id: { type: string, format: uuid, description: Sala o box activos donde se vio. }
+        estado_fisico: { $ref: "#/components/schemas/EstadoFisico" }
+        nota: { $ref: "#/components/schemas/NotaMotivo" }
+        ocurrido_en: { type: [string, "null"], format: date-time, description: "Reloj del cliente, informativo." }
+    ActivoConEstado:
+      type: object
+      required: [id, codigo, nombre, estado]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string }
+        nombre: { type: string }
+        estado: { $ref: "#/components/schemas/EstadoActivo" }
+    Discrepancia:
+      type: object
+      required:
+        [verificacion_id, activo, ubicacion_esperada, ubicacion_encontrada, ubicacion_actual, verificado_por, recibido_en, estado, resolucion]
+      additionalProperties: false
+      properties:
+        verificacion_id: { type: string, format: uuid }
+        activo: { $ref: "#/components/schemas/ActivoConEstado" }
+        ubicacion_esperada: { $ref: "#/components/schemas/UbicacionRuta" }
+        ubicacion_encontrada: { $ref: "#/components/schemas/UbicacionRuta" }
+        ubicacion_actual: { $ref: "#/components/schemas/UbicacionRuta" }
+        verificado_por: { $ref: "#/components/schemas/Autor" }
+        recibido_en: { type: string, format: date-time }
+        estado: { type: string, enum: [pendiente, desfasada, aplicada, descartada] }
+        resolucion:
+          oneOf:
+            - type: object
+              required: [tipo, por, en]
+              additionalProperties: false
+              properties:
+                tipo: { type: string, enum: [aplicada, descartada] }
+                por: { $ref: "#/components/schemas/Autor" }
+                en: { type: string, format: date-time }
+            - { type: "null" }
+    ListaDiscrepancias:
+      type: object
+      required: [discrepancias]
+      additionalProperties: false
+      properties:
+        discrepancias:
+          type: array
+          items: { $ref: "#/components/schemas/Discrepancia" }
+    AplicarDiscrepanciasBody:
+      type: object
+      required: [verificaciones]
+      additionalProperties: false
+      properties:
+        verificaciones:
+          type: array
+          description: De 1 a 100 ids de verificación, sin repetir.
+          items: { type: string, format: uuid }
+        confirmar_desfase:
+          type: boolean
+          description: Aplicar aunque el activo ya no esté en la ubicación esperada.
+    DescartarDiscrepanciasBody:
+      type: object
+      required: [verificaciones]
+      additionalProperties: false
+      properties:
+        verificaciones:
+          type: array
+          description: De 1 a 100 ids de verificación, sin repetir.
+          items: { type: string, format: uuid }
+    ResultadosDiscrepancias:
+      type: object
+      required: [resultados]
+      additionalProperties: false
+      properties:
+        resultados:
+          type: array
+          items:
+            type: object
+            required: [verificacion_id, resultado]
+            additionalProperties: false
+            properties:
+              verificacion_id: { type: string, format: uuid }
+              resultado:
+                type: string
+                enum:
+                  - aplicada
+                  - descartada
+                  - desfasada
+                  - ya_en_la_encontrada
+                  - ya_resuelta
+                  - ya_no_es_discrepancia
+                  - dado_de_baja
+                  - ubicacion_invalida
+                  - no_encontrada
+              activo:
+                type: object
+                required: [id, codigo, nombre, ubicacion]
+                additionalProperties: false
+                properties:
+                  id: { type: string, format: uuid }
+                  codigo: { type: string }
+                  nombre: { type: string }
+                  ubicacion: { $ref: "#/components/schemas/UbicacionRuta" }
+    Pendiente:
+      type: object
+      required: [id, codigo, nombre, categoria, ubicacion, estado]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string }
+        nombre: { type: string }
+        categoria: { $ref: "#/components/schemas/Categoria" }
+        ubicacion: { $ref: "#/components/schemas/UbicacionRuta" }
+        estado: { $ref: "#/components/schemas/EstadoActivo" }
+    ListaPendientes:
+      type: object
+      required: [activos, total, pagina, por_pagina]
+      additionalProperties: false
+      properties:
+        activos:
+          type: array
+          items: { $ref: "#/components/schemas/Pendiente" }
+        total: { type: integer, minimum: 0 }
+        pagina: { type: integer, minimum: 1 }
+        por_pagina: { type: integer, minimum: 1 }
+    Cifras:
+      type: object
+      required: [encontrado, no_encontrado, registrado, unidades_encontrado, unidades_no_encontrado, unidades_registrado]
+      additionalProperties: false
+      properties:
+        encontrado: { $ref: "#/components/schemas/Precio" }
+        no_encontrado: { $ref: "#/components/schemas/Precio" }
+        registrado: { $ref: "#/components/schemas/Precio" }
+        unidades_encontrado: { type: integer, minimum: 0 }
+        unidades_no_encontrado: { type: integer, minimum: 0 }
+        unidades_registrado: { type: integer, minimum: 0 }
+    FilaDesglose:
+      type: object
+      required: [id, etiqueta, total_encontrado, total_no_encontrado, total_registrado, unidades_encontrado, unidades_no_encontrado, unidades_registrado]
+      additionalProperties: false
+      description: etiqueta es el nombre de la categoría o la ruta de la ubicación al cierre.
+      properties:
+        id: { type: string, format: uuid }
+        etiqueta: { type: string }
+        total_encontrado: { $ref: "#/components/schemas/Precio" }
+        total_no_encontrado: { $ref: "#/components/schemas/Precio" }
+        total_registrado: { $ref: "#/components/schemas/Precio" }
+        unidades_encontrado: { type: integer, minimum: 0 }
+        unidades_no_encontrado: { type: integer, minimum: 0 }
+        unidades_registrado: { type: integer, minimum: 0 }
+    NoEncontrado:
+      type: object
+      required: [activo_id, codigo, nombre, categoria, ubicacion, precio, en_reparacion]
+      additionalProperties: false
+      properties:
+        activo_id: { type: string, format: uuid }
+        codigo: { type: string }
+        nombre: { type: string }
+        categoria: { $ref: "#/components/schemas/Categoria" }
+        ubicacion: { $ref: "#/components/schemas/UbicacionRuta" }
+        precio: { $ref: "#/components/schemas/Precio" }
+        en_reparacion: { type: boolean }
+    Informe:
+      type: object
+      required: [sesion, empresa, detalle_disponible, totales, desglose, no_encontrados]
+      additionalProperties: false
+      properties:
+        sesion: { $ref: "#/components/schemas/SesionConteo" }
+        empresa: { $ref: "#/components/schemas/EmpresaDelInforme" }
+        detalle_disponible:
+          type: boolean
+          description: >-
+            false en sesiones cerradas antes de la spec 013: no guardaron el detalle por
+            activo ni la copia de la empresa.
+        totales: { $ref: "#/components/schemas/Cifras" }
+        desglose:
+          type: object
+          required: [categorias, ubicaciones]
+          additionalProperties: false
+          properties:
+            categorias:
+              type: array
+              items: { $ref: "#/components/schemas/FilaDesglose" }
+            ubicaciones:
+              type: array
+              items: { $ref: "#/components/schemas/FilaDesglose" }
+        no_encontrados:
+          type: array
+          items: { $ref: "#/components/schemas/NoEncontrado" }
+    FilaValor:
+      type: object
+      required: [id, etiqueta, valor, unidades]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        etiqueta: { type: string }
+        valor: { $ref: "#/components/schemas/Precio" }
+        unidades: { type: integer, minimum: 0 }
+    ValorActual:
+      type: object
+      required: [total, unidades, en_reparacion, por_categoria, por_ubicacion, calculado_en]
+      additionalProperties: false
+      properties:
+        total: { $ref: "#/components/schemas/Precio" }
+        unidades: { type: integer, minimum: 0 }
+        en_reparacion:
+          type: object
+          required: [valor, unidades]
+          additionalProperties: false
+          properties:
+            valor: { $ref: "#/components/schemas/Precio" }
+            unidades: { type: integer, minimum: 0 }
+        por_categoria:
+          type: array
+          items: { $ref: "#/components/schemas/FilaValor" }
+        por_ubicacion:
+          type: array
+          items: { $ref: "#/components/schemas/FilaValor" }
+        calculado_en: { type: string, format: date-time }
+    RefSesion:
+      type: object
+      required: [id, nombre]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+    Porcentaje:
+      type: string
+      description: Porcentaje con un decimal y punto ("33.3"), calculado por el servidor.
+    Inicio:
+      type: object
+      required: [activos_hoy, sesion_abierta]
+      additionalProperties: false
+      properties:
+        activos_hoy:
+          type: object
+          required: [unidades, en_reparacion]
+          additionalProperties: false
+          properties:
+            unidades: { type: integer, minimum: 0 }
+            en_reparacion: { type: integer, minimum: 0 }
+        sesion_abierta:
+          oneOf:
+            - type: object
+              required: [id, nombre, fecha_corte, avance]
+              additionalProperties: false
+              properties:
+                id: { type: string, format: uuid }
+                nombre: { type: string }
+                fecha_corte: { type: string, format: date }
+                avance:
+                  type: object
+                  required: [total, verificados, pendientes, porcentaje]
+                  additionalProperties: false
+                  properties:
+                    total: { type: integer, minimum: 0 }
+                    verificados: { type: integer, minimum: 0 }
+                    pendientes: { type: integer, minimum: 0 }
+                    porcentaje: { $ref: "#/components/schemas/Porcentaje" }
+            - { type: "null" }
+        valor_actual:
+          type: object
+          description: Solo admin. Valor vivo (R7); no es el informe.
+          required: [total, unidades, calculado_en]
+          additionalProperties: false
+          properties:
+            total: { $ref: "#/components/schemas/Precio" }
+            unidades: { type: integer, minimum: 0 }
+            calculado_en: { type: string, format: date-time }
+        discrepancias:
+          description: Solo admin. Por resolver en la sesión de referencia (abierta o última cerrada).
+          oneOf:
+            - type: object
+              required: [por_resolver, sesion]
+              additionalProperties: false
+              properties:
+                por_resolver: { type: integer, minimum: 0 }
+                sesion: { $ref: "#/components/schemas/RefSesion" }
+            - { type: "null" }
+        danados:
+          type: object
+          description: Solo admin. En reparación ∪ dañados en la sesión de referencia (P26).
+          required: [total, en_reparacion, danados, sesion]
+          additionalProperties: false
+          properties:
+            total: { type: integer, minimum: 0 }
+            en_reparacion: { type: integer, minimum: 0 }
+            danados: { type: integer, minimum: 0 }
+            sesion:
+              oneOf:
+                - { $ref: "#/components/schemas/RefSesion" }
+                - { type: "null" }
+        ultimo_informe:
+          description: Solo admin. Tres cifras congeladas del último cierre de tipo conteo.
+          oneOf:
+            - type: object
+              required: [sesion, totales]
+              additionalProperties: false
+              properties:
+                sesion: { $ref: "#/components/schemas/SesionConteo" }
+                totales: { $ref: "#/components/schemas/Cifras" }
+            - { type: "null" }
+    EventoActividad:
+      type: object
+      required: [seq, tipo, ocurrido_en, autor, datos, activo]
+      additionalProperties: false
+      properties:
+        seq: { type: integer, minimum: 1 }
+        tipo: { $ref: "#/components/schemas/TipoEvento" }
+        ocurrido_en: { type: string, format: date-time }
+        autor:
+          type: object
+          required: [id, nombre]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            nombre: { type: string }
+        datos:
+          type: object
+          description: Contenido por tipo (docs/03, spec 005); sin precios para el contador.
+        activo:
+          type: object
+          required: [id, codigo, nombre]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            codigo: { type: string }
+            nombre: { type: string }
+    Actividad:
+      type: object
+      required: [eventos, siguiente]
+      additionalProperties: false
+      properties:
+        eventos:
+          type: array
+          items: { $ref: "#/components/schemas/EventoActividad" }
+        siguiente:
+          type: [integer, "null"]
+          description: Cursor para la página siguiente (antes_de); null si no hay más.
+    Evolucion:
+      type: object
+      required: [sesiones, por_categoria]
+      additionalProperties: false
+      properties:
+        sesiones:
+          type: array
+          items:
+            type: object
+            required: [sesion, total_registrado, unidades_registrado, unidades_encontrado, porcentaje_encontrado]
+            additionalProperties: false
+            properties:
+              sesion:
+                type: object
+                required: [id, nombre, fecha_corte, cerrada_en]
+                additionalProperties: false
+                properties:
+                  id: { type: string, format: uuid }
+                  nombre: { type: string }
+                  fecha_corte: { type: string, format: date }
+                  cerrada_en: { type: [string, "null"], format: date-time }
+              total_registrado: { $ref: "#/components/schemas/Precio" }
+              unidades_registrado: { type: integer, minimum: 0 }
+              unidades_encontrado: { type: integer, minimum: 0 }
+              porcentaje_encontrado: { $ref: "#/components/schemas/Porcentaje" }
+        por_categoria:
+          type: array
+          items:
+            type: object
+            required: [categoria_id, etiqueta, puntos]
+            additionalProperties: false
+            properties:
+              categoria_id: { type: string, format: uuid }
+              etiqueta: { type: string, description: Nombre al cierre más reciente en que aparece. }
+              puntos:
+                type: array
+                items:
+                  type: object
+                  required: [sesion_id, total_registrado, unidades_registrado]
+                  additionalProperties: false
+                  properties:
+                    sesion_id: { type: string, format: uuid }
+                    total_registrado: { $ref: "#/components/schemas/Precio" }
+                    unidades_registrado: { type: integer, minimum: 0 }
+    TipoEvento:
+      type: string
+      enum:
+        - creado
+        - importado
+        - verificado
+        - ubicacion_cambiada
+        - precio_cambiado
+        - estado_cambiado
+        - categoria_cambiada
+        - datos_cambiados
+        - dado_de_baja
+        - discrepancia_descartada
+        - foto_agregada
+        - foto_cambiada
+        - foto_retirada
+    EventoActivo:
+      type: object
+      required: [seq, tipo, ocurrido_en, autor, datos]
+      additionalProperties: false
+      properties:
+        seq: { type: integer, minimum: 1 }
+        tipo: { $ref: "#/components/schemas/TipoEvento" }
+        ocurrido_en: { type: string, format: date-time }
+        autor:
+          type: object
+          required: [id, nombre]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            nombre: { type: string }
+        datos:
+          type: object
+          description: Contenido por tipo (docs/03, spec 005); sin precios para el contador.
+        foto_id:
+          type: string
+          format: uuid
+          description: Foto de la verificación del evento, si la tiene (spec 012).
+    Historial:
+      type: object
+      required: [eventos, siguiente]
+      additionalProperties: false
+      properties:
+        eventos:
+          type: array
+          items: { $ref: "#/components/schemas/EventoActivo" }
+        siguiente:
+          type: [integer, "null"]
+          description: Cursor para la página siguiente (antes_de); null si no hay más.
+    MoverActivoBody:
+      type: object
+      required: [ubicacion_id]
+      additionalProperties: false
+      properties:
+        ubicacion_id: { type: string, format: uuid, description: Una sala o un box activos (D1). }
+    NotaMotivo:
+      type: [string, "null"]
+      maxLength: 120
+      description: Texto corto (H-3); en una baja o reactivación, obligatoria si el motivo es "otro".
+    EstadoActivoBody:
+      type: object
+      required: [estado]
+      additionalProperties: false
+      description: >-
+        Entre activo y en_reparacion sin motivo. Un dado de baja solo pasa a activo y con
+        motivo (reactivar).
+      properties:
+        estado: { type: string, enum: [activo, en_reparacion] }
+        motivo: { type: string, enum: [encontrado, baja_por_error, otro] }
+        nota: { $ref: "#/components/schemas/NotaMotivo" }
+    BajaActivoBody:
+      type: object
+      required: [motivo]
+      additionalProperties: false
+      properties:
+        motivo:
+          type: string
+          enum: [danado_sin_reparacion, perdido, vendido_o_donado, obsoleto, otro]
+        nota: { $ref: "#/components/schemas/NotaMotivo" }
+    CrearActivoBody:
+      type: object
+      required: [id, codigo, nombre, precio_compra, categoria_id, ubicacion_id]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid, description: Lo genera el cliente; reintentar con el mismo id no duplica. }
+        codigo: { type: string, description: "1 a 40: letras sin tilde, números y - . / _; se guarda en mayúsculas." }
+        nombre: { $ref: "#/components/schemas/NombreVisible" }
+        precio_compra: { $ref: "#/components/schemas/Precio" }
+        categoria_id: { type: string, format: uuid }
+        ubicacion_id: { type: string, format: uuid, description: Una sala o un box activos (D1). }
+        serial: { $ref: "#/components/schemas/TextoOpcional" }
+        marca: { $ref: "#/components/schemas/TextoOpcional" }
+        modelo: { $ref: "#/components/schemas/TextoOpcional" }
+        subtipo: { $ref: "#/components/schemas/TextoOpcional" }
+        fecha_compra: { type: [string, "null"], format: date, description: No futura. }
+    DuplicarActivoBody:
+      type: object
+      required: [id, codigo, copiar_de]
+      additionalProperties: false
+      description: >-
+        El servidor copia nombre, categoría, marca, modelo, subtipo, precio y ubicación
+        del original; nunca código, serial ni historial.
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string }
+        copiar_de: { type: string, format: uuid }
+        serial: { $ref: "#/components/schemas/TextoOpcional" }
+        ubicacion_id: { type: string, format: uuid, description: Si la unidad nueva está en otro cuarto. }
+        precio_compra:
+          $ref: "#/components/schemas/Precio"
+          description: Solo el admin; el contador hereda el precio sin verlo (400 si lo manda).
+
+    Health:
+      type: object
+      required: [status, db, version]
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, error] }
+        version: { type: string }
+    Ready:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [ok, error] }

@@ -1,0 +1,91 @@
+name: CI e2e
+
+# Spec 010c, T3 (R3): el flujo real en Chromium con su propia API y base (assetcontrol_e2e).
+on:
+  pull_request:
+    branches: [main, develop, "feat/**", "docs/**"]
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-e2e-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: assetcontrol_admin
+          POSTGRES_PASSWORD: ci-migrador-efimera
+          POSTGRES_DB: assetcontrol
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U assetcontrol_admin -d assetcontrol"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Valores efímeros de este servicio desechable: no son secretos ni datos reales.
+      POSTGRES_USER: assetcontrol_admin
+      POSTGRES_PASSWORD: ci-migrador-efimera
+      POSTGRES_DB: assetcontrol
+      APP_DB_USER: assetcontrol_app
+      APP_DB_PASSWORD: ci-app-efimera
+      DATABASE_URL: postgresql+psycopg://assetcontrol_app:ci-app-efimera@127.0.0.1:5432/assetcontrol
+      MIGRATION_DATABASE_URL: postgresql+psycopg://assetcontrol_admin:ci-migrador-efimera@127.0.0.1:5432/assetcontrol
+      SECRET_KEY: ci-clave-efimera-de-al-menos-32-bytes-xx
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Instalar uv y el backend
+        working-directory: backend
+        run: |
+          python -m pip install "uv==0.13.7"
+          uv sync --locked --no-dev
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instalar la web y Chromium de Playwright
+        working-directory: web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Roles (mismo script que docker-compose)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGPASSWORD: ci-migrador-efimera
+        run: bash docker/postgres/init/01-app-role.sh
+
+      - name: Pruebas e2e
+        working-directory: web
+        run: npm run e2e
+
+      - name: Informe y rastros si algo falla
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-informe
+          path: |
+            web/playwright-report/
+            web/test-results/
+          retention-days: 7

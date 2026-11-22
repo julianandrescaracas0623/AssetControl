@@ -1,0 +1,51 @@
+name: CI web
+
+# Corre en todo PR hacia develop, main y las ramas encadenadas (feat/**, docs/**).
+# Sin filtro de rutas: un check obligatorio que no corre deja el PR bloqueado o,
+# peor, en verde sin haberse ejecutado (riesgo de T10).
+on:
+  pull_request:
+    branches: [main, develop, "feat/**", "docs/**"]
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-web-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Node 24.x; web/package.json fija "engines" y web/.npmrc hace que npm ci falle fuera de rango.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tipos
+        run: npm run typecheck
+
+      - name: Pruebas
+        run: npm test
+
+      - name: Build
+        run: npm run build
