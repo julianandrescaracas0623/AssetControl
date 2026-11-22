@@ -551,7 +551,7 @@ def test_link_uses_public_url_despite_forged_host_headers(client, rec_db, rec_ap
     correo = get_correo(rec_app)
     assert correo.esperar(5)
     [mensaje] = correo.transporte.mensajes
-    contenido = mensaje.get_content()
+    contenido = mensaje.get_body(preferencelist=("plain",)).get_content()
     assert mensaje["To"] == cuenta.email
     assert f"{URL_PUBLICA}/restablecer#" in contenido
     assert "atacante" not in contenido

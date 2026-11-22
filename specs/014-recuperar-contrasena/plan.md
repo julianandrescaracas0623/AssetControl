@@ -31,7 +31,7 @@ POST /auth/restablecer {token, password}
 | `backend/app/correo/__init__.py` | `Correo` (interfaz), `enviar_en_hilo`, semáforo acotado |
 | `backend/app/correo/buzon.py` | destino carpeta (`.eml`, nombre `<UTC>-<aleatorio>.eml`, sin el correo en el nombre) |
 | `backend/app/correo/smtp.py` | `smtplib.SMTP`/`SMTP_SSL`, `ssl.create_default_context()`, `timeout=10` |
-| `backend/app/correo/plantillas.py` | asunto y cuerpo fijos en texto plano |
+| `backend/app/correo/plantillas.py` | asunto fijo; cuerpo en texto plano y alternativa HTML con la marca (R6, 2026-11-22) |
 | `backend/migrations/versions/0015_recuperacion_contrasena.py` | tabla, RLS, `CHECK` de `limite_tasa` |
 | `backend/migrations/versions/0016_funciones_recuperacion.py` | funciones `acceso.*` y políticas del dueño |
 | `backend/openapi.yaml`, `web/src/lib/api/schema.d.ts`, `web/src/lib/api/cliente.ts` | contrato, tipos y llamadas |
