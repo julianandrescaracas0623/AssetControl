@@ -69,8 +69,8 @@ $env:DATABASE_URL = "postgresql+psycopg://assetcontrol_app.<ref>:<APP_DB_PASSWOR
 $env:SECRET_KEY = "<la que generaste>"
 $env:ENVIRONMENT = "production"
 
-uv run flask --app app preparar-roles      # crea assetcontrol_app y auth_owner (C8)
-uv run alembic upgrade head                 # migra hasta la última (0012)
+uv run flask --app app preparar-roles      # crea assetcontrol_app, auth_owner y plataforma_owner (C8; spec 017)
+uv run alembic upgrade head                 # migra hasta la última (0032 con los cambios C1 y C1b de la spec 017)
 uv run alembic current
 uv run flask --app app create-tenant "<Nombre de la clínica>" "<correo del primer admin>"
 ```
@@ -100,6 +100,10 @@ uv run flask --app app create-tenant "<Nombre de la clínica>" "<correo del prim
 | `SMTP_PUERTO` | Opcional: por defecto `587` con `starttls` y `465` con `ssl`. |
 | `SMTP_USUARIO`, `SMTP_CLAVE` | Las credenciales del proveedor, como **secretos**; van juntas o ninguna (si falta una, la app no arranca y dice cuál, sin mostrar valores). |
 | `URL_PUBLICA` | Obligatoria con `CORREO_MODO`: `https://<tu-dominio>`, sin `/` final, sin `?`, `#` ni usuario. Es la base del enlace del correo; nunca se toma de la petición. Fuera de development debe ser `https`. |
+| `PLATAFORMA_HABILITADA` | Spec 017. Solo el valor `true` (sin distinguir mayúsculas ni espacios) habilita la consola `/plataforma`. **Apagada por defecto**: con cualquier otro valor o sin la variable no se registra ninguna ruta `/plataforma` (responde `404`) ni se crea nada al arrancar. Ver 5.2. |
+| `PLATAFORMA_REDES_PERMITIDAS` | Opcional. Redes CIDR o direcciones sueltas separadas por comas (`10.0.0.0/8, 192.168.1.10`). Vacía = sin restricción. Fuera de la lista, `/plataforma` responde `404`. Un valor mal formado impide arrancar (el mensaje no repite el valor). Es una defensa adicional: la restricción real va en el proxy o el firewall. |
+| `RATE_LIMIT_PLAT_LOGIN_ACCOUNT`, `RATE_LIMIT_PLAT_LOGIN_IP` | Opcionales (por defecto 5 y 10 por ventana de 15 min). Login de plataforma por cuenta y por IP. |
+| `RATE_LIMIT_PLAT_ACCION`, `RATE_LIMIT_PLAT_REFRESH_IP` | Opcionales (por defecto 60 y 30). Acciones de la consola por desarrollador (`POST`/`PATCH` de Empresas y Usuarios, subida o reemplazo del logo y, desde el cambio C1, los `PUT` de la ficha de la empresa y de nombre y rol de un usuario; los `GET` no cuentan) y refresh de plataforma por IP. Entre 1 y 10000. |
 
 `MIGRATION_DATABASE_URL` **no** va en la plataforma: la app nunca usa el rol migrador.
 
@@ -116,7 +120,7 @@ uv run flask --app app create-tenant "<Nombre de la clínica>" "<correo del prim
 
 **Cabeceras.** `/restablecer#<token>` e `/invitacion#<token>` llevan un enlace de un solo uso en el fragmento. La API ya responde `Referrer-Policy: no-referrer` en `/api/auth/*`, y la web fija el meta `referrer` en `no-referrer` mientras `/restablecer` está abierta, pero el contenedor responde hoy `Referrer-Policy: same-origin` a toda la web (`backend/app/wsgi.py`). **Pendiente de la spec de despliegue:** responder `Referrer-Policy: no-referrer` en `/restablecer`, en `/invitacion` y en el *fallback* de la SPA (`index.html`), o en toda la web.
 
-**Registro (auditoría).** El registro de la app debe quedar en nivel **INFO** en producción (gunicorn ya usa `loglevel = "info"`): ahí quedan `Contraseña restablecida por enlace de recuperación (request_id=…, usuario_id=…)` y `Correo de recuperación entregado (request_id=…)`. Nunca se registran correo, token, enlace, host ni contraseña; los rechazos y fallos solo llevan `request_id` y el tipo de error. En la base, `log_statement` debe quedar en `none` (compruébalo con `SHOW log_statement;` como `postgres` y no lo subas para depurar): con `all` o `mod`, PostgreSQL escribiría en su registro la clave canjeable del enlace que viaja como parámetro de `acceso.*`.
+**Registro (auditoría).** El registro de la app debe quedar en nivel **INFO** en producción (gunicorn ya usa `loglevel = "info"`): ahí quedan `Contraseña restablecida por enlace de recuperación (request_id=…, usuario_id=…)` y `Correo de recuperación entregado (request_id=…)`. Nunca se registran correo, token, enlace, host ni contraseña; los rechazos y fallos solo llevan `request_id` y el tipo de error. En la base, `log_statement` debe quedar en `none` en producción (compruébalo con `SHOW log_statement;` como `postgres` y no lo subas para depurar); es el criterio único de este documento (ver también «Registro de sentencias de PostgreSQL» en la consola de plataforma). Con `all`, PostgreSQL escribiría en su registro la clave canjeable del enlace que viaja como parámetro de `acceso.*`. `mod` hoy no registraría esas llamadas (son `SELECT acceso.fn(...)`, no sentencias que modifiquen datos), pero también se prohíbe: la regla segura es `none`, sin excepciones que dependan de cómo se escribe cada llamada.
 
 **Apagado.** Un correo en curso se pierde si el proceso se apaga (riesgo aceptado: la persona pide otro). **Pendiente de la spec de despliegue:** un `worker_exit` en `backend/gunicorn.conf.py` que llame a `Correo.esperar(timeout)` (con un plazo menor que `graceful_timeout = 20`) para dejar terminar los envíos en curso.
 
@@ -127,6 +131,33 @@ uv run flask --app app create-tenant "<Nombre de la clínica>" "<correo del prim
 3. Abre el enlace **desde el cliente de correo** (web y teléfono): la barra de direcciones queda en `/restablecer` sin el fragmento. Guarda una contraseña nueva: llegas a `/login` con «Tu contraseña se actualizó. Inicia sesión con la nueva.»; las sesiones abiertas en otros equipos se cierran al renovar (el acceso ya emitido dura hasta 15 min).
 4. Abre el mismo enlace otra vez: «Enlace vencido o ya usado».
 5. Revisa el registro: `Correo de recuperación entregado` y `Contraseña restablecida…` con su `request_id`, sin el correo ni el enlace.
+
+### 5.2 Consola de plataforma `/plataforma` (spec 017)
+
+Consola gráfica solo para desarrolladores de AssetControl (Empresas, Usuarios y Actividad). Vive en el mismo contenedor y dominio que la app de la clínica y está **apagada por defecto**.
+
+**Comandos del operador** (rol migrador, `MIGRATION_DATABASE_URL`; desde `backend/`, con `uv run flask --app app <comando>`). No hay pantalla de alta de desarrolladores:
+
+| Comando | Qué hace |
+|---|---|
+| `crear-desarrollador <correo> [--password-stdin]` | Pide el nombre y la contraseña (sin eco y con confirmación; 14–128 caracteres) o lee la contraseña de la entrada estándar. Argon2id calculado en el comando. Audita `desarrollador_creado` sin desarrollador (operador). |
+| `restablecer-desarrollador <correo> [--password-stdin]` | Fija una contraseña nueva y cierra todas las sesiones del desarrollador. |
+| `desactivar-desarrollador <correo> [--reactivar]` | Desactiva (cierra sus sesiones; un token vigente recibe `401` en su siguiente petición) o reactiva la cuenta. No pide contraseña. |
+
+**Exposición (riesgo R1 de la spec 017).** `/plataforma` queda en el mismo dominio que la clínica y una cuenta de desarrollador comprometida controla todas las empresas (crear admins con contraseña conocida, definir una contraseña temporal a cualquier usuario —incluido el único admin— y entrar con ella, desactivar usuarios; no lee datos de negocio). Cada contraseña temporal queda en Actividad como «Contraseña temporal definida» y la persona pierde todas sus sesiones; no hay aviso por correo. Hasta que haya spec de despliegue: **no habilites `PLATAFORMA_HABILITADA` en un entorno expuesto** sin restringir `/plataforma` y `/api/plataforma` por red en el proxy o el firewall (`PLATAFORMA_REDES_PERMITIDAS` solo es respaldo), y usa contraseñas largas y únicas. No hay segundo factor (TOTP): reevaluar antes del piloto. **No ir al piloto sin la spec de despliegue.**
+
+**Notas de despliegue acumuladas:**
+
+- **Relojes (NTP obligatorio):** Flask y PostgreSQL deben tener la hora sincronizada. El corte `usuario.sesiones_validas_desde` usa `now()` de la base y el access token usa la hora de Flask: con la base adelantada más de 60 s, todo acceso emitido tras un cambio de contraseña se rechaza hasta que el reloj de Flask alcance el corte.
+- **Orden con la migración `0026`:** migrar `0026` **antes** de desplegar el código (el ORM lee `usuario.sesiones_validas_desde` en cada petición). Para revertir, retirar el código **antes** del `alembic downgrade`.
+- **Cookie de refresh de plataforma:** viaja con `Path=/plataforma/auth` en la aplicación. En el contenedor único, la API montada bajo `/api` la deja en `/api/plataforma/auth`, y el servidor de desarrollo de Vite ya lo reescribe (`cookiePathRewrite`); un proxy de producción que quite el prefijo `/api` debe reescribir `/plataforma/auth` a `/api/plataforma/auth` igual que hace con `/auth`. Si no, el navegador no manda la cookie al refresh y recargar la consola pierde la sesión. **Pendiente de comprobar con el despliegue real.**
+- **Cabeceras de las páginas de la consola:** las respuestas de la API de plataforma ya llevan `Cache-Control: no-store` y `Referrer-Policy: no-referrer`. Las páginas web `/plataforma/**` (y `/cambiar-contrasena`) las sirve el contenedor como el resto de la web (hoy `Referrer-Policy: same-origin`): para que lleven `no-referrer` y `no-store`, ponlo en el proxy o en `ConCabeceras` (spec de despliegue; lo mismo se pidió para `/restablecer` e `/invitacion`). Las páginas llevan `noindex, nofollow`.
+- **Tope de cuerpo:** `/plataforma` rechaza cuerpos de más de 4 KB (`413`), salvo `POST /plataforma/empresas/<id>/logo`, que admite 2 MB + 64 KB (el logo de la spec 013 y su formulario). Si el proxy impone un tope menor, súbelo solo para esa ruta. La subida chunked del logo requiere un servidor WSGI que marque `wsgi.input_terminated` (gunicorn lo hace). Si se cambia de servidor y no la marca, la subida sin Content-Length responde 400.
+- **Almacén para logos:** el logo del alta y su reemplazo desde «Editar empresa» (cambio C1) usan el mismo almacén que las fotos y el logo de la clínica (`ALMACEN=s3`, bucket `fotos`, clave `<tenant>/<logo>.png`). Reemplazar no borra el archivo anterior (los informes cerrados lo siguen usando). Sin almacén, la subida responde `503 logos_no_disponibles`: la empresa se crea igual, la consola avisa «Empresa creada; el logo no se pudo subir» y se reintenta desde «Editar empresa» (o el admin lo sube en su pantalla Empresa). Si falla el borrado del archivo tras un `rollback` (mejor esfuerzo, como en la 013) puede quedar un archivo huérfano sin fila.
+- **Registro de sentencias de PostgreSQL (cambio C1b):** la contraseña temporal se convierte en hash Argon2id en Flask y el hash viaja a la base como **parámetro** de `acceso.plataforma_restablecer_password_usuario` (igual que en el alta, el cambio de contraseña y la recuperación). Criterio único: `log_statement = none` en producción (ni `ddl`, ni `mod`, ni `all`). `mod` no registraría estas llamadas, porque son `SELECT acceso.fn(...)`, pero se prohíbe igual por regla segura. Si usas `log_min_duration_statement` o `auto_explain`, fija además `log_parameter_max_length = 0` (y `log_parameter_max_length_on_error = 0`) para que no se registren los parámetros, y no actives `auto_explain` con parámetros. Si no, el hash quedaría en los registros de la base. Nota: esto vale porque hoy psycopg 3 enlaza los parámetros en el servidor (protocolo extendido). Si algún día se usa `ClientCursor` (u otro enlace en el cliente), los valores irían dentro del texto de la sentencia y `log_parameter_max_length` ya no los protegería: cualquier registro de sentencias los mostraría.
+- **Rol `plataforma_owner`:** lo crea `preparar-roles` (`NOLOGIN`, sin atributos). Antes del piloto, validar `preparar-roles` y las migraciones `0017`–`0032` con el rol real de Supabase (como C8 de la spec 002).
+
+**Prueba manual antes del piloto** (con datos de prueba, nunca de la clínica): crea un desarrollador con `crear-desarrollador`, entra a `/plataforma/entrar`, crea una empresa con logo (con el almacén real) y entra como su admin: debe llevar a `/cambiar-contrasena` y, tras cambiarla, a `/admin`. Recarga la consola con la sesión abierta (comprueba la cookie), desactiva y reactiva la empresa y revisa Actividad. Del cambio C1: edita la ficha y reemplaza el logo (el admin lo ve en `/admin/empresa` y un informe ya cerrado conserva el anterior), cambia el rol de un usuario de prueba (su sesión abierta se cierra y al volver a entrar tiene los permisos nuevos) y comprueba en Actividad «Empresa editada», «Logo reemplazado» y «Usuario editado». Del cambio C1b: con un usuario de prueba con sesión abierta, define una contraseña temporal desde Usuarios; su sesión cae al recargar, la contraseña anterior da «incorrectos», con la temporal llega a «Cambia tu contraseña», la cambia y entra; la fila mostró «Cambio de contraseña pendiente» y Actividad registra «Contraseña temporal definida».
 
 ## 6. Plataforma (pendiente, Q1)
 
@@ -180,8 +211,9 @@ Remove-Item Env:PGPASSWORD
 
 ## 11. Qué no hacer
 
+- No habilitar `PLATAFORMA_HABILITADA` en un entorno expuesto sin restringir `/plataforma` por red (sección 5.2).
 - No usar las claves `anon` ni `service_role` de Supabase, ni Supabase Auth ni Storage público.
 - No poner `MIGRATION_DATABASE_URL` en la plataforma ni en `.env` del servidor.
 - No desplegar con `ENVIRONMENT=development` ni con `sslmode=disable`, `allow` o `prefer` (la app se niega a arrancar). Con `development` la app aceptaría además el buzón en carpeta y una `URL_PUBLICA` con `http`.
-- No activar en el proveedor de correo la reescritura de enlaces ni el seguimiento de clics, ni subir `log_statement` de la base.
+- No activar en el proveedor de correo la reescritura de enlaces ni el seguimiento de clics, ni subir `log_statement` de la base de `none` (tampoco a `ddl` ni `mod`).
 - No publicar `.claude/`, `.cursor/`, `AGENTS.md`, `CLAUDE.md` ni `MEMORY.md` (la imagen no los copia).
