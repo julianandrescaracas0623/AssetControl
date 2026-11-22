@@ -257,6 +257,12 @@ class Plantilla:
     estilos_datos: tuple[str, ...] = ()
     estilos_total: tuple[str, ...] = ()
     estilo_vacia: str = "datos"  # celda de datos sin valor
+    # Hojas de lista del informe (T4): fila 6 (título y su línea), fila 7 (nota combinada) y
+    # regla de fila completa «se encontró en otra ubicación» (B11, matriz fila 23a).
+    estilos_titulo_lista: tuple[str, ...] = ()
+    combinar_nota: str | None = None
+    formula_otra_ubicacion: str | None = None
+    ultima_columna_datos: int | None = None  # rango del formato condicional
 
 
 def _bloque(*celdas: tuple[str, str | None, str]) -> tuple[CeldaBloque, ...]:
@@ -391,6 +397,9 @@ _DATOS_DESGLOSE = (
     "datos_porcentaje",
 )
 _INFORME = {"titulo": "Informe de activos", "rotulo_fecha": "Corte", "margen_encabezado": 0.3}
+# El formato condicional de las listas llega en la plantilla hasta la fila 499 (A10:J499,
+# A10:I499); con más filas se extiende hasta la última escrita (req. 5).
+FILA_FIN_FORMATO_CONDICIONAL = 498
 
 
 def _desglose(caja: CajaLogo) -> Plantilla:
@@ -477,6 +486,11 @@ PLANTILLAS: dict[str, Plantilla] = {
         estilos_cabecera=("cabecera",) * 10,
         estilos_datos=("datos",) * 9 + ("datos_cop",),
         estilos_total=("total", "total") + ("total_izquierda",) * 7 + ("total_cop_derecha",),
+        estilos_titulo_lista=("titulo_lista_izquierda", "linea_titulo_izquierda")
+        + ("linea_titulo",) * 8,
+        combinar_nota="A7:J7",
+        formula_otra_ubicacion='AND($F10<>"",$G10<>"",$F10<>$G10)',
+        ultima_columna_datos=9,
     ),
     "por_ubicacion": _desglose(CajaLogo(171450, 114300, 2388870, 1013460)),
     "no_encontrados": _lista(
@@ -486,9 +500,16 @@ PLANTILLAS: dict[str, Plantilla] = {
         columnas=_COLUMNAS_NO_ENCONTRADOS,
         altos={5: 26.1, 6: 26.1, 7: 21.95, 8: 27.95},
         fila_datos=9,
-        # La plantilla no trae fila de datos con estilo: no se inventa (T4 pregunta).
         estilos_cabecera=("cabecera",) * 6 + ("cabecera_fuera",) * 4,
+        # La plantilla no trae fila de datos con estilo. Decisión del humano 2026-11-22 (T4):
+        # los estilos de datos de las otras listas (texto y COP de «Todos los activos»; la
+        # celda vacía, ``datos_vacia``), sin filas alternas. Sin formato condicional: la
+        # regla de fila completa compara con «Encontrado en», que esta hoja no tiene.
+        estilos_datos=("datos",) * 5 + ("datos_cop",),
         estilos_total=("total",) * 5 + ("total_cop",) + ("total_fuera",) * 4,
+        estilos_titulo_lista=("titulo_lista_vcentro",) + ("linea_titulo",) * 5 + ("base",) * 4,
+        combinar_nota="A7:F7",
+        ultima_columna_datos=5,
     ),
     "categoria": _lista(
         ultima_columna_banda=8,
@@ -501,6 +522,12 @@ PLANTILLAS: dict[str, Plantilla] = {
         estilos_cabecera=("cabecera",) * 9,
         estilos_datos=("datos",) * 8 + ("datos_cop",),
         estilos_total=("total",) * 8 + ("total_cop", "total_fuera"),
+        estilos_titulo_lista=("titulo_lista_vcentro",)
+        + ("linea_titulo_vcentro",) * 8
+        + ("base_vcentro",),
+        combinar_nota="A7:I7",
+        formula_otra_ubicacion='AND($E10<>"",$F10<>"",$E10<>$F10)',
+        ultima_columna_datos=8,
     ),
     "por_categoria": _desglose(CajaLogo(129540, 57150, 2343150, 1082040)),
     "resumen": Plantilla(

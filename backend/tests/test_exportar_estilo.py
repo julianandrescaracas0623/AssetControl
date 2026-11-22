@@ -335,6 +335,10 @@ def test_cabecera_datos_y_total(clave):
     plantilla = est.PLANTILLAS[clave]
     esp = _esperada(clave)
     filas = _filas_de_tabla(plantilla)
+    if clave == "no_encontrados":
+        # Sin fila de datos medida: sus estilos son los de las otras listas (decisión del
+        # humano, T4); se prueban en ``test_no_encontrados_usa_los_estilos_…`` y en T4.
+        filas = [f for f in filas if f[1] != "datos"]
     assert filas, clave
 
     def cuerpo(hoja, estilos, p):
@@ -389,11 +393,19 @@ def test_alturas_fijas_del_cuerpo(clave):
         assert esp["filas"][str(fila + 1)]["alto"] == plantilla.alto_datos, fila
 
 
-def test_no_encontrados_sin_fila_de_datos_medida():
-    """La plantilla «No encontrados» no trae una fila de datos con estilo: no se inventa."""
+def test_no_encontrados_usa_los_estilos_de_datos_de_las_otras_listas():
+    """La plantilla «No encontrados» no trae fila de datos con estilo. Decisión del humano
+    2026-11-22 (T4): sus filas llevan los estilos de datos de las otras listas (texto y COP de
+    «Todos los activos»; la celda vacía, ``datos_vacia``), sin filas alternas."""
     esp = _esperada("no_encontrados")
     assert not [r for r in esp["celdas"] if _fila(r) >= 10]
-    assert est.PLANTILLAS["no_encontrados"].estilos_datos == ()
+    plantilla = est.PLANTILLAS["no_encontrados"]
+    assert plantilla.estilos_datos == ("datos",) * 5 + ("datos_cop",)
+    assert plantilla.estilo_vacia == est.PLANTILLAS["todos"].estilo_vacia == "datos_vacia"
+    todos = est.PLANTILLAS["todos"].estilos_datos
+    assert plantilla.estilos_datos == todos[:5] + todos[-1:]
+    # Alto de datos: el de las filas 10–11 de la plantilla (con altura y sin celdas).
+    assert {esp["filas"][n]["alto"] for n in ("10", "11")} == {plantilla.alto_datos}
 
 
 # ---------------------------------------------------------------------------

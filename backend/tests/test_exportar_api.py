@@ -28,6 +28,7 @@ from acceso_db import (
     make_app,
     temporary_acceso_db,
 )
+from botocore.exceptions import ClientError, EndpointConnectionError
 from flask import Flask
 from openpyxl import load_workbook
 from PIL import Image
@@ -36,13 +37,14 @@ from sqlalchemy import text
 from test_cierre_api import Clinica
 from test_exportar_documento import (
     EMPRESA_HOSTIL,
+    FORMULAS_PERMITIDAS,
     HOSTIL,
     SESION_HOSTIL,
     comprobar_libro_seguro,
 )
 
 from app.conteo import exportar
-from app.fotos.almacen import EXTENSION_KEY, CarpetaLocal
+from app.fotos.almacen import EXTENSION_KEY, CarpetaLocal, ClaveInvalida
 
 ADMIN = bearer(ADMIN_A, TENANT_A)
 CONTADOR = bearer(CONTADOR_A, TENANT_A, rol="contador")
@@ -404,8 +406,9 @@ def test_flat_sheet_is_a_table_with_frozen_header_filters_and_print_setup(client
     tabla = hoja.tables["Activos"]
     assert tabla.ref == f"A{cabecera}:J{cabecera + 4}"
     assert tabla.totalsRowCount in (None, 0)
-    # Encabezado y fila de total fijos (encima de la cabecera, dentro del panel congelado).
-    assert hoja.freeze_panes == f"C{cabecera + 1}"
+    # Encabezado y fila de total fijos (encima de la cabecera, dentro del panel congelado);
+    # spec 019 (B12): solo filas, sin columnas congeladas, como la plantilla.
+    assert hoja.freeze_panes == f"A{cabecera + 1}"
     assert fila_de(hoja, "Total") < cabecera
     assert hoja.print_title_rows.replace("$", "") == f"{cabecera}:{cabecera}"
     assert hoja.page_setup.orientation == "landscape"
@@ -435,47 +438,50 @@ def test_list_sheets_keep_their_total_fixed_above_the_header(client):
         assert hoja.max_row == cabecera + len(filas), nombre
 
 
-def test_columns_fit_their_content(client):
+def test_columns_have_the_template_widths_whatever_the_content(client):
+    """Spec 019 (D-1, B15): anchos fijos de la plantilla, no calculados por contenido."""
+    _, sesion, _, _ = cerrada(client)
+    wb = libro(excel(client, sesion))
+    for nombre, anchos in (
+        ("Todos los activos", (14, 26, 18, 18, 22, 22, 20, 16, 16, 18)),
+        ("Biomédicos", (14, 26, 18, 18, 22, 22, 20, 16, 16, 18)),
+        ("No encontrados", (14, 26, 18, 18, 22, 22, 20, 16, 16, 18, 13)),
+    ):
+        hoja = wb[nombre]
+        for col, ancho in enumerate(anchos, start=1):
+            # XlsxWriter junta columnas seguidas del mismo ancho en un solo <col min max>.
+            dim = next(d for d in hoja.column_dimensions.values() if d.min <= col <= d.max)
+            assert dim.width == ancho, (nombre, col)
+            assert bool(dim.hidden) is (nombre == "No encontrados" and col >= 7), (nombre, col)
+
+
+def test_found_elsewhere_is_a_full_row_rule_and_rows_are_uniform(client):
+    """Spec 019 (B11): sin filas alternas ni colores fijos por celda; lo encontrado en otra
+    ubicación se marca con una regla de fila completa (cursiva y fondo ámbar)."""
     _, sesion, _, _ = cerrada(client)
     hoja = libro(excel(client, sesion))["Todos los activos"]
-    cabecera = fila_de(hoja, "Código")
-    for col in range(1, 11):
-        letra = hoja.cell(row=cabecera, column=col).column_letter
-        textos = [
-            hoja.cell(row=r, column=col).value
-            for r in range(cabecera, hoja.max_row + 1)
-            if isinstance(hoja.cell(row=r, column=col).value, str)
-        ]
-        # XlsxWriter junta columnas seguidas del mismo ancho en un solo <col min max>.
-        ancho = next(d.width for d in hoja.column_dimensions.values() if d.min <= col <= d.max)
-        largo = max((len(x) for x in textos), default=0)
-        assert ancho >= min(largo + 1, exportar.ANCHO_MAXIMO), letra
-        assert ancho <= exportar.ANCHO_MAXIMO + 1, letra
+    (rango,) = list(hoja.conditional_formatting)
+    (regla,) = rango.rules
+    assert str(rango.sqref) == "A10:J499"
+    assert regla.type == "expression"
+    assert regla.formula == ['AND($F10<>"",$G10<>"",$F10<>$G10)']
+    assert regla.dxf.font.i and regla.dxf.fill.bgColor.rgb.endswith("FDE68A")
 
+    def fila(nombre: str):
+        return [hoja.cell(row=fila_de(hoja, nombre), column=c) for c in range(1, 11)]
 
-def test_state_colors_are_static_cell_formats(client):
-    """«En reparación» y lo encontrado en otra ubicación se ven distinto, sin reglas."""
-    _, sesion, _, _ = cerrada(client)
-    hoja = libro(excel(client, sesion))["Todos los activos"]
-    assert not list(hoja.conditional_formatting)
-    aviso = exportar.FONDO_AVISO.lstrip("#")
-
-    def celda(nombre: str, columna: int):
-        fila = fila_de(hoja, nombre)
-        return hoja.cell(row=fila, column=columna)
-
-    reparacion = celda("Silla", 8)
-    assert reparacion.value == "En reparación"
-    assert reparacion.fill.fgColor.rgb.endswith(aviso)
-    # La lámpara se esperaba en la bodega y se encontró en el box (diferencia).
-    movido = celda("Lámpara", 7)
-    assert movido.value == "Consultorios › Box 1"
-    assert movido.font.i and movido.fill.fgColor.rgb.endswith(aviso)
-    # El autoclave se encontró donde se esperaba: sin resaltado.
-    igual = celda("Autoclave", 7)
-    assert not igual.font.i and not (igual.fill.fgColor.rgb or "").endswith(aviso)
-    assert celda("Silla", 9).font.color.rgb.endswith("B91C1C")  # No encontrado en rojo
-    assert celda("Autoclave", 9).font.color.rgb.endswith("15803D")  # Encontrado en verde
+    # La lámpara se esperaba en la bodega y se encontró en el box: F ≠ G (la regla aplica).
+    lampara = fila("Lámpara")
+    assert (lampara[5].value, lampara[6].value) == ("Bodega", "Consultorios › Box 1")
+    # El autoclave, donde se esperaba (F = G); la silla, no encontrada (G vacía).
+    autoclave, silla = fila("Autoclave"), fila("Silla")
+    assert autoclave[5].value == autoclave[6].value
+    assert silla[6].value is None
+    for celdas in (lampara, autoclave, silla):
+        for c in celdas:
+            assert not c.font.i and c.fill.fill_type in (None, "none"), c.coordinate
+            if c.value is not None:  # sin verde/rojo/ámbar fijos: la tinta de la plantilla
+                assert c.font.color.rgb == "FF111827", c.coordinate
 
 
 def test_each_category_sheet_lists_its_assets_and_its_frozen_total(client):
@@ -514,7 +520,9 @@ def test_excel_money_is_a_number_with_cop_format_and_no_formulas(client):
     with zipfile.ZipFile(io.BytesIO(response.data)) as z:
         hojas = "".join(z.read(n).decode() for n in z.namelist() if n.startswith("xl/worksheets/"))
         assert "<f>" not in hojas
-        assert "<formula>" not in hojas
+        # Solo la fórmula fija del formato condicional de fila completa (spec 019, B11).
+        formulas = set(re.findall(r"<formula>(.*?)</formula>", hojas))
+        assert formulas and formulas <= FORMULAS_PERMITIDAS
         # El número se escribe desde el Decimal exacto, no desde un float redondeado.
         assert "<v>1390000.50</v>" in hojas
 
@@ -544,14 +552,23 @@ def test_every_sheet_carries_the_frozen_company_and_its_logo(client):
     assert subida.status_code == 201, subida.get_json()
     _, sesion, _, _ = cerrada(client)
     wb = libro(excel(client, sesion))
+    # El Resumen conserva su encabezado hasta T5 de la spec 019.
+    resumen = wb["Resumen"]
+    assert resumen["B1"].value == "Clínica & Ejemplo S.A.S."
+    assert resumen["B2"].value == "NIT 900.123.456-8 · Calle 10 # 5-20, Cartago"
+    assert "«Conteo nov 2026» · corte 30/11/2026" in resumen["B3"].value
+    assert resumen["B4"].value == "Informe congelado al cierre · valores en COP"
+    # Hojas de lista (spec 019, T4): el bloque de la plantilla con la empresa congelada.
+    for hoja in wb.worksheets[1:]:
+        assert hoja["C2"].value == "Informe de activos", hoja.title
+        assert hoja["C3"].value == "Clínica & Ejemplo S.A.S.", hoja.title
+        assert hoja["E3"].value == "Corte 30/11/2026", hoja.title
+        assert hoja["C4"].value == "NIT 900.123.456-8", hoja.title
+        assert hoja["C5"].value == "Calle 10 # 5-20, Cartago", hoja.title
+        assert hoja.HeaderFooter.oddFooter.right.text.strip() == "Página &P de &N"
     for hoja in wb.worksheets:
-        assert hoja["B1"].value == "Clínica & Ejemplo S.A.S.", hoja.title
-        assert hoja["B2"].value == "NIT 900.123.456-8 · Calle 10 # 5-20, Cartago", hoja.title
-        assert "«Conteo nov 2026» · corte 30/11/2026" in hoja["B3"].value
-        assert hoja["B4"].value == "Informe congelado al cierre · valores en COP"
         assert len(hoja._images) == 1, hoja.title
         assert hoja.page_setup.orientation == "landscape"
-        assert hoja.HeaderFooter.oddFooter.right.text == "Página &P de &N"
 
 
 class ClinicaOtra(ClinicaExp):
@@ -723,6 +740,184 @@ def test_export_does_not_log_figures_or_names(client, caplog):
         assert client.get(f"/sesiones/{sesion}/informe/pdf", headers=ADMIN).status_code == 200
     registros = " ".join(r.getMessage() for r in caplog.records)
     assert not re.search(r"1390000|Autoclave|Conteo nov", registros)
+
+
+# --- Spec 019 (T4): un fallo del almacén al leer el logo congelado degrada a «sin logo» ------
+
+
+class AlmacenQueFalla:
+    """Almacén falso: ``leer`` lanza el error dado (S3 caído, sin permiso, disco roto)."""
+
+    def __init__(self, error: BaseException) -> None:
+        self.error = error
+        self.lecturas = 0
+
+    def guardar(self, *_args) -> None:
+        raise AssertionError("no se escribe en el almacén al exportar")
+
+    def leer(self, _clave: str) -> bytes:
+        self.lecturas += 1
+        raise self.error
+
+    def borrar(self, *_args) -> None:
+        raise AssertionError("no se borra del almacén al exportar")
+
+
+ERRORES_DEL_ALMACEN = [
+    pytest.param(OSError("disco no disponible"), id="oserror"),
+    pytest.param(
+        ClientError({"Error": {"Code": "AccessDenied", "Message": "denegado"}}, "GetObject"),
+        id="clienterror",
+    ),
+    pytest.param(EndpointConnectionError(endpoint_url="https://almacen.invalido"), id="botocore"),
+]
+EMPRESA_CON_LOGO = {
+    "nombre": "Clínica Ficticia de Prueba S.A.S.",
+    "direccion": "Calle Falsa 00 # 00-00",
+    "nit": "900123456-8",
+    "telefono": "600 000 0000",
+    "correo": "contacto@ejemplo.test",
+}
+
+
+def cerrada_con_logo(client) -> tuple[str, dict, str, ClinicaExp]:
+    """Sesión cerrada con la empresa y su logo congelados; devuelve sesión, informe, logo y
+    la clínica de prueba."""
+    assert client.put("/empresa", json=EMPRESA_CON_LOGO, headers=ADMIN).status_code == 200
+    logo_id = str(uuid.uuid4())
+    subida = client.put(
+        "/empresa/logo",
+        data={"logo_id": logo_id, "archivo": (io.BytesIO(_png()), "l.png")},
+        headers=ADMIN,
+        content_type="multipart/form-data",
+    )
+    assert subida.status_code == 201, subida.get_json()
+    c, sesion, informe, _ = cerrada(client)
+    return sesion, informe, logo_id, c
+
+
+@pytest.mark.parametrize("error", ERRORES_DEL_ALMACEN)
+def test_if_the_store_fails_the_excel_is_complete_without_logo(
+    client, exp_app, monkeypatch, caplog, error
+):
+    """Req. 8: el logo es decorativo; un fallo del almacén no tumba el informe (ni ``500``):
+    el Excel sale completo y con las cifras congeladas, sin imagen."""
+    sesion, informe, logo_id, _ = cerrada_con_logo(client)
+    con_logo = libro(excel(client, sesion))
+    almacen = AlmacenQueFalla(error)
+    monkeypatch.setitem(exp_app.extensions, EXTENSION_KEY, almacen)
+    with caplog.at_level(logging.DEBUG):
+        response = excel(client, sesion)
+    assert response.status_code == 200
+    assert response.mimetype == XLSX
+    assert almacen.lecturas == 1
+    wb = libro(response)
+    assert wb.sheetnames == con_logo.sheetnames
+    for hoja in wb.worksheets:
+        assert hoja._images == [], hoja.title
+        filas = list(hoja.iter_rows(values_only=True))
+        assert filas == list(con_logo[hoja.title].iter_rows(values_only=True)), hoja.title
+    items, total = activos_de_hoja(wb["Todos los activos"])
+    assert len(items) == informe["totales"]["unidades_registrado"]
+    assert dinero(total[9]) == Decimal(informe["totales"]["registrado"])
+    registros = " ".join(r.getMessage() for r in caplog.records)
+    for dato in [logo_id, str(TENANT_A), "almacen.invalido", *EMPRESA_CON_LOGO.values()]:
+        assert dato not in registros, dato
+
+
+@pytest.mark.parametrize("error", ERRORES_DEL_ALMACEN)
+def test_if_the_store_fails_the_pdf_is_complete_without_logo(client, exp_app, monkeypatch, error):
+    """La misma lectura del logo sirve al PDF: también degrada a «sin logo»."""
+    sesion, informe, _, _ = cerrada_con_logo(client)
+    monkeypatch.setitem(exp_app.extensions, EXTENSION_KEY, AlmacenQueFalla(error))
+    response = pdf(client, sesion)
+    assert response.status_code == 200
+    assert response.mimetype == exportar.PDF
+    lineas = lineas_pdf(response)
+    assert exportar.formato_cop(Decimal(informe["totales"]["registrado"])) in " ".join(lineas)
+
+
+def test_store_failure_is_a_warning_with_the_s3_code_and_no_data(
+    client, exp_app, monkeypatch, caplog
+):
+    """Un WARNING con el tipo del error y, en S3, su código (un enum, sin datos); nunca la
+    clave, el tenant, el endpoint, el bucket ni datos de la empresa o del informe."""
+    sesion, _, logo_id, _ = cerrada_con_logo(client)
+    error = ClientError({"Error": {"Code": "AccessDenied", "Message": "denegado"}}, "GetObject")
+    monkeypatch.setitem(exp_app.extensions, EXTENSION_KEY, AlmacenQueFalla(error))
+    with caplog.at_level(logging.DEBUG, logger="app.conteo.routes"):
+        assert excel(client, sesion).status_code == 200
+    avisos = [r for r in caplog.records if r.name == "app.conteo.routes"]
+    assert len(avisos) == 1
+    assert avisos[0].levelno == logging.WARNING
+    mensaje = avisos[0].getMessage()
+    assert "ClientError" in mensaje and "AccessDenied" in mensaje
+    registros = " ".join(r.getMessage() for r in caplog.records)
+    for dato in [logo_id, str(TENANT_A), sesion, "denegado", "GetObject", "Conteo nov"]:
+        assert dato not in registros, dato
+    for dato in EMPRESA_CON_LOGO.values():
+        assert dato not in registros, dato
+
+
+def test_oserror_warning_has_only_the_error_type(client, exp_app, monkeypatch, caplog):
+    sesion, _, _, _ = cerrada_con_logo(client)
+    error = OSError(2, "No such file", "/ruta/secreta/tenant/logo.png")
+    monkeypatch.setitem(exp_app.extensions, EXTENSION_KEY, AlmacenQueFalla(error))
+    with caplog.at_level(logging.DEBUG, logger="app.conteo.routes"):
+        assert excel(client, sesion).status_code == 200
+    (aviso,) = [r for r in caplog.records if r.name == "app.conteo.routes"]
+    # errno 2 hace de ``OSError`` un ``FileNotFoundError``: solo el nombre del tipo.
+    assert aviso.getMessage() == "Informe sin logo: el almacén falló (FileNotFoundError)."
+    assert "/ruta/secreta" not in aviso.getMessage() and "No such file" not in aviso.getMessage()
+
+
+def test_informe_logo_con_clave_invalida_no_se_traga_el_error(client, exp_app, monkeypatch):
+    """Decisión documentada (security-reviewer, T4): solo los fallos del almacén degradan a
+    «sin logo». ``ClaveInvalida`` es un error de integridad de la clave congelada y NO se
+    traga en ``_logo``: se propaga al manejador central y sale como ``500 error_interno``
+    (no un Excel «sin logo»)."""
+    sesion, _, _, _ = cerrada_con_logo(client)
+    almacen = AlmacenQueFalla(ClaveInvalida())
+    monkeypatch.setitem(exp_app.extensions, EXTENSION_KEY, almacen)
+    response = excel(client, sesion)
+    assert response.status_code == 500
+    assert response.mimetype == "application/json"
+    assert response.get_json()["error"]["code"] == "error_interno"
+    assert almacen.lecturas == 1
+
+
+def test_contador_and_previous_errors_do_not_touch_the_store(client, exp_app, monkeypatch):
+    """El ``403`` del contador, el ``404`` y el ``409`` salen antes de leer el logo."""
+    sesion, _, _, clinica = cerrada_con_logo(client)
+    abierta = clinica.abrir()
+    almacen = AlmacenQueFalla(AssertionError("no se debe leer el logo"))
+    monkeypatch.setitem(exp_app.extensions, EXTENSION_KEY, almacen)
+    prohibido = excel(client, sesion, CONTADOR)
+    assert prohibido.status_code == 403
+    assert prohibido.get_json()["error"]["code"] == "prohibido"
+    assert pdf(client, sesion, CONTADOR).status_code == 403
+    assert excel(client, str(uuid.uuid4())).status_code == 404
+    assert excel(client, sesion, ADMIN_OTRO).status_code == 404
+    respuesta = excel(client, abierta)
+    assert respuesta.status_code == 409
+    assert respuesta.get_json()["error"]["code"] == "sesion_abierta"
+    assert almacen.lecturas == 0
+
+
+def test_list_sheets_carry_the_frozen_block_not_the_current_company(client):
+    """El bloque de las hojas de lista es el de la empresa congelada al cierre: cambiar la
+    empresa después no cambia el archivo; tampoco aparece la de otro tenant."""
+    sesion, _, _, _ = cerrada_con_logo(client)
+    otra = {**EMPRESA_CON_LOGO, "nombre": "Empresa Ajena de Prueba Ltda.", "nit": "800197268"}
+    assert client.put("/empresa", json=otra, headers=ADMIN_OTRO).status_code == 200
+    nueva = {"nombre": "Nombre nuevo", "direccion": "Otra dirección"}
+    assert client.put("/empresa", json=nueva, headers=ADMIN).status_code == 200
+    wb = libro(excel(client, sesion))
+    for hoja in wb.worksheets[1:]:
+        assert hoja["C3"].value == EMPRESA_CON_LOGO["nombre"], hoja.title
+    with zipfile.ZipFile(io.BytesIO(excel(client, sesion).data)) as z:
+        xml = "".join(z.read(n).decode() for n in z.namelist() if n.endswith(".xml"))
+    assert "Empresa Ajena" not in xml and "800.197.268" not in xml and "Nombre nuevo" not in xml
 
 
 # --- PDF (T3) ------------------------------------------------------------------------------

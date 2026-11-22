@@ -267,6 +267,17 @@ def test_matriz_sincronizada_con_la_huella():
     assert u.MATRIZ.read_text(encoding="utf-8") == u.generar_matriz(HUELLAS)
 
 
+def test_matriz_registra_las_decisiones_de_t4():
+    """«No encontrados» con los estilos de datos de las listas (humano 2026-11-22), sin
+    marcarlo como omitido; celda vacía y columnas ocultas G–K."""
+    texto = u.MATRIZ.read_text(encoding="utf-8")
+    seccion = texto.split("## Hojas de lista del informe (T4)", 1)[1]
+    for clave in ("no_encontrados_datos", "celda_vacia_informe", "columnas_ocultas_no_encontrados"):
+        assert f"`{clave}`" in seccion, clave
+    assert "Decisión del humano 2026-11-22" in seccion
+    assert "NO REPRODUCIDO" not in seccion
+
+
 def test_matriz_sin_datos_reales():
     texto = u.MATRIZ.read_text(encoding="utf-8")
     assert not re.search(r"[\w.+-]+@[\w-]+\.[a-z]{2,}", texto)
