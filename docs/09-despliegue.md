@@ -170,6 +170,24 @@ Lo que cualquier plataforma necesita de AssetControl:
 
 Cuando se elija la plataforma se añaden aquí sus pasos y, si conviene, un paso de despliegue al final de `migrar.yml`.
 
+### 6.1 Coolify en el VPS propio (2026-11-22)
+
+Dos aplicaciones de Coolify, cada una con su proyecto de Supabase (plan Free: dos proyectos activos). Traefik (el proxy de Coolify) pone el TLS con Let's Encrypt; el DNS comodín `*.juliancaracas.dev` ya apunta al VPS.
+
+| | Producción | Desarrollo |
+|---|---|---|
+| Dominio | `https://assetcontrol.juliancaracas.dev` | `https://dev-assetcontrol.juliancaracas.dev` |
+| Rama | `main` | `develop` |
+| `ENVIRONMENT` | `production` | `staging` (mismas exigencias, sin HSTS) |
+| Supabase | proyecto de producción | proyecto de desarrollo (nunca datos de la clínica) |
+| Despliegue | manual, **después** de `migrar.yml` | automático en cada `push` a `develop` |
+
+- **Construcción:** *Dockerfile*, archivo `Dockerfile.prod`, contexto la raíz del repo, puerto `8000`, salud `GET /api/ready`.
+- **Variables:** las de la sección 5, con `TRUSTED_PROXY_HOPS=1` (solo Traefik delante) y `URL_PUBLICA` igual al dominio. Los secretos se marcan como secretos en Coolify. `MIGRATION_DATABASE_URL` no va en Coolify.
+- **Producción no se despliega sola:** el orden es `develop` → `main` (el humano), `migrar.yml` y luego *Deploy* en Coolify. Un despliegue automático podría llegar antes que la migración (ver la nota de la `0026`).
+- **Desarrollo:** su base se migra desde el VPS con el rol migrador del proyecto de desarrollo antes de desplegar (mismos comandos de la sección 4, dentro de la imagen de producción).
+- **Consola `/plataforma`:** apagada en ambos (`PLATAFORMA_HABILITADA` vacía) hasta restringirla por red en Traefik (sección 5.2).
+
 ## 7. Cada vez que algo llega a `main`
 
 1. El humano pasa `develop` → `main` (nunca Claude).
