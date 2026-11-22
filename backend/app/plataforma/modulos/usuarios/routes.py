@@ -10,7 +10,9 @@
   ``campo``, ``404``, ``409 empresa_inactiva`` / ``ultimo_admin``, ``503``.
 - ``POST /plataforma/empresas/{id}/usuarios/{usuario_id}/contrasena`` (C1b; R53–R58):
   exactamente ``{password, password_confirmacion}`` -> ``204`` sin cuerpo; ``400``, ``422``
-  con ``campo``, ``404``, ``409 empresa_inactiva``, ``503``. No idempotente.
+  con ``campo``, ``404``, ``409 empresa_inactiva``, ``503``. No idempotente. C1d (R61–R64):
+  con el correo activo, tras el ``COMMIT`` se envía a la persona un aviso con un enlace de
+  la 014 para elegir su contraseña (``aviso.py``); la respuesta no cambia.
 
 El ``PATCH``, el ``PUT`` y el ``POST`` cuentan en ``plat_accion`` por desarrollador antes de
 validar y de la base (``429``/``503``), como las acciones de Empresas. Todas con
@@ -32,7 +34,7 @@ from app.plataforma.decoradores import (
     current_plataforma_session,
     require_desarrollador,
 )
-from app.plataforma.modulos.usuarios import service
+from app.plataforma.modulos.usuarios import aviso, service
 
 bp = Blueprint("plataforma_usuarios", __name__, url_prefix="/plataforma/empresas")
 
@@ -97,4 +99,6 @@ def restablecer_contrasena(
         service.restablecer_contrasena(current_plataforma_session(), id, usuario_id, password)
     except service.ErrorUsuarios as exc:
         return _error(exc)
+    # C1d (R61–R64): aviso por correo tras el ``COMMIT``; nunca cambia el ``204``.
+    aviso.programar(current_plataforma_session(), id, usuario_id)
     return "", 204
