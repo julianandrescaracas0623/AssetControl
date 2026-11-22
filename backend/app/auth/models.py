@@ -35,10 +35,17 @@ class Tenant(Base):
     )
     # Spec 017, T1 (0017): estado de la empresa; solo lo cambia la consola de plataforma.
     activo: Mapped[bool] = mapped_column(server_default=FetchedValue())
+    # Spec 017, T3a (0018): la aplicación solo lee (id, nombre, creado_en, activo); la
+    # fecha y el autor de la desactivación quedan diferidos con raiseload.
     desactivado_en: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), server_default=FetchedValue()
+        DateTime(timezone=True),
+        server_default=FetchedValue(),
+        deferred=True,
+        deferred_raiseload=True,
     )
-    desactivado_por: Mapped[uuid.UUID | None] = mapped_column(Uuid, server_default=FetchedValue())
+    desactivado_por: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, server_default=FetchedValue(), deferred=True, deferred_raiseload=True
+    )
 
 
 class Usuario(Base):
@@ -49,10 +56,14 @@ class Usuario(Base):
     nombre: Mapped[str] = mapped_column(Text)
     password_hash: Mapped[str] = mapped_column(Text, deferred=True, deferred_raiseload=True)
     activo: Mapped[bool]
-    # Spec 017, T1 (0017): la aplicación aún no tiene SELECT sobre la columna (lo da T4);
-    # diferida con raiseload para que ningún SELECT del ORM la pida.
-    debe_cambiar_password: Mapped[bool] = mapped_column(
-        server_default=FetchedValue(), deferred=True, deferred_raiseload=True
+    # Spec 017, T4 (0024): la aplicación solo la lee (SELECT por columna) en cada petición;
+    # la escriben únicamente acceso.cambiar_password_propio y acceso.restablecer_contrasena
+    # (a false) y acceso.plataforma_crear_tenant (a true).
+    debe_cambiar_password: Mapped[bool] = mapped_column(server_default=FetchedValue())
+    # Spec 017, T4 (M1, 0026): corte de los JWT de acceso; NULL = sin corte. La aplicación
+    # solo la lee; la ponen en now() cambiar_password_propio y restablecer_contrasena.
+    sesiones_validas_desde: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=FetchedValue()
     )
 
 

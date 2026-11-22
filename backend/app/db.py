@@ -40,7 +40,23 @@ Las funciones ``acceso.*`` (antes de conocer el tenant) se llaman con funciones
 propias de este módulo sin tenant y en su propia transacción, como
 ``buscar_login`` (spec 002, T6; plan.md §2), ``validar_invitacion`` y
 ``aceptar_invitacion`` (T9), ``contar_y_solicitar_recuperacion`` y
-``restablecer_contrasena`` (spec 014, T4), nunca dentro de ``tenant_session``.
+``restablecer_contrasena`` (spec 014, T4), y ``plataforma_buscar_login`` (spec 017,
+T2), nunca dentro de ``tenant_session``. Única excepción: ``cambiar_password_propio``
+(spec 017, T4), que corre en la ``tenant_session`` de la petición y con su tenant para que
+el cambio y la sesión nueva queden en una transacción.
+
+Consola de plataforma (spec 017, T2; R37, A6; plan.md §2.1): ``plataforma_session``
+es la sesión del desarrollador, paralela a ``tenant_session`` y sin mezclarse con ella.
+Fija ``app.desarrollador_id`` (nunca ``app.tenant_id``) con ``set_config(..., true)`` y
+solo admite los modelos de las tablas de plataforma (``PLATAFORMA_TABLES``): cualquier
+otro modelo, de lectura o escritura, falla con ``PlataformaScopeError``. Como en
+``tenant_session``, se rechazan ``text()`` y ``connection()``. La barrera sigue siendo
+RLS: sin ``app.tenant_id`` ninguna tabla de negocio devuelve filas, y sin
+``app.desarrollador_id`` ninguna tabla de plataforma. ``tenant_session`` nunca fija
+``app.desarrollador_id``. Las funciones ``acceso.plataforma_*`` de Empresas (spec 017,
+T3a) se llaman con ``plataforma_listar_tenants``, ``plataforma_crear_tenant`` y
+``plataforma_cambiar_estado_tenant``, dentro de la ``plataforma_session`` y siempre con
+su desarrollador.
 
 El engine se crea en ``init_db`` (llamado por ``create_app``), nunca al importar.
 ``create_engine`` no abre conexiones; la primera se abre al usar la sesión.
@@ -51,11 +67,12 @@ import logging
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 from flask import Flask, current_app, has_app_context
-from sqlalchemy import Uuid, create_engine, event, text
+from sqlalchemy import Uuid, create_engine, event, func, select, text
 from sqlalchemy.engine import Connection, Engine, make_url
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlalchemy.orm import (
@@ -71,6 +88,11 @@ from sqlalchemy.sql.elements import TextClause
 
 _EXTENSION_KEY = "assetcontrol.db"
 _SET_TENANT = text("select set_config('app.tenant_id', :tenant_id, true)")
+_SET_DESARROLLADOR = text("select set_config('app.desarrollador_id', :desarrollador_id, true)")
+# Únicas tablas que admite ``plataforma_session`` (spec 017, plan.md §3).
+PLATAFORMA_TABLES: frozenset[str] = frozenset(
+    {"desarrollador", "plataforma_refresh_token", "plataforma_auditoria"}
+)
 _PING = text("select 1")
 # Sin tope, psycopg espera ~130 s si la base no responde y /health no llega a dar 503.
 CONNECT_TIMEOUT_SECONDS = 5
@@ -93,6 +115,14 @@ class TenantMismatchError(RuntimeError):
 
 class UnscopedStatementError(RuntimeError):
     """Vía de acceso no permitida dentro de una sesión con tenant."""
+
+
+class MissingDesarrolladorError(ValueError):
+    """Se pidió una sesión de plataforma sin un ``desarrollador_id`` válido."""
+
+
+class PlataformaScopeError(RuntimeError):
+    """Una sesión de plataforma intentó usar un modelo fuera de las tablas de plataforma."""
 
 
 class DatabaseNotInitializedError(RuntimeError):
@@ -165,6 +195,26 @@ class _TenantSession(Session):
         )
 
 
+class _PlataformaSession(Session):
+    """Sesión del desarrollador. Solo se obtiene a través de ``plataforma_session``.
+
+    El desarrollador se fija al construirla y no tiene setter. Nunca lleva tenant.
+    """
+
+    def __init__(self, *args: Any, desarrollador_id: uuid.UUID, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.__desarrollador = _normalize_desarrollador(desarrollador_id)
+
+    @property
+    def scoped_desarrollador(self) -> uuid.UUID:
+        return self.__desarrollador
+
+    def connection(self, *args: Any, **kwargs: Any):
+        raise UnscopedStatementError(
+            "session.connection() no está disponible en una sesión de plataforma."
+        )
+
+
 class _DropRowRecords(logging.Filter):
     """Descarta los registros DEBUG del engine: son las filas (``Row``) y columnas (``Col``).
 
@@ -192,6 +242,7 @@ def _quiet_sqlalchemy_logs() -> None:
 class _Database:
     engine: Engine
     session_factory: sessionmaker[_TenantSession]
+    plataforma_factory: sessionmaker[_PlataformaSession]
 
 
 TLS_ESTRICTOS = frozenset({"require", "verify-ca", "verify-full"})
@@ -235,7 +286,10 @@ def init_db(app: Flask) -> None:
     )
     event.listen(engine, "connect", _verify_role_on_connect)
     factory = sessionmaker(bind=engine, class_=_TenantSession, expire_on_commit=False)
-    app.extensions[_EXTENSION_KEY] = _Database(engine=engine, session_factory=factory)
+    plataforma = sessionmaker(bind=engine, class_=_PlataformaSession, expire_on_commit=False)
+    app.extensions[_EXTENSION_KEY] = _Database(
+        engine=engine, session_factory=factory, plataforma_factory=plataforma
+    )
 
 
 def _normalize_tenant(tenant_id: object) -> uuid.UUID:
@@ -252,6 +306,16 @@ def _normalize_tenant(tenant_id: object) -> uuid.UUID:
         return uuid.UUID(str(tenant_id).strip())
     except ValueError:
         raise MissingTenantError("El tenant_id no es un UUID válido.") from None
+
+
+def _normalize_desarrollador(desarrollador_id: object) -> uuid.UUID:
+    """Como ``_normalize_tenant``, para el ``desarrollador_id`` de una sesión de plataforma."""
+    try:
+        return _normalize_tenant(desarrollador_id)
+    except MissingTenantError:
+        raise MissingDesarrolladorError(
+            "La sesión de plataforma requiere un desarrollador_id válido."
+        ) from None
 
 
 def _get_database() -> _Database:
@@ -273,6 +337,21 @@ def tenant_session(tenant_id: uuid.UUID | str) -> Iterator[Session]:
     tenant = _normalize_tenant(tenant_id)
     database = _get_database()
     with database.session_factory(tenant_id=tenant) as session:
+        with session.begin():
+            yield session
+
+
+@contextmanager
+def plataforma_session(desarrollador_id: uuid.UUID | str) -> Iterator[Session]:
+    """Sesión del desarrollador con ``app.desarrollador_id`` fijado en la transacción.
+
+    Confirma al salir sin errores y revierte si el bloque lanza. Falla con
+    ``MissingDesarrolladorError`` antes de conectar si el id no es un UUID. No fija
+    ``app.tenant_id`` (R37).
+    """
+    desarrollador = _normalize_desarrollador(desarrollador_id)
+    database = _get_database()
+    with database.plataforma_factory(desarrollador_id=desarrollador) as session:
         with session.begin():
             yield session
 
@@ -333,6 +412,35 @@ def buscar_login(email: str) -> list[LoginRow]:
         )
         for row in rows
     ]
+
+
+@dataclass(frozen=True)
+class PlataformaLoginRow:
+    """La fila de ``acceso.plataforma_buscar_login``. El hash nunca sale en ``repr``."""
+
+    id: uuid.UUID
+    password_hash: str = field(repr=False)
+    activo: bool
+
+
+_PLATAFORMA_BUSCAR_LOGIN = text(
+    "select id, password_hash, activo from acceso.plataforma_buscar_login(:email)"
+)
+
+
+def plataforma_buscar_login(email: str) -> PlataformaLoginRow | None:
+    """``acceso.plataforma_buscar_login`` sin tenant ni desarrollador, en su transacción.
+
+    El login de plataforma (spec 017, T2) la llama antes de conocer al desarrollador;
+    nunca dentro de una sesión. El ``email`` debe venir normalizado. El hash solo se usa
+    para verificar la contraseña en el servidor: no se devuelve, registra ni audita.
+    """
+    database = _get_database()
+    with database.engine.begin() as connection:
+        row = connection.execute(_PLATAFORMA_BUSCAR_LOGIN, {"email": email}).one_or_none()
+    if row is None:
+        return None
+    return PlataformaLoginRow(id=row.id, password_hash=row.password_hash, activo=row.activo)
 
 
 _VALIDAR_INVITACION = text("select acceso.validar_invitacion(:clave)")
@@ -596,6 +704,79 @@ def restablecer_contrasena(clave: str, password_hash: str) -> uuid.UUID | None:
     return usuario
 
 
+# --- Cambio de contraseña propio (spec 017, T4; R27; plan.md §2.6) ----------------------
+
+_CAMBIAR_PASSWORD_PROPIO = text(
+    "select acceso.cambiar_password_propio(:usuario, :tenant, :hash_actual, :hash_nuevo)"
+)
+# Excepción estática de cambiar_password_propio (sin eco): la cuenta ya no es elegible o la
+# contraseña cambió desde que Flask la verificó. No cambia nada.
+_CAMBIO_INVALIDO = ("P0001", "cambio_invalido")
+
+
+def _is_cambio_invalido(exc: DBAPIError) -> bool:
+    orig = exc.orig
+    message = getattr(getattr(orig, "diag", None), "message_primary", None)
+    return (getattr(orig, "sqlstate", None), message) == _CAMBIO_INVALIDO
+
+
+def cambiar_password_propio(
+    session: Session, usuario_id: uuid.UUID, hash_actual: str, hash_nuevo: str
+) -> bool:
+    """``acceso.cambiar_password_propio`` dentro de la ``tenant_session`` de la petición.
+
+    Única función ``acceso.*`` que corre dentro de ``tenant_session`` (excepción explícita
+    a la regla del módulo): así el cambio de hash, la marca en ``false``, la revocación de
+    los refresh y la familia nueva que inserta quien llama quedan en **una** transacción
+    (R27). El tenant es siempre el de la sesión, nunca uno que elija quien llama. La
+    función va en un ``SAVEPOINT``: si rechaza (``cambio_invalido``) se revierte solo ese
+    punto, la sesión sigue sana y se devuelve ``False``. Cualquier otro error se propaga
+    sin leer su mensaje. Nunca recibe ni devuelve la contraseña en claro.
+    """
+    params = {
+        "usuario": str(_normalize_tenant(usuario_id)),
+        "tenant": str(_session_tenant(session)),
+        "hash_actual": hash_actual,
+        "hash_nuevo": hash_nuevo,
+    }
+    rechazado = False
+    resultado = None
+    try:
+        with session.begin_nested():
+            resultado = Session.connection(session).scalar(_CAMBIAR_PASSWORD_PROPIO, params)
+    except DBAPIError as exc:
+        if not _is_cambio_invalido(exc):
+            raise
+        rechazado = True
+    return not rechazado and resultado is True
+
+
+# Candado no obtenido dentro del lock_timeout o interbloqueo al esperarlo.
+_CANDADO_NO_OBTENIDO = frozenset({"55P03", "40P01"})
+
+
+def candado_compartido_acotado(session: Session, clave: str, lock_timeout: str) -> bool:
+    """``pg_advisory_xact_lock_shared(hashtextextended(clave, 0))`` esperando a lo sumo
+    ``lock_timeout``; ``False`` si no se obtuvo (``55P03``/``40P01``).
+
+    Spec 017, T5. El ``lock_timeout`` se fija con ``set_config(..., true)`` (local a la
+    transacción) y, tomado el candado, se restaura el valor previo en la misma transacción:
+    no acota las consultas siguientes. Si no se obtiene, la transacción queda abortada y
+    quien llama debe revertirla (el ``ROLLBACK`` descarta también el valor local). No lee
+    ni propaga el mensaje de la base.
+    """
+    previo = session.scalar(select(func.current_setting("lock_timeout")))
+    session.execute(select(func.set_config("lock_timeout", lock_timeout, True)))
+    try:
+        session.execute(select(func.pg_advisory_xact_lock_shared(func.hashtextextended(clave, 0))))
+    except DBAPIError as exc:
+        if getattr(exc.orig, "sqlstate", None) not in _CANDADO_NO_OBTENIDO:
+            raise
+        return False
+    session.execute(select(func.set_config("lock_timeout", previo, True)))
+    return True
+
+
 def _session_tenant(session: Session) -> uuid.UUID:
     if not isinstance(session, _TenantSession):
         raise MissingTenantError("El acceso a datos requiere un tenant_id.")
@@ -644,3 +825,603 @@ def _enforce_tenant_on_write(session: Session, flush_context, instances) -> None
     for obj in session.dirty:
         if isinstance(obj, TenantScoped) and _normalize_tenant(obj.tenant_id) != tenant:
             raise TenantMismatchError("No se puede mover una fila a otro tenant.")
+
+
+# --- Sesión de plataforma (spec 017, T2) ------------------------------------------------------
+
+
+def session_desarrollador(session: Session) -> uuid.UUID:
+    if not isinstance(session, _PlataformaSession):
+        raise MissingDesarrolladorError("La sesión de plataforma requiere un desarrollador_id.")
+    return session.scoped_desarrollador
+
+
+def _is_platform_class(cls: type) -> bool:
+    table = getattr(cls, "__table__", None)
+    return getattr(table, "name", None) in PLATAFORMA_TABLES
+
+
+@event.listens_for(_PlataformaSession, "after_begin")
+def _set_transaction_desarrollador(
+    session: Session, transaction: SessionTransaction, connection: Connection
+) -> None:
+    """Fija el desarrollador (y solo él) en cada transacción que la sesión abre."""
+    connection.execute(
+        _SET_DESARROLLADOR, {"desarrollador_id": str(session_desarrollador(session))}
+    )
+
+
+@event.listens_for(_PlataformaSession, "do_orm_execute")
+def _restrict_platform_statement(state: ORMExecuteState) -> None:
+    """Defensa en profundidad: la barrera real es RLS en la base.
+
+    Sin ``app.tenant_id`` ninguna tabla de negocio devuelve ni acepta filas, aunque este
+    filtro del ORM se saltara; aquí solo se corta antes el uso de un modelo indebido.
+    """
+    if isinstance(state.statement, TextClause):
+        raise UnscopedStatementError("No se permite SQL crudo en una sesión de plataforma.")
+    for mapper in state.all_mappers:
+        if not _is_platform_class(mapper.class_):
+            raise PlataformaScopeError(
+                "Una sesión de plataforma solo admite las tablas de plataforma."
+            )
+
+
+@event.listens_for(_PlataformaSession, "before_flush")
+def _restrict_platform_write(session: Session, flush_context, instances) -> None:
+    for obj in (*session.new, *session.dirty, *session.deleted):
+        if not _is_platform_class(type(obj)):
+            raise PlataformaScopeError(
+                "Una sesión de plataforma solo escribe en las tablas de plataforma."
+            )
+
+
+# --- Funciones de Empresas de la consola (spec 017, T3a; plan.md §2.3) ------------------------
+#
+# Se llaman dentro de ``plataforma_session`` (misma transacción que la auditoría de T3b) y
+# siempre con el desarrollador de la sesión: nunca con uno que elija quien llama. El
+# ``text()`` va por la conexión de la sesión, no por ``session.execute`` (que lo rechaza).
+
+_PLATAFORMA_LISTAR_TENANTS = text(
+    "select id, nombre, activo, creado_en, tiene_logo, n_membresias_activas, n_admins_activos "
+    "from acceso.plataforma_listar_tenants(:desarrollador)"
+)
+_PLATAFORMA_CREAR_TENANT = text(
+    "select tenant_id, usuario_id from acceso.plataforma_crear_tenant("
+    ":desarrollador, :tenant, :nombre, :direccion, :nit, :telefono, :correo, "
+    ":admin_email, :admin_nombre, :password_hash)"
+)
+_PLATAFORMA_CAMBIAR_ESTADO_TENANT = text(
+    "select acceso.plataforma_cambiar_estado_tenant(:desarrollador, :tenant, :activo)"
+)
+# Excepciones estáticas de las funciones (sqlstate, mensaje) -> código de error.
+_PLATAFORMA_ERRORES = {
+    ("42501", "desarrollador_no_autorizado"): "desarrollador_no_autorizado",
+    ("22023", "hash_invalido"): "hash_invalido",
+    ("23505", "empresa_existente"): "empresa_existente",
+    ("23505", "email_en_uso"): "email_en_uso",
+    ("P0002", "empresa_no_encontrada"): "empresa_no_encontrada",
+    # Spec 017, T5 (0027): Usuarios.
+    ("P0002", "usuario_no_encontrado"): "usuario_no_encontrado",
+    ("P0001", "empresa_inactiva"): "empresa_inactiva",
+    ("P0001", "ultimo_admin"): "ultimo_admin",
+    # Candado del tenant o de una fila no obtenido dentro del lock_timeout de la función.
+    ("55P03", "membresia_ocupada"): "membresia_ocupada",
+    # Spec 017, T7 (0029): logo en el alta.
+    ("22023", "clave_invalida"): "clave_invalida",
+    ("P0001", "empresa_sin_datos"): "empresa_sin_datos",
+    ("P0001", "empresa_sin_admin"): "empresa_sin_admin",
+    ("23505", "logo_id_en_uso"): "logo_id_en_uso",
+    ("55P03", "empresa_ocupada"): "empresa_ocupada",
+}
+
+
+class PlataformaFuncionError(Exception):
+    """Rechazo esperado de una función ``acceso.plataforma_*``: solo lleva su código.
+
+    Sin mensaje de la base, SQL ni parámetros. La transacción de la sesión queda abortada:
+    ``plataforma_session`` la revierte al salir (no queda nada creado).
+    """
+
+    def __init__(self, codigo: str) -> None:
+        self.codigo = codigo
+        super().__init__(codigo)
+
+
+@dataclass(frozen=True)
+class TenantResumen:
+    """Una fila de ``acceso.plataforma_listar_tenants``: identidad y conteos (R21)."""
+
+    id: uuid.UUID
+    nombre: str
+    activo: bool
+    creado_en: Any
+    tiene_logo: bool
+    n_membresias_activas: int
+    n_admins_activos: int
+
+
+@dataclass(frozen=True)
+class FichaEmpresa:
+    """Datos de la ficha ``empresa`` ya validados en Flask (reglas de la 013)."""
+
+    nombre: str
+    direccion: str
+    nit: str | None = None
+    telefono: str | None = None
+    correo: str | None = None
+
+
+@dataclass(frozen=True)
+class TenantCreado:
+    tenant_id: uuid.UUID
+    usuario_id: uuid.UUID
+
+
+def _plataforma_connection(session: Session) -> tuple[Connection, str]:
+    """Conexión de la transacción de ``session`` y su desarrollador (en texto)."""
+    desarrollador = session_desarrollador(session)
+    return Session.connection(session), str(desarrollador)
+
+
+def _plataforma_codigo(exc: DBAPIError) -> str | None:
+    orig = exc.orig
+    message = getattr(getattr(orig, "diag", None), "message_primary", None)
+    return _PLATAFORMA_ERRORES.get((getattr(orig, "sqlstate", None), message))
+
+
+def _plataforma_call(session: Session, statement: TextClause, params: dict[str, Any]):
+    connection, desarrollador = _plataforma_connection(session)
+    codigo = None
+    try:
+        return connection.execute(statement, {"desarrollador": desarrollador, **params})
+    except DBAPIError as exc:
+        codigo = _plataforma_codigo(exc)
+        if codigo is None:
+            raise
+    # Fuera del except: sin causa ni contexto que arrastren SQL o parámetros.
+    raise PlataformaFuncionError(codigo)
+
+
+def plataforma_listar_tenants(session: Session) -> list[TenantResumen]:
+    """``acceso.plataforma_listar_tenants`` con el desarrollador de ``session``."""
+    rows = _plataforma_call(session, _PLATAFORMA_LISTAR_TENANTS, {}).all()
+    return [
+        TenantResumen(
+            id=row.id,
+            nombre=row.nombre,
+            activo=row.activo,
+            creado_en=row.creado_en,
+            tiene_logo=row.tiene_logo,
+            n_membresias_activas=row.n_membresias_activas,
+            n_admins_activos=row.n_admins_activos,
+        )
+        for row in rows
+    ]
+
+
+def plataforma_crear_tenant(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    ficha: FichaEmpresa,
+    admin_email: str,
+    admin_nombre: str,
+    password_hash: str,
+) -> TenantCreado:
+    """``acceso.plataforma_crear_tenant`` en la transacción de ``session`` (R16).
+
+    ``admin_email`` normalizado y ``password_hash`` ya calculado con Argon2id. Los
+    opcionales de la ficha viajan como ``''`` (la función es ``STRICT``) y se guardan
+    como ``NULL``. Rechazos esperados: ``PlataformaFuncionError`` con
+    ``empresa_existente``, ``email_en_uso``, ``hash_invalido`` o
+    ``desarrollador_no_autorizado``.
+    """
+    params = {
+        "tenant": str(_normalize_tenant(tenant_id)),
+        "nombre": ficha.nombre,
+        "direccion": ficha.direccion,
+        "nit": ficha.nit or "",
+        "telefono": ficha.telefono or "",
+        "correo": ficha.correo or "",
+        "admin_email": admin_email,
+        "admin_nombre": admin_nombre,
+        "password_hash": password_hash,
+    }
+    row = _plataforma_call(session, _PLATAFORMA_CREAR_TENANT, params).one()
+    return TenantCreado(tenant_id=row.tenant_id, usuario_id=row.usuario_id)
+
+
+def plataforma_cambiar_estado_tenant(session: Session, tenant_id: uuid.UUID, activo: bool) -> bool:
+    """``acceso.plataforma_cambiar_estado_tenant`` (R22); idempotente.
+
+    Devuelve el estado resultante. ``PlataformaFuncionError`` con
+    ``empresa_no_encontrada`` o ``desarrollador_no_autorizado``.
+    """
+    params = {"tenant": str(_normalize_tenant(tenant_id)), "activo": bool(activo)}
+    return _plataforma_call(session, _PLATAFORMA_CAMBIAR_ESTADO_TENANT, params).scalar_one()
+
+
+# --- Funciones de Usuarios de la consola (spec 017, T5; 0027) ---------------------------------
+
+_PLATAFORMA_LISTAR_USUARIOS = text(
+    "select usuario_id, nombre, email, rol, activa, debe_cambiar_password "
+    "from acceso.plataforma_listar_usuarios(:desarrollador, :tenant)"
+)
+_PLATAFORMA_CAMBIAR_ESTADO_MEMBRESIA = text(
+    "select estado, cambiado from acceso.plataforma_cambiar_estado_membresia("
+    ":desarrollador, :tenant, :usuario, :activa)"
+)
+
+
+@dataclass(frozen=True)
+class UsuarioResumen:
+    """Una fila de ``acceso.plataforma_listar_usuarios`` (R29). ``repr`` sin nombre ni correo."""
+
+    usuario_id: uuid.UUID
+    nombre: str = field(repr=False)
+    email: str = field(repr=False)
+    rol: str
+    activa: bool
+    debe_cambiar_password: bool
+
+
+def plataforma_listar_usuarios(session: Session, tenant_id: uuid.UUID) -> list[UsuarioResumen]:
+    """``acceso.plataforma_listar_usuarios`` con el desarrollador de ``session`` (R29).
+
+    ``PlataformaFuncionError`` con ``empresa_no_encontrada`` o
+    ``desarrollador_no_autorizado``.
+    """
+    params = {"tenant": str(_normalize_tenant(tenant_id))}
+    rows = _plataforma_call(session, _PLATAFORMA_LISTAR_USUARIOS, params).all()
+    return [
+        UsuarioResumen(
+            usuario_id=row.usuario_id,
+            nombre=row.nombre,
+            email=row.email,
+            rol=row.rol,
+            activa=row.activa,
+            debe_cambiar_password=row.debe_cambiar_password,
+        )
+        for row in rows
+    ]
+
+
+@dataclass(frozen=True)
+class CambioMembresia:
+    """Resultado de ``acceso.plataforma_cambiar_estado_membresia``: el estado resultante
+    y si hubo un cambio real (``False`` al repetir el estado actual)."""
+
+    activa: bool
+    cambiado: bool
+
+
+def plataforma_cambiar_estado_membresia(
+    session: Session, tenant_id: uuid.UUID, usuario_id: uuid.UUID, activa: bool
+) -> CambioMembresia:
+    """``acceso.plataforma_cambiar_estado_membresia`` (R30, R31); idempotente.
+
+    ``PlataformaFuncionError`` con ``empresa_no_encontrada``, ``usuario_no_encontrado``,
+    ``empresa_inactiva``, ``ultimo_admin``, ``membresia_ocupada`` (candado no obtenido a
+    tiempo) o ``desarrollador_no_autorizado``.
+    """
+    if not isinstance(usuario_id, uuid.UUID):
+        raise TypeError("usuario_id debe ser un UUID.")
+    params = {
+        "tenant": str(_normalize_tenant(tenant_id)),
+        "usuario": str(usuario_id),
+        "activa": bool(activa),
+    }
+    row = _plataforma_call(session, _PLATAFORMA_CAMBIAR_ESTADO_MEMBRESIA, params).one()
+    if type(row.estado) is not bool or type(row.cambiado) is not bool:
+        raise RuntimeError("Resultado inesperado de plataforma_cambiar_estado_membresia.")
+    return CambioMembresia(activa=row.estado, cambiado=row.cambiado)
+
+
+# --- Editar nombre y rol de un usuario (spec 017, C1/T13; 0031) -------------------------------
+
+_PLATAFORMA_CAMBIAR_USUARIO = text(
+    "select nombre, rol, cambiado, rol_cambiado from acceso.plataforma_cambiar_usuario("
+    ":desarrollador, :tenant, :usuario, :nombre, :rol)"
+)
+
+
+@dataclass(frozen=True)
+class UsuarioEditado:
+    """Resultado de ``acceso.plataforma_cambiar_usuario``: el nombre y el rol resultantes,
+    si hubo algún cambio real y si cambió el rol (entonces se revocaron las familias de
+    refresh de esa membresía). ``repr`` sin el nombre."""
+
+    nombre: str = field(repr=False)
+    rol: str
+    cambiado: bool
+    rol_cambiado: bool
+
+
+def plataforma_cambiar_usuario(
+    session: Session, tenant_id: uuid.UUID, usuario_id: uuid.UUID, nombre: str, rol: str
+) -> UsuarioEditado:
+    """``acceso.plataforma_cambiar_usuario`` (R47–R51); idempotente.
+
+    ``nombre`` ya normalizado y ``rol`` ya validado en Flask. ``PlataformaFuncionError`` con
+    ``empresa_no_encontrada``, ``usuario_no_encontrado``, ``empresa_inactiva``,
+    ``ultimo_admin``, ``membresia_ocupada`` (candado no obtenido a tiempo) o
+    ``desarrollador_no_autorizado``.
+    """
+    if not isinstance(usuario_id, uuid.UUID):
+        raise TypeError("usuario_id debe ser un UUID.")
+    if not isinstance(nombre, str) or not isinstance(rol, str):
+        raise TypeError("nombre y rol deben ser texto.")
+    params = {
+        "tenant": str(_normalize_tenant(tenant_id)),
+        "usuario": str(usuario_id),
+        "nombre": nombre,
+        "rol": rol,
+    }
+    row = _plataforma_call(session, _PLATAFORMA_CAMBIAR_USUARIO, params).one()
+    if (
+        type(row.cambiado) is not bool
+        or type(row.rol_cambiado) is not bool
+        or (row.rol_cambiado and not row.cambiado)
+        or row.nombre != nombre
+        or row.rol != rol
+    ):
+        raise RuntimeError("Resultado inesperado de plataforma_cambiar_usuario.")
+    return UsuarioEditado(
+        nombre=row.nombre, rol=row.rol, cambiado=row.cambiado, rol_cambiado=row.rol_cambiado
+    )
+
+
+# --- Contraseña temporal de un usuario (spec 017, C1b/T16; 0032) ------------------------------
+
+_PLATAFORMA_RESTABLECER_PASSWORD_USUARIO = text(
+    "select acceso.plataforma_restablecer_password_usuario("
+    ":desarrollador, :tenant, :usuario, :password_hash)"
+)
+
+
+def plataforma_restablecer_password_usuario(
+    session: Session, tenant_id: uuid.UUID, usuario_id: uuid.UUID, password_hash: str
+) -> None:
+    """``acceso.plataforma_restablecer_password_usuario`` (R53–R56); no idempotente.
+
+    ``password_hash`` ya calculado con Argon2id en Flask (nunca viaja la contraseña). La
+    función no devuelve nada (``void``): ni hash ni contraseña. ``PlataformaFuncionError``
+    con ``empresa_no_encontrada``, ``usuario_no_encontrado``, ``empresa_inactiva``,
+    ``hash_invalido``, ``membresia_ocupada`` (candado no obtenido a tiempo) o
+    ``desarrollador_no_autorizado``.
+    """
+    if not isinstance(usuario_id, uuid.UUID):
+        raise TypeError("usuario_id debe ser un UUID.")
+    if not isinstance(password_hash, str):
+        raise TypeError("password_hash debe ser texto.")
+    params = {
+        "tenant": str(_normalize_tenant(tenant_id)),
+        "usuario": str(usuario_id),
+        "password_hash": password_hash,
+    }
+    _plataforma_call(session, _PLATAFORMA_RESTABLECER_PASSWORD_USUARIO, params).one()
+
+
+# --- Función de Actividad de la consola (spec 017, T6; 0028) ----------------------------------
+#
+# La función es ``STRICT``: «sin filtro» viaja con centinelas, nunca ``NULL`` (ver 0028). Los
+# instantes viajan como texto ISO 8601 con zona (o ``±infinity``) y la base los convierte.
+
+_PLATAFORMA_LISTAR_AUDITORIA = text(
+    "select id, creado_en, accion, resultado, desarrollador_nombre, tenant_id, tenant_nombre, "
+    "objeto_id from acceso.plataforma_listar_auditoria(:desarrollador, cast(:tenant as uuid), "
+    ":accion, cast(:desde as timestamptz), cast(:hasta as timestamptz), :limite, "
+    "cast(:cursor_fecha as timestamptz), cast(:cursor_id as uuid))"
+)
+_SIN_TENANT = "00000000-0000-0000-0000-000000000000"
+_PRIMER_CURSOR_ID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+
+
+@dataclass(frozen=True)
+class FiltroAuditoria:
+    """Filtros ya validados en Flask. ``hasta`` es exclusivo; ``cursor`` = ``(fecha, id)``
+    del último registro visto (la página sigue estrictamente después)."""
+
+    tenant_id: uuid.UUID | None = None
+    accion: str | None = None
+    desde: datetime | None = None
+    hasta: datetime | None = None
+    cursor: tuple[datetime, uuid.UUID] | None = None
+    limite: int = 50
+
+
+@dataclass(frozen=True)
+class RegistroAuditoria:
+    """Una fila de ``acceso.plataforma_listar_auditoria`` (R32). ``repr`` sin nombres."""
+
+    id: uuid.UUID
+    creado_en: datetime
+    accion: str
+    resultado: str
+    desarrollador_nombre: str | None = field(repr=False)
+    tenant_id: uuid.UUID | None
+    tenant_nombre: str | None = field(repr=False)
+    objeto_id: uuid.UUID | None
+
+
+def _instante(value: datetime | None, sentinel: str) -> str:
+    if value is None:
+        return sentinel
+    if not isinstance(value, datetime) or value.tzinfo is None:
+        raise TypeError("Se esperaba un datetime con zona horaria.")
+    return value.isoformat()
+
+
+def plataforma_listar_auditoria(
+    session: Session, filtro: FiltroAuditoria
+) -> list[RegistroAuditoria]:
+    """``acceso.plataforma_listar_auditoria`` con el desarrollador de ``session`` (R32).
+
+    Solo lectura. ``PlataformaFuncionError`` con ``desarrollador_no_autorizado``.
+    """
+    if filtro.cursor is None:
+        cursor_fecha, cursor_id = "infinity", _PRIMER_CURSOR_ID
+    else:
+        fecha, ultimo = filtro.cursor
+        if not isinstance(ultimo, uuid.UUID):
+            raise TypeError("El cursor debe llevar un UUID.")
+        cursor_fecha, cursor_id = _instante(fecha, "infinity"), str(ultimo)
+    if type(filtro.limite) is not int:
+        raise TypeError("limite debe ser un entero.")
+    params = {
+        "tenant": _SIN_TENANT
+        if filtro.tenant_id is None
+        else str(_normalize_tenant(filtro.tenant_id)),
+        "accion": filtro.accion or "",
+        "desde": _instante(filtro.desde, "-infinity"),
+        "hasta": _instante(filtro.hasta, "infinity"),
+        "limite": filtro.limite,
+        "cursor_fecha": cursor_fecha,
+        "cursor_id": cursor_id,
+    }
+    rows = _plataforma_call(session, _PLATAFORMA_LISTAR_AUDITORIA, params).all()
+    return [
+        RegistroAuditoria(
+            id=row.id,
+            creado_en=row.creado_en,
+            accion=row.accion,
+            resultado=row.resultado,
+            desarrollador_nombre=row.desarrollador_nombre,
+            tenant_id=row.tenant_id,
+            tenant_nombre=row.tenant_nombre,
+            objeto_id=row.objeto_id,
+        )
+        for row in rows
+    ]
+
+
+# --- Función del logo de la consola (spec 017, T7 en 0029; C1/T12 en 0030: reemplazo) --------
+
+_PLATAFORMA_REGISTRAR_LOGO = text(
+    "select logo_id, creado, reemplazado from acceso.plataforma_registrar_logo("
+    ":desarrollador, :tenant, :logo, :clave, :bytes, :ancho, :alto)"
+)
+
+
+@dataclass(frozen=True)
+class LogoRegistrado:
+    """Resultado de ``acceso.plataforma_registrar_logo``: ``creado`` es ``False`` si la
+    empresa ya tenía este mismo logo (idempotente; no se escribió nada); ``reemplazado``,
+    si el logo nuevo sustituyó a otro vigente (el anterior se conserva, 013 R2)."""
+
+    logo_id: uuid.UUID
+    creado: bool
+    reemplazado: bool = False
+
+
+def plataforma_registrar_logo(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    logo_id: uuid.UUID,
+    clave: str,
+    bytes_: int,
+    ancho: int,
+    alto: int,
+) -> LogoRegistrado:
+    """``acceso.plataforma_registrar_logo`` en la transacción de ``session`` (R23, R44).
+
+    El PNG ya procesado (reglas de la 013) lo guarda quien llama **después**, solo si
+    ``creado``. ``PlataformaFuncionError`` con ``clave_invalida``,
+    ``empresa_no_encontrada``, ``empresa_sin_datos``, ``empresa_sin_admin``,
+    ``logo_id_en_uso``, ``empresa_ocupada`` (fila bloqueada más allá del
+    ``lock_timeout``) o ``desarrollador_no_autorizado``.
+    """
+    if not isinstance(logo_id, uuid.UUID):
+        raise TypeError("logo_id debe ser un UUID.")
+    for valor in (bytes_, ancho, alto):
+        if type(valor) is not int:
+            raise TypeError("bytes, ancho y alto deben ser enteros.")
+    params = {
+        "tenant": str(_normalize_tenant(tenant_id)),
+        "logo": str(logo_id),
+        "clave": clave,
+        "bytes": bytes_,
+        "ancho": ancho,
+        "alto": alto,
+    }
+    row = _plataforma_call(session, _PLATAFORMA_REGISTRAR_LOGO, params).one()
+    if (
+        type(row.creado) is not bool
+        or type(row.reemplazado) is not bool
+        or row.logo_id != logo_id
+        or (row.reemplazado and not row.creado)
+    ):
+        raise RuntimeError("Resultado inesperado de plataforma_registrar_logo.")
+    return LogoRegistrado(logo_id=row.logo_id, creado=row.creado, reemplazado=row.reemplazado)
+
+
+# --- Ficha de la empresa desde la consola (spec 017, C1/T12; 0030) ----------------------------
+
+_PLATAFORMA_LEER_EMPRESA = text(
+    "select nombre, direccion, nit, telefono, correo, tiene_logo "
+    "from acceso.plataforma_leer_empresa(:desarrollador, :tenant)"
+)
+_PLATAFORMA_ACTUALIZAR_EMPRESA = text(
+    "select acceso.plataforma_actualizar_empresa("
+    ":desarrollador, :tenant, :nombre, :direccion, :nit, :telefono, :correo)"
+)
+
+
+@dataclass(frozen=True)
+class FichaLeida:
+    """Una fila de ``acceso.plataforma_leer_empresa`` (R41). ``repr`` sin los datos."""
+
+    nombre: str = field(repr=False)
+    direccion: str | None = field(repr=False)
+    nit: str | None = field(repr=False)
+    telefono: str | None = field(repr=False)
+    correo: str | None = field(repr=False)
+    tiene_logo: bool
+
+
+def plataforma_leer_empresa(session: Session, tenant_id: uuid.UUID) -> FichaLeida:
+    """``acceso.plataforma_leer_empresa`` con el desarrollador de ``session`` (R41).
+
+    Solo lectura. ``PlataformaFuncionError`` con ``empresa_no_encontrada``,
+    ``empresa_sin_datos`` o ``desarrollador_no_autorizado``.
+    """
+    params = {"tenant": str(_normalize_tenant(tenant_id))}
+    row = _plataforma_call(session, _PLATAFORMA_LEER_EMPRESA, params).one()
+    if type(row.tiene_logo) is not bool:
+        raise RuntimeError("Resultado inesperado de plataforma_leer_empresa.")
+    return FichaLeida(
+        nombre=row.nombre,
+        direccion=row.direccion,
+        nit=row.nit,
+        telefono=row.telefono,
+        correo=row.correo,
+        tiene_logo=row.tiene_logo,
+    )
+
+
+def plataforma_actualizar_empresa(
+    session: Session, tenant_id: uuid.UUID, ficha: FichaEmpresa
+) -> bool:
+    """``acceso.plataforma_actualizar_empresa`` en la transacción de ``session`` (R42, R43).
+
+    ``ficha`` ya validada y normalizada en Flask (reglas de la 013); los opcionales viajan
+    como ``''`` (la función es ``STRICT``) y se guardan como ``NULL``. Devuelve si cambió
+    algo (``False``: no escribió nada). Si cambió el nombre, también cambia
+    ``tenant.nombre`` (Q-E1). ``PlataformaFuncionError`` con ``empresa_no_encontrada``,
+    ``empresa_sin_datos``, ``empresa_ocupada`` (fila bloqueada más allá del
+    ``lock_timeout``) o ``desarrollador_no_autorizado``.
+    """
+    params = {
+        "tenant": str(_normalize_tenant(tenant_id)),
+        "nombre": ficha.nombre,
+        "direccion": ficha.direccion,
+        "nit": ficha.nit or "",
+        "telefono": ficha.telefono or "",
+        "correo": ficha.correo or "",
+    }
+    cambiado = _plataforma_call(session, _PLATAFORMA_ACTUALIZAR_EMPRESA, params).scalar_one()
+    if type(cambiado) is not bool:
+        raise RuntimeError("Resultado inesperado de plataforma_actualizar_empresa.")
+    return cambiado

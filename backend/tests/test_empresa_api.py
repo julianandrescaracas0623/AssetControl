@@ -40,7 +40,7 @@ ADMIN_OTRO = bearer(ADMIN_B, TENANT_B)
 DATOS = {
     "nombre": "Clínica Dental Ejemplo S.A.S.",
     "direccion": "Calle 10 # 5-20, Cartago",
-    "nit": "890903938-8",
+    "nit": "900123456-8",
     "telefono": "(602) 210 0000",
     "correo": "contacto@clinica-ejemplo.co",
 }
@@ -113,7 +113,7 @@ def test_save_and_read_back_with_normalized_nit(client):
     response = _guardar(client)
     assert response.status_code == 200, response.get_json()
     empresa = response.get_json()["empresa"]
-    assert empresa["nit"] == "890.903.938-8"
+    assert empresa["nit"] == "900.123.456-8"
     assert empresa["completa"] is True
     assert client.get("/empresa", headers=ADMIN).get_json()["empresa"] == empresa
 
@@ -121,11 +121,11 @@ def test_save_and_read_back_with_normalized_nit(client):
 @pytest.mark.parametrize(
     ("entrada", "guardado"),
     [
-        ("890903938-8", "890.903.938-8"),
-        ("890.903.938-8", "890.903.938-8"),
-        ("890 903 938 - 8", "890.903.938-8"),
+        ("900123456-8", "900.123.456-8"),
+        ("900.123.456-8", "900.123.456-8"),
+        ("900 123 456 - 8", "900.123.456-8"),
         ("800197268-4", "800.197.268-4"),
-        ("890903938", "890.903.938"),
+        ("900123456", "900.123.456"),
         ("1094123456", "1.094.123.456"),
     ],
 )
@@ -135,7 +135,7 @@ def test_nit_is_normalized(client, entrada, guardado):
     assert response.get_json()["empresa"]["nit"] == guardado
 
 
-@pytest.mark.parametrize("nit", ["890903938-7", "8909039380-1", "12-3", "ABC", "890903938-88"])
+@pytest.mark.parametrize("nit", ["900123456-7", "9001234560-2", "12-3", "ABC", "900123456-88"])
 def test_wrong_nit_is_refused(client, nit):
     response = _guardar(client, {**DATOS, "nit": nit})
     assert response.status_code == 400

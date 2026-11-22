@@ -374,6 +374,8 @@ def test_refresh_returns_the_same_contract_as_login_and_rotates_the_cookie(clien
             "usuario",
             "tenant",
             "rol",
+            # Spec 017, T4 (R26).
+            "debe_cambiar_password",
         }
     )
     assert data["token_type"] == "Bearer"

@@ -398,6 +398,8 @@ def test_access_token_round_trip():
 
     assert claims.sub == USER
     assert claims.tenant == TENANT
+    # Spec 017, T4 (M1): el iat entero viaja a load_current_user para el corte de sesiones.
+    assert claims.iat == jwt.decode(token, options={"verify_signature": False})["iat"]
     assert jwt.get_unverified_header(token)["alg"] == JWT_ALGORITHM == "HS256"
 
 
@@ -458,6 +460,8 @@ def test_header_alg_hs256_with_a_forged_signature_is_rejected():
     "claims",
     [
         _claims(exp=None),
+        _claims(iat=None),
+        _claims(iat="ayer"),
         _claims(iss=None),
         _claims(iss="otro-emisor"),
         _claims(sub=None),
@@ -468,6 +472,8 @@ def test_header_alg_hs256_with_a_forged_signature_is_rejected():
     ],
     ids=[
         "sin-exp",
+        "sin-iat",
+        "iat-malo",
         "sin-iss",
         "iss-ajeno",
         "sin-sub",
@@ -480,6 +486,46 @@ def test_header_alg_hs256_with_a_forged_signature_is_rejected():
 def test_invalid_claims_are_rejected(claims):
     key = derive_key(SECRET, credentials.JWT_KEY_CONTEXT)
     token = _forge({"alg": "HS256", "typ": "JWT"}, claims, key)
+
+    with pytest.raises(InvalidAccessTokenError):
+        decode_access_token(SECRET, token)
+
+
+def _future_iat(seconds: int) -> int:
+    return int((datetime.now(UTC) + timedelta(seconds=seconds)).timestamp())
+
+
+def test_a_slightly_future_iat_is_accepted():
+    # O-2 (spec 017, T4): la sesión nueva del cambio sale con iat = corte de la base, que puede
+    # ir unos segundos por delante del reloj de Flask; hasta 60 s de holgura.
+    key = derive_key(SECRET, credentials.JWT_KEY_CONTEXT)
+    token = _forge({"alg": "HS256", "typ": "JWT"}, _claims(iat=_future_iat(30)), key)
+
+    assert decode_access_token(SECRET, token).sub == USER
+    assert credentials.ACCESS_TOKEN_MAX_FUTURE_IAT == timedelta(seconds=60)
+
+
+@pytest.mark.parametrize(
+    "iat",
+    ["+120s", float("inf"), float("-inf"), float("nan"), 10**400, "123", [1]],
+    ids=["mas-120s", "infinito", "menos-infinito", "nan", "entero-enorme", "texto", "lista"],
+)
+def test_a_far_future_or_non_finite_iat_is_rejected(iat):
+    # O-2: un iat más de 60 s en el futuro o no finito es el mismo token inválido (401), sin
+    # OverflowError ni ValueError que escapen del decodificador.
+    if iat == "+120s":  # se calcula al correr la prueba, no al recolectarla
+        iat = _future_iat(120)
+    key = derive_key(SECRET, credentials.JWT_KEY_CONTEXT)
+    token = _forge({"alg": "HS256", "typ": "JWT"}, _claims(iat=iat), key)
+
+    with pytest.raises(InvalidAccessTokenError):
+        decode_access_token(SECRET, token)
+
+
+@pytest.mark.parametrize("exp", [float("inf"), float("nan")])
+def test_a_non_finite_exp_is_rejected(exp):
+    key = derive_key(SECRET, credentials.JWT_KEY_CONTEXT)
+    token = _forge({"alg": "HS256", "typ": "JWT"}, _claims(exp=exp), key)
 
     with pytest.raises(InvalidAccessTokenError):
         decode_access_token(SECRET, token)

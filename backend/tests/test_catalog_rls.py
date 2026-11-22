@@ -78,7 +78,31 @@ PLATFORM_FUNCTIONS = frozenset(
         "restablecer_desarrollador",
         "cambiar_estado_desarrollador",
         "plataforma_buscar_login",
+        # Spec 017, T3a (0018): Empresas.
+        "plataforma_listar_tenants",
+        "plataforma_crear_tenant",
+        "plataforma_cambiar_estado_tenant",
+        # Spec 017, T5 (0027): Usuarios.
+        "plataforma_listar_usuarios",
+        "plataforma_cambiar_estado_membresia",
+        # Spec 017, T6 (0028): Actividad.
+        "plataforma_listar_auditoria",
+        # Spec 017, T7 (0029): logo en el alta (C1, 0030: rehecha con reemplazo).
+        "plataforma_registrar_logo",
+        # Spec 017, C1 (0030): ficha de la empresa.
+        "plataforma_leer_empresa",
+        "plataforma_actualizar_empresa",
+        # Spec 017, C1/T13 (0031): editar nombre y rol de un usuario.
+        "plataforma_cambiar_usuario",
+        # Spec 017, C1b/T16 (0032): contraseña temporal de un usuario.
+        "plataforma_restablecer_password_usuario",
     }
+)
+# Spec 017, T3a (0018): tablas existentes con políticas TO plataforma_owner (las fija
+# test_plataforma_catalogo.py). T5 (0027): también refresh_token (revocar al desactivar).
+# T7 (0029): también empresa_logo (el INSERT del logo inicial).
+PLATFORM_OWNER_TABLES = frozenset(
+    {"tenant", "usuario", "membresia", "empresa", "refresh_token", "empresa_logo"}
 )
 # Lista cerrada de tablas de public sin tenant_id; cada una tiene su prueba propia.
 EXCEPTIONS = frozenset({"alembic_version", "tenant", "usuario", "limite_tasa"}) | PLATFORM_TABLES
@@ -408,11 +432,21 @@ VERIFICACION_INSERT = {
     "ocurrido_en",
 }
 EXPECTED_APP_COLUMNS = {
-    # Spec 017, T1 (0017): el GRANT SELECT de tabla (0002) cubre las columnas nuevas.
-    "tenant": {
-        "SELECT": {"id", "nombre", "creado_en", "activo", "desactivado_en", "desactivado_por"}
+    # Spec 017, T3a (0018): SELECT por columna; la aplicación no lee desactivado_en ni
+    # desactivado_por (quién y cuándo desactivó la empresa).
+    "tenant": {"SELECT": {"id", "nombre", "creado_en", "activo"}},
+    # Spec 017, T4 (0024): también la marca debe_cambiar_password (solo lectura); M1 (0026):
+    # y el corte sesiones_validas_desde (solo lectura).
+    "usuario": {
+        "SELECT": {
+            "id",
+            "email",
+            "nombre",
+            "activo",
+            "debe_cambiar_password",
+            "sesiones_validas_desde",
+        }
     },
-    "usuario": {"SELECT": {"id", "email", "nombre", "activo"}},
     "membresia": {"SELECT": {"id", "tenant_id", "usuario_id", "rol", "activa"}},
     "invitacion": {
         "SELECT": {"id", "tenant_id", "email", "rol", "expira_en", "usada_en", "creada_por"},
@@ -539,7 +573,7 @@ EXPECTED_APP_COLUMNS = {
 
 EXPECTED_APP_TABLE_PRIVILEGES = {
     "alembic_version": set(),
-    "tenant": {"SELECT"},
+    "tenant": set(),
     "usuario": set(),
     "membresia": {"SELECT"},
     "invitacion": set(),
@@ -700,6 +734,49 @@ RECOVERY_OWNER_POLICIES = {
     ),
 }
 
+# Spec 017, T4 (0024): políticas del dueño para acceso.cambiar_password_propio (GUC
+# app.auth_cambio_usuario), una por comando, nunca FOR ALL: la fila del usuario (solo si
+# está activo), sus membresías y los refresh de sus membresías (solo marcar revocado_en).
+_CAMBIO_USUARIO = _uuid_guc("app.auth_cambio_usuario")
+_REFRESH_DEL_CAMBIO = (
+    "(EXISTS ( SELECT 1 FROM membresia m "  # noqa: S608
+    "WHERE ((m.id = refresh_token.membresia_id) "
+    "AND (m.tenant_id = refresh_token.tenant_id) "
+    f"AND (m.usuario_id = {_CAMBIO_USUARIO}))))"
+)
+CAMBIO_OWNER_POLICIES = {
+    ("usuario", "dueno_usuario_cambio_leer"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"(id = {_CAMBIO_USUARIO})",
+        None,
+    ),
+    ("usuario", "dueno_usuario_cambio_propio"): (
+        "PERMISSIVE",
+        "UPDATE",
+        f"((id = {_CAMBIO_USUARIO}) AND activo)",
+        f"((id = {_CAMBIO_USUARIO}) AND activo)",
+    ),
+    ("membresia", "dueno_membresia_cambio"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"(usuario_id = {_CAMBIO_USUARIO})",
+        None,
+    ),
+    ("refresh_token", "dueno_refresh_cambio"): (
+        "PERMISSIVE",
+        "SELECT",
+        _REFRESH_DEL_CAMBIO,
+        None,
+    ),
+    ("refresh_token", "dueno_refresh_cambio_revocar"): (
+        "PERMISSIVE",
+        "UPDATE",
+        f"((revocado_en IS NULL) AND {_REFRESH_DEL_CAMBIO})",
+        "(revocado_en = now())",
+    ),
+}
+
 # Catálogo cerrado C6 (T3): políticas del dueño (0003) con su texto exacto, tal como lo
 # devuelve pg_policies con los espacios normalizados.
 # (tabla, nombre) -> (permissive, cmd, USING, WITH CHECK).
@@ -775,7 +852,35 @@ EXPECTED_OWNER_POLICIES = {
         f"((id = {_uuid_guc('app.auth_tenant_nuevo')}) AND (creado_en = now()))",
         None,
     ),
+    # Spec 017, T3a (0018): buscar_login lee tenant.activo solo de los tenants del usuario
+    # de app.auth_usuario (la GUC que ya fija para sus membresías).
+    ("tenant", "dueno_tenant_login"): (
+        "PERMISSIVE",
+        "SELECT",
+        "(EXISTS ( SELECT 1 FROM membresia m "  # noqa: S608
+        f"WHERE ((m.tenant_id = tenant.id) AND (m.usuario_id = {_uuid_guc('app.auth_usuario')}))))",
+        None,
+    ),
+    # Spec 017, T3b (0023): validar_invitacion y aceptar_invitacion leen tenant.activo solo
+    # del tenant de la invitación de su clave (la GUC que ya fija cada una).
+    ("tenant", "dueno_tenant_inv_validar"): (
+        "PERMISSIVE",
+        "SELECT",
+        "(EXISTS ( SELECT 1 FROM invitacion i "  # noqa: S608
+        "WHERE ((i.tenant_id = tenant.id) "
+        f"AND (i.token_hash = {_key_guc('app.auth_inv_validar')}))))",
+        None,
+    ),
+    ("tenant", "dueno_tenant_inv_aceptar"): (
+        "PERMISSIVE",
+        "SELECT",
+        "(EXISTS ( SELECT 1 FROM invitacion i "  # noqa: S608
+        "WHERE ((i.tenant_id = tenant.id) "
+        f"AND (i.token_hash = {_key_guc('app.auth_inv_aceptar')}))))",
+        None,
+    ),
     **RECOVERY_OWNER_POLICIES,
+    **CAMBIO_OWNER_POLICIES,
 }
 
 # Catálogo cerrado C6 (T3): funciones de acceso (0004).
@@ -787,21 +892,24 @@ EXPECTED_FUNCTIONS = {
         "p_email text",
         "TABLE(usuario_id uuid, password_hash text, activo boolean, tenant_id uuid, rol text)",
         {"app.auth_email", "app.auth_usuario"},
-        "e2d65ea58fe28d0906cd6ecdc87126b3fe75f61105f6203bb15c93f4f8f1ae1c",
+        # Spec 017, T3a (0018): sin membresías de un tenant inactivo; vacía las once GUC.
+        "11cdc8bffd925b0fdc46c6b08d3a1fcbfe83ad442843a01155e3a4152d6ce6f6",
         "app",
     ),
     "validar_invitacion": (
         "p_clave text",
         "boolean",
         {"app.auth_inv_validar"},
-        "c51ab1560e578613b40021f4eec9e2b0134f9ec19256524bc49636cc748ef19d",
+        # Spec 017, T3b (0023): solo invitaciones de un tenant activo.
+        "f04443af343794b904d9a1ba03d14551bad6fa1e16202c46094350d7b96ea1ac",
         "app",
     ),
     "aceptar_invitacion": (
         "p_clave text, p_nombre text, p_password_hash text",
         "TABLE(usuario_id uuid, tenant_id uuid, rol text)",
         {"app.auth_inv_aceptar", "app.auth_usuario_nuevo"},
-        "04aebfbb9e1aa4c96ddb0ffd18b70756f71e1db506b97e33f3e272a7daa95407",
+        # Spec 017, T3b (0023): no consume la invitación de un tenant inactivo.
+        "8ae9ac7f42098e7edb161d1eb93d0fb0006c597d60a8f0992c515e498df5dc3e",
         "app",
     ),
     "crear_tenant": (
@@ -825,8 +933,19 @@ EXPECTED_FUNCTIONS = {
         {"app.auth_reset_clave", "app.auth_reset_usuario"},
         # I1 de la revisión de T2 y B1 de la auditoría: formato completo del hash de
         # argon2-cffi sin barras invertidas y como máximo 255 caracteres. H1: revocación
-        # de refresh repetida hasta NOT FOUND (tope de 10 pasadas).
-        "5c610ef358b4b823cafc24f1a5aaa7e183d404b91518995d52308b172a065b68",
+        # de refresh repetida hasta NOT FOUND (tope de 10 pasadas). Spec 017, T4 (0024,
+        # R28): deja debe_cambiar_password en false y vacía también app.auth_cambio_usuario.
+        # M1 (0026): el mismo UPDATE pone sesiones_validas_desde = now().
+        "5c2ab3f65c168ba7779962fe498e74cca457dab15c6fcbbebd04bfe657101d8e",
+        "app",
+    ),
+    # Spec 017, T4 (0024): cambio de contraseña propio (R27).
+    "cambiar_password_propio": (
+        "p_usuario uuid, p_tenant uuid, p_hash_actual text, p_hash_nuevo text",
+        "boolean",
+        {"app.auth_cambio_usuario"},
+        # M1 (0026): el mismo UPDATE pone sesiones_validas_desde = now().
+        "cb733ca49a196da4be0966807af73ad7a5800bbfd135b6d58dd4cabf3a7f097b",
         "app",
     ),
 }
@@ -839,19 +958,26 @@ FUNCTION_CALLS = {
         "select acceso.solicitar_recuperacion('x@ejemplo.test', '" + "0" * 64 + "')"
     ),
     "restablecer_contrasena": "select acceso.restablecer_contrasena('" + "0" * 64 + "', 'h')",
+    "cambiar_password_propio": (
+        "select acceso.cambiar_password_propio(gen_random_uuid(), gen_random_uuid(), 'a', 'b')"
+    ),
 }
 # GRANT de auth_owner (0003): tabla -> privilegio -> columnas; nada a nivel de tabla.
 EXPECTED_OWNER_COLUMNS = {
     "alembic_version": {},
     # SELECT solo de id y creado_en, y solo de la fila creada en su transacción (I2);
     # creado_en nunca en INSERT.
-    "tenant": {"INSERT": {"id", "nombre"}, "SELECT": {"id", "creado_en"}},
+    # Spec 017, T3a (0018): también activo (buscar_login, solo tenants del usuario).
+    "tenant": {"INSERT": {"id", "nombre"}, "SELECT": {"id", "creado_en", "activo"}},
     # Spec 014, T2 (0016): UPDATE solo de password_hash (restablecer_contrasena). El SELECT
     # de password_hash es el de 0003 (buscar_login); 0016 no añade ningún SELECT.
+    # Spec 017, T4 (0024): UPDATE también de debe_cambiar_password (cambiar_password_propio
+    # y restablecer_contrasena la ponen en false); ningún SELECT nuevo. M1 (0026): UPDATE de
+    # sesiones_validas_desde (las mismas dos funciones la ponen en now()).
     "usuario": {
         "SELECT": {"id", "email", "password_hash", "activo"},
         "INSERT": {"id", "email", "nombre", "password_hash"},
-        "UPDATE": {"password_hash"},
+        "UPDATE": {"password_hash", "debe_cambiar_password", "sesiones_validas_desde"},
     },
     # Sin INSERT de id en membresia ni invitacion (M3): lo pone el DEFAULT.
     "membresia": {
@@ -1041,7 +1167,12 @@ def test_platform_policies_are_excluded_only_by_table_or_owner(conn):
         if table in PLATFORM_TABLES or roles == "{" + PLATFORM_OWNER + "}"
     ]
     assert len(rows) - len(omitted) == len(_policies(conn))
-    assert {table for table, _ in omitted} == set(PLATFORM_TABLES)
+    assert {table for table, _ in omitted} == set(PLATFORM_TABLES) | PLATFORM_OWNER_TABLES
+    assert all(
+        roles == "{" + PLATFORM_OWNER + "}"
+        for table, roles in omitted
+        if table not in PLATFORM_TABLES
+    )
 
 
 OWNER_ROLES = "{" + AUTH_OWNER + "}"
@@ -1341,19 +1472,28 @@ def test_exception_tenant(conn, catalog):
     assert owner_tenant == {
         ("tenant", "dueno_tenant_crear"),
         ("tenant", "dueno_tenant_recien_creado"),
+        ("tenant", "dueno_tenant_login"),
+        # Spec 017, T3b (0023).
+        ("tenant", "dueno_tenant_inv_validar"),
+        ("tenant", "dueno_tenant_inv_aceptar"),
     }
     assert tenant_policies == {
         ("tenant", "tenant_isolation"): _expected_policies(catalog.app_role)[
             ("tenant", "tenant_isolation")
         ]
     }
-    assert _table_privileges(conn, catalog.app_role, "tenant") == {"SELECT"}
+    # Spec 017, T3a (0018): SELECT por columna, sin desactivado_en ni desactivado_por.
+    assert _table_privileges(conn, catalog.app_role, "tenant") == set()
+    assert _column_privileges(conn, catalog.app_role, "tenant") == {
+        "SELECT": {"id", "nombre", "creado_en", "activo"}
+    }
 
 
 def test_exception_usuario(conn, catalog):
     columns = _columns(conn, "usuario")
     assert "tenant_id" not in columns
-    # Spec 017, T1 (0017): debe_cambiar_password, sin GRANT para la aplicación (T4).
+    # Spec 017, T1 (0017): debe_cambiar_password; T4 (0024): la aplicación solo la lee.
+    # M1 (0026): sesiones_validas_desde, también solo de lectura para la aplicación.
     assert set(columns) == {
         "id",
         "email",
@@ -1361,6 +1501,7 @@ def test_exception_usuario(conn, catalog):
         "password_hash",
         "activo",
         "debe_cambiar_password",
+        "sesiones_validas_desde",
     }
     assert _rls_flags(conn, "usuario") == (True, True)
     usuario_policies = {k: v for k, v in _app_policies(conn).items() if k[0] == "usuario"}
@@ -1698,8 +1839,9 @@ def test_keys_and_checks(conn):
         "CHECK ((ambito = ANY (ARRAY['login_ip'::text, 'login_cuenta'::text, "
         "'refresh_ip'::text, 'validar_ip'::text, 'aceptar_ip'::text, "
         "'recuperar_ip'::text, 'recuperar_cuenta'::text, 'restablecer_ip'::text, "
-        # Spec 017, T1 (0017): login de plataforma.
-        "'plat_login_ip'::text, 'plat_login_cuenta'::text])))",
+        # Spec 017, T1 (0017): login de plataforma; T4 (0025): acciones y refresh.
+        "'plat_login_ip'::text, 'plat_login_cuenta'::text, "
+        "'plat_accion'::text, 'plat_refresh_ip'::text])))",
         "CHECK ((octet_length(clave_hash) = 32))",
         "CHECK ((intentos >= 0))",
     }
@@ -1741,6 +1883,7 @@ def test_column_types_and_nullability(conn):
         "password_hash": ("text", True),
         "activo": ("boolean", True),
         "debe_cambiar_password": ("boolean", True),
+        "sesiones_validas_desde": ("timestamp with time zone", False),
     }
     assert _columns(conn, "tenant") == {
         "id": ("uuid", True),
@@ -1782,3 +1925,6 @@ def test_models_never_select_the_hash_columns_by_default():
     # Spec 014, T1: la aplicación no tiene privilegios sobre la tabla; el modelo tampoco
     # pediría el hash.
     assert "token_hash" not in str(select(models.RecuperacionContrasena))
+    # Spec 017, T3a (0018): sin SELECT de la aplicación sobre estas columnas de tenant.
+    tenant_sql = str(select(models.Tenant))
+    assert "desactivado_en" not in tenant_sql and "desactivado_por" not in tenant_sql

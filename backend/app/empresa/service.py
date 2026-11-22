@@ -118,7 +118,7 @@ def _con_puntos(base: str) -> str:
 
 
 def normalizar_nit(valor: str) -> str:
-    """``890903938-8`` → ``890.903.938-8``; sin guion se guarda sin dígito."""
+    """``900123456-8`` → ``900.123.456-8``; sin guion se guarda sin dígito."""
     coincide = _NIT.fullmatch(valor.strip())
     if coincide is None:
         raise CampoInvalido("nit")

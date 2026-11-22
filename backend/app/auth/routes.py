@@ -25,6 +25,16 @@ cuerpo, R14). ``POST /auth/recuperar`` ``{email}`` responde **siempre** el mismo
 el mismo ``202`` sin tocar la base. ``POST /auth/restablecer`` ``{token, password}``:
 ``400 contrasena_*`` antes de contar, ``restablecer_ip``, Argon2 siempre, ``204`` sin
 sesión (R10) o ``400 enlace_invalido`` idéntico para todo enlace no canjeable.
+
+Cambiar la contraseña (spec 017, T4; R26–R27, A16): ``POST /auth/cambiar-contrasena``
+``{actual, nueva, confirmacion}`` con ``Authorization: Bearer`` (cualquier rol; está en la
+lista blanca de ``require_auth`` aunque la cuenta tenga ``debe_cambiar_password``). Forma
+mala -> ``400``; política de la 002, confirmación distinta o nueva igual a la actual ->
+``422`` (antes de contar, sin depender de la cuenta); cuenta en ``login_ip`` y
+``login_cuenta`` antes de Argon2 (``429``/``503``); actual errónea -> ``401
+credenciales_invalidas`` (el intento queda contado). Si cambia, responde como el login
+(sesión nueva, cookie de una familia nueva; las demás quedan revocadas) y devuelve el
+intento. Ninguna contraseña se registra.
 """
 
 from flask import Blueprint, abort, current_app, jsonify, request
@@ -38,7 +48,7 @@ from app.auth.credentials import (
     PasswordPolicyError,
     check_password_policy,
 )
-from app.auth.decorators import current_user, require_auth
+from app.auth.decorators import current_session, current_user, require_auth
 from app.auth.http import is_same_site_request, refresh_cookie_options
 from app.config import get_config
 from app.correo import correo_activo
@@ -49,6 +59,11 @@ bp = Blueprint("auth", __name__, url_prefix="/auth")
 INVALID_CREDENTIALS = ("credenciales_invalidas", "Correo o contraseña incorrectos.")
 NOT_AUTHENTICATED = ("no_autenticado", "Debes iniciar sesión.")
 BAD_REQUEST = ("solicitud_invalida", "La solicitud no es válida.")
+PASSWORDS_DIFFER = ("contrasenas_distintas", "Las contraseñas no coinciden.")
+PASSWORD_REPEATED = (
+    "contrasena_repetida",
+    "La contraseña nueva debe ser distinta de la actual.",
+)
 
 
 def session_response(result: service.LoginResult) -> Response:
@@ -170,3 +185,35 @@ def restablecer() -> ResponseReturnValue:
     if not recuperacion.restablecer(token, password):
         return error_response(400, *recuperacion.INVALID_LINK)
     return Response(status=204)
+
+
+# --- Cambiar la contraseña (spec 017, T4) ------------------------------------------------
+
+
+@bp.post("/cambiar-contrasena")
+@require_auth
+def cambiar_contrasena() -> ResponseReturnValue:
+    fields = _text_fields("actual", "nueva", "confirmacion")
+    if fields is None:
+        return error_response(400, *BAD_REQUEST)
+    actual, nueva, confirmacion = fields
+    policy_error = None
+    try:
+        # Antes de contar y de Argon2; no depende de la cuenta.
+        check_password_policy(nueva)
+    except PasswordPolicyError as exc:
+        policy_error = (exc.code, str(exc))
+    if policy_error is not None:
+        return error_response(422, *policy_error)
+    if confirmacion != nueva:
+        return error_response(422, *PASSWORDS_DIFFER)
+    if nueva == actual:
+        return error_response(422, *PASSWORD_REPEATED)
+
+    user = current_user()
+    attempts = limits.limit_login(user.email)
+    result = service.cambiar_contrasena(current_session(), user, actual, nueva)
+    if result is None:
+        return error_response(401, *INVALID_CREDENTIALS)
+    limits.give_back(attempts)
+    return session_response(result)

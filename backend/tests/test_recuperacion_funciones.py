@@ -1125,7 +1125,10 @@ def test_new_gucs_of_a_victim_do_not_widen_the_old_functions(db, case):
         # Sin contexto residual del dueño: las GUC de 0004 vacías; las nuevas, tal cual
         # las dejó quien llama (0004 no las lee ni las cambia).
         assert {g: after[g] for g in OLD_GUCS if after[g]} == {}
-        expected_new = victim_gucs if with_gucs else {}
+        # Spec 017, T3a (0018): buscar_login se reescribió y ahora vacía también las GUC de
+        # 0016 (más estricto: no deja contexto del dueño de ninguna migración).
+        clears_all = case.startswith("buscar_login")
+        expected_new = victim_gucs if with_gucs and not clears_all else {}
         assert {g: after[g] for g in NEW_GUCS if after[g]} == expected_new
 
     assert outcomes[True] == outcomes[False]

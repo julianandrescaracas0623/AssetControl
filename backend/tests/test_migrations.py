@@ -12,6 +12,7 @@ borran al terminar: la base de pruebas compartida no recibe ``alembic_version``
 """
 
 import importlib.util
+import os
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -53,6 +54,27 @@ EMPRESA = "0014_empresa_y_detalle"
 RECUPERACION = "0015_recuperacion_contrasena"
 FUNCIONES_RECUPERACION = "0016_funciones_recuperacion"
 PLATAFORMA = "0017_plataforma"
+FUNCIONES_PLATAFORMA = "0018_funciones_plataforma"
+# Spec 017, T3b: hallazgo de la revisión (0019-0022 los reserva el plan para T4-T7).
+INVITACION_TENANT_ACTIVO = "0023_invitacion_tenant_activo"
+# Spec 017, T4: cambio obligatorio de contraseña y ámbitos de plataforma en limite_tasa.
+CAMBIO_PASSWORD = "0024_cambio_password"
+LIMITE_TASA_PLATAFORMA = "0025_limite_tasa_plataforma"
+# Spec 017, T4 (M1 de la revisión de seguridad): corte de los JWT al cambiar la contraseña.
+SESIONES_VALIDAS_DESDE = "0026_sesiones_validas_desde"
+# Spec 017, T5: funciones del módulo Usuarios de la consola.
+PLATAFORMA_USUARIOS = "0027_plataforma_usuarios"
+# Spec 017, T6: función del módulo Actividad de la consola.
+PLATAFORMA_ACTIVIDAD = "0028_plataforma_actividad"
+# Spec 017, T7: función del logo en el alta de la consola.
+PLATAFORMA_LOGO = "0029_plataforma_logo"
+# Spec 017, C1 (T12): editar la ficha y reemplazar el logo de una empresa.
+PLATAFORMA_EDICION = "0030_plataforma_edicion_empresa"
+# Spec 017, C1 (T13): editar nombre y rol de un usuario.
+PLATAFORMA_EDITAR_USUARIO = "0031_plataforma_editar_usuario"
+# Spec 017, C1b (T16): contraseña temporal de un usuario.
+PLATAFORMA_PASSWORD_USUARIO = "0032_plataforma_password_usuario"
+HEAD = PLATAFORMA_PASSWORD_USUARIO
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
 MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
@@ -205,8 +227,19 @@ def test_revision_chain():
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == [PLATAFORMA]
+    assert script.get_heads() == [HEAD]
     assert [r.revision for r in revisions] == [
+        PLATAFORMA_PASSWORD_USUARIO,
+        PLATAFORMA_EDITAR_USUARIO,
+        PLATAFORMA_EDICION,
+        PLATAFORMA_LOGO,
+        PLATAFORMA_ACTIVIDAD,
+        PLATAFORMA_USUARIOS,
+        SESIONES_VALIDAS_DESDE,
+        LIMITE_TASA_PLATAFORMA,
+        CAMBIO_PASSWORD,
+        INVITACION_TENANT_ACTIVO,
+        FUNCIONES_PLATAFORMA,
         PLATAFORMA,
         FUNCIONES_RECUPERACION,
         RECUPERACION,
@@ -225,23 +258,34 @@ def test_revision_chain():
         ACCESO,
         BASELINE,
     ]
-    assert revisions[0].down_revision == FUNCIONES_RECUPERACION
-    assert revisions[1].down_revision == RECUPERACION
-    assert revisions[2].down_revision == EMPRESA
-    assert revisions[3].down_revision == FOTOS
-    assert revisions[4].down_revision == SUPABASE_FUNCIONES
-    assert revisions[5].down_revision == CIERRE
-    assert revisions[6].down_revision == DISCREPANCIAS
-    assert revisions[7].down_revision == CONTEO
-    assert revisions[8].down_revision == CAMBIOS
-    assert revisions[9].down_revision == ACTIVOS
-    assert revisions[10].down_revision == CATALOGO
-    assert revisions[11].down_revision == LIMITE_TASA
-    assert revisions[12].down_revision == FUNCIONES
-    assert revisions[13].down_revision == POLITICAS
-    assert revisions[14].down_revision == ACCESO
-    assert revisions[15].down_revision == BASELINE
-    assert revisions[16].down_revision is None
+    assert revisions[0].down_revision == PLATAFORMA_EDITAR_USUARIO
+    assert revisions[1].down_revision == PLATAFORMA_EDICION
+    assert revisions[2].down_revision == PLATAFORMA_LOGO
+    assert revisions[3].down_revision == PLATAFORMA_ACTIVIDAD
+    assert revisions[4].down_revision == PLATAFORMA_USUARIOS
+    assert revisions[5].down_revision == SESIONES_VALIDAS_DESDE
+    assert revisions[6].down_revision == LIMITE_TASA_PLATAFORMA
+    assert revisions[7].down_revision == CAMBIO_PASSWORD
+    assert revisions[8].down_revision == INVITACION_TENANT_ACTIVO
+    assert revisions[9].down_revision == FUNCIONES_PLATAFORMA
+    assert revisions[10].down_revision == PLATAFORMA
+    assert revisions[11].down_revision == FUNCIONES_RECUPERACION
+    assert revisions[12].down_revision == RECUPERACION
+    assert revisions[13].down_revision == EMPRESA
+    assert revisions[14].down_revision == FOTOS
+    assert revisions[15].down_revision == SUPABASE_FUNCIONES
+    assert revisions[16].down_revision == CIERRE
+    assert revisions[17].down_revision == DISCREPANCIAS
+    assert revisions[18].down_revision == CONTEO
+    assert revisions[19].down_revision == CAMBIOS
+    assert revisions[20].down_revision == ACTIVOS
+    assert revisions[21].down_revision == CATALOGO
+    assert revisions[22].down_revision == LIMITE_TASA
+    assert revisions[23].down_revision == FUNCIONES
+    assert revisions[24].down_revision == POLITICAS
+    assert revisions[25].down_revision == ACCESO
+    assert revisions[26].down_revision == BASELINE
+    assert revisions[27].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -373,7 +417,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [PLATAFORMA])
+    assert _public_state(migrate_env) == (with_auth, [HEAD])
     assert _schema_exists(migrate_env, "acceso")
 
     command.downgrade(config, "base")
@@ -382,7 +426,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
     assert not _schema_exists(migrate_env, "acceso")
 
     command.upgrade(config, "head")
-    assert _public_state(migrate_env) == (with_auth, [PLATAFORMA])
+    assert _public_state(migrate_env) == (with_auth, [HEAD])
     assert _schema_exists(migrate_env, "acceso")
 
 
@@ -1186,8 +1230,9 @@ def test_downgrade_0003_removes_only_the_owner_policies_and_grants(migrate_env):
     config = alembic_config()
     command.upgrade(config, "head")
     policies, grants = _owner_state(migrate_env)
-    # 10 de 0003 y 13 de 0016 (spec 014, T2).
-    assert len(policies) == 23
+    # 10 de 0003, 13 de 0016 (spec 014, T2), 1 de 0018 (spec 017, T3a), 2 de 0023 (T3b) y
+    # 5 de 0024 (T4).
+    assert len(policies) == 31
     assert grants > 0
 
     command.downgrade(config, ACCESO)
@@ -1442,7 +1487,38 @@ PLATFORM_FUNCTION_NAMES = [
     "plataforma_buscar_login",
     "restablecer_desarrollador",
 ]
-HEAD_FUNCTION_NAMES = sorted([*RECOVERY_HEAD_FUNCTION_NAMES, *PLATFORM_FUNCTION_NAMES])
+PLATAFORMA_FUNCTION_NAMES = sorted([*RECOVERY_HEAD_FUNCTION_NAMES, *PLATFORM_FUNCTION_NAMES])
+# Spec 017, T3a (0018): las de Empresas.
+EMPRESAS_FUNCTION_NAMES = [
+    "plataforma_cambiar_estado_tenant",
+    "plataforma_crear_tenant",
+    "plataforma_listar_tenants",
+]
+# Las que hay tras 0018 y 0023 (sin la de 0024).
+EMPRESAS_HEAD_FUNCTION_NAMES = sorted([*PLATAFORMA_FUNCTION_NAMES, *EMPRESAS_FUNCTION_NAMES])
+# Spec 017, T4 (0024): el cambio de contraseña propio (lo que hay tras 0024–0026).
+CAMBIO_HEAD_FUNCTION_NAMES = sorted([*EMPRESAS_HEAD_FUNCTION_NAMES, "cambiar_password_propio"])
+# Spec 017, T5 (0027): las de Usuarios.
+USUARIOS_FUNCTION_NAMES = ["plataforma_cambiar_estado_membresia", "plataforma_listar_usuarios"]
+USUARIOS_HEAD_FUNCTION_NAMES = sorted([*CAMBIO_HEAD_FUNCTION_NAMES, *USUARIOS_FUNCTION_NAMES])
+# Spec 017, T6 (0028): la de Actividad.
+ACTIVIDAD_HEAD_FUNCTION_NAMES = sorted(
+    [*USUARIOS_HEAD_FUNCTION_NAMES, "plataforma_listar_auditoria"]
+)
+# Spec 017, T7 (0029): la del logo en el alta.
+LOGO_HEAD_FUNCTION_NAMES = sorted([*ACTIVIDAD_HEAD_FUNCTION_NAMES, "plataforma_registrar_logo"])
+# Spec 017, C1 (0030): las dos de la ficha (la del logo se rehace con el mismo nombre).
+EDICION_HEAD_FUNCTION_NAMES = sorted(
+    [*LOGO_HEAD_FUNCTION_NAMES, "plataforma_actualizar_empresa", "plataforma_leer_empresa"]
+)
+# Spec 017, C1/T13 (0031): la de editar nombre y rol.
+EDITAR_USUARIO_HEAD_FUNCTION_NAMES = sorted(
+    [*EDICION_HEAD_FUNCTION_NAMES, "plataforma_cambiar_usuario"]
+)
+# Spec 017, C1b/T16 (0032): la de la contraseña temporal.
+HEAD_FUNCTION_NAMES = sorted(
+    [*EDITAR_USUARIO_HEAD_FUNCTION_NAMES, "plataforma_restablecer_password_usuario"]
+)
 
 
 def test_0004_creates_the_functions_and_leaves_no_create_nor_membership(migrate_env):
@@ -1742,7 +1818,7 @@ def test_0017_up_down_up_touches_only_the_platform_objects(migrate_env):
         sorted([*tables_before, *PLATFORM_TABLES]),
         [PLATAFORMA],
     )
-    assert _acceso_state(migrate_env) == (HEAD_FUNCTION_NAMES, False, [])
+    assert _acceso_state(migrate_env) == (PLATAFORMA_FUNCTION_NAMES, False, [])
     assert _owner_state(migrate_env) == owner_before  # auth_owner no cambia
     assert _public_functions(migrate_env) == functions_before
     platform = _platform_state(migrate_env)
@@ -2021,3 +2097,1859 @@ def test_0017_rejects_an_owner_as_app_role(migration_database_url, monkeypatch, 
     finally:
         engine.dispose()
     assert APP_ROLE_VAR in str(excinfo.value)
+
+
+# --- Spec 017, T3a: 0018_funciones_plataforma ----------------------------------------------
+
+MIGRATION_0018 = BACKEND_DIR / "migrations" / "versions" / "0018_funciones_plataforma.py"
+# Huella de buscar_login de 0004 (la que el downgrade de 0018 debe restaurar).
+BUSCAR_LOGIN_0004_SHA = "e2d65ea58fe28d0906cd6ecdc87126b3fe75f61105f6203bb15c93f4f8f1ae1c"
+
+
+def _empresas_state(url: URL) -> dict[str, object]:
+    """Lo que toca 0018: cuerpos, ACL de tenant, políticas y privilegios de los dueños."""
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            bodies = dict(
+                conn.execute(
+                    text(
+                        "select p.proname, encode(sha256(convert_to(p.prosrc, 'UTF8')), 'hex') "
+                        "from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+                        "where n.nspname = 'acceso'"
+                    )
+                ).all()
+            )
+            acls = dict(
+                conn.execute(
+                    text(
+                        "select p.proname, p.proacl::text from pg_proc p "
+                        "join pg_namespace n on n.oid = p.pronamespace "
+                        "where n.nspname = 'acceso'"
+                    )
+                ).all()
+            )
+            tenant_acl = conn.scalar(
+                text("select relacl::text from pg_class where oid = 'tenant'::regclass")
+            )
+            tenant_columns = sorted(
+                tuple(row)
+                for row in conn.execute(
+                    text(
+                        "select grantee, column_name, privilege_type "
+                        "from information_schema.column_privileges "
+                        "where table_schema = 'public' and table_name = 'tenant'"
+                    )
+                )
+            )
+            policies = sorted(
+                tuple(row)
+                for row in conn.execute(
+                    text(
+                        "select tablename, policyname, roles::text, qual, with_check "
+                        "from pg_policies where schemaname = 'public'"
+                    )
+                )
+            )
+            owner_columns = sorted(
+                tuple(row)
+                for row in conn.execute(
+                    text(
+                        "select grantee, table_name, column_name, privilege_type "
+                        "from information_schema.column_privileges where table_schema = 'public' "
+                        "and grantee in ('auth_owner', 'plataforma_owner')"
+                    )
+                )
+            )
+            leftovers = conn.execute(
+                text(
+                    "select has_schema_privilege('auth_owner', 'acceso', 'CREATE'), "
+                    "has_schema_privilege('plataforma_owner', 'acceso', 'CREATE'), "
+                    "(select count(*) from pg_auth_members where roleid in "
+                    "('auth_owner'::regrole, 'plataforma_owner'::regrole))"
+                )
+            ).one()
+    finally:
+        engine.dispose()
+    return {
+        "bodies": bodies,
+        "acls": acls,
+        "tenant_acl": tenant_acl,
+        "tenant_columns": tenant_columns,
+        "policies": policies,
+        "owner_columns": owner_columns,
+        "leftovers": tuple(leftovers),
+    }
+
+
+def test_0018_up_down_up_touches_only_its_objects(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA)
+    tables_before = _public_state(migrate_env)[0]
+    before = _empresas_state(migrate_env)
+    assert before["bodies"]["buscar_login"] == BUSCAR_LOGIN_0004_SHA
+
+    command.upgrade(config, FUNCIONES_PLATAFORMA)
+    after = _empresas_state(migrate_env)
+    assert _public_state(migrate_env) == (tables_before, [FUNCIONES_PLATAFORMA])
+    assert sorted(after["bodies"]) == EMPRESAS_HEAD_FUNCTION_NAMES
+    assert after["bodies"]["buscar_login"] != BUSCAR_LOGIN_0004_SHA
+    # CREATE OR REPLACE como auth_owner: mismo EXECUTE de buscar_login.
+    assert after["acls"]["buscar_login"] == before["acls"]["buscar_login"]
+    for name in set(before["bodies"]) - {"buscar_login"}:
+        assert after["bodies"][name] == before["bodies"][name], name
+    added = sorted(set(after["policies"]) - set(before["policies"]))
+    removed = sorted(set(before["policies"]) - set(after["policies"]))
+    assert [p[1] for p in removed] == ["plataforma_auditoria_insertar"]
+    assert sorted(p[1] for p in added) == sorted(
+        [
+            "dueno_plat_desarrollador_actor",
+            "dueno_plat_empresa_crear",
+            "dueno_plat_empresa_listar",
+            "dueno_plat_membresia_crear",
+            "dueno_plat_membresia_listar",
+            "dueno_plat_tenant_crear",
+            "dueno_plat_tenant_estado",
+            "dueno_plat_tenant_estado_leer",
+            "dueno_plat_tenant_listar",
+            "dueno_plat_tenant_recien_creado",
+            "dueno_plat_usuario_crear",
+            "dueno_tenant_login",
+            "plataforma_auditoria_insertar",
+        ]
+    )
+    assert after["tenant_acl"] != before["tenant_acl"]
+    assert after["leftovers"] == (False, False, 0)
+
+    command.downgrade(config, PLATAFORMA)
+    assert _public_state(migrate_env) == (tables_before, [PLATAFORMA])
+    assert _empresas_state(migrate_env) == before
+
+    command.upgrade(config, FUNCIONES_PLATAFORMA)
+    assert _empresas_state(migrate_env) == after
+
+
+def test_0018_downgrade_keeps_the_companies_created_from_the_console(migrate_env):
+    # El downgrade no borra datos: la empresa creada desde la consola queda como cualquier otra.
+    config = alembic_config()
+    command.upgrade(config, FUNCIONES_PLATAFORMA)
+    dev, tenant = uuid.uuid4(), uuid.uuid4()
+    _insert_bypassing_rls(
+        migrate_env,
+        "desarrollador",
+        "insert into desarrollador (id, email, nombre, password_hash) "
+        "values (:d, 'dev.0018@ejemplo.test', 'Dev', 'h')",
+        {"d": dev},
+    )
+    engine = create_engine(migrate_env, poolclass=NullPool)
+    password_hash = "$argon2id$v=19$m=8,t=1,p=1$c2FsdHNhbHQ$aGFzaGhhc2g"
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "select * from acceso.plataforma_crear_tenant(:d, :t, 'Clínica 0018', "
+                    "'Calle 1', '', '', '', 'admin.0018@ejemplo.test', 'Admin', :h)"
+                ),
+                {"d": dev, "t": tenant, "h": password_hash},
+            )
+        command.downgrade(config, PLATAFORMA)
+        with engine.connect() as conn:
+            for table in ("tenant", "empresa"):
+                conn.exec_driver_sql(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
+            counts = conn.execute(
+                text(
+                    "select (select count(*) from tenant where id = :t), "
+                    "(select count(*) from empresa where tenant_id = :t)"
+                ),
+                {"t": tenant},
+            ).one()
+            conn.rollback()
+    finally:
+        engine.dispose()
+    assert tuple(counts) == (1, 1)
+
+
+def _load_migration(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_migration_0018():
+    return _load_migration(MIGRATION_0018, "migration_0018_under_test")
+
+
+def test_0018_restores_exactly_the_0004_login_body():
+    migration = _load_migration_0018()
+    migration_0004 = _load_migration(MIGRATION_0004, "migration_0004_login_body")
+
+    def body(statement: str) -> str:
+        return statement.split("$fn$")[1]
+
+    assert body(migration.RESTORE_BUSCAR_LOGIN) == body(migration_0004.CREATE_BUSCAR_LOGIN)
+
+
+def test_0018_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration_0018()
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+    message = str(excinfo.value)
+    assert "0018" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+@pytest.mark.parametrize("owner", ["AUTH_OWNER", "PLATAFORMA_OWNER"])
+@pytest.mark.parametrize("step", ["upgrade", "downgrade"])
+def test_0018_without_an_owner_fails_with_a_clear_message(
+    migration_database_url, app_database_url, monkeypatch, step, owner
+):
+    migration = _load_migration_0018()
+    monkeypatch.setenv(APP_ROLE_VAR, app_database_url.username)
+    missing = f"dueno_falta_{uuid.uuid4().hex[:6]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, owner, missing)
+                with pytest.raises(RuntimeError) as excinfo:
+                    getattr(migration, step)()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "01-app-role.sh" in str(excinfo.value)
+    assert "0018" not in str(excinfo.value)  # no llegó a ejecutar ninguna sentencia
+
+
+@pytest.mark.parametrize("name", ["auth_owner", "plataforma_owner"])
+def test_0018_rejects_an_owner_as_app_role(migration_database_url, monkeypatch, name):
+    migration = _load_migration_0018()
+    monkeypatch.setenv(APP_ROLE_VAR, name)
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration._app_role(conn)
+    finally:
+        engine.dispose()
+    assert APP_ROLE_VAR in str(excinfo.value)
+
+
+# --- Spec 017, T3b: 0023_invitacion_tenant_activo -----------------------------------------
+
+MIGRATION_0023 = BACKEND_DIR / "migrations" / "versions" / "0023_invitacion_tenant_activo.py"
+# Huellas de validar_invitacion y aceptar_invitacion de 0004 (las que restaura el downgrade).
+VALIDAR_INVITACION_0004_SHA = "c51ab1560e578613b40021f4eec9e2b0134f9ec19256524bc49636cc748ef19d"
+ACEPTAR_INVITACION_0004_SHA = "04aebfbb9e1aa4c96ddb0ffd18b70756f71e1db506b97e33f3e272a7daa95407"
+INVITATION_FUNCTIONS = ("aceptar_invitacion", "validar_invitacion")
+
+
+def _load_migration_0023():
+    return _load_migration(MIGRATION_0023, "migration_0023_under_test")
+
+
+def test_0023_up_down_up_touches_only_its_objects(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, FUNCIONES_PLATAFORMA)
+    tables_before = _public_state(migrate_env)[0]
+    before = _empresas_state(migrate_env)
+    assert before["bodies"]["validar_invitacion"] == VALIDAR_INVITACION_0004_SHA
+    assert before["bodies"]["aceptar_invitacion"] == ACEPTAR_INVITACION_0004_SHA
+
+    command.upgrade(config, INVITACION_TENANT_ACTIVO)
+    after = _empresas_state(migrate_env)
+    assert _public_state(migrate_env) == (tables_before, [INVITACION_TENANT_ACTIVO])
+    assert sorted(after["bodies"]) == EMPRESAS_HEAD_FUNCTION_NAMES
+    for name in INVITATION_FUNCTIONS:
+        assert after["bodies"][name] != before["bodies"][name], name
+        # CREATE OR REPLACE como auth_owner: mismo dueño y mismo EXECUTE.
+        assert after["acls"][name] == before["acls"][name], name
+    for name in set(before["bodies"]) - set(INVITATION_FUNCTIONS):
+        assert after["bodies"][name] == before["bodies"][name], name
+    added = sorted(set(after["policies"]) - set(before["policies"]))
+    assert set(before["policies"]) <= set(after["policies"])
+    assert [(p[0], p[1], p[2]) for p in added] == [
+        ("tenant", "dueno_tenant_inv_aceptar", "{auth_owner}"),
+        ("tenant", "dueno_tenant_inv_validar", "{auth_owner}"),
+    ]
+    # Sin GRANT nuevo: auth_owner ya leía tenant (id, creado_en, activo).
+    for key in ("tenant_acl", "tenant_columns", "owner_columns"):
+        assert after[key] == before[key], key
+    assert after["leftovers"] == (False, False, 0)
+
+    command.downgrade(config, FUNCIONES_PLATAFORMA)
+    assert _public_state(migrate_env) == (tables_before, [FUNCIONES_PLATAFORMA])
+    assert _empresas_state(migrate_env) == before
+
+    command.upgrade(config, INVITACION_TENANT_ACTIVO)
+    assert _empresas_state(migrate_env) == after
+
+
+def test_0023_downgrade_keeps_the_invitations_and_accounts(migrate_env):
+    # El downgrade no borra datos: la invitación aceptada y su cuenta quedan.
+    config = alembic_config()
+    command.upgrade(config, INVITACION_TENANT_ACTIVO)
+    engine = create_engine(migrate_env, poolclass=NullPool)
+    clave = uuid.uuid4().hex * 2
+    try:
+        with engine.begin() as conn:
+            tenant = conn.scalar(
+                text("select acceso.crear_tenant('Clínica 0023', 'admin.0023@ejemplo.test', :c)"),
+                {"c": clave},
+            )
+        command.downgrade(config, FUNCIONES_PLATAFORMA)
+        with engine.connect() as conn:
+            for table in ("tenant", "invitacion"):
+                conn.exec_driver_sql(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
+            counts = conn.execute(
+                text(
+                    "select (select count(*) from tenant where id = :t), "
+                    "(select count(*) from invitacion where tenant_id = :t)"
+                ),
+                {"t": tenant},
+            ).one()
+            conn.rollback()
+    finally:
+        engine.dispose()
+    assert tuple(counts) == (1, 1)
+
+
+def test_0023_restores_exactly_the_0004_invitation_bodies():
+    migration = _load_migration_0023()
+    migration_0004 = _load_migration(MIGRATION_0004, "migration_0004_invitation_bodies")
+
+    def body(statement: str) -> str:
+        return statement.split("$fn$")[1]
+
+    assert body(migration.RESTORE_VALIDAR) == body(migration_0004.CREATE_VALIDAR_INVITACION)
+    assert body(migration.RESTORE_ACEPTAR) == body(migration_0004.CREATE_ACEPTAR_INVITACION)
+    # El cuerpo nuevo solo añade la condición del tenant activo.
+    for new, old in (
+        (migration.REPLACE_VALIDAR, migration_0004.CREATE_VALIDAR_INVITACION),
+        (migration.REPLACE_ACEPTAR, migration_0004.CREATE_ACEPTAR_INVITACION),
+    ):
+        assert body(new).replace(migration._TENANT_ACTIVO, "") == body(old)
+        assert body(new).count(migration._TENANT_ACTIVO) == 1
+
+
+def test_0023_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration_0023()
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+    message = str(excinfo.value)
+    assert "0023" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+@pytest.mark.parametrize("step", ["upgrade", "downgrade"])
+def test_0023_without_auth_owner_fails_with_a_clear_message(
+    migration_database_url, monkeypatch, step
+):
+    migration = _load_migration_0023()
+    missing = f"dueno_falta_{uuid.uuid4().hex[:6]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "AUTH_OWNER", missing)
+                with pytest.raises(RuntimeError) as excinfo:
+                    getattr(migration, step)()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "01-app-role.sh" in str(excinfo.value)
+    assert "0023" not in str(excinfo.value)  # no llegó a ejecutar ninguna sentencia
+
+
+# --- Spec 017, T4: 0024_cambio_password y 0025_limite_tasa_plataforma ----------------------
+
+MIGRATION_0024 = BACKEND_DIR / "migrations" / "versions" / "0024_cambio_password.py"
+MIGRATION_0025 = BACKEND_DIR / "migrations" / "versions" / "0025_limite_tasa_plataforma.py"
+# Huella del cuerpo de 0016 de restablecer_contrasena (la que restaura el downgrade).
+RESTABLECER_0016_SHA = "5c610ef358b4b823cafc24f1a5aaa7e183d404b91518995d52308b172a065b68"
+CAMBIO_POLICIES = [
+    ("membresia", "dueno_membresia_cambio", "{auth_owner}"),
+    ("refresh_token", "dueno_refresh_cambio", "{auth_owner}"),
+    ("refresh_token", "dueno_refresh_cambio_revocar", "{auth_owner}"),
+    ("usuario", "dueno_usuario_cambio_leer", "{auth_owner}"),
+    ("usuario", "dueno_usuario_cambio_propio", "{auth_owner}"),
+]
+
+
+def _usuario_columns(url: URL) -> list[tuple[str, str, str]]:
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            return sorted(
+                tuple(row)
+                for row in conn.execute(
+                    text(
+                        "select grantee, column_name, privilege_type "
+                        "from information_schema.column_privileges "
+                        "where table_schema = 'public' and table_name = 'usuario'"
+                    )
+                )
+            )
+    finally:
+        engine.dispose()
+
+
+def test_0024_up_down_up_touches_only_its_objects(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, INVITACION_TENANT_ACTIVO)
+    tables_before = _public_state(migrate_env)[0]
+    before = _empresas_state(migrate_env)
+    columns_before = _usuario_columns(migrate_env)
+    assert before["bodies"]["restablecer_contrasena"] == RESTABLECER_0016_SHA
+
+    command.upgrade(config, CAMBIO_PASSWORD)
+    after = _empresas_state(migrate_env)
+    assert _public_state(migrate_env) == (tables_before, [CAMBIO_PASSWORD])
+    assert sorted(after["bodies"]) == CAMBIO_HEAD_FUNCTION_NAMES
+    assert after["bodies"]["restablecer_contrasena"] != RESTABLECER_0016_SHA
+    # CREATE OR REPLACE como auth_owner: mismo dueño y mismo EXECUTE.
+    assert after["acls"]["restablecer_contrasena"] == before["acls"]["restablecer_contrasena"]
+    assert after["acls"]["cambiar_password_propio"] == after["acls"]["restablecer_contrasena"]
+    for name in set(before["bodies"]) - {"restablecer_contrasena"}:
+        assert after["bodies"][name] == before["bodies"][name], name
+    added = sorted(set(after["policies"]) - set(before["policies"]))
+    assert set(before["policies"]) <= set(after["policies"])
+    assert [(p[0], p[1], p[2]) for p in added] == CAMBIO_POLICIES
+    new_owner = sorted(set(after["owner_columns"]) - set(before["owner_columns"]))
+    assert new_owner == [("auth_owner", "usuario", "debe_cambiar_password", "UPDATE")]
+    # La aplicación solo gana el SELECT de la marca; auth_owner, su UPDATE.
+    app_added = sorted(set(_usuario_columns(migrate_env)) - set(columns_before))
+    assert sorted((c, p) for _, c, p in app_added) == [
+        ("debe_cambiar_password", "SELECT"),
+        ("debe_cambiar_password", "UPDATE"),
+    ]
+    assert after["leftovers"] == (False, False, 0)
+
+    command.downgrade(config, INVITACION_TENANT_ACTIVO)
+    assert _public_state(migrate_env) == (tables_before, [INVITACION_TENANT_ACTIVO])
+    assert _empresas_state(migrate_env) == before
+    assert _usuario_columns(migrate_env) == columns_before
+
+    command.upgrade(config, CAMBIO_PASSWORD)
+    assert _empresas_state(migrate_env) == after
+
+
+def test_0024_does_not_change_any_flag(migrate_env):
+    # R25: la migración no cambia a ningún usuario.
+    config = alembic_config()
+    command.upgrade(config, INVITACION_TENANT_ACTIVO)
+    usuario = uuid.uuid4()
+    engine = create_engine(migrate_env, poolclass=NullPool)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "insert into usuario (id, email, nombre, password_hash, debe_cambiar_password) "
+                    "values (:u, 'marcado.0024@ejemplo.test', 'Marcado', 'h', true)"
+                ),
+                {"u": usuario},
+            )
+        command.upgrade(config, CAMBIO_PASSWORD)
+        command.downgrade(config, INVITACION_TENANT_ACTIVO)
+        command.upgrade(config, CAMBIO_PASSWORD)
+        with engine.connect() as conn:
+            conn.exec_driver_sql("ALTER TABLE usuario NO FORCE ROW LEVEL SECURITY")
+            marcas = conn.execute(
+                text("select debe_cambiar_password from usuario where id = :u"), {"u": usuario}
+            ).all()
+            conn.rollback()
+    finally:
+        engine.dispose()
+    assert [tuple(row) for row in marcas] == [(True,)]
+
+
+def test_0024_restores_exactly_the_0016_reset_body():
+    migration = _load_migration(MIGRATION_0024, "migration_0024_under_test")
+    migration_0016 = _load_migration(MIGRATION_0016, "migration_0016_reset_body")
+
+    def body(statement: str) -> str:
+        return statement.split("$fn$")[1]
+
+    assert body(migration.RESTORE_RESTABLECER) == body(migration_0016.CREATE_RESTABLECER)
+    # El cuerpo nuevo solo quita la marca y vacía también la GUC nueva.
+    nuevo = body(migration.REPLACE_RESTABLECER)
+    assert nuevo.count(", debe_cambiar_password = false") == 1
+    sin_cambios = nuevo.replace(", debe_cambiar_password = false", "").replace(
+        ", 'app.auth_cambio_usuario'", ""
+    )
+    assert sin_cambios == body(migration_0016.CREATE_RESTABLECER)
+
+
+def test_0024_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration(MIGRATION_0024, "migration_0024_leak")
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+    message = str(excinfo.value)
+    assert "0024" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+@pytest.mark.parametrize("step", ["upgrade", "downgrade"])
+def test_0024_without_auth_owner_fails_with_a_clear_message(
+    migration_database_url, monkeypatch, step
+):
+    migration = _load_migration(MIGRATION_0024, "migration_0024_owner")
+    missing = f"dueno_falta_{uuid.uuid4().hex[:6]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "AUTH_OWNER", missing)
+                with pytest.raises(RuntimeError) as excinfo:
+                    getattr(migration, step)()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "01-app-role.sh" in str(excinfo.value)
+    assert "0024" not in str(excinfo.value)  # no llegó a ejecutar ninguna sentencia
+
+
+NEW_PLATFORM_SCOPES = ("plat_accion", "plat_refresh_ip")
+
+
+def test_0025_up_down_up_changes_only_the_scope_check(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, CAMBIO_PASSWORD)
+    tables_before = _public_state(migrate_env)[0]
+    check_before = _limite_tasa_scope_check(migrate_env)
+    state_before = _empresas_state(migrate_env)
+    assert not any(scope in check_before[0][1] for scope in NEW_PLATFORM_SCOPES)
+
+    command.upgrade(config, LIMITE_TASA_PLATAFORMA)
+    check_after = _limite_tasa_scope_check(migrate_env)
+    assert _public_state(migrate_env) == (tables_before, [LIMITE_TASA_PLATAFORMA])
+    assert [name for name, _ in check_after] == [check_before[0][0]]
+    assert all(scope in check_after[0][1] for scope in (*PLATFORM_SCOPES, *NEW_PLATFORM_SCOPES))
+    assert _empresas_state(migrate_env) == state_before
+
+    _count(migrate_env, ("login_ip", "plat_login_ip", *NEW_PLATFORM_SCOPES))
+    command.downgrade(config, CAMBIO_PASSWORD)
+    assert _limite_tasa_scope_check(migrate_env) == check_before
+    assert _limite_tasa_scopes(migrate_env) == ["login_ip", "plat_login_ip"]
+
+    command.upgrade(config, LIMITE_TASA_PLATAFORMA)
+    assert _limite_tasa_scope_check(migrate_env) == check_after
+
+
+def test_0025_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration(MIGRATION_0025, "migration_0025_leak")
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+    message = str(excinfo.value)
+    assert "0025" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+# --- Spec 017, T4 (M1): 0026_sesiones_validas_desde -----------------------------------------
+
+MIGRATION_0026 = BACKEND_DIR / "migrations" / "versions" / "0026_sesiones_validas_desde.py"
+CORTE = ", sesiones_validas_desde = pg_catalog.now()"
+
+
+def _body(statement: str) -> str:
+    return statement.split("$fn$")[1]
+
+
+def test_0026_restores_exactly_the_0024_bodies_and_only_adds_the_cut():
+    migration = _load_migration(MIGRATION_0026, "migration_0026_bodies")
+    migration_0024 = _load_migration(MIGRATION_0024, "migration_0024_for_0026")
+
+    assert migration.CORTE == CORTE
+    assert _body(migration.RESTORE_CAMBIAR) == _body(migration_0024.CREATE_CAMBIAR)
+    assert _body(migration.RESTORE_RESTABLECER) == _body(migration_0024.REPLACE_RESTABLECER)
+    for nuevo, viejo in (
+        (migration.REPLACE_CAMBIAR, migration.RESTORE_CAMBIAR),
+        (migration.REPLACE_RESTABLECER, migration.RESTORE_RESTABLECER),
+    ):
+        cuerpo = _body(nuevo)
+        assert cuerpo.count(CORTE) == 1
+        assert cuerpo.replace(CORTE, "") == _body(viejo)
+        # La misma sentencia que cambia el hash pone el corte (sin UPDATE aparte).
+        (sentencia,) = [s for s in cuerpo.split(";") if CORTE in s]
+        assert "SET password_hash = " in sentencia
+        assert sentencia.count("UPDATE public.usuario") == 1
+    # Mismo encabezado (STRICT, SECURITY DEFINER, search_path) que 0024.
+    assert migration._HEADER == migration_0024._HEADER
+    assert set(migration.AUTH_GUCS) == set(migration_0024.AUTH_GUCS)
+
+
+def test_0026_up_down_up_touches_only_its_objects(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, LIMITE_TASA_PLATAFORMA)
+    tables_before = _public_state(migrate_env)[0]
+    before = _empresas_state(migrate_env)
+    columns_before = _usuario_columns(migrate_env)
+
+    command.upgrade(config, SESIONES_VALIDAS_DESDE)
+    after = _empresas_state(migrate_env)
+    assert _public_state(migrate_env) == (tables_before, [SESIONES_VALIDAS_DESDE])
+    assert sorted(after["bodies"]) == CAMBIO_HEAD_FUNCTION_NAMES
+    cambiadas = {"cambiar_password_propio", "restablecer_contrasena"}
+    for name in cambiadas:
+        assert after["bodies"][name] != before["bodies"][name], name
+        # CREATE OR REPLACE como auth_owner: mismo dueño y mismo EXECUTE.
+        assert after["acls"][name] == before["acls"][name], name
+    for name in set(before["bodies"]) - cambiadas:
+        assert after["bodies"][name] == before["bodies"][name], name
+    assert after["policies"] == before["policies"]
+    new_owner = sorted(set(after["owner_columns"]) - set(before["owner_columns"]))
+    assert new_owner == [("auth_owner", "usuario", "sesiones_validas_desde", "UPDATE")]
+    # La aplicación solo gana el SELECT de la columna y auth_owner su UPDATE (el migrador,
+    # dueño de la tabla, figura con todos sus privilegios sobre la columna nueva).
+    added = sorted(set(_usuario_columns(migrate_env)) - set(columns_before))
+    assert sorted(
+        (g, c, p) for g, c, p in added if g in (os.environ[APP_ROLE_VAR], "auth_owner")
+    ) == sorted(
+        [
+            (os.environ[APP_ROLE_VAR], "sesiones_validas_desde", "SELECT"),
+            ("auth_owner", "sesiones_validas_desde", "UPDATE"),
+        ]
+    )
+    assert after["leftovers"] == (False, False, 0)
+
+    command.downgrade(config, LIMITE_TASA_PLATAFORMA)
+    assert _public_state(migrate_env) == (tables_before, [LIMITE_TASA_PLATAFORMA])
+    # Cuerpos (huella SHA de prosrc), ACL, políticas y privilegios: exactamente los de 0025.
+    assert _empresas_state(migrate_env) == before
+    assert _usuario_columns(migrate_env) == columns_before
+
+    command.upgrade(config, SESIONES_VALIDAS_DESDE)
+    assert _empresas_state(migrate_env) == after
+
+
+def test_0026_keeps_users_and_their_data(migrate_env):
+    # Ningún usuario cambia al subir (corte NULL) ni al bajar (hash y marca intactos).
+    config = alembic_config()
+    command.upgrade(config, LIMITE_TASA_PLATAFORMA)
+    usuario = uuid.uuid4()
+    engine = create_engine(migrate_env, poolclass=NullPool)
+    consulta = "select password_hash, debe_cambiar_password, activo from usuario where id = :u"
+
+    def leer(sql: str) -> list[tuple]:
+        with engine.connect() as conn:
+            conn.exec_driver_sql("ALTER TABLE usuario NO FORCE ROW LEVEL SECURITY")
+            rows = [tuple(row) for row in conn.execute(text(sql), {"u": usuario})]
+            conn.rollback()
+        return rows
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "insert into usuario (id, email, nombre, password_hash, debe_cambiar_password) "
+                    "values (:u, 'corte.0026@ejemplo.test', 'Corte', 'h', true)"
+                ),
+                {"u": usuario},
+            )
+        antes = leer(consulta)
+        command.upgrade(config, SESIONES_VALIDAS_DESDE)
+        assert leer("select sesiones_validas_desde from usuario where id = :u") == [(None,)]
+        assert leer(consulta) == antes
+        command.downgrade(config, LIMITE_TASA_PLATAFORMA)
+        assert leer(consulta) == antes
+    finally:
+        engine.dispose()
+    assert antes == [("h", True, True)]
+
+
+def test_0026_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration(MIGRATION_0026, "migration_0026_leak")
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+    message = str(excinfo.value)
+    assert "0026" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+@pytest.mark.parametrize("step", ["upgrade", "downgrade"])
+def test_0026_without_auth_owner_fails_with_a_clear_message(
+    migration_database_url, monkeypatch, step
+):
+    migration = _load_migration(MIGRATION_0026, "migration_0026_owner")
+    missing = f"dueno_falta_{uuid.uuid4().hex[:6]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "AUTH_OWNER", missing)
+                with pytest.raises(RuntimeError) as excinfo:
+                    getattr(migration, step)()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "01-app-role.sh" in str(excinfo.value)
+    assert "0026" not in str(excinfo.value)  # no llegó a ejecutar ninguna sentencia
+
+
+# --- Spec 017, T5: 0027_plataforma_usuarios ------------------------------------------------
+
+MIGRATION_0027 = BACKEND_DIR / "migrations" / "versions" / "0027_plataforma_usuarios.py"
+
+
+def _refresh_owner_columns(url: URL) -> list[tuple[str, str, str, str]]:
+    """Privilegios por columna de ``plataforma_owner`` en ``refresh_token`` (0027)."""
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            return sorted(
+                tuple(row)
+                for row in conn.execute(
+                    text(
+                        "select grantee, table_name, column_name, privilege_type "
+                        "from information_schema.column_privileges "
+                        "where table_schema = 'public' and table_name = 'refresh_token' "
+                        "and grantee = 'plataforma_owner'"
+                    )
+                )
+            )
+    finally:
+        engine.dispose()
+
+
+def test_0027_up_down_up_touches_only_its_objects(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, SESIONES_VALIDAS_DESDE)
+    tables_before = _public_state(migrate_env)[0]
+    before = _empresas_state(migrate_env)
+    refresh_before = _refresh_owner_columns(migrate_env)
+    assert refresh_before == []
+
+    command.upgrade(config, PLATAFORMA_USUARIOS)
+    after = _empresas_state(migrate_env)
+    assert _public_state(migrate_env) == (tables_before, [PLATAFORMA_USUARIOS])
+    assert sorted(after["bodies"]) == USUARIOS_HEAD_FUNCTION_NAMES
+    for name in before["bodies"]:
+        assert after["bodies"][name] == before["bodies"][name], name
+        assert after["acls"][name] == before["acls"][name], name
+    added = sorted(set(after["policies"]) - set(before["policies"]))
+    assert set(before["policies"]) <= set(after["policies"])
+    assert sorted(p[1] for p in added) == sorted(
+        [
+            "dueno_plat_membresia_estado",
+            "dueno_plat_membresia_estado_leer",
+            "dueno_plat_membresia_usuarios",
+            "dueno_plat_refresh_membresia_leer",
+            "dueno_plat_refresh_membresia_revocar",
+            "dueno_plat_tenant_membresia",
+            "dueno_plat_tenant_usuarios",
+            "dueno_plat_usuario_usuarios",
+        ]
+    )
+    assert all(p[2] == "{plataforma_owner}" for p in added)
+    assert after["tenant_acl"] == before["tenant_acl"]
+    assert after["tenant_columns"] == before["tenant_columns"]
+    new_owner = sorted(set(after["owner_columns"]) - set(before["owner_columns"]))
+    assert new_owner == sorted(
+        [
+            ("plataforma_owner", "membresia", "activa", "UPDATE"),
+            ("plataforma_owner", "membresia", "id", "SELECT"),
+            ("plataforma_owner", "membresia", "usuario_id", "SELECT"),
+            ("plataforma_owner", "usuario", "debe_cambiar_password", "SELECT"),
+            ("plataforma_owner", "usuario", "email", "SELECT"),
+            ("plataforma_owner", "usuario", "id", "SELECT"),
+            ("plataforma_owner", "usuario", "nombre", "SELECT"),
+            ("plataforma_owner", "refresh_token", "membresia_id", "SELECT"),
+            ("plataforma_owner", "refresh_token", "revocado_en", "SELECT"),
+            ("plataforma_owner", "refresh_token", "revocado_en", "UPDATE"),
+            ("plataforma_owner", "refresh_token", "tenant_id", "SELECT"),
+        ]
+    )
+    assert set(before["owner_columns"]) <= set(after["owner_columns"])
+    assert after["leftovers"] == (False, False, 0)
+
+    command.downgrade(config, SESIONES_VALIDAS_DESDE)
+    assert _public_state(migrate_env) == (tables_before, [SESIONES_VALIDAS_DESDE])
+    assert _empresas_state(migrate_env) == before
+    assert _refresh_owner_columns(migrate_env) == refresh_before
+
+    command.upgrade(config, PLATAFORMA_USUARIOS)
+    assert _empresas_state(migrate_env) == after
+
+
+def test_0027_downgrade_keeps_the_deactivated_memberships(migrate_env):
+    # El downgrade no borra datos: una membresía desactivada sigue desactivada.
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA_USUARIOS)
+    tenant, admin, contador = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    engine = create_engine(migrate_env, poolclass=NullPool)
+    try:
+        with engine.begin() as conn:
+            for table in ("tenant", "usuario", "membresia"):
+                conn.exec_driver_sql(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
+            conn.execute(
+                text("insert into tenant (id, nombre) values (:t, 'Clínica 0027')"), {"t": tenant}
+            )
+            for usuario, rol in ((admin, "admin"), (contador, "contador")):
+                conn.execute(
+                    text(
+                        "insert into usuario (id, email, nombre, password_hash) "
+                        "values (:u, :e, 'Persona 0027', 'h')"
+                    ),
+                    {"u": usuario, "e": f"{rol}.0027@ejemplo.test"},
+                )
+                conn.execute(
+                    text(
+                        "insert into membresia (tenant_id, usuario_id, rol, activa) "
+                        "values (:t, :u, :r, :a)"
+                    ),
+                    {"t": tenant, "u": usuario, "r": rol, "a": rol == "admin"},
+                )
+            for table in ("tenant", "usuario", "membresia"):
+                conn.exec_driver_sql(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+        command.downgrade(config, SESIONES_VALIDAS_DESDE)
+        with engine.connect() as conn:
+            conn.exec_driver_sql("ALTER TABLE membresia NO FORCE ROW LEVEL SECURITY")
+            rows = sorted(
+                tuple(row)
+                for row in conn.execute(
+                    text("select rol, activa from membresia where tenant_id = :t"), {"t": tenant}
+                )
+            )
+            conn.rollback()
+    finally:
+        engine.dispose()
+    assert rows == [("admin", True), ("contador", False)]
+
+
+def test_0027_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration(MIGRATION_0027, "migration_0027_leak")
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+    message = str(excinfo.value)
+    assert "0027" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+@pytest.mark.parametrize("step", ["upgrade", "downgrade"])
+def test_0027_without_plataforma_owner_fails_with_a_clear_message(
+    migration_database_url, app_database_url, monkeypatch, step
+):
+    migration = _load_migration(MIGRATION_0027, "migration_0027_owner")
+    monkeypatch.setenv(APP_ROLE_VAR, app_database_url.username)
+    missing = f"dueno_falta_{uuid.uuid4().hex[:6]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "PLATAFORMA_OWNER", missing)
+                with pytest.raises(RuntimeError) as excinfo:
+                    getattr(migration, step)()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "01-app-role.sh" in str(excinfo.value)
+    assert "0027" not in str(excinfo.value)  # no llegó a ejecutar ninguna sentencia
+
+
+def test_0027_bodies_clear_every_platform_guc_and_reuse_the_0018_check():
+    migration = _load_migration(MIGRATION_0027, "migration_0027_bodies")
+    migration_0018 = _load_migration_0018()
+    # Las diez GUC de 0017 y 0018 más las tres de aquí, en el mismo orden.
+    assert migration.OWNER_GUCS[: len(migration_0018.OWNER_GUCS)] == migration_0018.OWNER_GUCS
+    assert len(migration.OWNER_GUCS) == len(migration_0018.OWNER_GUCS) + 3
+    assert migration._HEADER == migration_0018._HEADER
+    assert migration._DESARROLLADOR_ACTIVO == migration_0018._DESARROLLADOR_ACTIVO
+    for statement in migration.CREATE_STATEMENTS:
+        cuerpo = statement.split("$fn$")[1]
+        assert cuerpo.count(migration._CLEAR) >= 2
+        assert cuerpo.index(migration._DESARROLLADOR_ACTIVO) < cuerpo.index("public.tenant")
+
+
+# --- Spec 017, T6: 0028_plataforma_actividad -----------------------------------------------
+
+MIGRATION_0028 = BACKEND_DIR / "migrations" / "versions" / "0028_plataforma_actividad.py"
+
+
+def test_0028_up_down_up_touches_only_its_objects(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA_USUARIOS)
+    tables_before = _public_state(migrate_env)[0]
+    before = _empresas_state(migrate_env)
+
+    command.upgrade(config, PLATAFORMA_ACTIVIDAD)
+    after = _empresas_state(migrate_env)
+    assert _public_state(migrate_env) == (tables_before, [PLATAFORMA_ACTIVIDAD])
+    assert sorted(after["bodies"]) == ACTIVIDAD_HEAD_FUNCTION_NAMES
+    for name in before["bodies"]:
+        assert after["bodies"][name] == before["bodies"][name], name
+        assert after["acls"][name] == before["acls"][name], name
+    added = sorted(set(after["policies"]) - set(before["policies"]))
+    assert set(before["policies"]) <= set(after["policies"])
+    assert sorted((p[0], p[1]) for p in added) == [
+        ("desarrollador", "dueno_plat_desarrollador_actividad"),
+        ("plataforma_auditoria", "dueno_plat_auditoria_actividad"),
+        ("tenant", "dueno_plat_tenant_actividad"),
+    ]
+    assert all(p[2] == "{plataforma_owner}" for p in added)
+    assert after["tenant_acl"] == before["tenant_acl"]
+    assert after["tenant_columns"] == before["tenant_columns"]
+    new_owner = sorted(set(after["owner_columns"]) - set(before["owner_columns"]))
+    auditoria = (
+        "id",
+        "desarrollador_id",
+        "accion",
+        "resultado",
+        "tenant_id",
+        "objeto_id",
+        "creado_en",
+    )
+    assert new_owner == sorted(
+        [
+            ("plataforma_owner", "desarrollador", "nombre", "SELECT"),
+            *(("plataforma_owner", "plataforma_auditoria", c, "SELECT") for c in auditoria),
+        ]
+    )
+    assert set(before["owner_columns"]) <= set(after["owner_columns"])
+    assert after["leftovers"] == (False, False, 0)
+
+    command.downgrade(config, PLATAFORMA_USUARIOS)
+    assert _public_state(migrate_env) == (tables_before, [PLATAFORMA_USUARIOS])
+    assert _empresas_state(migrate_env) == before
+
+    command.upgrade(config, PLATAFORMA_ACTIVIDAD)
+    assert _empresas_state(migrate_env) == after
+
+
+def test_0028_downgrade_keeps_the_audit_rows(migrate_env):
+    # El downgrade no borra datos: la auditoría sigue entera.
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA_ACTIVIDAD)
+    engine = create_engine(migrate_env, poolclass=NullPool)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "insert into plataforma_auditoria (accion, resultado) "
+                    "values ('desarrollador_creado', 'ok')"
+                )
+            )
+        command.downgrade(config, PLATAFORMA_USUARIOS)
+        with engine.connect() as conn:
+            count = conn.scalar(text("select count(*) from plataforma_auditoria"))
+    finally:
+        engine.dispose()
+    assert count == 1
+
+
+def test_0028_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration(MIGRATION_0028, "migration_0028_leak")
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+    message = str(excinfo.value)
+    assert "0028" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+@pytest.mark.parametrize("step", ["upgrade", "downgrade"])
+def test_0028_without_plataforma_owner_fails_with_a_clear_message(
+    migration_database_url, app_database_url, monkeypatch, step
+):
+    migration = _load_migration(MIGRATION_0028, "migration_0028_owner")
+    monkeypatch.setenv(APP_ROLE_VAR, app_database_url.username)
+    missing = f"dueno_falta_{uuid.uuid4().hex[:6]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "PLATAFORMA_OWNER", missing)
+                with pytest.raises(RuntimeError) as excinfo:
+                    getattr(migration, step)()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "01-app-role.sh" in str(excinfo.value)
+    assert "0028" not in str(excinfo.value)  # no llegó a ejecutar ninguna sentencia
+
+
+def test_0028_body_clears_every_platform_guc_and_reuses_the_0018_check():
+    migration = _load_migration(MIGRATION_0028, "migration_0028_bodies")
+    migration_0027 = _load_migration(MIGRATION_0027, "migration_0027_for_0028")
+    migration_0018 = _load_migration_0018()
+    # Las trece GUC de 0017, 0018 y 0027 más la de aquí, en el mismo orden.
+    assert migration.OWNER_GUCS[: len(migration_0027.OWNER_GUCS)] == migration_0027.OWNER_GUCS
+    assert migration.OWNER_GUCS[len(migration_0027.OWNER_GUCS) :] == ("app.plat_actividad",)
+    assert migration._HEADER == migration_0018._HEADER
+    assert migration._DESARROLLADOR_ACTIVO == migration_0018._DESARROLLADOR_ACTIVO
+    for statement in migration.CREATE_STATEMENTS:
+        cuerpo = statement.split("$fn$")[1]
+        assert cuerpo.count(migration._CLEAR) >= 2
+        check = cuerpo.index(migration._DESARROLLADOR_ACTIVO)
+        assert check < cuerpo.index("public.tenant")
+        assert check < cuerpo.index("public.plataforma_auditoria")
+        # Solo lectura.
+        for palabra in ("INSERT", "UPDATE", "DELETE"):
+            assert palabra not in cuerpo, palabra
+
+
+# --- Spec 017, T7: 0029_plataforma_logo ----------------------------------------------------
+
+MIGRATION_0029 = BACKEND_DIR / "migrations" / "versions" / "0029_plataforma_logo.py"
+
+
+def test_0029_up_down_up_touches_only_its_objects(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA_ACTIVIDAD)
+    tables_before = _public_state(migrate_env)[0]
+    before = _empresas_state(migrate_env)
+
+    command.upgrade(config, PLATAFORMA_LOGO)
+    after = _empresas_state(migrate_env)
+    assert _public_state(migrate_env) == (tables_before, [PLATAFORMA_LOGO])
+    assert sorted(after["bodies"]) == LOGO_HEAD_FUNCTION_NAMES
+    for name in before["bodies"]:
+        assert after["bodies"][name] == before["bodies"][name], name
+        assert after["acls"][name] == before["acls"][name], name
+    added = sorted(set(after["policies"]) - set(before["policies"]))
+    assert set(before["policies"]) <= set(after["policies"])
+    assert sorted((p[0], p[1]) for p in added) == [
+        ("empresa", "dueno_plat_empresa_logo"),
+        ("empresa", "dueno_plat_empresa_logo_leer"),
+        ("empresa_logo", "dueno_plat_empresa_logo_crear"),
+        ("membresia", "dueno_plat_membresia_logo"),
+        ("tenant", "dueno_plat_tenant_logo"),
+    ]
+    assert all(p[2] == "{plataforma_owner}" for p in added)
+    assert after["tenant_acl"] == before["tenant_acl"]
+    assert after["tenant_columns"] == before["tenant_columns"]
+    new_owner = sorted(set(after["owner_columns"]) - set(before["owner_columns"]))
+    logo = ("id", "tenant_id", "clave", "bytes", "ancho", "alto", "subido_por")
+    assert new_owner == sorted(
+        [
+            ("plataforma_owner", "empresa", "actualizada_en", "UPDATE"),
+            ("plataforma_owner", "empresa", "logo_id", "UPDATE"),
+            *(("plataforma_owner", "empresa_logo", c, "INSERT") for c in logo),
+        ]
+    )
+    assert set(before["owner_columns"]) <= set(after["owner_columns"])
+    assert after["leftovers"] == (False, False, 0)
+
+    command.downgrade(config, PLATAFORMA_ACTIVIDAD)
+    assert _public_state(migrate_env) == (tables_before, [PLATAFORMA_ACTIVIDAD])
+    assert _empresas_state(migrate_env) == before
+
+    command.upgrade(config, PLATAFORMA_LOGO)
+    assert _empresas_state(migrate_env) == after
+
+
+def test_0029_downgrade_keeps_the_uploaded_logos(migrate_env):
+    # El downgrade no borra datos: el logo subido sigue en empresa_logo y en empresa.
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA_LOGO)
+    tenant, admin, logo = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    tables = ("tenant", "usuario", "membresia", "empresa", "empresa_logo")
+    engine = create_engine(migrate_env, poolclass=NullPool)
+    try:
+        with engine.begin() as conn:
+            for table in tables:
+                conn.exec_driver_sql(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
+            conn.execute(
+                text("insert into tenant (id, nombre) values (:t, 'Clínica 0029')"), {"t": tenant}
+            )
+            conn.execute(
+                text(
+                    "insert into usuario (id, email, nombre, password_hash) "
+                    "values (:u, 'admin.0029@ejemplo.test', 'Persona 0029', 'h')"
+                ),
+                {"u": admin},
+            )
+            conn.execute(
+                text("insert into membresia (tenant_id, usuario_id, rol) values (:t, :u, 'admin')"),
+                {"t": tenant, "u": admin},
+            )
+            conn.execute(
+                text(
+                    "insert into empresa_logo (id, tenant_id, clave, bytes, ancho, alto, "
+                    "subido_por) values (:l, :t, :c, 1, 1, 1, :u)"
+                ),
+                {"l": logo, "t": tenant, "c": f"{tenant}/{logo}.png", "u": admin},
+            )
+            conn.execute(
+                text(
+                    "insert into empresa (tenant_id, nombre, direccion, logo_id, actualizada_por) "
+                    "values (:t, 'Clínica 0029', 'Calle 1', :l, :u)"
+                ),
+                {"t": tenant, "l": logo, "u": admin},
+            )
+            for table in tables:
+                conn.exec_driver_sql(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+        command.downgrade(config, PLATAFORMA_ACTIVIDAD)
+        with engine.connect() as conn:
+            conn.exec_driver_sql("ALTER TABLE empresa NO FORCE ROW LEVEL SECURITY")
+            conn.exec_driver_sql("ALTER TABLE empresa_logo NO FORCE ROW LEVEL SECURITY")
+            vigente = conn.scalar(
+                text("select logo_id from empresa where tenant_id = :t"), {"t": tenant}
+            )
+            logos = conn.scalar(
+                text("select count(*) from empresa_logo where tenant_id = :t"), {"t": tenant}
+            )
+            conn.rollback()
+    finally:
+        engine.dispose()
+    assert (vigente, logos) == (logo, 1)
+
+
+def test_0029_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration(MIGRATION_0029, "migration_0029_leak")
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+    message = str(excinfo.value)
+    assert "0029" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+@pytest.mark.parametrize("step", ["upgrade", "downgrade"])
+def test_0029_without_plataforma_owner_fails_with_a_clear_message(
+    migration_database_url, app_database_url, monkeypatch, step
+):
+    migration = _load_migration(MIGRATION_0029, "migration_0029_owner")
+    monkeypatch.setenv(APP_ROLE_VAR, app_database_url.username)
+    missing = f"dueno_falta_{uuid.uuid4().hex[:6]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "PLATAFORMA_OWNER", missing)
+                with pytest.raises(RuntimeError) as excinfo:
+                    getattr(migration, step)()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "01-app-role.sh" in str(excinfo.value)
+    assert "0029" not in str(excinfo.value)  # no llegó a ejecutar ninguna sentencia
+
+
+def test_0029_body_clears_every_platform_guc_and_reuses_the_0018_check():
+    migration = _load_migration(MIGRATION_0029, "migration_0029_bodies")
+    migration_0028 = _load_migration(MIGRATION_0028, "migration_0028_for_0029")
+    migration_0018 = _load_migration_0018()
+    # Las catorce GUC de 0017, 0018, 0027 y 0028 más las dos de aquí, en el mismo orden.
+    assert migration.OWNER_GUCS[: len(migration_0028.OWNER_GUCS)] == migration_0028.OWNER_GUCS
+    assert migration.OWNER_GUCS[len(migration_0028.OWNER_GUCS) :] == (
+        "app.plat_logo_tenant",
+        "app.plat_logo_id",
+    )
+    assert migration._HEADER == migration_0018._HEADER
+    assert migration._DESARROLLADOR_ACTIVO == migration_0018._DESARROLLADOR_ACTIVO
+    for statement in migration.CREATE_STATEMENTS:
+        cuerpo = statement.split("$fn$")[1]
+        # Al entrar, al salir y en las dos salidas idempotentes.
+        assert cuerpo.count(migration._CLEAR) >= 4
+        check = cuerpo.index(migration._DESARROLLADOR_ACTIVO)
+        for palabra in ("public.empresa", "public.tenant", "public.membresia", "INSERT", "UPDATE"):
+            assert check < cuerpo.index(palabra), palabra
+        # Nunca borra ni lee la ficha de la empresa.
+        assert "DELETE" not in cuerpo
+        for columna in ("e.nombre", "e.direccion", "e.nit", "e.telefono", "e.correo"):
+            assert columna not in cuerpo, columna
+
+
+# --- Spec 017, C1 (T12): 0030_plataforma_edicion_empresa -----------------------------------
+
+MIGRATION_0030 = BACKEND_DIR / "migrations" / "versions" / "0030_plataforma_edicion_empresa.py"
+_CHECK_ACCION = (
+    "select pg_get_constraintdef(oid), convalidated from pg_constraint "
+    "where conname = 'plataforma_auditoria_accion_valida'"
+)
+_ACCIONES_C1 = ("empresa_editada", "empresa_logo_reemplazado", "usuario_editado")
+
+
+def _audit_check(url: URL) -> tuple[str, bool]:
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            return tuple(conn.execute(text(_CHECK_ACCION)).one())
+    finally:
+        engine.dispose()
+
+
+def test_0030_up_down_up_touches_only_its_objects(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA_LOGO)
+    tables_before = _public_state(migrate_env)[0]
+    before = _empresas_state(migrate_env)
+    check_before = _audit_check(migrate_env)
+
+    command.upgrade(config, PLATAFORMA_EDICION)
+    after = _empresas_state(migrate_env)
+    assert _public_state(migrate_env) == (tables_before, [PLATAFORMA_EDICION])
+    assert sorted(after["bodies"]) == EDICION_HEAD_FUNCTION_NAMES
+    # Solo cambia el cuerpo de la del logo (rehecha); las demás, intactas.
+    logo_fn = "plataforma_registrar_logo"
+    for name in set(before["bodies"]) - {logo_fn}:
+        assert after["bodies"][name] == before["bodies"][name], name
+        assert after["acls"][name] == before["acls"][name], name
+    assert after["bodies"][logo_fn] != before["bodies"][logo_fn]
+    assert after["acls"][logo_fn] == before["acls"][logo_fn]
+    added = sorted(set(after["policies"]) - set(before["policies"]))
+    removed = sorted(set(before["policies"]) - set(after["policies"]))
+    # Cambian la de logo (sin logo_id IS NULL) y la de inserción de auditoría (tres acciones).
+    assert sorted((p[0], p[1]) for p in removed) == [
+        ("empresa", "dueno_plat_empresa_logo"),
+        ("plataforma_auditoria", "plataforma_auditoria_insertar"),
+    ]
+    assert sorted((p[0], p[1]) for p in added) == [
+        ("empresa", "dueno_plat_empresa_ficha"),
+        ("empresa", "dueno_plat_empresa_ficha_leer"),
+        ("empresa", "dueno_plat_empresa_logo"),
+        ("plataforma_auditoria", "plataforma_auditoria_insertar"),
+        ("tenant", "dueno_plat_tenant_ficha"),
+        ("tenant", "dueno_plat_tenant_ficha_leer"),
+    ]
+    logo = next(p for p in added if p[1] == "dueno_plat_empresa_logo")
+    assert "logo_id IS NULL" not in logo[3]
+    insertar = next(p for p in added if p[1] == "plataforma_auditoria_insertar")
+    for accion in _ACCIONES_C1:
+        assert f"'{accion}'" in insertar[4], accion
+    assert all(
+        p[2] == "{plataforma_owner}" for p in added if p[1] != "plataforma_auditoria_insertar"
+    )
+    assert after["tenant_acl"] == before["tenant_acl"]
+    new_owner = sorted(set(after["owner_columns"]) - set(before["owner_columns"]))
+    ficha = ("nombre", "direccion", "nit", "telefono", "correo")
+    assert new_owner == sorted(
+        [
+            *(("plataforma_owner", "empresa", c, "SELECT") for c in ficha),
+            *(("plataforma_owner", "empresa", c, "UPDATE") for c in ficha),
+            ("plataforma_owner", "tenant", "nombre", "UPDATE"),
+        ]
+    )
+    assert set(before["owner_columns"]) <= set(after["owner_columns"])
+    assert sorted(set(after["tenant_columns"]) - set(before["tenant_columns"])) == [
+        ("plataforma_owner", "nombre", "UPDATE")
+    ]
+    assert after["leftovers"] == (False, False, 0)
+    check_after = _audit_check(migrate_env)
+    assert check_after[1] is True
+    assert check_after[0] != check_before[0]
+    for accion in _ACCIONES_C1:
+        assert f"'{accion}'" in check_after[0], accion
+
+    command.downgrade(config, PLATAFORMA_LOGO)
+    assert _public_state(migrate_env) == (tables_before, [PLATAFORMA_LOGO])
+    assert _empresas_state(migrate_env) == before
+    assert _audit_check(migrate_env) == check_before
+
+    command.upgrade(config, PLATAFORMA_EDICION)
+    assert _empresas_state(migrate_env) == after
+    assert _audit_check(migrate_env) == check_after
+
+
+def test_0030_downgrade_keeps_the_c1_audit_rows(migrate_env):
+    # El downgrade no borra datos: la auditoría de C1 se conserva (el CHECK de antes vuelve
+    # NOT VALID: rige para filas nuevas) y se puede volver a subir.
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA_EDICION)
+    tenant = uuid.uuid4()
+    _insert_bypassing_rls(
+        migrate_env,
+        "tenant",
+        "insert into tenant (id, nombre) values (:t, 'Clínica 0030')",
+        {"t": tenant},
+    )
+    _insert_bypassing_rls(
+        migrate_env,
+        "plataforma_auditoria",
+        "insert into plataforma_auditoria (accion, resultado, tenant_id) "
+        "values ('empresa_editada', 'ok', :t)",
+        {"t": tenant},
+    )
+    command.downgrade(config, PLATAFORMA_LOGO)
+    engine = create_engine(migrate_env, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            conn.exec_driver_sql("ALTER TABLE plataforma_auditoria NO FORCE ROW LEVEL SECURITY")
+            filas_c1 = conn.scalar(
+                text("select count(*) from plataforma_auditoria where tenant_id = :t"),
+                {"t": tenant},
+            )
+            conn.rollback()
+    finally:
+        engine.dispose()
+    assert filas_c1 == 1
+    definicion, validada = _audit_check(migrate_env)
+    assert validada is False
+    assert "'empresa_editada'" not in definicion
+    command.upgrade(config, PLATAFORMA_EDICION)
+    assert _audit_check(migrate_env)[1] is True
+
+
+def test_0030_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration(MIGRATION_0030, "migration_0030_leak")
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+    message = str(excinfo.value)
+    assert "0030" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+@pytest.mark.parametrize("step", ["upgrade", "downgrade"])
+def test_0030_without_plataforma_owner_fails_with_a_clear_message(
+    migration_database_url, app_database_url, monkeypatch, step
+):
+    migration = _load_migration(MIGRATION_0030, "migration_0030_owner")
+    monkeypatch.setenv(APP_ROLE_VAR, app_database_url.username)
+    missing = f"dueno_falta_{uuid.uuid4().hex[:6]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "PLATAFORMA_OWNER", missing)
+                with pytest.raises(RuntimeError) as excinfo:
+                    getattr(migration, step)()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "01-app-role.sh" in str(excinfo.value)
+    assert "0030" not in str(excinfo.value)  # no llegó a ejecutar ninguna sentencia
+
+
+def test_0030_bodies_clear_every_platform_guc_and_restore_0029_and_0018_exactly():
+    migration = _load_migration(MIGRATION_0030, "migration_0030_bodies")
+    migration_0029 = _load_migration(MIGRATION_0029, "migration_0029_for_0030")
+    migration_0018 = _load_migration_0018()
+    # Las dieciséis GUC de 0017–0029 más la de aquí, en el mismo orden.
+    assert migration.OWNER_GUCS_0029 == migration_0029.OWNER_GUCS
+    assert migration.OWNER_GUCS == (*migration_0029.OWNER_GUCS, "app.plat_empresa_tenant")
+    assert migration._HEADER == migration_0018._HEADER
+    assert migration._DESARROLLADOR_ACTIVO == migration_0018._DESARROLLADOR_ACTIVO
+    # El downgrade recrea la función de 0029 con su mismo cuerpo, y la política de
+    # auditoría y la lista de acciones de 0018 con el mismo texto.
+    assert migration.RESTORE_REGISTRAR_0029 == migration_0029.CREATE_REGISTRAR
+    assert migration.ACCIONES_APP_0018 == migration_0018.ACCIONES_APP
+    assert migration._audit_policy('"app"', migration.ACCIONES_APP_0018) == (
+        migration_0018._audit_policy('"app"', migration_0018.ACCIONES_APP)
+    )
+    for statement in migration.CREATE_STATEMENTS:
+        cuerpo = statement.split("$fn$")[1]
+        assert cuerpo.count(migration._CLEAR) >= 2
+        check = cuerpo.index(migration._DESARROLLADOR_ACTIVO)
+        for palabra in ("public.empresa", "public.tenant", "UPDATE", "RETURN QUERY", "RETURN v_"):
+            if palabra in cuerpo:
+                assert check < cuerpo.index(palabra), palabra
+        # Nunca borra, nunca lee ni escribe actualizada_por, ni toca activo/desactivado_*.
+        for prohibido in ("DELETE", "actualizada_por", "activo =", "desactivado_"):
+            assert prohibido not in cuerpo, prohibido
+
+
+# --- Spec 017, C1 (T13): 0031_plataforma_editar_usuario -----------------------------------
+
+MIGRATION_0031 = BACKEND_DIR / "migrations" / "versions" / "0031_plataforma_editar_usuario.py"
+
+
+def test_0031_up_down_up_touches_only_its_objects(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA_EDICION)
+    tables_before = _public_state(migrate_env)[0]
+    before = _empresas_state(migrate_env)
+    check_before = _audit_check(migrate_env)
+
+    command.upgrade(config, PLATAFORMA_EDITAR_USUARIO)
+    after = _empresas_state(migrate_env)
+    assert _public_state(migrate_env) == (tables_before, [PLATAFORMA_EDITAR_USUARIO])
+    assert sorted(after["bodies"]) == EDITAR_USUARIO_HEAD_FUNCTION_NAMES
+    for name in before["bodies"]:
+        assert after["bodies"][name] == before["bodies"][name], name
+        assert after["acls"][name] == before["acls"][name], name
+    assert set(before["policies"]) <= set(after["policies"])
+    added = sorted(set(after["policies"]) - set(before["policies"]))
+    assert sorted((p[0], p[1]) for p in added) == [
+        ("usuario", "dueno_plat_usuario_edicion"),
+        ("usuario", "dueno_plat_usuario_edicion_leer"),
+    ]
+    assert all(p[2] == "{plataforma_owner}" for p in added)
+    # Ni la ACL ni las columnas de tenant cambian; la auditoría ya admitía usuario_editado.
+    assert after["tenant_acl"] == before["tenant_acl"]
+    assert after["tenant_columns"] == before["tenant_columns"]
+    assert _audit_check(migrate_env) == check_before
+    new_owner = sorted(set(after["owner_columns"]) - set(before["owner_columns"]))
+    assert new_owner == [
+        ("plataforma_owner", "membresia", "rol", "UPDATE"),
+        ("plataforma_owner", "usuario", "nombre", "UPDATE"),
+    ]
+    assert set(before["owner_columns"]) <= set(after["owner_columns"])
+    assert after["leftovers"] == (False, False, 0)
+
+    command.downgrade(config, PLATAFORMA_EDICION)
+    assert _public_state(migrate_env) == (tables_before, [PLATAFORMA_EDICION])
+    assert _empresas_state(migrate_env) == before
+
+    command.upgrade(config, PLATAFORMA_EDITAR_USUARIO)
+    assert _empresas_state(migrate_env) == after
+
+
+def test_0031_downgrade_keeps_the_edited_names_and_roles(migrate_env):
+    # El downgrade no borra datos: el nombre y el rol editados se conservan.
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA_EDITAR_USUARIO)
+    tenant, usuario = uuid.uuid4(), uuid.uuid4()
+    engine = create_engine(migrate_env, poolclass=NullPool)
+    tables = ("tenant", "usuario", "membresia")
+    try:
+        with engine.begin() as conn:
+            for table in tables:
+                conn.exec_driver_sql(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
+            conn.execute(
+                text("insert into tenant (id, nombre) values (:t, 'Clínica 0031')"), {"t": tenant}
+            )
+            conn.execute(
+                text(
+                    "insert into usuario (id, email, nombre, password_hash) "
+                    "values (:u, 'persona.0031@ejemplo.test', 'Editada 0031', 'h')"
+                ),
+                {"u": usuario},
+            )
+            conn.execute(
+                text("insert into membresia (tenant_id, usuario_id, rol) values (:t, :u, 'admin')"),
+                {"t": tenant, "u": usuario},
+            )
+            for table in tables:
+                conn.exec_driver_sql(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+        command.downgrade(config, PLATAFORMA_EDICION)
+        with engine.connect() as conn:
+            for table in ("usuario", "membresia"):
+                conn.exec_driver_sql(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
+            fila = conn.execute(
+                text(
+                    "select u.nombre, m.rol from usuario u join membresia m on m.usuario_id = u.id "
+                    "where u.id = :u"
+                ),
+                {"u": usuario},
+            ).one()
+            conn.rollback()
+    finally:
+        engine.dispose()
+    assert tuple(fila) == ("Editada 0031", "admin")
+
+
+def test_0031_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration(MIGRATION_0031, "migration_0031_leak")
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+    message = str(excinfo.value)
+    assert "0031" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+@pytest.mark.parametrize("step", ["upgrade", "downgrade"])
+def test_0031_without_plataforma_owner_fails_with_a_clear_message(
+    migration_database_url, app_database_url, monkeypatch, step
+):
+    migration = _load_migration(MIGRATION_0031, "migration_0031_owner")
+    monkeypatch.setenv(APP_ROLE_VAR, app_database_url.username)
+    missing = f"dueno_falta_{uuid.uuid4().hex[:6]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "PLATAFORMA_OWNER", missing)
+                with pytest.raises(RuntimeError) as excinfo:
+                    getattr(migration, step)()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "01-app-role.sh" in str(excinfo.value)
+    assert "0031" not in str(excinfo.value)  # no llegó a ejecutar ninguna sentencia
+
+
+def test_0031_body_clears_every_platform_guc_and_reuses_the_0027_lock_and_checks():
+    migration = _load_migration(MIGRATION_0031, "migration_0031_bodies")
+    migration_0030 = _load_migration(MIGRATION_0030, "migration_0030_for_0031")
+    migration_0027 = _load_migration(MIGRATION_0027, "migration_0027_for_0031")
+    migration_0018 = _load_migration_0018()
+    # Las diecisiete GUC de 0017–0030 más la de aquí, en el mismo orden.
+    assert migration.OWNER_GUCS_0030 == migration_0030.OWNER_GUCS
+    assert migration.OWNER_GUCS == (*migration_0030.OWNER_GUCS, "app.plat_usuario_edicion")
+    assert migration._HEADER == migration_0018._HEADER
+    assert migration._DESARROLLADOR_ACTIVO == migration_0018._DESARROLLADOR_ACTIVO
+    assert migration.LOCK_TIMEOUT == migration_0027.LOCK_TIMEOUT
+    assert migration.REVOKE_MAX_PASSES == migration_0027.REVOKE_MAX_PASSES
+    (statement,) = migration.CREATE_STATEMENTS
+    cuerpo = statement.split("$fn$")[1]
+    estado = migration_0027.CREATE_CAMBIAR_ESTADO.split("$fn$")[1]
+    assert cuerpo.count(migration._CLEAR) >= 2
+    check = cuerpo.index(migration._DESARROLLADOR_ACTIVO)
+    for palabra in ("public.tenant", "public.membresia", "public.usuario", "UPDATE"):
+        assert check < cuerpo.index(palabra), palabra
+    # El mismo candado, los mismos rechazos y la misma revocación que desactivar (0027).
+    for fragmento in (
+        "pg_catalog.hashtextextended('plataforma_membresia:' || p_tenant::text, 0)",
+        "MESSAGE = 'empresa_no_encontrada'",
+        "MESSAGE = 'usuario_no_encontrado'",
+        "MESSAGE = 'empresa_inactiva'",
+        "MESSAGE = 'ultimo_admin'",
+        "MESSAGE = 'membresia_ocupada'",
+        "UPDATE public.refresh_token AS t SET revocado_en = pg_catalog.now()",
+    ):
+        assert fragmento in cuerpo and fragmento in estado, fragmento
+    orden = [
+        cuerpo.index(f"MESSAGE = '{c}'")
+        for c in (
+            "empresa_no_encontrada",
+            "usuario_no_encontrado",
+            "empresa_inactiva",
+            "ultimo_admin",
+        )
+    ]
+    assert orden == sorted(orden)
+    # Nunca borra ni toca correo, contraseña, marcas, estado ni el tenant.
+    for prohibido in (
+        "DELETE",
+        "INSERT",
+        "u.email",
+        "password_hash",
+        "debe_cambiar_password",
+        "sesiones_validas_desde",
+        "SET activa",
+        "UPDATE public.tenant",
+        "set_config('app.plat_tenant_estado'",
+        "set_config('app.plat_empresa_tenant'",
+    ):
+        assert prohibido not in cuerpo, prohibido
+
+
+# --- Spec 017, C1b (T16): 0032_plataforma_password_usuario ---------------------------------
+
+MIGRATION_0032 = BACKEND_DIR / "migrations" / "versions" / "0032_plataforma_password_usuario.py"
+MIGRATION_0031_FOR_0032 = MIGRATION_0031
+_ACCION_C1B = "usuario_contrasena_restablecida"
+
+
+def test_0032_up_down_up_touches_only_its_objects(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA_EDITAR_USUARIO)
+    tables_before = _public_state(migrate_env)[0]
+    before = _empresas_state(migrate_env)
+    check_before = _audit_check(migrate_env)
+
+    command.upgrade(config, PLATAFORMA_PASSWORD_USUARIO)
+    after = _empresas_state(migrate_env)
+    assert _public_state(migrate_env) == (tables_before, [PLATAFORMA_PASSWORD_USUARIO])
+    assert sorted(after["bodies"]) == HEAD_FUNCTION_NAMES
+    for name in before["bodies"]:
+        assert after["bodies"][name] == before["bodies"][name], name
+        assert after["acls"][name] == before["acls"][name], name
+    added = sorted(set(after["policies"]) - set(before["policies"]))
+    removed = sorted(set(before["policies"]) - set(after["policies"]))
+    # Solo cambia la de inserción de auditoría (una acción más); cinco del dueño nuevas.
+    assert [(p[0], p[1]) for p in removed] == [
+        ("plataforma_auditoria", "plataforma_auditoria_insertar")
+    ]
+    assert sorted((p[0], p[1]) for p in added) == [
+        ("membresia", "dueno_plat_membresia_password"),
+        ("plataforma_auditoria", "plataforma_auditoria_insertar"),
+        ("refresh_token", "dueno_plat_refresh_password_leer"),
+        ("refresh_token", "dueno_plat_refresh_password_revocar"),
+        ("usuario", "dueno_plat_usuario_password"),
+        ("usuario", "dueno_plat_usuario_password_leer"),
+    ]
+    insertar = next(p for p in added if p[1] == "plataforma_auditoria_insertar")
+    assert f"'{_ACCION_C1B}'" in insertar[4]
+    assert all(
+        p[2] == "{plataforma_owner}" for p in added if p[1] != "plataforma_auditoria_insertar"
+    )
+    assert after["tenant_acl"] == before["tenant_acl"]
+    assert after["tenant_columns"] == before["tenant_columns"]
+    new_owner = sorted(set(after["owner_columns"]) - set(before["owner_columns"]))
+    # Solo UPDATE de las tres columnas de la contraseña temporal; nunca SELECT del hash.
+    assert new_owner == sorted(
+        ("plataforma_owner", "usuario", column, "UPDATE")
+        for column in ("password_hash", "debe_cambiar_password", "sesiones_validas_desde")
+    )
+    assert set(before["owner_columns"]) <= set(after["owner_columns"])
+    assert ("plataforma_owner", "usuario", "password_hash", "SELECT") not in after["owner_columns"]
+    assert after["leftovers"] == (False, False, 0)
+    check_after = _audit_check(migrate_env)
+    assert check_after[1] is True
+    assert f"'{_ACCION_C1B}'" in check_after[0]
+    assert f"'{_ACCION_C1B}'" not in check_before[0]
+
+    command.downgrade(config, PLATAFORMA_EDITAR_USUARIO)
+    assert _public_state(migrate_env) == (tables_before, [PLATAFORMA_EDITAR_USUARIO])
+    assert _empresas_state(migrate_env) == before
+    assert _audit_check(migrate_env) == check_before
+
+    command.upgrade(config, PLATAFORMA_PASSWORD_USUARIO)
+    assert _empresas_state(migrate_env) == after
+    assert _audit_check(migrate_env) == check_after
+
+
+def test_0032_downgrade_keeps_the_passwords_the_flag_and_the_audit(migrate_env):
+    # El downgrade no borra datos: la contraseña definida, la marca, el corte y la auditoría
+    # de C1b se conservan (el CHECK de antes vuelve NOT VALID: rige para filas nuevas).
+    config = alembic_config()
+    command.upgrade(config, PLATAFORMA_PASSWORD_USUARIO)
+    tenant, usuario = uuid.uuid4(), uuid.uuid4()
+    engine = create_engine(migrate_env, poolclass=NullPool)
+    tables = ("tenant", "usuario", "membresia")
+    try:
+        with engine.begin() as conn:
+            for table in tables:
+                conn.exec_driver_sql(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
+            conn.execute(
+                text("insert into tenant (id, nombre) values (:t, 'Clínica 0032')"), {"t": tenant}
+            )
+            conn.execute(
+                text(
+                    "insert into usuario (id, email, nombre, password_hash, "
+                    "debe_cambiar_password, sesiones_validas_desde) "
+                    "values (:u, 'persona.0032@ejemplo.test', 'Persona 0032', 'h-0032', true, "
+                    "now())"
+                ),
+                {"u": usuario},
+            )
+            conn.execute(
+                text("insert into membresia (tenant_id, usuario_id, rol) values (:t, :u, 'admin')"),
+                {"t": tenant, "u": usuario},
+            )
+            for table in tables:
+                conn.exec_driver_sql(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+        _insert_bypassing_rls(
+            migrate_env,
+            "plataforma_auditoria",
+            "insert into plataforma_auditoria (accion, resultado, tenant_id, objeto_id) "
+            "values ('usuario_contrasena_restablecida', 'ok', :t, :u)",
+            {"t": tenant, "u": usuario},
+        )
+        command.downgrade(config, PLATAFORMA_EDITAR_USUARIO)
+        with engine.connect() as conn:
+            for table in ("usuario", "plataforma_auditoria"):
+                conn.exec_driver_sql(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
+            fila = conn.execute(
+                text(
+                    "select password_hash, debe_cambiar_password, "
+                    "sesiones_validas_desde is not null from usuario where id = :u"
+                ),
+                {"u": usuario},
+            ).one()
+            filas_c1b = conn.scalar(
+                text("select count(*) from plataforma_auditoria where tenant_id = :t"),
+                {"t": tenant},
+            )
+            conn.rollback()
+    finally:
+        engine.dispose()
+    assert tuple(fila) == ("h-0032", True, True)
+    assert filas_c1b == 1
+    definicion, validada = _audit_check(migrate_env)
+    assert validada is False
+    assert f"'{_ACCION_C1B}'" not in definicion
+    command.upgrade(config, PLATAFORMA_PASSWORD_USUARIO)
+    assert _audit_check(migrate_env)[1] is True
+
+
+def test_0032_failed_statement_does_not_leak_the_sql(migration_database_url):
+    migration = _load_migration(MIGRATION_0032, "migration_0032_leak")
+    secret = f"centinela_{uuid.uuid4().hex[:8]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            with pytest.raises(RuntimeError) as excinfo:
+                migration.execute_statements(conn, [f'GRANT SELECT ON no_existe TO "{secret}"'])
+    finally:
+        engine.dispose()
+    message = str(excinfo.value)
+    assert "0032" in message
+    assert "centinela" not in message
+    assert excinfo.value.__cause__ is None
+
+
+@pytest.mark.parametrize("step", ["upgrade", "downgrade"])
+def test_0032_without_plataforma_owner_fails_with_a_clear_message(
+    migration_database_url, app_database_url, monkeypatch, step
+):
+    migration = _load_migration(MIGRATION_0032, "migration_0032_owner")
+    monkeypatch.setenv(APP_ROLE_VAR, app_database_url.username)
+    missing = f"dueno_falta_{uuid.uuid4().hex[:6]}"
+    engine = create_engine(migration_database_url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            tx = conn.begin()
+            try:
+                monkeypatch.setattr(migration, "op", _FakeOp(conn))
+                monkeypatch.setattr(migration, "PLATAFORMA_OWNER", missing)
+                with pytest.raises(RuntimeError) as excinfo:
+                    getattr(migration, step)()
+            finally:
+                tx.rollback()
+    finally:
+        engine.dispose()
+    assert "01-app-role.sh" in str(excinfo.value)
+    assert "0032" not in str(excinfo.value)  # no llegó a ejecutar ninguna sentencia
+
+
+def test_0032_body_clears_every_platform_guc_and_reuses_the_0027_lock_and_checks():
+    migration = _load_migration(MIGRATION_0032, "migration_0032_bodies")
+    migration_0031 = _load_migration(MIGRATION_0031_FOR_0032, "migration_0031_for_0032")
+    migration_0030 = _load_migration(MIGRATION_0030, "migration_0030_for_0032")
+    migration_0027 = _load_migration(MIGRATION_0027, "migration_0027_for_0032")
+    migration_0026 = _load_migration(
+        BACKEND_DIR / "migrations" / "versions" / "0026_sesiones_validas_desde.py",
+        "migration_0026_for_0032",
+    )
+    migration_0018 = _load_migration_0018()
+    # Las dieciocho GUC de 0017–0031 más la de aquí (propia: ni la de 0031 ni otra), en orden.
+    assert migration.OWNER_GUCS_0031 == migration_0031.OWNER_GUCS
+    assert migration.OWNER_GUCS == (*migration_0031.OWNER_GUCS, "app.plat_usuario_password")
+    assert migration._HEADER == migration_0018._HEADER
+    assert migration._DESARROLLADOR_ACTIVO == migration_0018._DESARROLLADOR_ACTIVO
+    assert migration.LOCK_TIMEOUT == migration_0027.LOCK_TIMEOUT
+    assert migration.REVOKE_MAX_PASSES == migration_0027.REVOKE_MAX_PASSES
+    assert migration._HASH_FORMAT == migration_0026._HASH_FORMAT
+    # El downgrade vuelve a la política y a la lista de acciones de 0030 con el mismo texto.
+    assert migration.ACCIONES_APP_0030 == migration_0030.ACCIONES_APP
+    assert migration.ACCIONES_0030 == migration_0030.ACCIONES
+    assert migration._audit_policy('"app"', migration.ACCIONES_APP_0030) == (
+        migration_0030._audit_policy('"app"', migration_0030.ACCIONES_APP)
+    )
+    (statement,) = migration.CREATE_STATEMENTS
+    cuerpo = statement.split("$fn$")[1]
+    estado = migration_0027.CREATE_CAMBIAR_ESTADO.split("$fn$")[1]
+    assert "RETURNS void" in statement
+    assert cuerpo.count(migration._CLEAR) >= 2
+    check = cuerpo.index(migration._DESARROLLADOR_ACTIVO)
+    palabras = ("public.tenant", "public.membresia", "public.usuario", "UPDATE", "hash_invalido")
+    for palabra in palabras:
+        assert check < cuerpo.index(palabra), palabra
+    # El formato del hash se valida antes de tocar ninguna tabla de negocio.
+    assert cuerpo.index("hash_invalido") < cuerpo.index("public.tenant")
+    # El mismo candado (de cada empresa del usuario), los mismos rechazos y la misma
+    # revocación acotada que desactivar (0027).
+    assert "pg_catalog.hashtextextended('plataforma_membresia:' || v_empresa::text, 0)" in cuerpo
+    assert "ORDER BY m.tenant_id" in cuerpo
+    for fragmento in (
+        "MESSAGE = 'empresa_no_encontrada'",
+        "MESSAGE = 'usuario_no_encontrado'",
+        "MESSAGE = 'empresa_inactiva'",
+        "MESSAGE = 'membresia_ocupada'",
+        "UPDATE public.refresh_token AS t SET revocado_en = pg_catalog.now()",
+        "EXCEPTION WHEN lock_not_available THEN",
+    ):
+        assert fragmento in cuerpo and fragmento in estado, fragmento
+    orden = [
+        cuerpo.index(f"MESSAGE = '{c}'")
+        for c in ("empresa_no_encontrada", "usuario_no_encontrado", "empresa_inactiva")
+    ]
+    assert orden == sorted(orden)
+    # Nunca borra, inserta ni toca el correo, el nombre, el estado, el rol ni el tenant;
+    # nunca la GUC de edición de 0031, la de membresía-usuario de 0027 ni la de estado.
+    for prohibido in (
+        "DELETE",
+        "INSERT",
+        "u.email",
+        "email =",
+        "nombre",
+        "SET activa",
+        "u.activo",
+        "SET rol",
+        "UPDATE public.tenant",
+        "UPDATE public.membresia",
+        "set_config('app.plat_usuario_edicion'",
+        "set_config('app.plat_membresia_usuario'",
+        "set_config('app.plat_tenant_estado'",
+        "set_config('app.plat_empresa_tenant'",
+        "u.password_hash",
+    ):
+        assert prohibido not in cuerpo, prohibido

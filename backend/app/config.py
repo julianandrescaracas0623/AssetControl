@@ -21,6 +21,7 @@ from app.fotos.almacen import (
     AlmacenConfig,
     AlmacenNoValido,
 )
+from app.plataforma.config import PlataformaConfig, load_plataforma
 
 if TYPE_CHECKING:
     from flask import Flask
@@ -98,8 +99,10 @@ class RateLimits:
     """Umbrales de los límites de tasa (R13, Q10): ventana fija y máximos por ventana.
 
     Los valores por defecto son los de referencia de Q10 (ventana de 15 min; login 5
-    fallidos por cuenta y 20 por IP; validar y aceptar 10 por IP; refresh 30 por IP) y
-    de la spec 014 (R12: recuperar 10 por IP y 3 por cuenta; restablecer 10 por IP); se
+    fallidos por cuenta y 20 por IP; validar y aceptar 10 por IP; refresh 30 por IP), de
+    la spec 014 (R12: recuperar 10 por IP y 3 por cuenta; restablecer 10 por IP) y de la
+    spec 017 (R3: login de plataforma 5 fallidos por cuenta y 10 por IP; O1 de T3b:
+    60 acciones de Empresas por desarrollador y 30 refresh de plataforma por IP); se
     ajustan con ``RATE_LIMIT_*``.
     """
 
@@ -112,6 +115,10 @@ class RateLimits:
     recover_ip: int = 10
     recover_account: int = 3
     reset_ip: int = 10
+    plat_login_account: int = 5
+    plat_login_ip: int = 10
+    plat_accion: int = 60
+    plat_refresh_ip: int = 30
 
 
 # Variable de entorno -> (campo de RateLimits, mínimo, máximo). La ventana máxima es un día:
@@ -126,6 +133,10 @@ RATE_LIMIT_VARS: dict[str, tuple[str, int, int]] = {
     "RATE_LIMIT_RECOVER_IP": ("recover_ip", 1, 10000),
     "RATE_LIMIT_RECOVER_ACCOUNT": ("recover_account", 1, 10000),
     "RATE_LIMIT_RESET_IP": ("reset_ip", 1, 10000),
+    "RATE_LIMIT_PLAT_LOGIN_ACCOUNT": ("plat_login_account", 1, 10000),
+    "RATE_LIMIT_PLAT_LOGIN_IP": ("plat_login_ip", 1, 10000),
+    "RATE_LIMIT_PLAT_ACCION": ("plat_accion", 1, 10000),
+    "RATE_LIMIT_PLAT_REFRESH_IP": ("plat_refresh_ip", 1, 10000),
 }
 TRUSTED_PROXY_HOPS_VAR = "TRUSTED_PROXY_HOPS"
 TRUSTED_PROXY_HOPS_RANGE = (0, 5)
@@ -172,6 +183,8 @@ class Config:
     almacen: AlmacenConfig | None = None
     # Spec 014 (R7, R18): correo de recuperación; ``None`` = recuperación desactivada.
     correo: CorreoConfig | None = None
+    # Spec 017 (R1): consola de plataforma; apagada por defecto.
+    plataforma: PlataformaConfig = field(default_factory=PlataformaConfig)
 
     def __post_init__(self) -> None:
         if self.environment not in ALLOWED_ENVIRONMENTS:
@@ -348,4 +361,5 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
         ),
         almacen=load_almacen(source, source["ENVIRONMENT"].strip()),
         correo=load_correo(source, source["ENVIRONMENT"].strip()),
+        plataforma=load_plataforma(source),
     )

@@ -18,6 +18,7 @@ los mensajes de error.
 
 import hashlib
 import hmac
+import math
 import secrets
 import threading
 import unicodedata
@@ -284,9 +285,12 @@ JWT_KEY_CONTEXT = "jwt-acceso"
 JWT_ALGORITHM = "HS256"
 JWT_ISSUER = "assetcontrol"
 ACCESS_TOKEN_TTL = timedelta(minutes=15)
+# Spec 017, T4 (O-2): holgura para un iat futuro (el corte de la base puede ir por delante
+# del reloj de Flask); más allá, el token es inválido. Exige NTP entre Flask y PostgreSQL.
+ACCESS_TOKEN_MAX_FUTURE_IAT = timedelta(seconds=60)
 # Q7: refresh de 7 días (la rotación es de T7).
 REFRESH_TOKEN_TTL = timedelta(days=7)
-_REQUIRED_CLAIMS = ("exp", "iss", "sub", "tenant")
+_REQUIRED_CLAIMS = ("exp", "iat", "iss", "sub", "tenant")
 
 
 def derive_key(secret_key: str, context: str) -> bytes:
@@ -306,6 +310,9 @@ class InvalidAccessTokenError(Exception):
 class AccessClaims:
     sub: uuid.UUID
     tenant: uuid.UUID
+    # Spec 017, T4 (M1, 0026): segundos enteros; ``load_current_user`` rechaza el token si
+    # es anterior al corte ``usuario.sesiones_validas_desde``.
+    iat: int
 
 
 def encode_access_token(
@@ -330,7 +337,7 @@ def encode_access_token(
 
 
 def decode_access_token(secret_key: str, token: str) -> AccessClaims:
-    """Valida firma (solo ``HS256``), ``exp``, ``iss``, ``sub`` y ``tenant``."""
+    """Valida firma (solo ``HS256``), ``exp``, ``iat``, ``iss``, ``sub`` y ``tenant``."""
     failed = False
     claims: dict[str, object] = {}
     try:
@@ -339,12 +346,24 @@ def decode_access_token(secret_key: str, token: str) -> AccessClaims:
             derive_key(secret_key, JWT_KEY_CONTEXT),
             algorithms=[JWT_ALGORITHM],
             issuer=JWT_ISSUER,
-            options={"require": list(_REQUIRED_CLAIMS)},
+            # M1 (0026): PyJWT no valida el iat; se valida a mano abajo. La sesión nueva sale
+            # con iat = corte de la base, que puede ir unos instantes por delante del reloj
+            # de Flask: se tolera hasta ACCESS_TOKEN_MAX_FUTURE_IAT (O-2).
+            options={"require": list(_REQUIRED_CLAIMS), "verify_iat": False},
         )
+        issued_at = claims["iat"]
+        if isinstance(issued_at, bool) or not isinstance(issued_at, int | float):
+            raise TypeError
+        iat = math.floor(issued_at)  # OverflowError (infinito) o ValueError (NaN)
+        latest = math.floor((datetime.now(UTC) + ACCESS_TOKEN_MAX_FUTURE_IAT).timestamp())
+        if iat > latest:
+            raise ValueError
         result = AccessClaims(
-            sub=uuid.UUID(str(claims["sub"])), tenant=uuid.UUID(str(claims["tenant"]))
+            sub=uuid.UUID(str(claims["sub"])),
+            tenant=uuid.UUID(str(claims["tenant"])),
+            iat=iat,
         )
-    except (jwt.PyJWTError, ValueError, TypeError, KeyError):
+    except (jwt.PyJWTError, ValueError, TypeError, KeyError, OverflowError):
         failed = True
     if failed:
         # Fuera del except: sin causa ni contexto que arrastren el token.

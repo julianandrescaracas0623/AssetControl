@@ -30,6 +30,9 @@ R13, Q10 y A13; contadores en la tabla de infraestructura ``limite_tasa``
 - **Solo los fallos de login y refresh.** Si la petición termina bien se devuelve
   su intento (``give_back``); validar y aceptar cuentan todas (Q10). El logout no
   se limita.
+- **Consola de plataforma (spec 017).** Login por IP y cuenta (``plat_login_*``), refresh
+  por IP (``plat_refresh_ip``) y acciones de Empresas por desarrollador (``plat_accion``,
+  HMAC del id con contexto propio; cuentan todas, sin ``give_back``).
 - **Recuperar y restablecer (spec 014).** Cuentan todas las peticiones, sin
   ``give_back``: ``recuperar_ip`` y ``recuperar_cuenta`` (``account_key`` del correo,
   exista o no; lo no normalizable en el cubo fijo) y ``restablecer_ip``. Los dos de
@@ -80,6 +83,14 @@ ACCEPT_IP = "aceptar_ip"
 RECOVER_IP = "recuperar_ip"
 RECOVER_ACCOUNT = "recuperar_cuenta"
 RESET_IP = "restablecer_ip"
+# Spec 017 (R3): login de la consola de plataforma, contadores propios.
+PLAT_LOGIN_IP = "plat_login_ip"
+PLAT_LOGIN_ACCOUNT = "plat_login_cuenta"
+# Spec 017, T4 (O1 de T3b; migración 0025): acciones de la consola por desarrollador y
+# refresh de plataforma por IP, separados del refresh del tenant.
+PLAT_ACTION = "plat_accion"
+PLAT_REFRESH_IP = "plat_refresh_ip"
+DEVELOPER_KEY_CONTEXT = "limite-tasa-desarrollador"
 
 
 def client_address(raw: str | None) -> str:
@@ -114,6 +125,12 @@ def account_key(secret_key: str, email: str) -> bytes:
     )
     key = derive_key(secret_key, ACCOUNT_KEY_CONTEXT)
     return hmac.new(key, message, hashlib.sha256).digest()
+
+
+def developer_key(secret_key: str, desarrollador_id: object) -> bytes:
+    """HMAC del id del desarrollador (``plat_accion``); 32 bytes, contexto propio."""
+    key = derive_key(secret_key, DEVELOPER_KEY_CONTEXT)
+    return hmac.new(key, str(desarrollador_id).encode(), hashlib.sha256).digest()
 
 
 @dataclass(frozen=True)
@@ -205,6 +222,34 @@ def limit_login(email: str) -> list[Counter]:
         ],
         limits,
     )
+
+
+def limit_platform_login(email: str) -> list[Counter]:
+    """Login de plataforma (spec 017, R3): por IP y por cuenta (exista o no), con sus
+    propios ámbitos. ``429``/``503`` antes de Argon2 y de ``plataforma_buscar_login``."""
+    secret, limits = _settings()
+    return _enforce(
+        [
+            (PLAT_LOGIN_IP, ip_key(secret, _ip()), limits.plat_login_ip),
+            (PLAT_LOGIN_ACCOUNT, account_key(secret, email), limits.plat_login_account),
+        ],
+        limits,
+    )
+
+
+def limit_platform_action(desarrollador_id: object) -> list[Counter]:
+    """Acción de la consola (``POST``/``PATCH`` de Empresas; O1): por desarrollador, cuenta
+    toda petición autenticada (sin ``give_back``). ``429``/``503`` antes de Argon2."""
+    secret, limits = _settings()
+    return _enforce(
+        [(PLAT_ACTION, developer_key(secret, desarrollador_id), limits.plat_accion)], limits
+    )
+
+
+def limit_platform_refresh() -> list[Counter]:
+    """Refresh de plataforma por IP, con su propio ámbito (O1)."""
+    secret, limits = _settings()
+    return _enforce([(PLAT_REFRESH_IP, ip_key(secret, _ip()), limits.plat_refresh_ip)], limits)
 
 
 def limit_refresh() -> list[Counter]:

@@ -538,8 +538,9 @@ def test_limite_tasa_scope_check_is_a_single_named_constraint(db):
                 "and pg_get_constraintdef(oid) like '%ambito%'"
             )
         ).all()
-    # Spec 017, T1 (0017): la base está en head, con los ámbitos del login de plataforma.
-    platform_scopes = ("plat_login_ip", "plat_login_cuenta")
+    # Spec 017, T1 (0017): la base está en head, con los ámbitos del login de plataforma;
+    # T4 (0025): y los de acciones y refresh de plataforma.
+    platform_scopes = ("plat_login_ip", "plat_login_cuenta", "plat_accion", "plat_refresh_ip")
     scopes = ", ".join(f"'{s}'::text" for s in OLD_SCOPES + NEW_SCOPES + platform_scopes)
     assert [tuple(c) for c in checks] == [
         ("limite_tasa_ambito_check", f"CHECK ((ambito = ANY (ARRAY[{scopes}])))")

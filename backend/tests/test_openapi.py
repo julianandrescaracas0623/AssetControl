@@ -36,6 +36,7 @@ from acceso_db import (
     temporary_acceso_db,
 )
 from flask import Flask
+from plataforma_db import DEV_PASSWORD, nuevo_dev, plat_bearer, sembrar_dev
 from sqlalchemy import text
 
 import app.meta.routes as meta_routes
@@ -44,13 +45,15 @@ from app.activos import cambios as activos_cambios
 from app.activos import service as activos_service
 from app.auth import limits, recuperacion
 from app.auth import routes as auth_routes
+from app.auth import service as auth_service
 from app.auth.credentials import (
+    ARGON2_TEST_PARAMS,
     COMMON_PASSWORDS,
     PasswordPolicyError,
     check_password_policy,
     new_token,
 )
-from app.auth.decorators import NOT_AUTHENTICATED
+from app.auth.decorators import NOT_AUTHENTICATED, PASSWORD_CHANGE_REQUIRED
 from app.auth.http import AUTH_MAX_BODY_BYTES, CSRF_HEADER, CSRF_HEADER_VALUE
 from app.catalogo import service as catalogo_service
 from app.config import RateLimits
@@ -64,6 +67,10 @@ from app.fotos import service as fotos_service
 from app.fotos.almacen import EXTENSION_KEY as ALMACEN_KEY
 from app.fotos.almacen import CarpetaLocal
 from app.invitaciones import routes as invitaciones_routes
+from app.plataforma.config import PlataformaConfig
+from app.plataforma.modulos.actividad import service as plataforma_actividad_service
+from app.plataforma.modulos.empresas import service as plataforma_empresas_service
+from app.plataforma.modulos.usuarios import service as plataforma_usuarios_service
 
 CONTRACT_FILE = Path(__file__).resolve().parent.parent / "openapi.yaml"
 CSRF = {CSRF_HEADER: CSRF_HEADER_VALUE}
@@ -274,6 +281,8 @@ def contrato_app(contrato_db, tmp_path_factory) -> Iterator[Flask]:
     flask_app = make_app(
         contrato_db,
         RateLimits(login_account=1000, login_ip=1000, validate_ip=1000, accept_ip=1000),
+        # Spec 017: la consola de plataforma habilitada para que sus rutas estén en el mapa.
+        plataforma=PlataformaConfig(habilitada=True),
     )
     # Spec 012: fotos en una carpeta temporal.
     flask_app.extensions[ALMACEN_KEY] = CarpetaLocal(tmp_path_factory.mktemp("almacen"))
@@ -433,6 +442,74 @@ def test_refresh_and_logout_responses(client):
         "/auth/logout",
         client.post("/auth/logout", headers=CSRF, data="x" * (AUTH_MAX_BODY_BYTES + 1)),
     )
+
+
+def test_cambiar_contrasena_responses(client, contrato_db, monkeypatch):
+    """Spec 017 (T4): cambio de contraseña propio."""
+    import argon2
+
+    from app.errors import ServiceUnavailableError
+
+    ruta = "/auth/cambiar-contrasena"
+    usuario, email = uuid.uuid4(), nuevo_email()
+    with contrato_db.migrator.begin() as conn:
+        conn.execute(
+            text(
+                "insert into usuario (id, email, nombre, password_hash, debe_cambiar_password) "
+                "values (:id, :e, 'Cambio contrato', :h, true)"
+            ),
+            {
+                "id": usuario,
+                "e": email,
+                "h": argon2.PasswordHasher.from_parameters(ARGON2_TEST_PARAMS).hash(PASSWORD),
+            },
+        )
+        conn.execute(
+            text("insert into membresia (tenant_id, usuario_id, rol) values (:t, :u, 'admin')"),
+            {"t": TENANT_A, "u": usuario},
+        )
+    entrada = check("post", "/auth/login", login(client, email=email))
+    assert entrada["debe_cambiar_password"] is True
+    auth = {"Authorization": f"Bearer {entrada['access_token']}"}
+    me = check("get", "/auth/me", client.get("/auth/me", headers=auth))
+    assert me["debe_cambiar_password"] is True
+
+    def cuerpo(actual=PASSWORD, nueva=NEW_PASSWORD, confirmacion=None):
+        return {"actual": actual, "nueva": nueva, "confirmacion": confirmacion or nueva}
+
+    check("post", ruta, client.post(ruta, json={"actual": 1}, headers=auth))  # 400
+    check("post", ruta, client.post(ruta, json=cuerpo()))  # 401 no_autenticado
+    erronea = check(
+        "post", ruta, client.post(ruta, json=cuerpo(actual="Otra-Clave-mala-17"), headers=auth)
+    )
+    assert erronea["error"]["code"] == "credenciales_invalidas"
+    for body in (
+        cuerpo(nueva=PASSWORD),
+        cuerpo(confirmacion="Otra-Confirmacion-17"),
+        cuerpo(nueva="corta"),
+    ):
+        check("post", ruta, client.post(ruta, json=body, headers=auth))  # 422
+    big = "x" * (AUTH_MAX_BODY_BYTES + 1)
+    check("post", ruta, client.post(ruta, data=big, content_type="application/json", headers=auth))
+
+    class Saturado:
+        def verify(self, stored, password):
+            raise ServiceUnavailableError()
+
+    monkeypatch.setattr(auth_service, "get_passwords", lambda: Saturado())
+    check("post", ruta, client.post(ruta, json=cuerpo(), headers=auth))  # 503
+    monkeypatch.undo()
+
+    def exceeded(items, window_seconds):
+        now = datetime.now(UTC)
+        return [limits.Counter(ambito, key, now, limit + 1, limit) for ambito, key, limit in items]
+
+    monkeypatch.setattr(limits, "increment_attempts", exceeded)
+    check("post", ruta, client.post(ruta, json=cuerpo(), headers=auth))  # 429
+    monkeypatch.undo()
+
+    cambio = check("post", ruta, client.post(ruta, json=cuerpo(), headers=auth))  # 200
+    assert cambio["debe_cambiar_password"] is False
 
 
 def test_crear_invitacion_responses(client):
@@ -1209,7 +1286,7 @@ def test_empresa_responses(client, contrato_app, monkeypatch):
     admin = bearer(ADMIN_A, TENANT_A)
     contador = bearer(CONTADOR_A, TENANT_A, rol="contador")
     mp = "multipart/form-data"
-    datos = {"nombre": "Empresa contrato", "direccion": "Calle 1 # 2-3", "nit": "890903938-8"}
+    datos = {"nombre": "Empresa contrato", "direccion": "Calle 1 # 2-3", "nit": "900123456-8"}
 
     def png() -> bytes:
         buffer = BytesIO()
@@ -1275,12 +1352,541 @@ def test_empresa_responses(client, contrato_app, monkeypatch):
     check("put", ruta_logo, logo(logo_id, png()))  # 409 logo_id_en_uso
 
 
+def test_plataforma_responses(client, contrato_db):
+    """Spec 017 (T2): login, refresh, logout, me y módulos de la consola."""
+    dev = sembrar_dev(contrato_db, nuevo_dev("contrato"))
+    login_path = "/plataforma/auth/login"
+
+    def plat_login(password=DEV_PASSWORD):
+        return client.post(login_path, json={"email": dev.email, "password": password})
+
+    ok = plat_login()
+    body = check("post", login_path, ok)
+    token = body["access_token"]
+    check("post", login_path, plat_login("Otra-Clave-incorrecta-17"))
+    check("post", login_path, client.post(login_path, json={"email": 1}))
+    big = "x" * (AUTH_MAX_BODY_BYTES + 1)
+    check("post", login_path, client.post(login_path, data=big, content_type="text/plain"))
+
+    cookie = refresh_cookie(ok)
+    refresh_path = "/plataforma/auth/refresh"
+    check("post", refresh_path, client.post(refresh_path, headers={**CSRF, "Cookie": cookie}))
+    check("post", refresh_path, client.post(refresh_path, headers=CSRF))
+    check("post", refresh_path, client.post(refresh_path, headers={"Cookie": cookie}))
+    check(
+        "post",
+        refresh_path,
+        client.post(refresh_path, data=big, content_type="text/plain", headers=CSRF),
+    )
+
+    me = "/plataforma/auth/me"
+    check("get", me, client.get(me, headers=plat_bearer(token)))
+    check("get", me, client.get(me))
+    modulos = "/plataforma/modulos"
+    check("get", modulos, client.get(modulos, headers=plat_bearer(token)))
+    check("get", modulos, client.get(modulos, headers=bearer(ADMIN_A, TENANT_A)))
+
+    logout_path = "/plataforma/auth/logout"
+    check("post", logout_path, client.post(logout_path, headers=CSRF))
+    check("post", logout_path, client.post(logout_path))
+    check(
+        "post",
+        logout_path,
+        client.post(logout_path, data=big, content_type="text/plain", headers=CSRF),
+    )
+
+
+def test_plataforma_empresas_responses(client, contrato_db, monkeypatch):
+    """Spec 017 (T3b): lista, alta y estado de las empresas de la consola."""
+    from app.errors import ServiceUnavailableError
+
+    dev = sembrar_dev(contrato_db, nuevo_dev("contrato-empresas"))
+    ok = client.post("/plataforma/auth/login", json={"email": dev.email, "password": DEV_PASSWORD})
+    dev_auth = plat_bearer(ok.get_json()["access_token"])
+    ruta, estado = "/plataforma/empresas", "/plataforma/empresas/{id}"
+    big = "x" * (AUTH_MAX_BODY_BYTES + 1)
+
+    def cuerpo(**admin) -> dict:
+        return {
+            "id": str(uuid.uuid4()),
+            "nombre": "Empresa contrato 017",
+            "direccion": "Calle 1 # 2-3",
+            "nit": "900123456-8",
+            "admin": {
+                "nombre": "Admin contrato",
+                "email": nuevo_email(),
+                "password": NEW_PASSWORD,
+                "password_confirmacion": NEW_PASSWORD,
+                **admin,
+            },
+        }
+
+    check("get", ruta, client.get(ruta, headers=dev_auth))
+    check("get", ruta, client.get(ruta, query_string={"estado": "otra"}, headers=dev_auth))
+    check("get", ruta, client.get(ruta, headers=bearer(ADMIN_A, TENANT_A)))
+
+    body = cuerpo()
+    creada = check("post", ruta, client.post(ruta, json=body, headers=dev_auth))  # 201
+    check("post", ruta, client.post(ruta, json=body, headers=dev_auth))  # 409 empresa_existente
+    en_uso = check(
+        "post", ruta, client.post(ruta, json=cuerpo(email=ADMIN_A.email), headers=dev_auth)
+    )
+    assert en_uso["error"]["code"] == "email_en_uso"
+    check("post", ruta, client.post(ruta, json={"id": "x"}, headers=dev_auth))  # 400
+    invalido = check(
+        "post",
+        ruta,
+        client.post(ruta, json=cuerpo(password_confirmacion="otra"), headers=dev_auth),
+    )
+    assert invalido["error"]["campo"] == "admin.password_confirmacion"
+    check("post", ruta, client.post(ruta, json=body))  # 401
+    check(
+        "post",
+        ruta,
+        client.post(ruta, data=big, content_type="application/json", headers=dev_auth),
+    )
+
+    class Saturado:
+        def hash(self, password):
+            raise ServiceUnavailableError()
+
+    monkeypatch.setattr(plataforma_empresas_service, "get_passwords", lambda: Saturado())
+    check("post", ruta, client.post(ruta, json=cuerpo(), headers=dev_auth))  # 503
+    monkeypatch.undo()
+
+    empresa = f"/plataforma/empresas/{creada['empresa_id']}"
+    check("patch", estado, client.patch(empresa, json={"activa": False}, headers=dev_auth))
+    check("patch", estado, client.patch(empresa, json={"activa": True}, headers=dev_auth))
+    check("patch", estado, client.patch(empresa, json={"activa": "no"}, headers=dev_auth))
+    check("patch", estado, client.patch(empresa, json={"activa": False}))
+    desconocida = f"/plataforma/empresas/{uuid.uuid4()}"
+    check("patch", estado, client.patch(desconocida, json={"activa": False}, headers=dev_auth))
+    check(
+        "patch",
+        estado,
+        client.patch(empresa, data=big, content_type="application/json", headers=dev_auth),
+    )
+
+    # Spec 017, T4 (O1): plat_accion por desarrollador en POST y PATCH (429/503).
+    def exceeded(items, window_seconds):
+        now = datetime.now(UTC)
+        return [limits.Counter(ambito, key, now, limit + 1, limit) for ambito, key, limit in items]
+
+    def unavailable(items, window_seconds):
+        raise RuntimeError("base caída (sintético)")
+
+    for falla in (exceeded, unavailable):
+        monkeypatch.setattr(limits, "increment_attempts", falla)
+        check("post", ruta, client.post(ruta, json=cuerpo(), headers=dev_auth))
+        check("patch", estado, client.patch(empresa, json={"activa": True}, headers=dev_auth))
+        monkeypatch.undo()
+
+
+def test_plataforma_usuarios_responses(client, contrato_db, monkeypatch):
+    """Spec 017 (T5): lista y estado de las membresías de una empresa."""
+    dev = sembrar_dev(contrato_db, nuevo_dev("contrato-usuarios"))
+    ok = client.post("/plataforma/auth/login", json={"email": dev.email, "password": DEV_PASSWORD})
+    dev_auth = plat_bearer(ok.get_json()["access_token"])
+    big = "x" * (AUTH_MAX_BODY_BYTES + 1)
+    alta = {
+        "id": str(uuid.uuid4()),
+        "nombre": "Empresa contrato usuarios 017",
+        "direccion": "Calle 1 # 2-3",
+        "admin": {
+            "nombre": "Admin contrato",
+            "email": nuevo_email(),
+            "password": NEW_PASSWORD,
+            "password_confirmacion": NEW_PASSWORD,
+        },
+    }
+    creada = client.post("/plataforma/empresas", json=alta, headers=dev_auth).get_json()
+    empresa_id, admin_id = creada["empresa_id"], creada["admin_id"]
+    lista, estado = (
+        "/plataforma/empresas/{id}/usuarios",
+        "/plataforma/empresas/{id}/usuarios/{usuario_id}",
+    )
+    usuarios = f"/plataforma/empresas/{empresa_id}/usuarios"
+    admin = f"{usuarios}/{admin_id}"
+
+    body = check("get", lista, client.get(usuarios, headers=dev_auth))  # 200
+    assert [u["id"] for u in body["usuarios"]] == [admin_id]
+    check("get", lista, client.get(usuarios))  # 401
+    check(
+        "get", lista, client.get(f"/plataforma/empresas/{uuid.uuid4()}/usuarios", headers=dev_auth)
+    )
+
+    ultimo = check("patch", estado, client.patch(admin, json={"activa": False}, headers=dev_auth))
+    assert ultimo["error"]["code"] == "ultimo_admin"
+    check("patch", estado, client.patch(admin, json={"activa": True}, headers=dev_auth))  # 200
+    check("patch", estado, client.patch(admin, json={"activa": "no"}, headers=dev_auth))  # 400
+    check("patch", estado, client.patch(admin, json={"activa": True}))  # 401
+    ajeno = f"{usuarios}/{ADMIN_A.usuario_id}"
+    check("patch", estado, client.patch(ajeno, json={"activa": False}, headers=dev_auth))  # 404
+    check(
+        "patch",
+        estado,
+        client.patch(admin, data=big, content_type="application/json", headers=dev_auth),
+    )  # 413
+    empresa = f"/plataforma/empresas/{empresa_id}"
+    assert client.patch(empresa, json={"activa": False}, headers=dev_auth).status_code == 200
+    inactiva = check("patch", estado, client.patch(admin, json={"activa": True}, headers=dev_auth))
+    assert inactiva["error"]["code"] == "empresa_inactiva"
+    assert client.patch(empresa, json={"activa": True}, headers=dev_auth).status_code == 200
+
+    def exceeded(items, window_seconds):
+        now = datetime.now(UTC)
+        return [limits.Counter(ambito, key, now, limit + 1, limit) for ambito, key, limit in items]
+
+    def unavailable(items, window_seconds):
+        raise RuntimeError("base caída (sintético)")
+
+    for falla in (exceeded, unavailable):
+        monkeypatch.setattr(limits, "increment_attempts", falla)
+        check("patch", estado, client.patch(admin, json={"activa": True}, headers=dev_auth))
+        monkeypatch.undo()
+
+
+def test_plataforma_editar_usuario_responses(client, contrato_db, monkeypatch):
+    """Spec 017, C1 (T13): editar nombre y rol de un usuario desde la consola."""
+    dev = sembrar_dev(contrato_db, nuevo_dev("contrato-editar-usuario"))
+    ok = client.post("/plataforma/auth/login", json={"email": dev.email, "password": DEV_PASSWORD})
+    dev_auth = plat_bearer(ok.get_json()["access_token"])
+    big = "x" * (AUTH_MAX_BODY_BYTES + 1)
+    alta = {
+        "id": str(uuid.uuid4()),
+        "nombre": "Empresa contrato editar usuario 017",
+        "direccion": "Calle 1 # 2-3",
+        "admin": {
+            "nombre": "Admin contrato",
+            "email": nuevo_email(),
+            "password": NEW_PASSWORD,
+            "password_confirmacion": NEW_PASSWORD,
+        },
+    }
+    creada = client.post("/plataforma/empresas", json=alta, headers=dev_auth).get_json()
+    empresa_id, admin_id = creada["empresa_id"], creada["admin_id"]
+    ruta = "/plataforma/empresas/{id}/usuarios/{usuario_id}"
+    admin = f"/plataforma/empresas/{empresa_id}/usuarios/{admin_id}"
+    cuerpo = {"nombre": "Admin contrato editado", "rol": "admin"}
+
+    editado = check("put", ruta, client.put(admin, json=cuerpo, headers=dev_auth))  # 200
+    assert editado == {"id": admin_id, "nombre": cuerpo["nombre"], "rol": "admin"}
+    check("put", ruta, client.put(admin, json=cuerpo, headers=dev_auth))  # 200 sin cambios
+    ultimo = check(
+        "put", ruta, client.put(admin, json={**cuerpo, "rol": "contador"}, headers=dev_auth)
+    )
+    assert ultimo["error"]["code"] == "ultimo_admin"  # 409
+    check(
+        "put", ruta, client.put(admin, json={**cuerpo, "email": "x@ejemplo.test"}, headers=dev_auth)
+    )  # 400
+    invalido = check(
+        "put", ruta, client.put(admin, json={**cuerpo, "rol": "dueño"}, headers=dev_auth)
+    )
+    assert invalido["error"]["campo"] == "rol"  # 422
+    check("put", ruta, client.put(admin, json=cuerpo))  # 401
+    check("put", ruta, client.put(admin, json=cuerpo, headers=bearer(ADMIN_A, TENANT_A)))  # 401
+    ajeno = f"/plataforma/empresas/{empresa_id}/usuarios/{ADMIN_A.usuario_id}"
+    check("put", ruta, client.put(ajeno, json=cuerpo, headers=dev_auth))  # 404
+    check(
+        "put",
+        ruta,
+        client.put(admin, data=big, content_type="application/json", headers=dev_auth),
+    )  # 413
+    empresa = f"/plataforma/empresas/{empresa_id}"
+    assert client.patch(empresa, json={"activa": False}, headers=dev_auth).status_code == 200
+    inactiva = check("put", ruta, client.put(admin, json=cuerpo, headers=dev_auth))
+    assert inactiva["error"]["code"] == "empresa_inactiva"  # 409
+    assert client.patch(empresa, json={"activa": True}, headers=dev_auth).status_code == 200
+
+    def exceeded(items, window_seconds):
+        now = datetime.now(UTC)
+        return [limits.Counter(ambito, key, now, limit + 1, limit) for ambito, key, limit in items]
+
+    def unavailable(items, window_seconds):
+        raise RuntimeError("base caída (sintético)")
+
+    for falla in (exceeded, unavailable):
+        monkeypatch.setattr(limits, "increment_attempts", falla)
+        check("put", ruta, client.put(admin, json=cuerpo, headers=dev_auth))  # 429 / 503
+        monkeypatch.undo()
+
+
+def test_plataforma_contrasena_usuario_responses(client, contrato_db, monkeypatch):
+    """Spec 017, C1b (T16): contraseña temporal de un usuario desde la consola."""
+    dev = sembrar_dev(contrato_db, nuevo_dev("contrato-contrasena-usuario"))
+    ok = client.post("/plataforma/auth/login", json={"email": dev.email, "password": DEV_PASSWORD})
+    dev_auth = plat_bearer(ok.get_json()["access_token"])
+    big = "x" * (AUTH_MAX_BODY_BYTES + 1)
+    alta = {
+        "id": str(uuid.uuid4()),
+        "nombre": "Empresa contrato contraseña 017",
+        "direccion": "Calle 1 # 2-3",
+        "admin": {
+            "nombre": "Admin contrato",
+            "email": nuevo_email(),
+            "password": NEW_PASSWORD,
+            "password_confirmacion": NEW_PASSWORD,
+        },
+    }
+    creada = client.post("/plataforma/empresas", json=alta, headers=dev_auth).get_json()
+    empresa_id, admin_id = creada["empresa_id"], creada["admin_id"]
+    ruta = "/plataforma/empresas/{id}/usuarios/{usuario_id}/contrasena"
+    url = f"/plataforma/empresas/{empresa_id}/usuarios/{admin_id}/contrasena"
+    temporal = "Temporal-Contrato-2026"
+    cuerpo = {"password": temporal, "password_confirmacion": temporal}
+
+    check("post", ruta, client.post(url, json=cuerpo, headers=dev_auth))  # 204
+    check("post", ruta, client.post(url, json={**cuerpo, "rol": "admin"}, headers=dev_auth))  # 400
+    distintas = check(
+        "post",
+        ruta,
+        client.post(
+            url, json={**cuerpo, "password_confirmacion": "Otra-2026-xyz"}, headers=dev_auth
+        ),
+    )
+    assert distintas["error"]["campo"] == "password_confirmacion"  # 422
+    corta = check(
+        "post",
+        ruta,
+        client.post(
+            url, json={"password": "corta", "password_confirmacion": "corta"}, headers=dev_auth
+        ),
+    )
+    assert corta["error"]["code"] == "contrasena_corta"  # 422
+    check("post", ruta, client.post(url, json=cuerpo))  # 401
+    check("post", ruta, client.post(url, json=cuerpo, headers=bearer(ADMIN_A, TENANT_A)))  # 401
+    ajeno = f"/plataforma/empresas/{empresa_id}/usuarios/{ADMIN_A.usuario_id}/contrasena"
+    check("post", ruta, client.post(ajeno, json=cuerpo, headers=dev_auth))  # 404
+    check(
+        "post",
+        ruta,
+        client.post(url, data=big, content_type="application/json", headers=dev_auth),
+    )  # 413
+    empresa = f"/plataforma/empresas/{empresa_id}"
+    assert client.patch(empresa, json={"activa": False}, headers=dev_auth).status_code == 200
+    inactiva = check("post", ruta, client.post(url, json=cuerpo, headers=dev_auth))
+    assert inactiva["error"]["code"] == "empresa_inactiva"  # 409
+    assert client.patch(empresa, json={"activa": True}, headers=dev_auth).status_code == 200
+
+    def exceeded(items, window_seconds):
+        now = datetime.now(UTC)
+        return [limits.Counter(ambito, key, now, limit + 1, limit) for ambito, key, limit in items]
+
+    def unavailable(items, window_seconds):
+        raise RuntimeError("base caída (sintético)")
+
+    for falla in (exceeded, unavailable):
+        monkeypatch.setattr(limits, "increment_attempts", falla)
+        check("post", ruta, client.post(url, json=cuerpo, headers=dev_auth))  # 429 / 503
+        monkeypatch.undo()
+
+
+def test_plataforma_logo_responses(client, contrato_app, contrato_db, monkeypatch):
+    """Spec 017 (T7): logo inicial de una empresa desde la consola."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    dev = sembrar_dev(contrato_db, nuevo_dev("contrato-logo"))
+    ok = client.post("/plataforma/auth/login", json={"email": dev.email, "password": DEV_PASSWORD})
+    dev_auth = plat_bearer(ok.get_json()["access_token"])
+    alta = {
+        "id": str(uuid.uuid4()),
+        "nombre": "Empresa contrato logo 017",
+        "direccion": "Calle 1 # 2-3",
+        "admin": {
+            "nombre": "Admin contrato",
+            "email": nuevo_email(),
+            "password": NEW_PASSWORD,
+            "password_confirmacion": NEW_PASSWORD,
+        },
+    }
+    creada = client.post("/plataforma/empresas", json=alta, headers=dev_auth).get_json()
+    ruta = "/plataforma/empresas/{id}/logo"
+    url = f"/plataforma/empresas/{creada['empresa_id']}/logo"
+    mp = "multipart/form-data"
+
+    def png() -> bytes:
+        buffer = BytesIO()
+        Image.new("RGBA", (60, 20), (1, 2, 3, 255)).save(buffer, "PNG")
+        return buffer.getvalue()
+
+    def subir(logo_id=None, archivo=None, headers=dev_auth, destino=url):
+        form: dict = {}
+        if logo_id is not None:
+            form["logo_id"] = str(logo_id)
+        if archivo is not None:
+            form["archivo"] = (BytesIO(archivo), "logo.png")
+        return client.post(destino, data=form, headers=headers, content_type=mp)
+
+    # Sin almacén: 503 logos_no_disponibles (la empresa sigue sin logo).
+    monkeypatch.setitem(contrato_app.extensions, ALMACEN_KEY, None)
+    sin_almacen = check("post", ruta, subir(uuid.uuid4(), png()))
+    assert sin_almacen["error"]["code"] == "logos_no_disponibles"
+    monkeypatch.undo()
+
+    check("post", ruta, subir(None, png()))  # 400
+    check("post", ruta, subir(uuid.uuid4(), png(), headers={}))  # 401
+    check("post", ruta, subir(uuid.uuid4(), png(), headers=bearer(ADMIN_A, TENANT_A)))  # 401
+    check("post", ruta, subir(uuid.uuid4(), b"GIF89a"))  # 415
+    roto = BytesIO()
+    Image.effect_noise((300, 300), 60).save(roto, "PNG")
+    check("post", ruta, subir(uuid.uuid4(), roto.getvalue()[:2000]))  # 422
+    check("post", ruta, subir(uuid.uuid4(), b"0" * (3 * 1024 * 1024)))  # 413
+    otra = f"/plataforma/empresas/{uuid.uuid4()}/logo"
+    check("post", ruta, subir(uuid.uuid4(), png(), destino=otra))  # 404
+    # Un tenant sin ficha empresa (como los que crea la CLI).
+    sin_ficha = uuid.uuid4()
+    with contrato_db.migrator.begin() as conn:
+        conn.execute(
+            text("insert into tenant (id, nombre) values (:t, 'Sin ficha 017')"), {"t": sin_ficha}
+        )
+    sin_datos = check(
+        "post", ruta, subir(uuid.uuid4(), png(), destino=f"/plataforma/empresas/{sin_ficha}/logo")
+    )
+    assert sin_datos["error"]["code"] == "empresa_sin_datos"
+
+    logo_id = uuid.uuid4()
+    check("post", ruta, subir(logo_id, png()))  # 201
+    check("post", ruta, subir(logo_id, png()))  # 200
+    # C1 (R44): con logo vigente, otro logo_id lo reemplaza (201).
+    reemplazo = uuid.uuid4()
+    assert check("post", ruta, subir(reemplazo, png())) == {"logo": {"id": str(reemplazo)}}
+    en_uso = check("post", ruta, subir(logo_id, png()))  # 409: el anterior ya se usó
+    assert en_uso["error"]["code"] == "logo_id_en_uso"
+
+    def exceeded(items, window_seconds):
+        now = datetime.now(UTC)
+        return [limits.Counter(ambito, key, now, limit + 1, limit) for ambito, key, limit in items]
+
+    def unavailable(items, window_seconds):
+        raise RuntimeError("base caída (sintético)")
+
+    for falla in (exceeded, unavailable):
+        monkeypatch.setattr(limits, "increment_attempts", falla)
+        check("post", ruta, subir(uuid.uuid4(), png()))  # 429 / 503
+        monkeypatch.undo()
+
+
+def test_plataforma_ficha_responses(client, contrato_db, monkeypatch):
+    """Spec 017, C1 (T12): leer y editar la ficha de una empresa desde la consola."""
+    dev = sembrar_dev(contrato_db, nuevo_dev("contrato-ficha"))
+    ok = client.post("/plataforma/auth/login", json={"email": dev.email, "password": DEV_PASSWORD})
+    dev_auth = plat_bearer(ok.get_json()["access_token"])
+    big = "x" * (AUTH_MAX_BODY_BYTES + 1)
+    alta = {
+        "id": str(uuid.uuid4()),
+        "nombre": "Empresa contrato ficha 017",
+        "direccion": "Calle 1 # 2-3",
+        "admin": {
+            "nombre": "Admin contrato",
+            "email": nuevo_email(),
+            "password": NEW_PASSWORD,
+            "password_confirmacion": NEW_PASSWORD,
+        },
+    }
+    creada = client.post("/plataforma/empresas", json=alta, headers=dev_auth).get_json()
+    ruta = "/plataforma/empresas/{id}/ficha"
+    url = f"/plataforma/empresas/{creada['empresa_id']}/ficha"
+    otra = f"/plataforma/empresas/{uuid.uuid4()}/ficha"
+    sin_ficha = uuid.uuid4()
+    with contrato_db.migrator.begin() as conn:
+        conn.execute(
+            text("insert into tenant (id, nombre) values (:t, 'Sin ficha ficha 017')"),
+            {"t": sin_ficha},
+        )
+    sin_datos_url = f"/plataforma/empresas/{sin_ficha}/ficha"
+    ficha = {
+        "nombre": "Empresa contrato ficha editada",
+        "direccion": "Carrera 9 # 8-7",
+        "nit": "900123456-8",
+        "telefono": None,
+        "correo": "contacto@ejemplo.test",
+    }
+
+    leida = check("get", ruta, client.get(url, headers=dev_auth))  # 200
+    assert leida["nombre"] == alta["nombre"] and leida["tiene_logo"] is False
+    check("get", ruta, client.get(url))  # 401
+    check("get", ruta, client.get(url, headers=bearer(ADMIN_A, TENANT_A)))  # 401
+    check("get", ruta, client.get(otra, headers=dev_auth))  # 404
+    sin_datos = check("get", ruta, client.get(sin_datos_url, headers=dev_auth))  # 409
+    assert sin_datos["error"]["code"] == "empresa_sin_datos"
+
+    editada = check("put", ruta, client.put(url, json=ficha, headers=dev_auth))  # 200
+    assert editada["nombre"] == ficha["nombre"] and editada["nit"] == "900.123.456-8"
+    check("put", ruta, client.put(url, json=ficha, headers=dev_auth))  # 200 sin cambios
+    check("put", ruta, client.put(url, json={**ficha, "extra": 1}, headers=dev_auth))  # 400
+    check("put", ruta, client.put(url, json=ficha))  # 401
+    check("put", ruta, client.put(otra, json=ficha, headers=dev_auth))  # 404
+    sin_datos = check("put", ruta, client.put(sin_datos_url, json=ficha, headers=dev_auth))
+    assert sin_datos["error"]["code"] == "empresa_sin_datos"  # 409
+    invalido = check(
+        "put", ruta, client.put(url, json={**ficha, "nit": "1-2"}, headers=dev_auth)
+    )  # 422
+    assert invalido["error"]["campo"] == "nit"
+    check(
+        "put",
+        ruta,
+        client.put(url, data=big, content_type="application/json", headers=dev_auth),
+    )  # 413
+
+    def exceeded(items, window_seconds):
+        now = datetime.now(UTC)
+        return [limits.Counter(ambito, key, now, limit + 1, limit) for ambito, key, limit in items]
+
+    def unavailable(items, window_seconds):
+        raise RuntimeError("base caída (sintético)")
+
+    for falla in (exceeded, unavailable):
+        monkeypatch.setattr(limits, "increment_attempts", falla)
+        check("put", ruta, client.put(url, json=ficha, headers=dev_auth))  # 429 / 503
+        monkeypatch.undo()
+
+
+def test_plataforma_actividad_responses(client, contrato_db):
+    """Spec 017 (T6): lista paginada de la auditoría de la consola."""
+    dev = sembrar_dev(contrato_db, nuevo_dev("contrato-actividad"))
+    ok = client.post("/plataforma/auth/login", json={"email": dev.email, "password": DEV_PASSWORD})
+    dev_auth = plat_bearer(ok.get_json()["access_token"])
+    ruta = "/plataforma/actividad"
+
+    body = check("get", ruta, client.get(ruta, query_string={"limite": "1"}, headers=dev_auth))
+    assert body["actividad"]
+    if body["siguiente"] is not None:
+        check(
+            "get",
+            ruta,
+            client.get(ruta, query_string={"cursor": body["siguiente"]}, headers=dev_auth),
+        )
+    filtrada = check(
+        "get",
+        ruta,
+        client.get(
+            ruta,
+            query_string={
+                "empresa_id": str(TENANT_A),
+                "accion": "empresa_creada",
+                "desde": "2026-01-01",
+                "hasta": "2026-12-31",
+            },
+            headers=dev_auth,
+        ),
+    )
+    assert isinstance(filtrada["actividad"], list)
+    check("get", ruta, client.get(ruta, query_string={"limite": "101"}, headers=dev_auth))  # 400
+    check("get", ruta, client.get(ruta))  # 401
+    check("get", ruta, client.get(ruta, headers=bearer(ADMIN_A, TENANT_A)))  # 401
+
+
 LIMITED = [
     ("post", "/auth/login", {"email": ADMIN_A.email, "password": PASSWORD}, {}),
     ("post", "/auth/refresh", None, CSRF),
     ("post", "/invitaciones/validar", {"token": "x"}, {}),
     ("post", "/invitaciones/aceptar", {"token": "x", "nombre": "N", "password": NEW_PASSWORD}, {}),
     ("post", "/auth/restablecer", {"token": "x", "password": NEW_PASSWORD}, CSRF),
+    # Spec 017 (T2): login y refresh de la consola de plataforma.
+    ("post", "/plataforma/auth/login", {"email": "dev@ejemplo.test", "password": "x"}, {}),
+    ("post", "/plataforma/auth/refresh", None, CSRF),
 ]
 
 
@@ -1339,6 +1945,9 @@ def backend_error_codes() -> set[str]:
         errors.SERVICE_UNAVAILABLE[0],
         errors.TOO_MANY_REQUESTS[0],
         NOT_AUTHENTICATED[0],
+        PASSWORD_CHANGE_REQUIRED[0],
+        auth_routes.PASSWORD_REPEATED[0],
+        auth_routes.PASSWORDS_DIFFER[0],
         auth_routes.INVALID_CREDENTIALS[0],
         auth_routes.BAD_REQUEST[0],
         invitaciones_routes.INVALID_INVITATION[0],
@@ -1359,6 +1968,9 @@ def backend_error_codes() -> set[str]:
     codes |= {error.code for error in conteo_cierre.ERRORES}
     codes |= {error.code for error in fotos_service.ERRORES}
     codes |= {error.code for error in empresa_service.ERRORES}
+    codes |= {error.code for error in plataforma_empresas_service.ERRORES}
+    codes |= {error.code for error in plataforma_usuarios_service.ERRORES}
+    codes |= {error.code for error in plataforma_actividad_service.ERRORES}
     codes |= {
         error.code
         for error in (

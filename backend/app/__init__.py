@@ -26,6 +26,7 @@ from app.fotos.routes import bp as fotos_bp
 from app.inicio.routes import bp as inicio_bp
 from app.invitaciones.routes import bp as invitaciones_bp
 from app.meta.routes import bp as meta_bp
+from app.plataforma import register_plataforma
 from app.version import __version__
 
 __all__ = ["__version__", "create_app"]
@@ -81,6 +82,8 @@ def create_app(config: Config | None = None) -> Flask:
     app.register_blueprint(inicio_bp)
     app.register_blueprint(empresa_bp)
     app.register_blueprint(fotos_bp)
+    # Spec 017 (R1): consola de plataforma; sin PLATAFORMA_HABILITADA=true no registra nada.
+    register_plataforma(app)
     register_cli(app)
     if config.environment == "production" and not config.trusted_proxy_hops:
         # Deuda (e) de la spec 002 / spec 010b (R3): detrás del proxy de la plataforma,
@@ -89,6 +92,18 @@ def create_app(config: Config | None = None) -> Flask:
         app.logger.warning(
             "ENVIRONMENT=production con TRUSTED_PROXY_HOPS=0: detrás de un proxy, fija "
             "TRUSTED_PROXY_HOPS (normalmente 1) o el límite de tasa tratará a todos como uno."
+        )
+    if (
+        config.environment == "production"
+        and config.plataforma.redes_permitidas
+        and not config.trusted_proxy_hops
+    ):
+        # Spec 017 (T2): la restricción por red compara ``remote_addr``; detrás de un proxy
+        # sin saltos de confianza es la IP del proxy. No se registran las redes.
+        app.logger.warning(
+            "ENVIRONMENT=production con PLATAFORMA_REDES_PERMITIDAS y TRUSTED_PROXY_HOPS=0: "
+            "la restricción por red de la consola depende de TRUSTED_PROXY_HOPS; detrás de "
+            "un proxy compara la IP del proxy, no la del cliente."
         )
     if config.trusted_proxy_hops:
         # T10: la IP del cliente para el límite de tasa sale de X-Forwarded-For solo con

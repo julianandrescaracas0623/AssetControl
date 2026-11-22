@@ -40,7 +40,7 @@ CONTADOR = bearer(CONTADOR_A, TENANT_A, rol="contador")
 EMPRESA = {
     "nombre": "Clínica Dental Ejemplo S.A.S.",
     "direccion": "Calle 10 # 5-20, Cartago",
-    "nit": "890903938-8",
+    "nit": "900123456-8",
     "telefono": "(602) 210 0000",
     "correo": "contacto@clinica-ejemplo.co",
 }
@@ -267,7 +267,7 @@ def test_company_is_frozen_at_close_and_later_changes_do_not_alter_anything(clie
     assert informe["empresa"] == {
         "nombre": EMPRESA["nombre"],
         "direccion": EMPRESA["direccion"],
-        "nit": "890.903.938-8",
+        "nit": "900.123.456-8",
         "telefono": EMPRESA["telefono"],
         "correo": EMPRESA["correo"],
         "logo": {"id": logo},

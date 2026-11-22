@@ -5,8 +5,9 @@ Ninguno es ``TenantScoped``: son excepciones cerradas del catálogo (no se filtr
 tenant de la sesión, sino por el desarrollador de la sesión en RLS). ``plataforma_auditoria``
 tiene un ``tenant_id`` informativo (nulo si la acción no es de una empresa).
 
-La aplicación no puede leer ``desarrollador.password_hash`` (``GRANT`` por columna): se
-mapea diferido con ``raiseload`` para que ningún ``SELECT`` del ORM lo pida.
+La aplicación no puede leer ``desarrollador.password_hash`` ni ``creado_en`` (``GRANT``
+por columna): se mapean diferidos con ``raiseload`` para que ningún ``SELECT`` del ORM los
+pida.
 """
 
 import uuid
@@ -26,8 +27,13 @@ class Desarrollador(Base):
     nombre: Mapped[str] = mapped_column(Text)
     password_hash: Mapped[str] = mapped_column(Text, deferred=True, deferred_raiseload=True)
     activo: Mapped[bool] = mapped_column(server_default=FetchedValue())
+    # T2 (hallazgo c de T1): la aplicación tampoco tiene SELECT sobre ``creado_en``; diferida
+    # con raiseload para que ``select(Desarrollador)`` no la pida (permiso denegado).
     creado_en: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=FetchedValue()
+        DateTime(timezone=True),
+        server_default=FetchedValue(),
+        deferred=True,
+        deferred_raiseload=True,
     )
 
 

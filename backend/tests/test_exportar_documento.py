@@ -92,7 +92,7 @@ INFORME = {
     "empresa": {
         "nombre": "Clínica Dental Ejemplo S.A.S.",
         "direccion": "Calle 10 # 5-20, Cartago",
-        "nit": "890.903.938-8",
+        "nit": "900.123.456-8",
         "telefono": None,
         "correo": None,
         "logo": None,
@@ -404,5 +404,5 @@ def test_document_keeps_the_real_cut_and_close_dates_for_the_spreadsheet():
 
 def test_company_contact_line_has_only_what_exists():
     empresa = exportar.documento(INFORME).empresa
-    assert empresa.contacto == "NIT 890.903.938-8 · Calle 10 # 5-20, Cartago"
+    assert empresa.contacto == "NIT 900.123.456-8 · Calle 10 # 5-20, Cartago"
     assert exportar.Empresa(nombre="X").contacto == ""

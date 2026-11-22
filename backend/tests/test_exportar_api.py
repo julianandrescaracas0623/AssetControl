@@ -531,7 +531,7 @@ def test_every_sheet_carries_the_frozen_company_and_its_logo(client):
     datos = {
         "nombre": "Clínica & Ejemplo S.A.S.",
         "direccion": "Calle 10 # 5-20, Cartago",
-        "nit": "890903938-8",
+        "nit": "900123456-8",
     }
     respuesta = client.put("/empresa", json=datos, headers=ADMIN)
     assert respuesta.status_code == 200, respuesta.get_json()
@@ -546,7 +546,7 @@ def test_every_sheet_carries_the_frozen_company_and_its_logo(client):
     wb = libro(excel(client, sesion))
     for hoja in wb.worksheets:
         assert hoja["B1"].value == "Clínica & Ejemplo S.A.S.", hoja.title
-        assert hoja["B2"].value == "NIT 890.903.938-8 · Calle 10 # 5-20, Cartago", hoja.title
+        assert hoja["B2"].value == "NIT 900.123.456-8 · Calle 10 # 5-20, Cartago", hoja.title
         assert "«Conteo nov 2026» · corte 30/11/2026" in hoja["B3"].value
         assert hoja["B4"].value == "Informe congelado al cierre · valores en COP"
         assert len(hoja._images) == 1, hoja.title
@@ -788,7 +788,7 @@ def test_pdf_carries_the_frozen_company_logo_and_footer(client):
     datos = {
         "nombre": "Clínica Ejemplo S.A.S.",
         "direccion": "Calle 10 # 5-20",
-        "nit": "890903938-8",
+        "nit": "900123456-8",
     }
     assert client.put("/empresa", json=datos, headers=ADMIN).status_code == 200
     subida = client.put(
@@ -802,7 +802,7 @@ def test_pdf_carries_the_frozen_company_logo_and_footer(client):
     response = pdf(client, sesion)
     lineas = lineas_pdf(response)
     assert lineas[0] == "Clínica Ejemplo S.A.S."
-    assert "NIT 890.903.938-8 · Calle 10 # 5-20" in lineas
+    assert "NIT 900.123.456-8 · Calle 10 # 5-20" in lineas
     pie = "Clínica Ejemplo S.A.S. · Conteo nov 2026 · Informe congelado al cierre"
     assert any(li.startswith(pie) for li in lineas)
     pagina = PdfReader(io.BytesIO(response.data)).pages[0]

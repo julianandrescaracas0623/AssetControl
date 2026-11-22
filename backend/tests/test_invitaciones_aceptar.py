@@ -260,7 +260,16 @@ def test_accept_creates_user_and_membership_from_the_invitation(client, acc_db, 
 
     assert response.status_code == 201, response.get_json()
     body = response.get_json()
-    assert set(body) == {"access_token", "token_type", "expires_in", "usuario", "tenant", "rol"}
+    assert set(body) == {
+        "access_token",
+        "token_type",
+        "expires_in",
+        "usuario",
+        "tenant",
+        "rol",
+        "debe_cambiar_password",  # Spec 017, T4: false en un invitado (R25).
+    }
+    assert body["debe_cambiar_password"] is False
     assert body["token_type"] == "Bearer"
     assert body["expires_in"] == 900
     assert body["usuario"]["email"] == email

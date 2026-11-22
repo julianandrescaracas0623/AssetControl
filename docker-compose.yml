@@ -45,6 +45,7 @@ services:
       # Dentro del contenedor "localhost" es la propia API: el host de la base es "db".
       # La API usa el rol de la aplicación (sin SUPERUSER ni BYPASSRLS).
       DATABASE_URL: postgresql+psycopg://${APP_DB_USER}:${APP_DB_PASSWORD}@db:5432/${POSTGRES_DB}
+      PLATAFORMA_HABILITADA: ${PLATAFORMA_HABILITADA:-}
       SECRET_KEY: ${SECRET_KEY:?falta SECRET_KEY en .env}
       # Fijo y explícito: este compose es solo de desarrollo (cookies sin Secure sobre
       # http local). Fuera de aquí, cualquier otro valor se trata como producción (B4).

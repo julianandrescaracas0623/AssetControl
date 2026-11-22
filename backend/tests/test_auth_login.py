@@ -321,6 +321,7 @@ def forged_token(
         "sub": str(sub),
         "tenant": str(tenant),
         "iss": JWT_ISSUER,
+        "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=15)).timestamp()),
         **extra,
     }
@@ -732,6 +733,8 @@ def test_me_returns_the_user_tenant_and_role_from_membresia(client):
         },
         "tenant": {"id": str(TENANT_A), "nombre": NOMBRE_A},
         "rol": "contador",
+        # Spec 017, T4 (R26): la marca, leída de la base.
+        "debe_cambiar_password": False,
     }
 
 

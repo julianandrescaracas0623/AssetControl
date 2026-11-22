@@ -414,6 +414,8 @@ PUBLIC_ENDPOINTS = frozenset(
 # y de aislamiento (A12) en este archivo o en el de su recurso.
 PROTECTED_ENDPOINTS = {
     "auth.me": frozenset({"admin", "contador"}),  # test_auth_me_*, test_tenant_a_with_*
+    # Spec 017, T4: roles, lista blanca del bloqueo y aislamiento en test_cambio_password.py.
+    "auth.cambiar_contrasena": frozenset({"admin", "contador"}),
     "invitaciones.crear": frozenset({"admin"}),  # test_contador_*, test_invitaciones_crear
     # Spec 003 (T2): roles y aislamiento en test_ubicaciones_api.py.
     "ubicaciones.listar": frozenset({"admin", "contador"}),
@@ -580,6 +582,7 @@ AUTH_RULES = (
     "/auth/refresh",
     "/auth/logout",
     "/auth/me",
+    "/auth/cambiar-contrasena",
     "/auth/recuperar",
     "/auth/restablecer",
     "/invitaciones",

@@ -25,6 +25,25 @@ combinan ``require_auth``/``require_role`` (``app.auth.decorators``).
 familia, ventana de gracia de reuso (Q15) y revocación de la familia de la
 cookie; todo bajo ``tenant_session`` con el tenant de la cookie.
 
+**Cambio de contraseña (spec 017, T4; R27).** Ver ``cambiar_contrasena``: verifica la
+actual con Argon2, guarda la nueva con ``acceso.cambiar_password_propio`` (marca en
+``false`` y refresh revocados) y emite una familia nueva, todo en la ``tenant_session`` de
+la petición. **M1 (0026):** la función pone también ``usuario.sesiones_validas_desde =
+now()`` y ``load_current_user`` rechaza (``401``) todo JWT de acceso con ``iat`` anterior a
+ese segundo; lo mismo tras restablecer por correo (014). Todo acceso (login, refresh y
+sesión nueva del cambio) sale de ``emitir_acceso`` con un ``iat`` que nunca es anterior al
+corte (``access_issued_at``). N4 sigue para el ``logout``.
+
+**Desactivar desde la consola (spec 017, T5; 0027).** ``issue_session`` y ``refresh`` toman
+el candado consultivo **compartido** del tenant (``bloquear_membresias``) antes de leer la
+membresía; ``acceso.plataforma_cambiar_estado_membresia`` toma el mismo en exclusivo. Así
+un login o una rotación a la vez que se desactiva o confirma antes (y la función revoca su
+refresh nuevo) o espera y ya ve la membresía inactiva: no queda un refresh vivo de una
+membresía desactivada. El cambio de contraseña (``cambiar_contrasena``) toma el mismo
+candado antes de ``acceso.cambiar_password_propio``. La espera la acota
+``LOCK_TIMEOUT_MEMBRESIAS`` (3 s, local a la transacción y restaurado tras tomarlo): si no
+llega, ``503`` genérico con ``Retry-After``.
+
 Nada de este módulo registra contraseñas, tokens, hashes ni el email.
 """
 
@@ -32,10 +51,11 @@ import re
 import unicodedata
 import uuid
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from flask import current_app
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import DBAPIError
 
 from app.auth.credentials import (
     REFRESH_TOKEN_TTL,
@@ -48,7 +68,13 @@ from app.auth.credentials import (
     token_storage_hash,
 )
 from app.auth.models import Membresia, RefreshToken, Tenant, Usuario
-from app.db import buscar_login, tenant_session
+from app.db import (
+    buscar_login,
+    cambiar_password_propio,
+    candado_compartido_acotado,
+    tenant_session,
+)
+from app.errors import ServiceUnavailableError
 
 
 @dataclass(frozen=True)
@@ -59,12 +85,17 @@ class CurrentUser:
     tenant_id: uuid.UUID
     tenant_nombre: str
     rol: str
+    # Spec 017 (R26): leída de la base en cada petición; el JWT no la lleva.
+    debe_cambiar_password: bool = False
+    # Spec 017, T4 (M1, 0026): corte de los JWT de acceso; no se serializa.
+    sesiones_validas_desde: datetime | None = None
 
     def to_json(self) -> dict[str, object]:
         return {
             "usuario": {"id": str(self.usuario_id), "email": self.email, "nombre": self.nombre},
             "tenant": {"id": str(self.tenant_id), "nombre": self.tenant_nombre},
             "rol": self.rol,
+            "debe_cambiar_password": self.debe_cambiar_password,
         }
 
 
@@ -105,7 +136,13 @@ def normalize_email(email: str) -> str | None:
 
 
 def _load_current_user(session, usuario_id: uuid.UUID, tenant_id: uuid.UUID):
-    """``(membresia, CurrentUser)`` si la membresía y el usuario están activos en el tenant."""
+    """``(membresia, CurrentUser)`` si la membresía, el usuario y el tenant están activos.
+
+    Punto único de ``load_current_user`` (cada petición), ``refresh`` e ``issue_session``
+    (login y aceptación de invitación). Spec 017 (R22, A9; plan §2.5): una empresa
+    desactivada desde la consola (``tenant.activo`` falso, leído en cada llamada, sin
+    caché) da ``None``, el mismo ``401`` genérico que una membresía revocada.
+    """
     membresia = session.scalars(
         select(Membresia).where(Membresia.usuario_id == usuario_id)
     ).one_or_none()
@@ -113,7 +150,7 @@ def _load_current_user(session, usuario_id: uuid.UUID, tenant_id: uuid.UUID):
         return None
     usuario = session.get(Usuario, usuario_id)
     tenant = session.get(Tenant, tenant_id)
-    if usuario is None or not usuario.activo or tenant is None:
+    if usuario is None or not usuario.activo or tenant is None or not tenant.activo:
         return None
     user = CurrentUser(
         usuario_id=usuario.id,
@@ -122,6 +159,8 @@ def _load_current_user(session, usuario_id: uuid.UUID, tenant_id: uuid.UUID):
         tenant_id=tenant.id,
         tenant_nombre=tenant.nombre,
         rol=membresia.rol,
+        debe_cambiar_password=usuario.debe_cambiar_password,
+        sesiones_validas_desde=usuario.sesiones_validas_desde,
     )
     return membresia, user
 
@@ -148,6 +187,40 @@ def login(email: str, password: str) -> LoginResult | None:
     return issue_session(account.usuario_id, active[0].tenant_id)
 
 
+# Misma clave que el candado exclusivo de acceso.plataforma_cambiar_estado_membresia (0027).
+CANDADO_MEMBRESIAS = "plataforma_membresia:"
+
+
+# Espera máxima del candado compartido (login, refresh, invitación, cambio de contraseña):
+# pasado este tiempo, ``503`` genérico con ``Retry-After`` en vez de colgar la petición.
+LOCK_TIMEOUT_MEMBRESIAS = "3s"
+# Candado no obtenido, interbloqueo y fallo de serialización: transitorios del cambio de
+# contraseña, ``503`` sin eco de la base.
+SQLSTATE_TRANSITORIOS = frozenset({"55P03", "40P01", "40001"})
+
+
+def sqlstate(exc: DBAPIError) -> str | None:
+    """SQLSTATE del error del driver, sin leer su mensaje."""
+    return getattr(exc.orig, "sqlstate", None)
+
+
+def bloquear_membresias(session, tenant_id: uuid.UUID) -> None:
+    """Candado consultivo compartido del tenant mientras se emite o rota un refresh.
+
+    Entre logins y refresh no se estorban (compartido); espera solo a un cambio de
+    membresía de la consola en curso (exclusivo, unos milisegundos, acotado por su
+    ``lock_timeout``). Va antes de cualquier otro candado de la transacción.
+
+    La espera la acota ``LOCK_TIMEOUT_MEMBRESIAS`` (``app.db.candado_compartido_acotado``:
+    local a la transacción y restaurado al valor previo tras tomarlo): si no llega,
+    ``ServiceUnavailableError`` (``503`` con ``Retry-After``) y quien llama revierte su
+    transacción.
+    """
+    clave = f"{CANDADO_MEMBRESIAS}{uuid.UUID(str(tenant_id))}"
+    if not candado_compartido_acotado(session, clave, LOCK_TIMEOUT_MEMBRESIAS):
+        raise ServiceUnavailableError()
+
+
 def issue_session(usuario_id: uuid.UUID, tenant_id: uuid.UUID) -> LoginResult | None:
     """Acceso y refresh nuevos (familia nueva) para la membresía activa en ``tenant_id``.
 
@@ -157,6 +230,7 @@ def issue_session(usuario_id: uuid.UUID, tenant_id: uuid.UUID) -> LoginResult | 
     """
     secret = new_token()
     with tenant_session(tenant_id) as session:
+        bloquear_membresias(session, tenant_id)
         loaded = _load_current_user(session, usuario_id, tenant_id)
         if loaded is None:
             return None
@@ -170,16 +244,38 @@ def issue_session(usuario_id: uuid.UUID, tenant_id: uuid.UUID) -> LoginResult | 
             )
         )
 
-    access_token = encode_access_token(
+    return LoginResult(
+        user=user,
+        access_token=emitir_acceso(user),
+        refresh_cookie_value=f"{user.tenant_id}.{secret}",
+    )
+
+
+def access_issued_at(user: CurrentUser) -> datetime:
+    """``iat`` del acceso nuevo de ``user``: ``max(ahora de Flask, floor(corte))`` (M1).
+
+    El corte (``usuario.sesiones_validas_desde``) es ``now()`` de PostgreSQL. Si el reloj de
+    Flask va detrás del de la base, un acceso emitido justo después del cambio o del
+    restablecer tendría ``iat`` anterior al corte y ``load_current_user`` lo rechazaría (login
+    ``200`` y ``401`` en la primera llamada). Usa el corte ya cargado en ``user`` (sin otra
+    consulta). Sin corte, el reloj de Flask. La holgura de ``iat`` futuro del decodificador
+    (``ACCESS_TOKEN_MAX_FUTURE_IAT``, O-2) exige NTP entre Flask y PostgreSQL.
+    """
+    issued = datetime.now(UTC)
+    cut = user.sesiones_validas_desde
+    if cut is None:
+        return issued
+    return max(issued, cut.replace(microsecond=0))
+
+
+def emitir_acceso(user: CurrentUser) -> str:
+    """JWT de acceso de ``user``; punto único del login, el refresh y el cambio (M1)."""
+    return encode_access_token(
         current_app.config["SECRET_KEY"],
         sub=user.usuario_id,
         tenant=user.tenant_id,
         rol=user.rol,
-    )
-    return LoginResult(
-        user=user,
-        access_token=access_token,
-        refresh_cookie_value=f"{user.tenant_id}.{secret}",
+        now=access_issued_at(user),
     )
 
 
@@ -234,6 +330,9 @@ def refresh(cookie_value: str | None) -> LoginResult | None:
     new_secret = new_token()
 
     with tenant_session(tenant_id) as session:
+        # Antes de rotar: el candado de la fila del refresh viene después (mismo orden que
+        # la función de la consola, sin interbloqueo).
+        bloquear_membresias(session, tenant_id)
         rotated = session.execute(
             update(RefreshToken)
             .where(
@@ -267,15 +366,9 @@ def refresh(cookie_value: str | None) -> LoginResult | None:
             )
         )
 
-    access_token = encode_access_token(
-        current_app.config["SECRET_KEY"],
-        sub=user.usuario_id,
-        tenant=user.tenant_id,
-        rol=user.rol,
-    )
     return LoginResult(
         user=user,
-        access_token=access_token,
+        access_token=emitir_acceso(user),
         refresh_cookie_value=f"{user.tenant_id}.{new_secret}",
     )
 
@@ -362,10 +455,116 @@ def access_claims(authorization: str | None) -> AccessClaims | None:
         return None
 
 
-def load_current_user(session, usuario_id: uuid.UUID, tenant_id: uuid.UUID) -> CurrentUser | None:
+def issued_before_cut(issued_at: int, cut: datetime | None) -> bool:
+    """``True`` si un JWT con ``iat`` = ``issued_at`` es anterior al corte ``cut`` (M1).
+
+    ``iat`` es entero en segundos y ``cut`` (``now()`` de PostgreSQL) tiene microsegundos:
+    se compara con el segundo entero del corte (``floor``), así que un token emitido en el
+    mismo segundo del corte vale (la sesión nueva del cambio nunca queda fuera).
+    """
+    if cut is None:
+        return False
+    return issued_at < int(cut.replace(microsecond=0).timestamp())
+
+
+def load_current_user(
+    session, usuario_id: uuid.UUID, tenant_id: uuid.UUID, *, issued_at: int
+) -> CurrentUser | None:
     """Usuario con membresía y cuenta activas en el tenant de ``session``, o ``None``.
 
-    ``session`` es la ``tenant_session`` de ``tenant_id``: RLS acota la lectura.
+    ``session`` es la ``tenant_session`` de ``tenant_id``: RLS acota la lectura. Spec 017,
+    T4 (M1, 0026): ``None`` también si el JWT (``issued_at``, su ``iat``) es anterior a
+    ``usuario.sesiones_validas_desde`` (cambio o restablecer de la contraseña), el mismo
+    ``401`` genérico. Solo el acceso del tenant; el de plataforma no pasa por aquí.
     """
     loaded = _load_current_user(session, usuario_id, tenant_id)
-    return None if loaded is None else loaded[1]
+    if loaded is None:
+        return None
+    user = loaded[1]
+    if issued_before_cut(issued_at, user.sesiones_validas_desde):
+        return None
+    return user
+
+
+# --- Cambio de contraseña (spec 017, T4; R27; plan.md §2.6) -------------------------------
+
+
+class _CuentaNoVigenteError(Exception):
+    """La cuenta dejó de estar activa en medio del cambio: se revierte todo (``401``)."""
+
+
+def _new_session(session, usuario_id: uuid.UUID, tenant_id: uuid.UUID) -> LoginResult:
+    """Familia nueva de refresh y acceso nuevo en la transacción de ``session``."""
+    loaded = _load_current_user(session, usuario_id, tenant_id)
+    if loaded is None:
+        raise _CuentaNoVigenteError()
+    membresia, user = loaded
+    secret = new_token()
+    session.add(
+        RefreshToken(
+            membresia_id=membresia.id,
+            familia_id=uuid.uuid4(),
+            token_hash=token_storage_hash(secret),
+            expira_en=func.now() + REFRESH_TOKEN_TTL,
+        )
+    )
+    session.flush()
+    # M1: el iat de la sesión nueva nunca es anterior al corte, aunque el reloj de Flask vaya
+    # detrás del de la base.
+    return LoginResult(
+        user=user,
+        access_token=emitir_acceso(user),
+        refresh_cookie_value=f"{user.tenant_id}.{secret}",
+    )
+
+
+def cambiar_contrasena(session, user: CurrentUser, actual: str, nueva: str) -> LoginResult | None:
+    """Cambia la contraseña de ``user`` y devuelve su sesión nueva, o ``None`` (``401``).
+
+    ``session`` es la ``tenant_session`` de la petición (la de ``require_auth``) y ``nueva``
+    ya cumple la política, coincide con su confirmación y difiere de ``actual`` (lo
+    comprueba la ruta). Pasos:
+
+    1. Hash guardado con ``acceso.buscar_login`` (transacción propia, como el login) y
+       **una** verificación Argon2 de ``actual`` (hash simulado si no aparece la cuenta).
+    2. Hash Argon2id de ``nueva`` (``503`` si Argon2 está saturado).
+    3. ``acceso.cambiar_password_propio``: compara el hash guardado y lo reemplaza, pone
+       ``debe_cambiar_password = false`` y ``sesiones_validas_desde = now()`` (M1) y
+       revoca los refresh del usuario. Si la cuenta ya
+       no es elegible o la contraseña cambió entretanto, ``None`` sin cambiar nada.
+    4. Familia nueva para esta sesión (las demás quedaron revocadas) y acceso nuevo.
+
+    Spec 017, T5: antes del paso 3 toma ``bloquear_membresias`` (compartido; el mismo orden
+    que login y refresh: el candado consultivo antes que cualquier fila), así no cruza una
+    desactivación de la consola: o confirma antes (y la consola revoca su familia nueva) o
+    espera y la función ve la membresía inactiva (``None``, ``401``). Los pasos 3 y 4 van en
+    un ``SAVEPOINT``: si la cuenta ya no se puede cargar en el 4, se revierte todo y ``None``
+    (``401``, no ``500``). Candado no obtenido a tiempo, interbloqueo (``40P01``) o fallo de
+    serialización (``40001``): ``ServiceUnavailableError`` (``503`` genérico, sin el mensaje
+    de la base) y la ``tenant_session`` revierte.
+    """
+    rows = buscar_login(user.email)
+    stored = rows[0].password_hash if rows and rows[0].usuario_id == user.usuario_id else None
+    passwords = get_passwords()
+    if not passwords.verify(stored, actual) or stored is None:
+        return None
+    nuevo_hash = passwords.hash(nueva)
+    bloquear_membresias(session, user.tenant_id)
+    resultado = None
+    transitorio = False
+    try:
+        with session.begin_nested():
+            if cambiar_password_propio(session, user.usuario_id, stored, nuevo_hash):
+                # La función cambió la fila fuera del ORM: se relee la marca de la base.
+                session.expire_all()
+                resultado = _new_session(session, user.usuario_id, user.tenant_id)
+    except _CuentaNoVigenteError:
+        return None
+    except DBAPIError as exc:
+        if sqlstate(exc) not in SQLSTATE_TRANSITORIOS:
+            raise
+        transitorio = True
+    if transitorio:
+        # Fuera del except: sin causa ni contexto con el mensaje de la base.
+        raise ServiceUnavailableError()
+    return resultado

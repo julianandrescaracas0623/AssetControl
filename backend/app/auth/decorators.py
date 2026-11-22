@@ -9,9 +9,16 @@ vista:
    ``membresia`` (``rol``, ``activa``) y ``usuario.activo`` en cada petición. El
    ``rol`` del claim es solo informativo y nunca se usa; el cuerpo, la URL y las
    cabeceras no proponen tenant ni rol. Sin membresía activa en ese tenant ->
-   ``401``.
-3. Rol fuera de los declarados -> ``403`` ``prohibido`` (``abort(403)``).
-4. La vista corre **dentro de esa misma transacción** (N5 de T6): sin ventana
+   ``401``. Spec 017, T4 (M1, 0026): también ``401`` si el ``iat`` del JWT es anterior a
+   ``usuario.sesiones_validas_desde`` (contraseña cambiada o restablecida después).
+3. Spec 017 (R26, A16; plan §2.6): si ``usuario.debe_cambiar_password`` (leída de la base
+   en la misma lectura, nunca del JWT) es ``true`` -> ``403`` ``cambio_password_requerido``
+   en todo endpoint salvo la lista blanca cerrada ``PASSWORD_CHANGE_ENDPOINTS`` (``GET
+   /auth/me`` y ``POST /auth/cambiar-contrasena``; login, refresh y logout son públicos y no
+   pasan por aquí). Va antes del rol: un endpoint nuevo queda bloqueado por defecto. Es la
+   única comprobación: ningún endpoint la repite.
+4. Rol fuera de los declarados -> ``403`` ``prohibido`` (``abort(403)``).
+5. La vista corre **dentro de esa misma transacción** (N5 de T6): sin ventana
    entre la lectura del rol y la de los datos. Toma la sesión con
    ``current_session()`` y el usuario con ``current_user()``. La transacción se
    confirma al volver la vista; si confirmar falla la respuesta no sale (``500``)
@@ -34,6 +41,12 @@ from app.errors import error_response
 
 ROLES: frozenset[str] = frozenset({"admin", "contador"})
 NOT_AUTHENTICATED = ("no_autenticado", "Debes iniciar sesión.")
+PASSWORD_CHANGE_REQUIRED = (
+    "cambio_password_requerido",
+    "Debes cambiar tu contraseña antes de continuar.",
+)
+# Lista blanca cerrada (R26): únicos endpoints autenticados que admiten la marca.
+PASSWORD_CHANGE_ENDPOINTS: frozenset[str] = frozenset({"auth.me", "auth.cambiar_contrasena"})
 
 _USER_KEY = "auth_current_user"
 _SESSION_KEY = "auth_tenant_session"
@@ -52,9 +65,15 @@ def require_role(*roles: str) -> Callable[[Callable[..., Any]], Callable[..., An
             if claims is None:
                 return error_response(401, *NOT_AUTHENTICATED)
             with tenant_session(claims.tenant) as session:
-                user = service.load_current_user(session, claims.sub, claims.tenant)
+                user = service.load_current_user(
+                    session, claims.sub, claims.tenant, issued_at=claims.iat
+                )
                 if user is None:
                     return error_response(401, *NOT_AUTHENTICATED)
+                if user.debe_cambiar_password and request.endpoint not in (
+                    PASSWORD_CHANGE_ENDPOINTS
+                ):
+                    return error_response(403, *PASSWORD_CHANGE_REQUIRED)
                 if user.rol not in allowed:
                     abort(403)
                 setattr(g, _USER_KEY, user)

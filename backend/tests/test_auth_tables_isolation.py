@@ -734,7 +734,39 @@ def test_owner_guc_of_one_table_does_not_open_another(acceso, guc):
             for other, other_sql, _ in OWNER_READS.values():
                 if other != table:
                     assert conn.scalar(text(other_sql)) == 0, (guc, other)
-            assert conn.scalar(text("select count(id) from tenant")) == 0, guc
+            # Spec 017, T3a (0018): app.auth_usuario abre también tenant.activo de los
+            # tenants de ese usuario (buscar_login). T3b (0023): las GUC de invitación abren
+            # el tenant de su invitación (validar/aceptar exigen que esté activo). Ninguna
+            # otra GUC abre tenant.
+            expected = 0 if guc == "app.auth_email" else 1
+            assert conn.scalar(text("select count(id) from tenant")) == expected, guc
+
+
+@pytest.mark.parametrize("guc", ["app.auth_inv_validar", "app.auth_inv_aceptar"])
+def test_owner_reads_only_the_state_of_the_tenant_of_the_invitation(acceso, guc):
+    # Spec 017, T3b (0023): solo id, creado_en y activo, y solo del tenant de esa clave.
+    with acceso.migrator.connect() as conn:
+        with conn.begin():
+            _set_owner(conn, {guc: CLAVE_A})
+            rows = conn.execute(text("select id, activo from tenant")).all()
+            assert [tuple(r) for r in rows] == [(TENANT_A, True)]
+            nested = conn.begin_nested()
+            with pytest.raises(DBAPIError):
+                conn.execute(text("select nombre from tenant"))
+            nested.rollback()
+
+
+def test_owner_reads_only_the_state_of_the_tenants_of_the_login_user(acceso):
+    # Spec 017, T3a (0018): solo id, creado_en y activo, y solo de sus tenants.
+    with acceso.migrator.connect() as conn:
+        with conn.begin():
+            _set_owner(conn, {"app.auth_usuario": str(USER_A)})
+            rows = conn.execute(text("select id, activo from tenant")).all()
+            assert [tuple(r) for r in rows] == [(TENANT_A, True)]
+            nested = conn.begin_nested()
+            with pytest.raises(DBAPIError):
+                conn.execute(text("select nombre from tenant"))
+            nested.rollback()
 
 
 def test_owner_empty_email_guc_does_not_match_an_empty_email(acceso):
