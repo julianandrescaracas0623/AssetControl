@@ -9,7 +9,8 @@ Regla común (FT-1 a FT-4 de `spec.md`): el criterio de terminado de CADA tarea 
 - Verificación: `cd backend && uv run pytest tests/test_xlsx_diseno_utilidad.py tests/test_xlsx_sondas.py -q` y `uv run ruff check .`; revisión de que los JSON no contienen NIT, teléfono, correo ni dirección reales (`Grep` de control).
 - Dependencia: ninguna. Solo resta aquí confirmar L1 (qué ancla se usa).
 
-## T2 — Módulo de estilo común y bloque de encabezado
+## T2 — Módulo de estilo común y bloque de encabezado — HECHA (2026-11-22)
+- Estado: completa y aprobada por el `reviewer` (2026-11-22). `backend/app/conteo/exportar_estilo.py` con el bloque común y `backend/tests/test_exportar_estilo.py` con la prueba por propiedad contra la huella; los puntos que dejó el reviewer quedan en T3, T4 y T5.
 - Resultado: constantes y funciones de dibujo comunes a ambos generadores: banda (fila 1), bloque de empresa con logo y marcadores de campos ausentes, cabecera de tabla, fila de datos, fila Total, formatos, pie, márgenes y página, con valores de la matriz (no calculados). Logo ajustado dentro de la caja de la hoja conservando proporción (Q10). Prueba por propiedad del bloque común contra la huella, con empresa sintética.
 - Archivos probables: `backend/app/conteo/exportar_estilo.py`, `backend/app/activos/exportar_estilo.py` (si aplica), `backend/tests/test_exportar_estilo.py`.
 - Verificación: `cd backend && uv run pytest tests/test_exportar_estilo.py -q` y `uv run ruff check .`
@@ -19,18 +20,21 @@ Regla común (FT-1 a FT-4 de `spec.md`): el criterio de terminado de CADA tarea 
 - Resultado: `a_excel` de activos replica la plantilla A (bloque de encabezado con logo, NIT, teléfono, correo, dirección y fecha de exportación de la empresa vigente del tenant, omitiendo los campos ausentes (Q9), cabecera en fila 7, congelado, autofiltro, impresión, formatos y anchos); datos, orden de filas y columnas sin cambios; celdas vacías con borde.
 - Archivos probables: `backend/app/activos/exportar.py`, `backend/app/activos/routes.py` (lectura de empresa y logo), `backend/tests/test_activos_exportar.py`, `backend/tests/test_exportar_api.py`, `backend/tests/test_roles.py`.
 - Verificación: `cd backend && uv run pytest tests/test_activos_exportar.py tests/test_exportar_api.py tests/test_roles.py -q` y `uv run ruff check .`
+- Pendiente del reviewer (T2): prueba por columna con celdas realmente vacías (serial, precio y fecha nulos) y decidir y documentar el estilo de la celda vacía (`datos_vacia` frente a `datos_fecha`/`datos_cop`); empresa y logo en la ruta de activos con prueba de `403` para `contador` y sin fuga entre tenants.
 - Dependencia: T2.
 
 ## T4 — Informe: hojas de lista («Todos los activos», por categoría, «No encontrados»)
 - Resultado: las tres familias de hojas replican la plantilla B (bloque común, título y nota combinada, fila Total sobre la cabecera, cabecera, datos sin filas alternas, formato condicional de fila completa, columnas ocultas en «No encontrados», congelado, impresión 1 página de ancho × alto automático (Q12), tabla de Excel «Activos» y filtros conservados con el estilo de la plantilla (Q8)); contenido, totales y orden sin cambios; `nombres_de_hoja` con los dos reservados nuevos.
 - Archivos probables: `backend/app/conteo/exportar.py`, `backend/tests/test_exportar_documento.py`, `backend/tests/test_exportar_api.py`.
 - Verificación: `cd backend && uv run pytest tests/test_exportar_documento.py tests/test_exportar_api.py -q` y `uv run ruff check .`
+- Pendiente del reviewer (T2): prueba por columna con celdas realmente vacías (serial, precio y fecha nulos) y decidir y documentar el estilo de la celda vacía (`datos_vacia` frente a `datos_fecha`/`datos_cop`). «No encontrados» no tiene estilo de fila de datos en la plantilla (`estilos_datos == ()`): NO inventarlo; preguntar al `coordinator`/humano antes de implementarlo, y cubrir con prueba las columnas ocultas G–K.
 - Dependencia: T2.
 
 ## T5 — Informe: «Por ubicación», «Por categoría», «Resumen» y orden del libro
 - Resultado: hojas «Por ubicación» y «Por categoría» (mismas cifras congeladas de `cierre.informe` en `Decimal`, barras de datos, fila Total con fondo `DBEAFE`, ajuste 1×1; prueba con centavos no representables en `float`), «Resumen» con las 4 tarjetas y filas finales (nombre de sesión, quién cerró y cuándo, moneda, estado «Informe congelado», `NOTA`, `SIN_DETALLE`, `EMPRESA_VIGENTE`) sin la lista duplicada (Q7), ajuste 1×1; libro en el orden de la plantilla (Q6); hoja activa la primera, A1 (Q11); sesión antigua sin detalle sigue generando un libro válido.
 - Archivos probables: `backend/app/conteo/exportar.py`, `backend/tests/test_exportar_documento.py`, `backend/tests/test_roles.py`.
 - Verificación: `cd backend && uv run pytest tests/test_exportar_documento.py tests/test_roles.py -q` y `uv run ruff check .`
+- Pendiente del reviewer (T2): «Corte» y `{fecha}` salen de la fecha del cierre (no de «hoy»); sesión antigua sin detalle; centavos no representables en `float` escritos desde `Decimal`; una aserción y su prueba para `Decimal` de más de 16 dígitos significativos (`write_number` redondea a 16 cifras significativas).
 - Dependencia: T4.
 
 ## T6 — Validación
