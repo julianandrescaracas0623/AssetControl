@@ -30,6 +30,10 @@ Cuentas de desarrollador de la consola de plataforma (spec 017, T1; R7–R10; pl
 §2.4): ``flask crear-desarrollador <email>``, ``flask restablecer-desarrollador <email>`` y
 ``flask desactivar-desarrollador <email> [--reactivar]``.
 
+``flask sembrar-demo <email> [--activos N] [--sin-sesion] [--password-stdin]``: datos de
+demostración por la API con la cuenta de un admin (``app.demo``). No corre con
+``ENVIRONMENT=production``; pide la contraseña sin eco y solo usa ``DATABASE_URL``.
+
 - Crear pide el **nombre** (``click.prompt``) y la **contraseña** sin eco y con
   confirmación; restablecer pide solo la contraseña. Con ``--password-stdin`` la contraseña
   es la siguiente línea de la entrada estándar (en crear, después de la línea del nombre),
@@ -49,18 +53,20 @@ import sys
 
 import click
 import psycopg
-from flask import Flask
+from flask import Flask, current_app
+from flask.cli import with_appcontext
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
-from app import conexiones, roles
+from app import conexiones, demo, roles
 from app.auth.credentials import PasswordPolicyError, new_token, token_key
 from app.config import (
     InvalidDatabaseUrlError,
     MissingConfigError,
     SameDatabaseRoleError,
+    get_config,
     load_migration_url,
 )
 from app.invitaciones.service import normalize_invitation_email
@@ -415,6 +421,50 @@ def desactivar_desarrollador_command(email: str, reactivar: bool) -> None:
         click.echo("Desarrollador desactivado; sus sesiones abiertas se cerraron.")
 
 
+@click.command("sembrar-demo")
+@click.argument("email")
+@click.option("--activos", "cantidad", default=40, show_default=True, help="Cuántos activos.")
+@click.option("--sin-sesion", is_flag=True, help="No abrir ni cerrar una sesión de conteo.")
+@click.option(
+    "--password-stdin", is_flag=True, help="Leer la contraseña de la primera línea de stdin."
+)
+@with_appcontext
+def sembrar_demo_command(email: str, cantidad: int, sin_sesion: bool, password_stdin: bool) -> None:
+    """Siembra datos de demostración por la API con la cuenta de un admin (no producción).
+
+    Crea salas, categorías, activos SEM-001… (repetible: no duplica) y, salvo
+    --sin-sesion, una sesión de conteo cerrada para ver el informe. Pide la contraseña
+    del admin sin eco; nunca por argumento.
+    """
+    app = current_app._get_current_object()  # type: ignore[attr-defined]
+    if get_config(app).environment == "production":
+        raise click.ClickException("sembrar-demo no se ejecuta con ENVIRONMENT=production.")
+    if password_stdin:
+        password = sys.stdin.readline().rstrip("\r\n")
+    else:
+        password = click.prompt("Contraseña del admin", hide_input=True)
+    try:
+        resultado = demo.sembrar(
+            app, email, password, cantidad=cantidad, sesion=not sin_sesion, avisar=click.echo
+        )
+    except demo.SiembraError as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(f"Ubicaciones creadas: {', '.join(resultado.ubicaciones_creadas) or 'ninguna'}")
+    click.echo(f"Categorías creadas: {', '.join(resultado.categorias_creadas) or 'ninguna'}")
+    click.echo(
+        f"Activos: {resultado.activos_nuevos} nuevos, {resultado.activos_existentes} ya existían"
+    )
+    if resultado.sesion_omitida:
+        click.echo(resultado.sesion_omitida)
+    elif resultado.sesion_id:
+        t = resultado.totales or {}
+        click.echo(
+            f"Sesión cerrada {resultado.sesion_id}: {t.get('unidades_encontrado')} de "
+            f"{t.get('unidades_registrado')} encontrados; registrado {t.get('registrado')}, "
+            f"encontrado {t.get('encontrado')}, no encontrado {t.get('no_encontrado')}"
+        )
+
+
 def register_cli(app: Flask) -> None:
     """Registra los comandos del operador en ``flask``."""
     app.cli.add_command(create_tenant_command)
@@ -424,3 +474,4 @@ def register_cli(app: Flask) -> None:
     app.cli.add_command(crear_desarrollador_command)
     app.cli.add_command(restablecer_desarrollador_command)
     app.cli.add_command(desactivar_desarrollador_command)
+    app.cli.add_command(sembrar_demo_command)
