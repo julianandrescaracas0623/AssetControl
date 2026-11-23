@@ -288,10 +288,6 @@ def documento(
 # --- Excel (009 T2 / 013 T4 / 015 T5: dinero como número COP, sin fórmulas) ---------------
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-FORMATO_COP = '"$" #,##0.00'
-FORMATO_PORCENTAJE = "0.0 %"
-FORMATO_FECHA = "dd/mm/yyyy"
-FORMATO_FECHA_HORA = "dd/mm/yyyy hh:mm"
 NOTA = (
     "Cifras calculadas por el servidor una sola vez, al cerrar la sesión. Lo encontrado usa "
     "el precio, la categoría y la ubicación del momento de contar; lo no encontrado, los del "
@@ -316,17 +312,6 @@ ENCABEZADO_DESGLOSE_EXCEL = (
     "Unid. registradas",
     "% encontrado",
 )
-
-# Colores de la marca «Grafito y Cobalto» (docs/08), sobrios; los de estado solo marcan.
-GRAFITO = "#18181B"
-COBALTO = "#2B50E0"
-GRIS = "#71717A"
-LINEA = "#E4E4E7"
-FONDO = "#F4F4F5"
-FONDO_TOTAL = "#EEF2FF"
-BARRA = "#C7D2FE"  # cobalto claro: la cifra se sigue leyendo sobre la barra
-VERDE = "#15803D"
-ROJO = "#B91C1C"
 
 HOJA_RESUMEN = "Resumen"
 HOJA_TODOS = "Todos los activos"
@@ -373,6 +358,13 @@ EMPRESA_VIGENTE = (
     "Datos de la empresa vigentes: la sesión se cerró antes de guardarlos con el informe."
 )
 LEYENDA = "En cursiva y fondo ámbar: se encontró en otra ubicación."
+# Resumen (spec 019, Q7): las filas de contexto empiezan en la fila 10 (índice 9), bajo las
+# tarjetas (filas 6–8); la fila 9 queda vacía, como el espacio de la plantilla.
+FILA_CONTEXTO_RESUMEN = 9
+FILA_TARJETAS = 5  # rótulos (fila 6); valores (7) y subtexto (8) debajo
+# Tarjetas en A, C, E y G; las celdas entre ellas y H–J llevan el estilo por defecto
+# centrado de la plantilla (B6, D6, F6, H6–J6 …).
+COLUMNAS_TARJETAS = 10
 
 
 def nombres_de_hoja(categorias: Sequence[str]) -> list[str]:
@@ -382,6 +374,7 @@ def nombres_de_hoja(categorias: Sequence[str]) -> list[str]:
     al final, ni dos hojas con el mismo nombre (sin distinguir mayúsculas). Tampoco se
     usan «Resumen», «Todos los activos», «No encontrados», «Por ubicación» ni «Por
     categoría», que son las otras hojas (spec 019, B16), ni «History», que Excel reserva.
+    Los caracteres de control se eliminan (se cambian por espacio, como los prohibidos).
     Los 31 caracteres se miden en unidades UTF-16, como Excel (un emoji ocupa dos), sin
     partir un par sustituto.
     """
@@ -396,7 +389,8 @@ def nombres_de_hoja(categorias: Sequence[str]) -> list[str]:
     usados = {h.casefold() for h in reservados}
     nombres = []
     for categoria in categorias:
-        limpio = re.sub(r"[\[\]:*?/\\]", " ", categoria)
+        # Tampoco caracteres de control (\x00–\x1f): romperían el XML del libro (spec 019, T5).
+        limpio = re.sub(r"[\[\]:*?/\\\x00-\x1f]", " ", categoria)
         limpio = " ".join(limpio.split()).strip("'").strip() or "Categoría"
         base = _recortar_utf16(limpio, 31).rstrip().rstrip("'").rstrip() or "Categoría"
         nombre, n = base, 2
@@ -424,14 +418,13 @@ def _recortar_utf16(texto: str, tope: int) -> str:
 
 
 def a_excel(doc: Documento) -> bytes:
-    """Libro v4 (spec 015, T5): «Resumen» tipo tablero, «Todos los activos» (tabla plana),
-    una hoja por categoría y «No encontrados».
+    """Libro del informe congelado con el diseño de la plantilla B (spec 019).
 
-    Spec 019 (T4): las tres familias de hojas de lista replican la plantilla B con el estilo
-    común (``exportar_estilo``): bloque de la empresa congelada, título y nota, Total sobre
-    la cabecera, datos sin filas alternas, formato condicional de fila completa, columnas
-    ocultas en «No encontrados», congelado, impresión de 1 página de ancho (Q12) y la tabla
-    «Activos» y los filtros (Q8). El Resumen y el orden del libro son de T5.
+    Orden de la plantilla (Q6): «Todos los activos», «Por ubicación», «No encontrados», una
+    hoja por categoría, «Por categoría» y «Resumen»; sin detalle (sesión anterior a la 013)
+    no hay «Todos los activos» ni hojas por categoría. Todas las hojas llevan el bloque de la
+    empresa congelada (filas 1–5) y el estilo común (``exportar_estilo``). El libro abre en
+    la primera hoja, celda A1, sin desplazamiento (Q11).
 
     El texto va siempre con ``write_string`` (nunca fórmula) y el dinero con
     ``write_number`` desde el ``Decimal`` exacto (un ``float`` se rechaza). Las cifras y
@@ -445,258 +438,10 @@ def a_excel(doc: Documento) -> bytes:
         salida,
         {"in_memory": True, "strings_to_formulas": False, "strings_to_urls": False},
     )
-    libro.set_properties({"title": f"Informe · {doc.sesion}", "comments": "Informe congelado"})
-    formatos: dict[tuple, Any] = {}
-
-    def fmt(**kw):
-        """Formato con la base común; uno por combinación (XlsxWriter no los deduplica)."""
-        clave = tuple(sorted(kw.items()))
-        if clave not in formatos:
-            formatos[clave] = libro.add_format(
-                {"font_name": "Calibri", "font_size": 10, "valign": "vcenter", **kw}
-            )
-        return formatos[clave]
-
-    celda = {"bottom": 1, "bottom_color": LINEA}
-    banda = {
-        "bold": True,
-        "bg_color": FONDO_TOTAL,
-        "top": 2,
-        "top_color": COBALTO,
-        "bottom": 2,
-        "bottom_color": COBALTO,
-    }
-    f = {
-        "empresa": fmt(bold=True, font_size=15, font_color=GRAFITO),
-        "gris": fmt(font_color=GRIS),
-        "rotulo": fmt(font_color=GRIS, font_size=9),
-        "antetitulo": fmt(bold=True, font_size=9, font_color=COBALTO),
-        "sesion": fmt(bold=True, font_size=18, font_color=GRAFITO),
-        "titulo": fmt(bold=True, font_size=12, font_color=COBALTO),
-        "dato": fmt(bold=True, font_color=GRAFITO),
-        "fecha": fmt(bold=True, font_color=GRAFITO, num_format=FORMATO_FECHA, align="left"),
-        "fecha_hora": fmt(
-            bold=True, font_color=GRAFITO, num_format=FORMATO_FECHA_HORA, align="left"
-        ),
-        "cabecera": fmt(
-            bold=True,
-            font_color="#FFFFFF",
-            bg_color=GRAFITO,
-            text_wrap=True,
-            border=1,
-            border_color=GRAFITO,
-        ),
-        "cabecera_num": fmt(
-            bold=True,
-            font_color="#FFFFFF",
-            bg_color=GRAFITO,
-            text_wrap=True,
-            border=1,
-            border_color=GRAFITO,
-            align="right",
-        ),
-        # Columna numérica con filtro: la sangría deja ver el texto junto al botón.
-        "cabecera_filtro_num": fmt(
-            bold=True,
-            font_color="#FFFFFF",
-            bg_color=GRAFITO,
-            text_wrap=True,
-            border=1,
-            border_color=GRAFITO,
-            align="right",
-            indent=2,
-        ),
-        "nota": fmt(italic=True, font_color=GRIS, text_wrap=True, valign="top"),
-        "total": fmt(**banda),
-        "total_cop": fmt(**banda, num_format=FORMATO_COP),
-        "total_entero": fmt(**banda, num_format="#,##0"),
-        "total_pct": fmt(**banda, num_format=FORMATO_PORCENTAJE),
-        "total_derecha": fmt(**banda, align="right"),
-    }
-
-    def cuerpo(alterna: bool = False, **kw):
-        """Celda de tabla: línea inferior suave y, si ``alterna``, fondo gris claro."""
-        return fmt(**celda, **({"bg_color": FONDO} if alterna else {}), **kw)
-
-    e = doc.empresa
-    sesion = (
-        f"Informe de inventario «{doc.sesion}» · corte {doc.corte} · "
-        f"cerrada {doc.cerrada_en} por {doc.cerrada_por}"
-    )
-    estado = "Informe congelado al cierre · valores en COP"
-    if e.vigente:
-        estado += f" · {EMPRESA_VIGENTE}"
-
-    def encabezado(hoja, filas_repetidas: int | None) -> None:
-        hoja.hide_gridlines(2)
-        hoja.set_row(0, 34)
-        if e.logo:
-            ancho, alto = _tamano_png(e.logo)
-            escala = min(40 / alto, 110 / ancho) if ancho and alto else 1
-            hoja.insert_image(
-                0,
-                0,
-                "logo.png",
-                {
-                    "image_data": io.BytesIO(e.logo),
-                    "x_scale": escala,
-                    "y_scale": escala,
-                    "x_offset": 4,
-                    "y_offset": 4,
-                    "object_position": 3,
-                },
-            )
-        hoja.write_string(0, 1, e.nombre, f["empresa"])
-        if e.contacto:
-            hoja.write_string(1, 1, e.contacto, f["gris"])
-        hoja.write_string(2, 1, sesion, f["gris"])
-        hoja.write_string(3, 1, estado, f["rotulo"])
-        hoja.set_landscape()
-        hoja.set_paper(1)  # Carta
-        hoja.fit_to_pages(1, 0)
-        if filas_repetidas is not None:
-            hoja.repeat_rows(filas_repetidas, filas_repetidas)
-        hoja.set_margins(left=0.4, right=0.4, top=0.6, bottom=0.6)
-        # El espacio separa el tamaño (``&8``) del texto: «2026 …» no se lee como ``&82026``.
-        hoja.set_header(
-            f"&L&8 {_cabecera_impresion(e.nombre)}&R&8 {_cabecera_impresion(doc.sesion)}"
-        )
-        hoja.set_footer("&L&8Generado con AssetControl&RPágina &P de &N")
-
-    def texto(hoja, fila: int, col: int, valor: str | None, formato_) -> None:
-        """Texto siempre como texto (nunca fórmula); vacío como celda en blanco."""
-        if valor:
-            hoja.write_string(fila, col, valor, formato_)
-        else:
-            hoja.write_blank(fila, col, None, formato_)
-
-    def cabecera(
-        hoja, fila: int, columnas: Sequence[str], numericas: int, filtro: bool = False
-    ) -> None:
-        numerica = "cabecera_filtro_num" if filtro else "cabecera_num"
-        for col, nombre in enumerate(columnas):
-            hoja.write_string(fila, col, nombre, f[numerica if col >= numericas else "cabecera"])
-        hoja.set_row(fila, 30)
-
-    def tabla_desglose(hoja, fila: int, titulo: str, rotulo: str, filas: tuple[Fila, ...]) -> int:
-        hoja.write_string(fila, 0, titulo, f["titulo"])
-        cabecera(hoja, fila + 1, (rotulo, *ENCABEZADO_DESGLOSE_EXCEL), 1)
-        fila += 2
-        primera = fila
-        for i, d in enumerate(filas):
-            alterna = i % 2 == 1
-            hoja.write_string(fila, 0, d.etiqueta, cuerpo(alterna))
-            for j, cifra in enumerate((d.encontrado, d.no_encontrado, d.registrado)):
-                hoja.write_number(
-                    fila, 1 + 2 * j, cifra.valor, cuerpo(alterna, num_format=FORMATO_COP)
-                )
-                hoja.write_number(
-                    fila, 2 + 2 * j, cifra.unidades, cuerpo(alterna, num_format="#,##0")
-                )
-            hoja.write_number(
-                fila,
-                7,
-                fraccion_encontrada(d.encontrado.unidades, d.registrado.unidades),
-                cuerpo(alterna, num_format=FORMATO_PORCENTAJE),
-            )
-            fila += 1
-        if filas:
-            # Barras de datos: solo visuales, sin fórmulas (mínimo y máximo automáticos).
-            for col in (5, 7):
-                hoja.conditional_format(
-                    primera,
-                    col,
-                    fila - 1,
-                    col,
-                    {"type": "data_bar", "bar_color": BARRA, "bar_solid": True},
-                )
-        t = doc.totales
-        hoja.write_string(fila, 0, t.etiqueta, f["total"])
-        for j, cifra in enumerate((t.encontrado, t.no_encontrado, t.registrado)):
-            hoja.write_number(fila, 1 + 2 * j, cifra.valor, f["total_cop"])
-            hoja.write_number(fila, 2 + 2 * j, cifra.unidades, f["total_entero"])
-        hoja.write_number(
-            fila,
-            7,
-            fraccion_encontrada(t.encontrado.unidades, t.registrado.unidades),
-            f["total_pct"],
-        )
-        return fila + 2
-
-    t = doc.totales
-
-    # --- Resumen (tablero)
-    hoja = libro.add_worksheet(HOJA_RESUMEN)
-    encabezado(hoja, None)
-    hoja.center_horizontally()
-    hoja.set_column(0, 0, 34)
-    hoja.set_column(1, 6, 18)
-    hoja.set_column(7, 7, 26)  # la tarjeta del % va sola en su columna
-    hoja.write_string(5, 0, "INFORME DE INVENTARIO DE ACTIVOS", f["antetitulo"])
-    hoja.write_string(6, 0, doc.sesion, f["sesion"])
-    hoja.set_row(6, 28)
-    for col, rotulo in enumerate(("Fecha de corte", "Cerrada", "Moneda", "Estado", "Cerró")):
-        hoja.write_string(8, col, rotulo, f["rotulo"])
-    if doc.fecha_corte is not None:
-        hoja.write_datetime(
-            9, 0, datetime.combine(doc.fecha_corte, datetime.min.time()), f["fecha"]
-        )
-    if doc.momento_cierre is not None:
-        hoja.write_datetime(9, 1, doc.momento_cierre, f["fecha_hora"])
-    hoja.write_string(9, 2, "COP", f["dato"])
-    hoja.write_string(9, 3, "Informe congelado", f["dato"])
-    hoja.merge_range(9, 4, 9, 7, "", f["dato"])
-    texto(hoja, 9, 4, doc.cerrada_por, f["dato"])
-
-    tarjeta = 11
-    for col, ultima, rotulo, color, valor, num, debajo in (
-        (1, 2, "Encontrado", VERDE, t.encontrado.valor, FORMATO_COP, t.encontrado.unidades),
-        (3, 4, "No encontrado", ROJO, t.no_encontrado.valor, FORMATO_COP, t.no_encontrado.unidades),
-        (5, 6, "Total registrado", COBALTO, t.registrado.valor, FORMATO_COP, t.registrado.unidades),
-        (
-            7,
-            7,
-            "% encontrado",
-            GRAFITO,
-            fraccion_encontrada(t.encontrado.unidades, t.registrado.unidades),
-            FORMATO_PORCENTAJE,
-            None,
-        ),
-    ):
-        fondo = {
-            "bg_color": FONDO,
-            "left": 1,
-            "left_color": LINEA,
-            "right": 1,
-            "right_color": LINEA,
-        }
-        f_rotulo = fmt(**fondo, bold=True, font_color=color, top=5, top_color=color)
-        f_valor = fmt(**fondo, bold=True, font_size=16, font_color=GRAFITO, num_format=num)
-        f_debajo = fmt(**fondo, font_color=GRIS, bottom=1, bottom_color=LINEA)
-        unidades = "de las unidades registradas" if debajo is None else _unidades(debajo)
-        if ultima > col:
-            hoja.merge_range(tarjeta, col, tarjeta, ultima, "", f_rotulo)
-            hoja.merge_range(tarjeta + 1, col, tarjeta + 1, ultima, "", f_valor)
-            hoja.merge_range(tarjeta + 2, col, tarjeta + 2, ultima, "", f_debajo)
-        hoja.write_string(tarjeta, col, rotulo, f_rotulo)
-        hoja.write_number(tarjeta + 1, col, valor, f_valor)
-        hoja.write_string(tarjeta + 2, col, unidades, f_debajo)
-    hoja.write_string(tarjeta, 0, "Cifras del cierre", f["titulo"])
-    hoja.set_row(tarjeta, 20)
-    hoja.set_row(tarjeta + 1, 30)
-
-    fila = tabla_desglose(
-        hoja, tarjeta + 4, "Por categoría", "Categoría (al cierre)", doc.por_categoria
-    )
-    fila = tabla_desglose(hoja, fila, "Por ubicación", "Ubicación (al cierre)", doc.por_ubicacion)
-    hoja.merge_range(fila, 0, fila + 1, 7, "", f["nota"])
-    hoja.write_string(fila, 0, NOTA, f["nota"])
-    if not doc.detalle_disponible:
-        hoja.merge_range(fila + 2, 0, fila + 3, 7, "", f["nota"])
-        hoja.write_string(fila + 2, 0, SIN_DETALLE, f["nota"])
-
-    # --- Hojas de lista (spec 019, T4): plantilla B, desde el estilo común
+    # Fila 26: título del libro y autor neutro («AssetControl»), nada del equipo.
+    libro.set_properties(est.propiedades(f"Informe · {doc.sesion}"))
     estilos = est.Estilos(libro)
+    t = doc.totales
 
     # Todos los activos (tabla plana del universo U congelado)
     if doc.detalle:
@@ -735,37 +480,16 @@ def a_excel(doc: Documento) -> bytes:
             },
         )
 
-    # Una hoja por categoría (R5)
-    grupos = doc.categorias_con_detalle()
-    plantilla = est.PLANTILLAS["categoria"]
-    for nombre, (cifras, activos) in zip(
-        nombres_de_hoja([g[0].etiqueta for g in grupos]), grupos, strict=True
-    ):
-        hoja = _hoja_de_lista(
-            libro,
-            estilos,
-            nombre,
-            plantilla,
-            doc,
-            titulo=f"Categoría: {cifras.etiqueta}",
-            nota=f"{_resumen_de_lista(cifras)} · {LEYENDA}",
-            total=(
-                "Total",
-                cifras.etiqueta,
-                *(None,) * 5,
-                _activos(cifras.registrado.unidades),
-                cifras.registrado.valor,
-                None,
-            ),
-            cabecera=COLUMNAS_DETALLE,
-            filas=[_valores_de_activo(a, con_categoria=False) for a in activos],
-        )
-        hoja.autofilter(
-            plantilla.fila_cabecera,
-            0,
-            plantilla.fila_cabecera + len(activos),
-            len(COLUMNAS_DETALLE) - 1,
-        )
+    # Por ubicación (desglose congelado del cierre)
+    _hoja_de_desglose(
+        libro,
+        estilos,
+        HOJA_POR_UBICACION,
+        est.PLANTILLAS["por_ubicacion"],
+        doc,
+        rotulo="Ubicación (al cierre)",
+        filas=doc.por_ubicacion,
+    )
 
     # No encontrados
     plantilla = est.PLANTILLAS["no_encontrados"]
@@ -808,8 +532,201 @@ def a_excel(doc: Documento) -> bytes:
             len(COLUMNAS_NO_ENCONTRADOS) - 1,
         )
 
+    # Una hoja por categoría (R5)
+    grupos = doc.categorias_con_detalle()
+    plantilla = est.PLANTILLAS["categoria"]
+    for nombre, (cifras, activos) in zip(
+        nombres_de_hoja([g[0].etiqueta for g in grupos]), grupos, strict=True
+    ):
+        hoja = _hoja_de_lista(
+            libro,
+            estilos,
+            nombre,
+            plantilla,
+            doc,
+            titulo=f"Categoría: {cifras.etiqueta}",
+            nota=f"{_resumen_de_lista(cifras)} · {LEYENDA}",
+            total=(
+                "Total",
+                cifras.etiqueta,
+                *(None,) * 5,
+                _activos(cifras.registrado.unidades),
+                cifras.registrado.valor,
+                None,
+            ),
+            cabecera=COLUMNAS_DETALLE,
+            filas=[_valores_de_activo(a, con_categoria=False) for a in activos],
+        )
+        hoja.autofilter(
+            plantilla.fila_cabecera,
+            0,
+            plantilla.fila_cabecera + len(activos),
+            len(COLUMNAS_DETALLE) - 1,
+        )
+
+    # Por categoría (desglose congelado del cierre)
+    _hoja_de_desglose(
+        libro,
+        estilos,
+        HOJA_POR_CATEGORIA,
+        est.PLANTILLAS["por_categoria"],
+        doc,
+        rotulo="Categoría (al cierre)",
+        filas=doc.por_categoria,
+    )
+
+    # Resumen: tarjetas de la plantilla y filas de contexto (Q7)
+    _hoja_resumen(libro, estilos, doc)
+
     libro.close()
     return salida.getvalue()
+
+
+def _cifras_de_desglose(f: Fila) -> tuple:
+    """Etiqueta, las tres cifras congeladas con sus unidades y la fracción encontrada."""
+    return (
+        f.etiqueta,
+        f.encontrado.valor,
+        f.encontrado.unidades,
+        f.no_encontrado.valor,
+        f.no_encontrado.unidades,
+        f.registrado.valor,
+        f.registrado.unidades,
+        fraccion_encontrada(f.encontrado.unidades, f.registrado.unidades),
+    )
+
+
+def _hoja_de_desglose(
+    libro: Any,
+    estilos: Any,
+    nombre: str,
+    plantilla: Any,
+    doc: Documento,
+    *,
+    rotulo: str,
+    filas: Sequence[Fila],
+) -> Any:
+    """«Por ubicación» o «Por categoría» (spec 019, T5; Q6): bloque de la empresa congelada
+    (filas 1–5), título (6), cabecera (7), una fila por etiqueta del desglose congelado desde
+    la 8 y la fila Total (los ``totales`` del cierre, con fondo ``DBEAFE``) justo debajo.
+    Barras de datos en «Valor registrado» y «% encontrado», sin extensión 2010, extendidas
+    hasta la última fila (req. 5). Las cifras son las de ``cierre.informe``: no se suma."""
+    hoja = libro.add_worksheet(nombre)
+    total = plantilla.fila_datos + len(filas)
+    est.preparar_hoja(hoja, plantilla, total)
+    est.dibujar_bloque(hoja, estilos, plantilla, doc.empresa, _fecha_de_corte(doc))
+    primero, *resto = plantilla.estilos_titulo_lista
+    est.escribir_fila(
+        hoja,
+        estilos,
+        plantilla.fila_cabecera - 1,
+        [(nombre, primero), *((None, s) for s in resto)],
+    )
+    est.escribir_fila(
+        hoja,
+        estilos,
+        plantilla.fila_cabecera,
+        list(
+            zip(
+                (rotulo, *ENCABEZADO_DESGLOSE_EXCEL, None, None),
+                plantilla.estilos_cabecera,
+                strict=True,
+            )
+        ),
+    )
+    for fila, cifras in enumerate(filas, start=plantilla.fila_datos):
+        est.escribir_fila(
+            hoja,
+            estilos,
+            fila,
+            list(zip(_cifras_de_desglose(cifras), plantilla.estilos_datos, strict=True)),
+            plantilla.alto_datos,
+        )
+    est.escribir_fila(
+        hoja,
+        estilos,
+        total,
+        list(
+            zip(
+                (*_cifras_de_desglose(doc.totales), None, None),
+                plantilla.estilos_total,
+                strict=True,
+            )
+        ),
+        plantilla.alto_total,
+    )
+    if filas:
+        # Barras de datos solo visuales (sin fórmulas): mínimo y máximo automáticos.
+        for col in (5, 7):
+            hoja.conditional_format(
+                plantilla.fila_datos,
+                col,
+                total - 1,
+                col,
+                {"type": "data_bar", "bar_color": est.BARRA, "data_bar_2010": False},
+            )
+    return hoja
+
+
+def _contexto_resumen(doc: Documento) -> list[tuple[str | None, ...]]:
+    """Filas finales del Resumen (spec 019, Q7): sesión, quién cerró y cuándo, moneda,
+    estado, la nota de cifras congeladas y los avisos que apliquen."""
+    filas: list[tuple[str | None, ...]] = [
+        ("Sesión", doc.sesion or None),
+        ("Cerró", doc.cerrada_por or None, "Cerrada", doc.cerrada_en or None),
+        ("Moneda", "COP"),
+        ("Estado", "Informe congelado"),
+        (NOTA,),
+    ]
+    if not doc.detalle_disponible:
+        filas.append((SIN_DETALLE,))
+    if doc.empresa.vigente:
+        filas.append((EMPRESA_VIGENTE,))
+    return filas
+
+
+def _hoja_resumen(libro: Any, estilos: Any, doc: Documento) -> Any:
+    """Resumen de la plantilla B (spec 019, T5): bloque (filas 1–5, título combinado C2:D2),
+    las cuatro tarjetas (rótulo en la fila 6, valor en la 7 y subtexto en la 8; columnas A,
+    C, E y G) y, desde la fila 10, las filas de contexto con el estilo de la nota de lista
+    (Q7). La lista «Todos los activos» duplicada de la plantilla no se genera (Q7)."""
+    plantilla = est.PLANTILLAS["resumen"]
+    hoja = libro.add_worksheet(HOJA_RESUMEN)
+    contexto = _contexto_resumen(doc)
+    est.preparar_hoja(hoja, plantilla, FILA_CONTEXTO_RESUMEN + len(contexto) - 1)
+    est.dibujar_bloque(hoja, estilos, plantilla, doc.empresa, _fecha_de_corte(doc))
+    t = doc.totales
+    tarjetas = (
+        ("Encontrado", "tarjeta_rotulo", t.encontrado.valor, "tarjeta_valor_cop"),
+        ("No encontrado", "tarjeta_rotulo", t.no_encontrado.valor, "tarjeta_valor_cop"),
+        ("Total registrado", "tarjeta_rotulo", t.registrado.valor, "tarjeta_valor_cop"),
+        (
+            "% encontrado",
+            "tarjeta_subtexto",  # G6 de la plantilla: sin negrita y en gris
+            fraccion_encontrada(t.encontrado.unidades, t.registrado.unidades),
+            "tarjeta_valor_porcentaje",
+        ),
+    )
+    debajo = (
+        _unidades(t.encontrado.unidades),
+        _unidades(t.no_encontrado.unidades),
+        _unidades(t.registrado.unidades),
+        "de las unidades registradas",
+    )
+    for desplazamiento in range(3):
+        celdas: list[tuple[Any, str]] = [(None, "base_centro")] * COLUMNAS_TARJETAS
+        for i, (rotulo, estilo_rotulo, valor, estilo_valor) in enumerate(tarjetas):
+            celdas[2 * i] = (
+                (rotulo, estilo_rotulo),
+                (valor, estilo_valor),
+                (debajo[i], "tarjeta_subtexto"),
+            )[desplazamiento]
+        est.escribir_fila(hoja, estilos, FILA_TARJETAS + desplazamiento, celdas)
+    for i, fila in enumerate(contexto):
+        est.escribir_fila(
+            hoja, estilos, FILA_CONTEXTO_RESUMEN + i, [(valor, "nota") for valor in fila]
+        )
+    return hoja
 
 
 def _resumen_de_lista(cifras: Fila) -> str:
@@ -911,36 +828,6 @@ def _hoja_de_lista(
             },
         )
     return hoja
-
-
-CABECERA_MAXIMA = 80  # unidades UTF-16 ya escapadas, por lado (Excel admite 255 en total)
-
-
-def _cabecera_impresion(texto: str) -> str:
-    """Texto seguro para el encabezado de impresión de Excel (``&`` es un código).
-
-    Se quita el ``&`` de ``&G`` y ``&[`` (imagen: XlsxWriter descarta el encabezado y avisa
-    con el texto) y de ``&"`` (fuente); los demás ``&`` se duplican. El tope se aplica al
-    escapar, carácter a carácter, para no partir un ``&&`` ni un emoji.
-    """
-    previo = None
-    while previo != texto:
-        previo, texto = texto, re.sub(r'&(?=[G"\[])', "", texto)
-    salida, largo = [], 0
-    for caracter in texto:
-        escapado = "&&" if caracter == "&" else caracter
-        largo += _unidades_utf16(escapado)
-        if largo > CABECERA_MAXIMA:
-            break
-        salida.append(escapado)
-    return "".join(salida)
-
-
-def _tamano_png(datos: bytes) -> tuple[int, int]:
-    """Ancho y alto de un PNG (los logos se guardan siempre en PNG, spec 013)."""
-    if datos[:8] == b"\x89PNG\r\n\x1a\n" and len(datos) >= 24:
-        return int.from_bytes(datos[16:20], "big"), int.from_bytes(datos[20:24], "big")
-    return 0, 0
 
 
 def _activos(n: int) -> str:

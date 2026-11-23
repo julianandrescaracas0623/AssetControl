@@ -272,6 +272,10 @@ def test_long_pdf_numbers_pages_and_repeats_the_header():
         (["a" * 29 + "😀"], ["a" * 29 + "😀"]),  # 31 unidades: cabe
         (["History", "history"], ["History (2)", "history (3)"]),
         (["a" * 30 + "'b"], ["a" * 30]),  # tras el corte tampoco termina en comilla
+        # Spec 019 (T5): sin caracteres de control (\x00–\x1f) en el nombre de hoja.
+        (["Rayos\x00X\x07"], ["Rayos X"]),
+        (["\x01\x1b\x1f"], ["Categoría"]),
+        (["a\x0bb\x0cc\x1ed"], ["a b c d"]),
     ],
 )
 def test_sheet_names_are_valid_and_unique(categorias, hojas):
@@ -281,6 +285,17 @@ def test_sheet_names_are_valid_and_unique(categorias, hojas):
         assert len(nombre.encode("utf-16-le")) // 2 <= 31
         assert not set(nombre) & set("[]:*?/\\")
         assert not nombre.startswith("'") and not nombre.endswith("'")
+        assert not any(ord(c) < 0x20 for c in nombre)
+
+
+def test_sheet_names_with_control_characters_are_accepted_by_the_writer():
+    """Una categoría con caracteres de control no llega al nombre de hoja (spec 019, T5)."""
+    informe = copy.deepcopy(INFORME)
+    informe["desglose"]["categorias"][0]["etiqueta"] = "Equipos\x00\x08Rayos"
+    detalle = [_detalle(categoria_nombre="Equipos\x00\x08Rayos")]
+    wb = load_workbook(io.BytesIO(exportar.a_excel(exportar.documento(informe, detalle))))
+    assert "Equipos Rayos" in wb.sheetnames
+    assert not any(ord(c) < 0x20 for nombre in wb.sheetnames for c in nombre)
 
 
 def test_sheet_names_with_emoji_are_accepted_by_the_writer():
@@ -291,18 +306,6 @@ def test_sheet_names_with_emoji_are_accepted_by_the_writer():
     detalle[0].categoria_nombre = informe["desglose"]["categorias"][0]["etiqueta"]
     wb = load_workbook(io.BytesIO(exportar.a_excel(exportar.documento(informe, detalle))))
     assert "Equipos " + "😀" * 11 in wb.sheetnames
-
-
-def test_print_header_text_is_cut_before_escaping_and_never_splits_a_double_ampersand():
-    # 79 letras y un «&»: duplicado ocuparía 81; se corta antes del «&&», no en medio.
-    assert exportar._cabecera_impresion("a" * 79 + "&b") == "a" * 79
-    assert exportar._cabecera_impresion("a" * 78 + "&b") == "a" * 78 + "&&"
-    assert exportar._cabecera_impresion("A&B") == "A&&B"
-    # Imágenes (``&G``, ``&[Picture]``) y fuentes (``&"``) no llegan como código.
-    assert exportar._cabecera_impresion('M&G &[Picture] &"Arial" &&G') == 'MG [Picture] "Arial" G'
-    # El tope se mide en UTF-16 y no parte un emoji.
-    assert exportar._cabecera_impresion("😀" * 50) == "😀" * 40
-    assert exportar._cabecera_impresion("a" + "😀" * 50) == "a" + "😀" * 39
 
 
 FORMULAS_PERMITIDAS = {
@@ -333,8 +336,9 @@ def _detalle(**cambios):
 
 
 def comprobar_libro_seguro(contenido: bytes, empresa: str, sesion: str) -> None:
-    """Todo texto es texto (``s``), sin fórmulas ni hipervínculos en el zip, y el
-    encabezado de impresión con cada ``&`` del usuario neutralizado y el tamaño aparte."""
+    """Todo texto es texto (``s``), sin fórmulas ni hipervínculos en el zip, y ninguna hoja
+    con encabezado de impresión (spec 019, B5/Q7: el texto del usuario no llega a un código
+    ``&`` de Excel)."""
     wb = load_workbook(io.BytesIO(contenido))
     for hoja in wb.worksheets:
         for fila in hoja.iter_rows():
@@ -342,18 +346,15 @@ def comprobar_libro_seguro(contenido: bytes, empresa: str, sesion: str) -> None:
                 if isinstance(celda.value, str):
                     assert celda.data_type == "s", (hoja.title, celda.coordinate)
         assert not hoja._hyperlinks, hoja.title
-    resumen = wb["Resumen"]
-    for ref in ("B1", "B2", "B3"):
-        assert resumen[ref].data_type == "s", ref
-    assert resumen["B1"].value == empresa
-    assert f"«{sesion}»" in resumen["B3"].value
-    # Spec 019 (T4): las hojas de lista llevan el bloque de la plantilla (empresa en C3) y su
-    # encabezado de impresión queda vacío (B5, Q7); el Resumen conserva el suyo hasta T5.
-    for hoja in wb.worksheets[1:]:
+    # Spec 019 (T5): todas las hojas, Resumen incluido, llevan el bloque de la plantilla
+    # (empresa en C3); el nombre de la sesión va como texto en las filas de contexto del
+    # Resumen (Q7), que es la última hoja (Q6).
+    for hoja in wb.worksheets:
         assert hoja["C3"].value == empresa and hoja["C3"].data_type == "s", hoja.title
-    esperado = (
-        f"&L&8 {exportar._cabecera_impresion(empresa)}&R&8 {exportar._cabecera_impresion(sesion)}"
-    )
+    resumen = wb.worksheets[-1]
+    assert resumen.title == "Resumen"
+    sesion_ref = f"B{FILA_CONTEXTO + 1}"
+    assert resumen[sesion_ref].value == sesion and resumen[sesion_ref].data_type == "s"
     with zipfile.ZipFile(io.BytesIO(contenido)) as z:
         xml = "".join(z.read(n).decode() for n in z.namelist() if n.endswith((".xml", ".rels")))
         assert "<f>" not in xml and "<f " not in xml
@@ -365,15 +366,19 @@ def comprobar_libro_seguro(contenido: bytes, empresa: str, sesion: str) -> None:
             (n for n in z.namelist() if re.fullmatch(r"xl/worksheets/sheet\d+\.xml", n)),
             key=lambda n: int(re.sub(r"\D", "", n)),
         )
-        for i, nombre in enumerate(hojas):
-            cabeceras = re.findall(r"<oddHeader>(.*?)</oddHeader>", z.read(nombre).decode())
-            assert [html.unescape(c) for c in cabeceras] == ([esperado] if i == 0 else []), nombre
-    assert not re.search(r"&8\d", esperado)
+        assert len(hojas) == len(wb.worksheets)
+        for nombre in hojas:
+            # Q6: el Resumen ya no es la primera hoja; ninguna hoja tiene encabezado (B5).
+            assert re.findall(r"<oddHeader>(.*?)</oddHeader>", z.read(nombre).decode()) == []
 
 
-def test_hostile_text_stays_text_in_every_sheet_and_in_the_print_header():
+def test_hostile_text_stays_text_in_every_sheet():
     informe = copy.deepcopy(INFORME)
     informe["empresa"]["nombre"] = EMPRESA_HOSTIL
+    informe["empresa"]["nit"] = HOSTIL
+    informe["empresa"]["telefono"] = EMPRESA_HOSTIL
+    informe["empresa"]["correo"] = HOSTIL
+    informe["empresa"]["direccion"] = EMPRESA_HOSTIL
     informe["sesion"]["nombre"] = SESION_HOSTIL
     categoria = informe["desglose"]["categorias"][0]
     categoria["etiqueta"] = HOSTIL
@@ -401,14 +406,32 @@ def test_hostile_text_stays_text_in_every_sheet_and_in_the_print_header():
     comprobar_libro_seguro(contenido, EMPRESA_HOSTIL, SESION_HOSTIL)
     wb = load_workbook(io.BytesIO(contenido))
     assert wb.sheetnames == [
-        "Resumen",
         "Todos los activos",
-        '=HYPERLINK("http evil","x")',
+        "Por ubicación",
         "No encontrados",
+        '=HYPERLINK("http evil","x")',
+        "Por categoría",
+        "Resumen",
     ]
     for nombre in ("Todos los activos", '=HYPERLINK("http evil","x")', "No encontrados"):
         valores = [c.value for fila in wb[nombre].iter_rows() for c in fila]
         assert valores.count(HOSTIL) >= 4, nombre
+    for nombre in ("Por ubicación", "Por categoría"):
+        assert wb[nombre]["A8"].value == HOSTIL and wb[nombre]["A8"].data_type == "s", nombre
+    # NIT, teléfono, correo y dirección de la empresa (bloque de cada hoja) salen como texto
+    # literal; ``comprobar_libro_seguro`` ya exige que no haya ``<f>`` ni hipervínculos.
+    contacto = {f"NIT {HOSTIL}", f"Tel. {EMPRESA_HOSTIL}", HOSTIL, EMPRESA_HOSTIL}
+    for hoja in wb.worksheets:
+        textos = {
+            c.value
+            for fila in hoja.iter_rows(min_row=1, max_row=5)
+            for c in fila
+            if isinstance(c.value, str) and c.data_type == "s"
+        }
+        assert contacto <= textos, hoja.title
+    # El título del libro (fila 26) lleva el nombre hostil escapado, nunca como código.
+    core = u_diseno.extraer(contenido)["libro"]["propiedades"]["core"]
+    assert core["title"] == f"Informe · {SESION_HOSTIL}"
 
 
 def test_document_keeps_the_real_cut_and_close_dates_for_the_spreadsheet():
@@ -429,7 +452,8 @@ def test_company_contact_line_has_only_what_exists():
 #
 # «Todos los activos», cada hoja por categoría y «No encontrados» se comparan, propiedad por
 # propiedad, contra la huella ``tests/plantillas/informe.json`` (FT-1 a FT-3). Empresa y
-# activos FICTICIOS (R8). El Resumen y el orden del libro son de T5.
+# activos FICTICIOS (R8). «Por ubicación», «Por categoría», el Resumen y el libro completo
+# (orden, hoja activa, propiedades y cobertura XML) son de T5 (más abajo).
 #
 # Celda vacía (pendiente del reviewer de T2, decidido aquí): la plantilla B SÍ determina un
 # estilo propio para la celda de datos sin valor: la única que trae (Todos E10, categoría
@@ -445,10 +469,14 @@ def test_company_contact_line_has_only_what_exists():
 HUELLA_INFORME = u_diseno.cargar_huella("informe")
 HOJA_HUELLA = {
     "Todos los activos": "Todos los activos",
+    "Por ubicación": "Por ubicación",
     "No encontrados": "No encontrados",
     "Electrónica": u_diseno.MARCA_CATEGORIA,
     "Mobiliario": u_diseno.MARCA_CATEGORIA,
+    "Por categoría": "Por categoría",
+    "Resumen": "Resumen",
 }
+FILA_CONTEXTO = exportar.FILA_CONTEXTO_RESUMEN  # índice de xlsxwriter (0 = fila 1)
 EMPRESA_DISENO = {
     "nombre": "Clínica Ficticia de Prueba S.A.S.",
     "direccion": "Calle Falsa 00 # 00-00, Ciudad Ficticia",
@@ -547,19 +575,59 @@ def _estilos_de_datos(nombre: str) -> tuple[dict, dict, dict]:
     return celdas["A10"]["estilo"], celdas["J10"]["estilo"], celdas["E10"]["estilo"]
 
 
+def comprobar_formato_hoja(hoja: dict, esp: dict) -> None:
+    """``sheetFormatPr``: alto por defecto, filas ocultas y alto propio, iguales. El ancho por
+    defecto y el ancho base son el equivalente no idéntico ``ancho_base`` (Q13): la plantilla
+    declara ``defaultColWidth=9.140625`` y ``baseColWidth=10``; xlsxwriter no los escribe y el
+    ancho por defecto efectivo es el mismo (8.43 caracteres = 64 px)."""
+    for k in ("alto_fila_defecto", "filas_ocultas_defecto", "alto_propio_defecto"):
+        assert hoja["formato_hoja"][k] == esp["formato_hoja"][k], k
+    assert "ancho_base" in u_diseno.EQUIVALENTES_NO_IDENTICOS
+    assert (esp["formato_hoja"]["ancho_col_defecto"], esp["formato_hoja"]["ancho_base"]) == (
+        9.140625,
+        10,
+    )
+    assert (hoja["formato_hoja"]["ancho_col_defecto"], hoja["formato_hoja"]["ancho_base"]) == (
+        None,
+        None,
+    )
+
+
+def comprobar_columnas(hoja: dict, esp: dict) -> None:
+    """Anchos, ocultas y rangos de la plantilla; el estilo de columna de la plantilla resuelve
+    al estilo por defecto (L7) y el generado no lo declara."""
+
+    def sin_estilo(cols):
+        return [{k: v for k, v in c.items() if k != "estilo"} for c in cols]
+
+    assert u_diseno.comparar(sin_estilo(esp["columnas"]), sin_estilo(hoja["columnas"])) == []
+    defecto = HUELLA_INFORME["libro"]["estilo_defecto"]
+    assert all(c["estilo"] in (None, defecto) for c in esp["columnas"])
+    assert all(c["estilo"] is None for c in hoja["columnas"])
+
+
+def comprobar_imagen_de_hoja(hoja: dict, esp: dict) -> None:
+    """Logo de la hoja (Q10, Q13, L8): ancla equivalente, desplazamiento exacto y tamaño
+    dentro de la caja de la plantilla."""
+    (img_esp,) = esp["imagenes"]
+    (img,) = hoja["imagenes"]
+    assert (img["ancla"], img["edit_as"]) == ("twoCellAnchor", "oneCell")
+    assert u_diseno.comparar(img_esp["desde"], img["desde"], "desde") == []
+    assert (img["xfrm"]["x"], img["xfrm"]["y"]) == (img_esp["xfrm"]["x"], img_esp["xfrm"]["y"])
+    caja, cx, cy = img_esp["ext"], img["xfrm"]["cx"], img["xfrm"]["cy"]
+    assert (cx == caja["cx"] and cy <= caja["cy"]) or (cy == caja["cy"] and cx <= caja["cx"])
+    for k in ("descr", "titulo", "oculta", "decorativa", "estirar", "geometria"):
+        assert img[k] == img_esp[k], k
+
+
 def comprobar_lista(gen: dict, nombre: str, cuerpo: dict[str, str | None], filas: list) -> None:
     """Una hoja de lista contra la huella: hoja, filas 1–9 (bloque, título, nota, Total y
     cabecera) con sus textos ``cuerpo`` (ref → texto) y cada fila de datos."""
     hoja, esp = gen["hojas"][nombre], _esperada_informe(nombre)
     for k in ("pestana", "esquema", "combinadas", "validaciones", "hipervinculos", "proteccion"):
         assert u_diseno.comparar(esp[k], hoja[k], f"{nombre}.{k}") == [], k
-    for k in ("alto_fila_defecto", "filas_ocultas_defecto", "alto_propio_defecto"):
-        assert hoja["formato_hoja"][k] == esp["formato_hoja"][k], k
-
-    def sin_estilo(cols):
-        return [{k: v for k, v in c.items() if k != "estilo"} for c in cols]
-
-    assert u_diseno.comparar(sin_estilo(esp["columnas"]), sin_estilo(hoja["columnas"])) == []
+    comprobar_formato_hoja(hoja, esp)
+    comprobar_columnas(hoja, esp)
     # Q12: listas a 1 página de ancho × alto automático (la plantilla: 1 × 1).
     pagina = {**esp["pagina"], "ajuste_alto": 0}
     assert u_diseno.comparar(pagina, hoja["pagina"], f"{nombre}.pagina") == []
@@ -625,15 +693,7 @@ def comprobar_lista(gen: dict, nombre: str, cuerpo: dict[str, str | None], filas
                 assert u_diseno.comparar(texto, g["estilo"], ref) == []
 
     # Logo de la hoja (Q10, Q13, L8).
-    (img_esp,) = esp["imagenes"]
-    (img,) = hoja["imagenes"]
-    assert (img["ancla"], img["edit_as"]) == ("twoCellAnchor", "oneCell")
-    assert u_diseno.comparar(img_esp["desde"], img["desde"], "desde") == []
-    assert (img["xfrm"]["x"], img["xfrm"]["y"]) == (img_esp["xfrm"]["x"], img_esp["xfrm"]["y"])
-    caja, cx, cy = img_esp["ext"], img["xfrm"]["cx"], img["xfrm"]["cy"]
-    assert (cx == caja["cx"] and cy <= caja["cy"]) or (cy == caja["cy"] and cx <= caja["cx"])
-    for k in ("descr", "titulo", "oculta", "decorativa", "estirar", "geometria"):
-        assert img[k] == img_esp[k], k
+    comprobar_imagen_de_hoja(hoja, esp)
 
 
 def _filas_todos(detalle) -> list[list]:
@@ -859,51 +919,572 @@ def test_los_dos_nombres_de_hoja_nuevos_estan_reservados(categorias, hojas):
     assert exportar.nombres_de_hoja(categorias) == hojas
 
 
-# Lo que las hojas de lista escriben y la plantilla no, y por qué.
-SOBRANTES_LISTAS = (
-    (r"worksheet/tableParts.*", "Q8: tabla «Activos» conservada"),
-    (r"worksheet/autoFilter.*", "Q8: filtros conservados"),
-    (r"wsDr/twoCellAnchor.*", "Q13: ancla twoCellAnchor editAs=oneCell (y picLocks, L8)"),
-    (r"worksheet/sheetData/row@spans", "pistas_fila (equivalente aceptado, L10)"),
+# --- Spec 019, T5: «Por ubicación», «Por categoría», Resumen y el libro completo -------------
+#
+# Las dos hojas de desglose escriben las cifras congeladas de ``cierre.informe`` (criterio 8):
+# una fila por etiqueta y la fila Total con los ``totales`` del cierre, sin sumar. El Resumen
+# replica las filas 1–8 de la plantilla (bloque y cuatro tarjetas) y, desde la fila 10, las
+# filas de contexto de Q7 con el estilo de la nota de lista (plan, fila 25g); la lista
+# «Todos los activos» duplicada de la plantilla (filas 9–13, A10:J10, regla A13:J13) no se
+# genera (Q7). Orden del libro (Q6), primera hoja activa en A1 (Q11), propiedades (fila 26) y
+# cobertura XML del libro completo (fila 27).
+
+LIBRO_HOJAS = [
+    "Todos los activos",
+    "Por ubicación",
+    "No encontrados",
+    "Electrónica",
+    "Mobiliario",
+    "Por categoría",
+    "Resumen",
+]
+
+
+def _cifras(etiqueta: str, f: dict, prefijo: str) -> list:
+    """Fila del desglose tal como está en ``cierre.informe`` (Decimal y unidades)."""
+    return [
+        etiqueta,
+        Decimal(f[f"{prefijo}encontrado"]),
+        f["unidades_encontrado"],
+        Decimal(f[f"{prefijo}no_encontrado"]),
+        f["unidades_no_encontrado"],
+        Decimal(f[f"{prefijo}registrado"]),
+        f["unidades_registrado"],
+        exportar.fraccion_encontrada(f["unidades_encontrado"], f["unidades_registrado"]),
+    ]
+
+
+def _desglose_esperado(informe: dict, dimension: str) -> tuple[list[list], list]:
+    filas = [_cifras(f["etiqueta"], f, "total_") for f in informe["desglose"][dimension]]
+    return filas, _cifras("Total", informe["totales"], "")
+
+
+def _valor_numerico(celda: dict) -> Decimal:
+    assert celda["tipo"] == "n", celda
+    return Decimal(str(celda["valor"]))
+
+
+def comprobar_hoja_corta(hoja: dict, esp: dict, nombre: str, combinadas: list[str]) -> None:
+    """Lo común de «Por ubicación», «Por categoría» y Resumen: pestaña, columnas, página
+    1 × 1 (Q12: igual que la plantilla), pie sin encabezado, sin congelar, sin tabla ni
+    filtro, vista sin la selección de edición de la plantilla (Q11)."""
+    for k in ("pestana", "esquema", "validaciones", "hipervinculos", "proteccion"):
+        assert u_diseno.comparar(esp[k], hoja[k], f"{nombre}.{k}") == [], k
+    assert hoja["combinadas"] == combinadas
+    assert hoja["formato_condicional_ext"] == esp["formato_condicional_ext"] == []
+    comprobar_formato_hoja(hoja, esp)
+    comprobar_columnas(hoja, esp)
+    assert u_diseno.comparar(esp["pagina"], hoja["pagina"], f"{nombre}.pagina") == []
+    assert (hoja["pagina"]["ajuste_ancho"], hoja["pagina"]["ajuste_alto"]) == (1, 1)  # Q12
+    assert hoja["pagina"]["encabezado_pie"] == {"oddFooter": est.PIE}
+    assert hoja["pagina"]["papel"] is None  # L3
+    assert hoja["tablas"] == esp["tablas"] == []
+    assert hoja["autofiltro"] is esp["autofiltro"] is None
+    assert hoja["impresion"]["titulos"] is esp["impresion"]["titulos"] is None
+    vista_esp = {k: v for k, v in esp["vista"].items() if k not in ("seleccion",)}
+    vista_esp["tab_seleccionada"] = hoja["vista"]["tab_seleccionada"]  # Q11: libro
+    vista_esp["celda_superior_izquierda"] = None  # Q11: sin el desplazamiento (Resumen A7)
+    vista_gen = {k: v for k, v in hoja["vista"].items() if k != "seleccion"}
+    assert u_diseno.comparar(vista_esp, vista_gen, f"{nombre}.vista") == []
+    assert hoja["vista"]["panel"] is None
+    assert hoja["vista"]["seleccion"] == []  # Q11: A1
+
+
+def comprobar_desglose(gen: dict, nombre: str, filas: list[list], total: list) -> None:
+    """Una hoja de desglose contra la huella: filas 1–7 (bloque, título y cabecera) iguales
+    a la plantilla, cada fila de datos con el estilo de su columna en la fila 8 y la fila
+    Total con el de la fila 9 (fondo ``DBEAFE``); barras de datos en F y H hasta la última
+    fila; cada cifra, la de ``cierre.informe`` exacta."""
+    hoja, esp = gen["hojas"][nombre], _esperada_informe(nombre)
+    comprobar_hoja_corta(hoja, esp, nombre, [])
+    n = len(filas)
+    fila_total = 8 + n  # 1-based: cabecera 7, datos desde 8
+    area = esp["impresion"]["area"].split("!")[1]
+    assert hoja["impresion"]["area"].split("!")[1] == re.sub(r"\d+$", str(fila_total), area)
+
+    filas_esp = {k: f for k, f in esp["filas"].items() if int(k) <= 7}
+    filas_esp.update({str(k): esp["filas"]["8"] for k in range(8, fila_total)})
+    filas_esp[str(fila_total)] = esp["filas"]["9"]
+    assert u_diseno.comparar(filas_esp, hoja["filas"], f"{nombre}.filas") == []
+
+    textos = _textos_del_bloque()
+    esp_fijas = {r: c for r, c in esp["celdas"].items() if _num_fila(r) <= 7}
+    gen_fijas = {r: c for r, c in hoja["celdas"].items() if _num_fila(r) <= 7}
+    assert sorted(gen_fijas) == sorted(esp_fijas), nombre
+    for ref, celda in esp_fijas.items():
+        g = gen_fijas[ref]
+        assert u_diseno.comparar(celda["estilo"], g["estilo"], f"{nombre}!{ref}") == []
+        valor = textos.get(celda["valor"], celda["valor"])
+        if valor is None:
+            assert g["tipo"] == "vacia", (ref, g["valor"])
+        else:
+            assert (g["tipo"], g["valor"]) == ("s", valor), ref
+
+    columnas = "ABCDEFGH"
+    esperadas = {f"{c}{k}" for c in columnas for k in range(8, fila_total)}
+    esperadas |= {f"{c}{fila_total}" for c in "ABCDEFGHIJ"}
+    assert sorted(r for r in hoja["celdas"] if _num_fila(r) >= 8) == sorted(esperadas)
+    for k, valores in enumerate([*filas, total], start=8):
+        plantilla = "9" if k == fila_total else "8"
+        for c, valor in zip(columnas, valores, strict=True):
+            g = hoja["celdas"][f"{c}{k}"]
+            molde = esp["celdas"][f"{c}{plantilla}"]
+            assert u_diseno.comparar(molde["estilo"], g["estilo"], f"{nombre}!{c}{k}") == []
+            if c == "A":
+                assert (g["tipo"], g["valor"]) == ("s", valor), f"{c}{k}"
+            else:
+                assert _valor_numerico(g) == valor, f"{c}{k}"
+        for c in "IJ" if k == fila_total else "":
+            g = hoja["celdas"][f"{c}{k}"]
+            assert g["tipo"] == "vacia", f"{c}{k}"
+            assert u_diseno.comparar(esp["celdas"][f"{c}9"]["estilo"], g["estilo"]) == []
+
+    # Barras de datos (L5): F y H de las filas de datos, BFDBFE, sin extensión 2010; el
+    # ``val="0"`` de min/max es el equivalente aceptado ``cfvo_val_min_max``.
+    reglas = hoja["formato_condicional"]
+    if not filas:
+        assert reglas == []
+    else:
+        ultima = 7 + n
+        esperadas_cf = []
+        for regla in esp["formato_condicional"]:
+            col = regla["rango"][0]
+            rango = f"{col}8" if n == 1 else f"{col}8:{col}{ultima}"
+            cfvo = [{**v, "valor": "0"} for v in regla["barra"]["cfvo"]]
+            barra = {**regla["barra"], "cfvo": cfvo}
+            esperadas_cf.append({**regla, "rango": rango, "barra": barra})
+        assert u_diseno.comparar(esperadas_cf, reglas, f"{nombre}.barras") == []
+        assert [r["rango"][0] for r in reglas] == ["F", "H"]
+    comprobar_imagen_de_hoja(hoja, esp)
+
+
+@pytest.mark.parametrize(
+    ("nombre", "dimension"), [("Por ubicación", "ubicaciones"), ("Por categoría", "categorias")]
 )
+def test_hoja_de_desglose_replica_la_huella_con_las_cifras_del_cierre(nombre, dimension):
+    gen = _generar_informe()
+    informe = _informe_diseno()
+    filas, total = _desglose_esperado(informe, dimension)
+    comprobar_desglose(gen, nombre, filas, total)
 
 
-def _rutas(xml: bytes) -> set[str]:
-    from xml.etree import ElementTree as ET  # noqa: S405 - archivo generado por la prueba
-
-    rutas: set[str] = set()
-
-    def recorrer(el, ruta: str) -> None:
-        r = f"{ruta}/{u_diseno._local(el.tag)}" if ruta else u_diseno._local(el.tag)
-        rutas.add(r)
-        rutas.update(f"{r}@{u_diseno._local(k)}" for k in el.attrib)
-        for h in el:
-            recorrer(h, r)
-
-    recorrer(ET.fromstring(xml), "")  # noqa: S314
-    return rutas
+def test_desglose_sin_filas_tiene_titulo_cabecera_y_total_sin_barras():
+    informe = _informe_diseno()
+    informe["desglose"] = {"categorias": [], "ubicaciones": []}
+    gen = _generar_informe(informe, detalle=[])
+    for nombre in ("Por ubicación", "Por categoría"):
+        comprobar_desglose(gen, nombre, [], _cifras("Total", informe["totales"], ""))
 
 
-def test_las_hojas_de_lista_no_escriben_nada_fuera_de_la_plantilla():
-    """Cobertura XML (fila 27) de las hojas de lista y sus dibujos: todo lo que escriben
-    está en la plantilla o es una decisión (Q8, Q13). El libro completo (Resumen y estilos)
-    se cubre en T5, cuando el Resumen pase a la plantilla."""
-    contenido = _generar_informe()["contenido"]
-    plantilla = HUELLA_INFORME["inventario_xml"]
-    with zipfile.ZipFile(io.BytesIO(contenido)) as z:
+def test_desglose_con_muchas_filas_extiende_barras_y_area():
+    """Req. 5: las barras de datos y el área de impresión llegan hasta la última fila."""
+    informe = _informe_diseno()
+    base = informe["desglose"]["ubicaciones"][0]
+    informe["desglose"]["ubicaciones"] = [
+        {**base, "id": f"u{i}", "etiqueta": f"Sala {i:03d}"} for i in range(40)
+    ]
+    gen = _generar_informe(informe)
+    filas, total = _desglose_esperado(informe, "ubicaciones")
+    comprobar_desglose(gen, "Por ubicación", filas, total)
+    hoja = gen["hojas"]["Por ubicación"]
+    assert [r["rango"] for r in hoja["formato_condicional"]] == ["F8:F47", "H8:H47"]
+    assert hoja["impresion"]["area"].endswith("$A$1:$H$48")
+
+
+def test_desglose_escribe_el_decimal_congelado_sin_sumar_ni_pasar_por_float():
+    """Criterio 8: las cifras de «Por ubicación» y «Por categoría» son las de
+    ``cierre.informe`` exactas. Centavos que ``float`` no representa (0,10; 0,07…) y un Total
+    que NO es la suma de las filas: el libro escribe lo congelado, dígito a dígito."""
+    informe = _informe_diseno()
+    informe["totales"].update(encontrado="0.10", no_encontrado="0.20", registrado="999999999999.99")
+    cat = informe["desglose"]["categorias"][0]
+    cat.update(total_encontrado="1234567.07", total_no_encontrado="0.30", total_registrado="0.70")
+    ubi = informe["desglose"]["ubicaciones"][0]
+    ubi.update(total_encontrado="12345678901.23", total_registrado="12345678901.10")
+    gen = _generar_informe(informe)
+    for nombre, dimension in (("Por ubicación", "ubicaciones"), ("Por categoría", "categorias")):
+        filas, total = _desglose_esperado(informe, dimension)
+        comprobar_desglose(gen, nombre, filas, total)
+    assert Decimal("0.1") != Decimal(0.1) and Decimal("0.07") != Decimal(0.07)
+    with zipfile.ZipFile(io.BytesIO(gen["contenido"])) as z:
         nombres = re.findall(r'<sheet name="([^"]+)"', z.read("xl/workbook.xml").decode())
-        dibujos = set()
-        for i, nombre in enumerate(nombres, start=1):
-            if html.unescape(nombre) == "Resumen":
-                continue
-            parte = f"xl/worksheets/sheet{i}.xml"
-            sobran = _rutas(z.read(parte)) - set(plantilla["sheet"])
-            for ruta in sorted(sobran):
-                assert any(re.fullmatch(p, ruta) for p, _ in SOBRANTES_LISTAS), (nombre, ruta)
-            rels = z.read(f"xl/worksheets/_rels/sheet{i}.xml.rels").decode()
-            dibujos |= {f"xl/drawings/{d}" for d in re.findall(r"drawings/(drawing\d+\.xml)", rels)}
-        assert len(dibujos) == len(nombres) - 1
-        for parte in sorted(dibujos):
-            sobran = _rutas(z.read(parte)) - set(plantilla["drawing"])
-            for ruta in sorted(sobran):
-                assert any(re.fullmatch(p, ruta) for p, _ in SOBRANTES_LISTAS), (parte, ruta)
+        xml = {
+            html.unescape(n): z.read(f"xl/worksheets/sheet{i}.xml").decode()
+            for i, n in enumerate(nombres, start=1)
+        }
+    # El texto del número es el del Decimal (con su cero final), no el de un float.
+    for texto in ("0.10", "0.20", "999999999999.99"):
+        assert f"<v>{texto}</v>" in xml["Por ubicación"], texto
+        assert f"<v>{texto}</v>" in xml["Por categoría"], texto
+    for texto in ("1234567.07", "0.30", "0.70"):
+        assert f"<v>{texto}</v>" in xml["Por categoría"], texto
+    for texto in ("12345678901.23", "12345678901.10"):
+        assert f"<v>{texto}</v>" in xml["Por ubicación"], texto
+
+
+def test_un_decimal_de_mas_de_16_cifras_se_rechaza_en_vez_de_redondearse():
+    """``xlsxwriter`` escribe los números con ``{:.16G}``: 17 cifras se redondearían en
+    silencio. El generador lo rechaza (``NUMERIC(14,2)`` nunca llega ahí)."""
+    assert format(Decimal("12345678901234567.89"), ".16G") == "1.234567890123457E+16"
+    informe = _informe_diseno()
+    informe["desglose"]["ubicaciones"][0]["total_registrado"] = "12345678901234567.89"
+    with pytest.raises(ValueError, match="16 cifras significativas"):
+        exportar.a_excel(exportar.documento(informe, _detalle_diseno()))
+    # 16 cifras sí caben exactas.
+    informe["desglose"]["ubicaciones"][0]["total_registrado"] = "12345678901234.56"
+    gen = _generar_informe(informe)
+    celda = gen["hojas"]["Por ubicación"]["celdas"]["F8"]
+    assert _valor_numerico(celda) == Decimal("12345678901234.56")
+
+
+def _textos_contexto(doc_informe: dict, detalle: bool = True, vigente: bool = False) -> list:
+    doc = exportar.documento(doc_informe)
+    filas = [
+        ["Sesión", doc.sesion],
+        ["Cerró", doc.cerrada_por, "Cerrada", doc.cerrada_en],
+        ["Moneda", "COP"],
+        ["Estado", "Informe congelado"],
+        [exportar.NOTA],
+    ]
+    if not detalle:
+        filas.append([exportar.SIN_DETALLE])
+    if vigente:
+        filas.append([exportar.EMPRESA_VIGENTE])
+    return filas
+
+
+def comprobar_resumen(gen: dict, informe: dict, contexto: list[list]) -> None:
+    """El Resumen contra la huella: filas 1–8 (bloque y tarjetas) iguales a la plantilla con
+    las cifras de ``totales``; nada en la fila 9; desde la 10, las filas de contexto (Q7) con
+    el estilo de la nota de lista; sin la lista duplicada ni su regla (Q7)."""
+    hoja, esp = gen["hojas"]["Resumen"], _esperada_informe("Resumen")
+    # Q7: A10:J10 es de la lista omitida; queda el título combinado C2:D2.
+    assert esp["combinadas"] == ["A10:J10", "C2:D2"]
+    comprobar_hoja_corta(hoja, esp, "Resumen", ["C2:D2"])
+    ultima = FILA_CONTEXTO + len(contexto)  # 1-based
+    area = esp["impresion"]["area"].split("!")[1]
+    assert hoja["impresion"]["area"].split("!")[1] == re.sub(r"\d+$", str(ultima), area)
+    # Q7: sin la regla de la lista duplicada (A13:J13).
+    assert [r["rango"] for r in esp["formato_condicional"]] == ["A13:J13"]
+    assert hoja["formato_condicional"] == []
+
+    # Alturas: filas 1–8 de la plantilla; las de contexto, la altura por defecto (plan 11b).
+    filas_esp = {k: f for k, f in esp["filas"].items() if int(k) <= 8}
+    defecto = {"alto": None, "alto_propio": False, "oculta": False, "nivel": 0}
+    filas_esp.update(
+        {
+            str(k): {**defecto, "contraida": False, "estilo": None}
+            for k in range(FILA_CONTEXTO + 1, ultima + 1)
+        }
+    )
+    assert u_diseno.comparar(filas_esp, hoja["filas"], "Resumen.filas") == []
+
+    t = informe["totales"]
+    tarjetas = {
+        "A7": Decimal(t["encontrado"]),
+        "C7": Decimal(t["no_encontrado"]),
+        "E7": Decimal(t["registrado"]),
+        "G7": exportar.fraccion_encontrada(t["unidades_encontrado"], t["unidades_registrado"]),
+    }
+    textos = {
+        **_textos_del_bloque(),
+        "A8": exportar._unidades(t["unidades_encontrado"]),
+        "C8": exportar._unidades(t["unidades_no_encontrado"]),
+        "E8": exportar._unidades(t["unidades_registrado"]),
+    }
+    esp_fijas = {r: c for r, c in esp["celdas"].items() if _num_fila(r) <= 8}
+    gen_fijas = {r: c for r, c in hoja["celdas"].items() if _num_fila(r) <= 8}
+    assert sorted(gen_fijas) == sorted(esp_fijas)
+    for ref, celda in esp_fijas.items():
+        g = gen_fijas[ref]
+        assert u_diseno.comparar(celda["estilo"], g["estilo"], f"Resumen!{ref}") == []
+        if ref in tarjetas:
+            assert _valor_numerico(g) == tarjetas[ref], ref
+            continue
+        valor = textos.get(ref, textos.get(celda["valor"], celda["valor"]))
+        if valor is None:
+            assert g["tipo"] == "vacia", (ref, g["valor"])
+        else:
+            assert (g["tipo"], g["valor"]) == ("s", valor), ref
+
+    # Filas de contexto (Q7): texto siempre como texto, con el estilo de la nota de lista.
+    nota = _esperada_informe("Todos los activos")["celdas"]["A7"]["estilo"]
+    resto = {r: c for r, c in hoja["celdas"].items() if _num_fila(r) > 8}
+    esperadas = {
+        f"{u_diseno.col_letra(c + 1)}{FILA_CONTEXTO + 1 + i}": v
+        for i, fila in enumerate(contexto)
+        for c, v in enumerate(fila)
+    }
+    assert sorted(resto) == sorted(esperadas)
+    for ref, valor in esperadas.items():
+        assert (resto[ref]["tipo"], resto[ref]["valor"]) == ("s", valor), ref
+        assert u_diseno.comparar(nota, resto[ref]["estilo"], ref) == []
+    comprobar_imagen_de_hoja(hoja, esp)
+
+
+def test_resumen_replica_la_huella_con_tarjetas_y_filas_de_contexto():
+    informe = _informe_diseno()
+    gen = _generar_informe(informe)
+    comprobar_resumen(gen, informe, _textos_contexto(informe))
+    # «Cerrada» es la hora del cierre en Colombia, como en el PDF (no «hoy»).
+    assert gen["hojas"]["Resumen"]["celdas"]["D11"]["valor"] == "14/11/2026, 5:58 p. m."
+
+
+def test_resumen_de_sesion_antigua_avisa_sin_detalle_y_empresa_vigente():
+    """Sesión cerrada antes de la 013: sin detalle ni empresa congelada. El libro sigue
+    siendo válido: «Por ubicación», «No encontrados», «Por categoría» y Resumen, con los
+    avisos ``SIN_DETALLE`` y ``EMPRESA_VIGENTE`` al final del Resumen."""
+    informe = _informe_diseno()
+    informe["detalle_disponible"] = False
+    informe["empresa"]["vigente"] = True
+    gen = _generar_informe(informe, detalle=[])
+    assert gen["libro"]["hojas"] == ["Por ubicación", "No encontrados", "Por categoría", "Resumen"]
+    comprobar_resumen(gen, informe, _textos_contexto(informe, detalle=False, vigente=True))
+    for nombre, dimension in (("Por ubicación", "ubicaciones"), ("Por categoría", "categorias")):
+        filas, total = _desglose_esperado(informe, dimension)
+        comprobar_desglose(gen, nombre, filas, total)
+    wb = load_workbook(io.BytesIO(gen["contenido"]))  # el libro abre sin errores
+    assert wb.active.title == "Por ubicación"
+
+
+def test_resumen_sin_avisos_cuando_no_aplican():
+    gen = _generar_informe()
+    textos = [c["valor"] for c in gen["hojas"]["Resumen"]["celdas"].values()]
+    assert exportar.NOTA in textos
+    assert exportar.SIN_DETALLE not in textos and exportar.EMPRESA_VIGENTE not in textos
+
+
+def test_corte_es_la_fecha_de_corte_congelada_no_la_de_hoy():
+    """«Corte dd/mm/aaaa» (E3) en todas las hojas: la fecha de corte de la sesión tal como
+    está en ``cierre.informe`` (B17); ni la de hoy ni la del momento del cierre."""
+    informe = _informe_diseno()
+    informe["sesion"]["fecha_corte"] = "2025-01-31"
+    gen = _generar_informe(informe)
+    hoy = date.today().strftime("%d/%m/%Y")
+    for nombre, hoja in gen["hojas"].items():
+        assert hoja["celdas"]["E3"]["valor"] == "Corte 31/01/2025", nombre
+        assert hoy not in hoja["celdas"]["E3"]["valor"], nombre
+        assert "14/11/2026" not in hoja["celdas"]["E3"]["valor"], nombre
+
+
+def test_el_libro_sigue_el_orden_de_la_plantilla_y_abre_en_la_primera_hoja():
+    """Q6: orden de la plantilla; Q11: primera hoja activa, A1, sin desplazamiento."""
+    gen = _generar_informe()
+    libro, esp = gen["libro"], HUELLA_INFORME["libro"]
+    assert libro["hojas"] == LIBRO_HOJAS
+    assert [HOJA_HUELLA[n] for n in libro["hojas"] if n != "Mobiliario"] == esp["hojas"]
+    assert esp["hoja_activa"] == 2  # residuo de edición de la plantilla (Q11)
+    assert libro["hoja_activa"] == 0
+    assert libro["primera_hoja_visible"] == esp["primera_hoja_visible"] == 0
+    assert libro["pestanas_visibles"] is esp["pestanas_visibles"] is True
+    assert set(libro["estados"]) == set(esp["estados"]) == {"visible"}
+    for i, nombre in enumerate(libro["hojas"]):
+        vista = gen["hojas"][nombre]["vista"]
+        assert vista["tab_seleccionada"] is (i == 0), nombre
+        assert vista["celda_superior_izquierda"] is None, nombre
+        for sel in vista["seleccion"]:  # sin celda activa ni rango: Excel abre en A1
+            assert (sel["celda_activa"], sel["rango"]) == (None, None), nombre
+    wb = load_workbook(io.BytesIO(gen["contenido"]))
+    assert wb.active.title == "Todos los activos"
+
+
+def test_el_libro_replica_tema_estilos_por_defecto_nombres_y_propiedades():
+    """Libro (FT-1): tema, fuente y estilo por defecto, estilos de tabla y ``dxf`` (uno,
+    deduplicado: decisión del humano T4); nombres definidos con los rangos extendidos y los
+    filtros de Q8; propiedades del documento (fila 26) y un solo medio (Q13)."""
+    gen = _generar_informe()
+    libro, esp = gen["libro"], HUELLA_INFORME["libro"]
+    for k in ("proteccion", "fecha_1904", "tema", "fuente_defecto", "estilo_defecto"):
+        assert u_diseno.comparar(esp[k], libro[k], k) == [], k
+    assert u_diseno.comparar(esp["estilos_tabla"], libro["estilos_tabla"]) == []
+    assert u_diseno.sha256_tema(gen["contenido"]) == esp["tema_sha256"]
+    # dxfs@count: la plantilla guarda 3 iguales; xlsxwriter, 1 (``dxf_deduplicado``).
+    assert len(esp["dxfs"]) == 3 and all(d == esp["dxfs"][0] for d in esp["dxfs"])
+    assert len(libro["dxfs"]) == 1
+    assert u_diseno.comparar(esp["dxfs"][0], libro["dxfs"][0]) == []
+    with zipfile.ZipFile(io.BytesIO(gen["contenido"])) as z:
+        estilos_xml = z.read("xl/styles.xml").decode()
+    assert re.search(r'<dxfs count="1">', estilos_xml)
+    for nombre in ("Todos los activos", "Electrónica", "Mobiliario"):
+        for regla in gen["hojas"][nombre]["formato_condicional"]:
+            assert u_diseno.comparar(esp["dxfs"][0], regla["dxf"], nombre) == []
+
+    # Nombres definidos: área de cada hoja hasta su última fila, filas a repetir de las
+    # listas y, por Q8, el filtro oculto de las hojas con autofiltro.
+    def hoja_(nombre: str) -> str:
+        return f"'{nombre}'" if " " in nombre else nombre
+
+    ultimas = {
+        "Todos los activos": ("J", 12),
+        "Por ubicación": ("H", 9),
+        "No encontrados": ("F", 10),
+        "Electrónica": ("I", 11),
+        "Mobiliario": ("I", 10),
+        "Por categoría": ("H", 10),
+        "Resumen": ("J", 14),
+    }
+    esperados = []
+    for i, nombre in enumerate(LIBRO_HOJAS):
+        col, fila = ultimas[nombre]
+        esperados.append(
+            {
+                "nombre": "_xlnm.Print_Area",
+                "hoja": i,
+                "oculto": False,
+                "valor": f"{hoja_(nombre)}!$A$1:${col}${fila}",
+            }
+        )
+        if nombre in ("Todos los activos", "No encontrados", "Electrónica", "Mobiliario"):
+            esperados.append(
+                {
+                    "nombre": "_xlnm.Print_Titles",
+                    "hoja": i,
+                    "oculto": False,
+                    "valor": f"{hoja_(nombre)}!$9:$9",
+                }
+            )
+        if nombre in ("No encontrados", "Electrónica", "Mobiliario"):
+            esperados.append(
+                {
+                    "nombre": "_xlnm._FilterDatabase",
+                    "hoja": i,
+                    "oculto": True,
+                    "valor": f"{hoja_(nombre)}!$A$9:${col}${fila}",
+                }
+            )
+    # La plantilla: un área por hoja y filas a repetir en las tres listas (sin filtros).
+    assert {d["nombre"] for d in esp["nombres_definidos"]} == {
+        "_xlnm.Print_Area",
+        "_xlnm.Print_Titles",
+    }
+
+    def orden(lista):
+        return sorted(lista, key=lambda d: (d["hoja"], d["nombre"]))
+
+    assert u_diseno.comparar(orden(esperados), orden(libro["nombres_definidos"])) == []
+
+    # Fila 26 (decisión del humano): título del libro, autor neutro, nada del equipo.
+    core = libro["propiedades"]["core"]
+    assert core["title"] == "Informe · Conteo nov 2026"
+    assert core["creator"] == core["lastModifiedBy"] == est.AUTOR == "AssetControl"
+    assert set(core) == {"title", "creator", "lastModifiedBy", "created", "modified"}
+    assert libro["propiedades"]["app"] == {
+        "Application": "Microsoft Excel",
+        "AppVersion": "12.0000",
+        "Company": None,
+    }
+    assert libro["medios"] == ["xl/media/image1.png"]  # Q13: un medio para las 7 hojas
+
+
+# Cobertura XML del libro completo (fila 27), en las dos direcciones. Lo que el generado
+# escribe y la plantilla no, y por qué:
+SOBRANTES_LIBRO = {
+    "workbook": (
+        (r"workbook/definedNames/definedName@hidden", "Q8: _FilterDatabase oculto (filtros)"),
+        (r"workbook/fileVersion(@\w+)?", "ventana_y_aplicacion (equivalente aceptado)"),
+        (r"workbook/workbookPr@defaultThemeVersion", "EQ L10: workbookPr sin efecto"),
+    ),
+    "styles": (
+        (
+            r"styleSheet/cellXfs/xf@apply(Alignment|Border|Fill|Font|NumberFormat|Protection)",
+            "ventana_y_aplicacion: banderas apply* (equivalente aceptado)",
+        ),
+    ),
+    "sheet": (
+        (r"worksheet/tableParts.*", "Q8: tabla «Activos» conservada"),
+        (r"worksheet/autoFilter.*", "Q8: filtros conservados"),
+        (r"worksheet/sheetData/row@spans", "pistas_fila (equivalente aceptado)"),
+        (
+            r"worksheet/conditionalFormatting/cfRule/dataBar/cfvo@val",
+            "cfvo_val_min_max (equivalente aceptado, L5)",
+        ),
+    ),
+    "drawing": ((r"wsDr/twoCellAnchor.*", "Q13: ancla twoCellAnchor editAs=oneCell (L8)"),),
+    "table": ((r"table.*", "Q8: la parte de la tabla «Activos»"),),
+}
+# Lo que la plantilla trae y el generado no escribe, y por qué (además de lo que la matriz
+# ya clasifica como EQ, Q11 o «valores por defecto»):
+FALTANTES_LIBRO = {
+    "workbook": (
+        (r"workbook/sheets/sheet@state", 'state="visible" por omisión (estados comparados)'),
+    ),
+    "styles": (
+        (
+            r"styleSheet/dxfs/dxf/fill/patternFill(/fgColor(@rgb)?|@patternType)",
+            "dxf_patternType (equivalente aceptado, L4)",
+        ),
+        # ``<b val="1"/>``/``<i val="1"/>`` frente a ``<b/>``/``<i/>``: ``val`` vale ``true``
+        # por omisión (ECMA-376); negrita y cursiva se comparan resueltas y coinciden.
+        (r"styleSheet/fonts/font/b@val", "val por omisión de <b> (negrita resuelta igual)"),
+        (r"styleSheet/dxfs/dxf/font/i@val", "val por omisión de <i> (cursiva resuelta igual)"),
+    ),
+    "sheet": (
+        (r"worksheet/cols/col@style", "L7: el estilo de columna resuelve al por defecto"),
+        (r"worksheet/pageSetup@fitToWidth", "fitToWidth=1 por omisión (ajuste comparado)"),
+        (r"worksheet/sheetData/row/c/is(/t)?", "cadenas: inlineStr vs sharedStrings"),
+    ),
+}
+
+
+# Sesión antigua (sin detalle): no hay hojas de lista con la regla de fila completa, así que
+# tampoco su fórmula ni su dxf; el resto del libro se cubre igual.
+FALTANTES_SIN_DETALLE = {
+    "sheet": (
+        (r"worksheet/conditionalFormatting/cfRule(/formula|@dxfId)", "sin listas"),
+        (r"worksheet/sheetData/row@(customFormat|s)", "sin hoja por categoría (estilo de f6)"),
+    ),
+    "styles": ((r"styleSheet/dxfs/.+", "sin listas: sin dxf"),),
+}
+
+
+def _aceptada_faltante(parte: str, ruta: str, generado: set[str], detalle: bool = True) -> bool:
+    if not detalle and any(re.fullmatch(p, ruta) for p, _ in FALTANTES_SIN_DETALLE.get(parte, ())):
+        return True
+    destino = u_diseno.destino_cobertura(f"{parte}:{ruta}") or ""
+    # «EQ …» = equivalente no idéntico (Q13) o aceptado (humano); Q11 = residuo de edición.
+    if re.search(r"\bEQ\b", destino) or "(Q11)" in destino or "(valores por defecto)" in destino:
+        return True
+    if parte == "drawing" and ruta.startswith("wsDr/oneCellAnchor"):
+        # Q13: el mismo elemento bajo twoCellAnchor; el «ext» del ancla va en xfrm y «to».
+        gemela = ruta.replace("oneCellAnchor", "twoCellAnchor")
+        return gemela in generado or ruta.startswith("wsDr/oneCellAnchor/ext")
+    return any(re.fullmatch(p, ruta) for p, _ in FALTANTES_LIBRO.get(parte, ()))
+
+
+@pytest.mark.parametrize("detalle", [True, False], ids=["con_detalle", "sesion_antigua"])
+def test_cobertura_xml_del_libro_completo_en_las_dos_direcciones(detalle):
+    """Fila 27: cada elemento y atributo del libro (workbook, styles, todas las hojas, sus
+    dibujos y la tabla) está en la plantilla o es una decisión registrada; y cada uno de la
+    plantilla está en el generado o tiene su equivalente/decisión. Sin sobrantes ni
+    faltantes sin clasificar."""
+    informe = _informe_diseno()
+    if not detalle:
+        informe["detalle_disponible"] = False
+    gen = _generar_informe(informe, detalle=None if detalle else [])
+    generado = u_diseno.inventario_xml(gen["contenido"])
+    plantilla = HUELLA_INFORME["inventario_xml"]
+    partes = {"workbook", "styles", "sheet", "drawing"}
+    assert set(plantilla) == partes
+    assert set(generado) == partes | ({"table"} if detalle else set())
+    for parte in sorted(generado):
+        sobran = set(generado[parte]) - set(plantilla.get(parte, ()))
+        for ruta in sorted(sobran):
+            assert any(re.fullmatch(p, ruta) for p, _ in SOBRANTES_LIBRO.get(parte, ())), (
+                f"sobra en el generado: {parte}:{ruta}"
+            )
+    for parte in sorted(plantilla):
+        faltan = set(plantilla[parte]) - set(generado[parte])
+        for ruta in sorted(faltan):
+            assert _aceptada_faltante(parte, ruta, set(generado[parte]), detalle), (
+                f"falta en el generado: {parte}:{ruta} "
+                f"({u_diseno.destino_cobertura(f'{parte}:{ruta}')})"
+            )
+    # Cada dibujo pertenece a una hoja; las 7 hojas llevan logo (un medio, Q13).
+    assert len(gen["libro"]["hojas"]) == sum(1 for h in gen["hojas"].values() if h["imagenes"])
+
+
+def test_las_decisiones_de_t5_estan_en_la_matriz():
+    texto = u_diseno.MATRIZ.read_text(encoding="utf-8")
+    seccion = texto.split("## Libro del informe (T5)", 1)[1]
+    for clave in u_diseno.DECISIONES_T5:
+        assert f"`{clave}`" in seccion, clave

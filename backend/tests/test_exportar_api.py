@@ -44,6 +44,7 @@ from test_exportar_documento import (
 )
 
 from app.conteo import exportar
+from app.conteo import exportar_estilo as est
 from app.fotos.almacen import EXTENSION_KEY, CarpetaLocal, ClaveInvalida
 
 ADMIN = bearer(ADMIN_A, TENANT_A)
@@ -133,8 +134,20 @@ def dinero(valor) -> Decimal:
     return Decimal(str(valor)).quantize(CENTAVO)
 
 
+LIBRO = [
+    "Todos los activos",
+    "Por ubicación",
+    "No encontrados",
+    "Biomédicos",
+    "Mobiliario",
+    "Por categoría",
+    "Resumen",
+]
+
+
 def filas_desglose(hoja, titulo: str) -> list[list]:
-    """Filas de la tabla «titulo» de la hoja Resumen (después de su cabecera, hasta Total)."""
+    """Filas de la tabla «titulo» (después de su cabecera, hasta Total): spec 019 (Q6), la
+    hoja «Por ubicación» o «Por categoría», cuyo título está en A6."""
     filas, dentro = [], False
     for fila in hoja.iter_rows(values_only=True):
         if fila[0] == titulo:
@@ -248,13 +261,9 @@ def test_excel_has_a_summary_one_sheet_per_category_and_the_missing(client):
     assert response.status_code == 200
     assert response.mimetype == XLSX
     wb = libro(response)
-    assert wb.sheetnames == [
-        "Resumen",
-        "Todos los activos",
-        "Biomédicos",
-        "Mobiliario",
-        "No encontrados",
-    ]
+    # Spec 019 (Q6): el orden de la plantilla; el libro abre en la primera hoja (Q11).
+    assert wb.sheetnames == LIBRO
+    assert wb.active.title == "Todos los activos"
 
     resumen = wb["Resumen"]
     t = informe["totales"]
@@ -271,10 +280,19 @@ def test_excel_has_a_summary_one_sheet_per_category_and_the_missing(client):
     # Spec 015 (T5): el % es un número con formato porcentaje, no texto.
     pct, debajo = cartas["% encontrado"]
     assert isinstance(pct.value, (int, float)) and Decimal(str(pct.value)) == Decimal("0.5")
-    assert pct.number_format == exportar.FORMATO_PORCENTAJE
+    assert pct.number_format == est.FORMATO_PORCENTAJE
     assert debajo == "de las unidades registradas"
-    assert filas_desglose(resumen, "Por categoría") == esperado_desglose(informe, "categorias")
-    assert filas_desglose(resumen, "Por ubicación") == esperado_desglose(informe, "ubicaciones")
+    # Criterio 8: las dos hojas de desglose dicen exactamente lo de ``cierre.informe``.
+    por_categoria, por_ubicacion = wb["Por categoría"], wb["Por ubicación"]
+    assert filas_desglose(por_categoria, "Por categoría") == esperado_desglose(
+        informe, "categorias"
+    )
+    assert filas_desglose(por_ubicacion, "Por ubicación") == esperado_desglose(
+        informe, "ubicaciones"
+    )
+    for hoja in (por_categoria, por_ubicacion):
+        reglas = [r for rango in hoja.conditional_formatting for r in rango.rules]
+        assert reglas and all(r.type == "dataBar" for r in reglas), hoja.title
 
     items, total = activos_de_hoja(wb["No encontrados"])
     assert [(f[0], f[1], f[2], f[3], f[4], dinero(f[5])) for f in items] == [
@@ -292,32 +310,38 @@ def test_excel_has_a_summary_one_sheet_per_category_and_the_missing(client):
     assert total[1] == "2 activos no encontrados"
 
 
-def test_summary_is_a_dashboard_with_real_dates(client):
-    """Spec 015 (T5): portada legible con la sesión, fechas reales y datos del cierre."""
+def test_summary_has_the_template_cards_and_the_closing_context(client):
+    """Spec 019 (Q7): el Resumen de la plantilla (título, tarjetas) y, al final, la sesión,
+    quién cerró y cuándo (hora de Colombia), la moneda, el estado y la nota de cifras
+    congeladas; el corte, en el bloque. Impresión horizontal 1 × 1 (Q12), sin centrar."""
     _, sesion, informe, _ = cerrada(client)
     resumen = libro(excel(client, sesion))["Resumen"]
-    textos = [c for fila in resumen.iter_rows(values_only=True) for c in fila if c]
-    assert "INFORME DE INVENTARIO DE ACTIVOS" in textos
-    assert "Conteo nov 2026" in textos
-    fila = fila_de(resumen, "Fecha de corte")
-    rotulos = [c.value for c in resumen[fila]]
-    valores = [c for c in resumen[fila + 1]]
-    corte = valores[rotulos.index("Fecha de corte")]
-    assert corte.value == datetime(2026, 11, 30)
-    assert corte.number_format == "dd/mm/yyyy"
-    cierre = valores[rotulos.index("Cerrada")]
-    assert isinstance(cierre.value, datetime)
+    assert resumen["C2"].value == "Informe de activos"
+    assert resumen["E3"].value == "Corte 30/11/2026"
+    contexto = exportar.FILA_CONTEXTO_RESUMEN + 1
+    filas = [
+        [c for c in fila if c is not None]
+        for fila in resumen.iter_rows(min_row=contexto, values_only=True)
+    ]
     cerrada_en = datetime.fromisoformat(informe["sesion"]["cerrada_en"])
-    esperado = cerrada_en.astimezone(timezone(timedelta(hours=-5))).replace(tzinfo=None)
-    assert abs(cierre.value - esperado) < timedelta(seconds=1)
-    assert cierre.number_format == "dd/mm/yyyy hh:mm"
-    assert valores[rotulos.index("Moneda")].value == "COP"
-    assert valores[rotulos.index("Estado")].value == "Informe congelado"
-    # Barras de datos solo visuales en el desglose (sin fórmulas).
-    reglas = [r for rango in resumen.conditional_formatting for r in rango.rules]
-    assert reglas and all(r.type == "dataBar" for r in reglas)
+    hora = cerrada_en.astimezone(timezone(timedelta(hours=-5)))
+    cuando = exportar._fecha_hora(informe["sesion"]["cerrada_en"])
+    assert cuando.startswith(f"{hora:%d/%m/%Y}, ")
+    assert filas == [
+        ["Sesión", "Conteo nov 2026"],
+        ["Cerró", ADMIN_A.nombre, "Cerrada", cuando],
+        ["Moneda", "COP"],
+        ["Estado", "Informe congelado"],
+        [exportar.NOTA],
+    ]
     assert resumen.page_setup.orientation == "landscape"
-    assert resumen.print_options.horizontalCentered
+    assert resumen.sheet_properties.pageSetUpPr.fitToPage
+    assert resumen.page_setup.fitToWidth in (None, 1) and resumen.page_setup.fitToHeight in (
+        None,
+        1,
+    )
+    assert not resumen.print_options.horizontalCentered
+    assert resumen.freeze_panes is None
 
 
 def test_flat_sheet_has_one_row_per_asset_of_the_frozen_universe(client, exp_db):
@@ -552,21 +576,19 @@ def test_every_sheet_carries_the_frozen_company_and_its_logo(client):
     assert subida.status_code == 201, subida.get_json()
     _, sesion, _, _ = cerrada(client)
     wb = libro(excel(client, sesion))
-    # El Resumen conserva su encabezado hasta T5 de la spec 019.
-    resumen = wb["Resumen"]
-    assert resumen["B1"].value == "Clínica & Ejemplo S.A.S."
-    assert resumen["B2"].value == "NIT 900.123.456-8 · Calle 10 # 5-20, Cartago"
-    assert "«Conteo nov 2026» · corte 30/11/2026" in resumen["B3"].value
-    assert resumen["B4"].value == "Informe congelado al cierre · valores en COP"
-    # Hojas de lista (spec 019, T4): el bloque de la plantilla con la empresa congelada.
-    for hoja in wb.worksheets[1:]:
+    assert wb.sheetnames == LIBRO
+    # Spec 019 (T5): todas las hojas, Resumen incluido, llevan el bloque de la plantilla con
+    # la empresa congelada y el pie «Página &P de &N»; ninguna, encabezado de impresión.
+    for hoja in wb.worksheets:
         assert hoja["C2"].value == "Informe de activos", hoja.title
         assert hoja["C3"].value == "Clínica & Ejemplo S.A.S.", hoja.title
         assert hoja["E3"].value == "Corte 30/11/2026", hoja.title
         assert hoja["C4"].value == "NIT 900.123.456-8", hoja.title
         assert hoja["C5"].value == "Calle 10 # 5-20, Cartago", hoja.title
-        assert hoja.HeaderFooter.oddFooter.right.text.strip() == "Página &P de &N"
-    for hoja in wb.worksheets:
+        assert hoja.HeaderFooter.oddFooter.left.text.strip() == "Generado con AssetControl"
+        assert hoja.HeaderFooter.oddFooter.right.text.strip() == "Página &P de &N", hoja.title
+        assert not hoja.HeaderFooter.oddHeader.left.text, hoja.title
+        assert not hoja.HeaderFooter.oddHeader.right.text, hoja.title
         assert len(hoja._images) == 1, hoja.title
         assert hoja.page_setup.orientation == "landscape"
 
@@ -649,11 +671,13 @@ def test_a_category_named_like_the_flat_sheet_gets_its_own_sheet(client):
     assert client.post(f"/sesiones/{sesion}/cerrar", headers=ADMIN).status_code == 200
     wb = libro(excel(client, sesion))
     assert wb.sheetnames == [
-        "Resumen",
         "Todos los activos",
+        "Por ubicación",
+        "No encontrados",
         "Biomédicos",
         "Todos los activos (2)",
-        "No encontrados",
+        "Por categoría",
+        "Resumen",
     ]
     plana = wb["Todos los activos"]
     cabecera = fila_de(plana, "Código")
@@ -683,10 +707,11 @@ def test_excel_of_an_empty_session_has_zeros_and_no_category_sheets(client):
     sesion = c.abrir()
     assert client.post(f"/sesiones/{sesion}/cerrar", headers=ADMIN).status_code == 200
     wb = libro(excel(client, sesion))
-    assert wb.sheetnames == ["Resumen", "No encontrados"]
-    assert filas_desglose(wb["Resumen"], "Por categoría") == [
-        ["Total", Decimal("0.00"), 0, Decimal("0.00"), 0, Decimal("0.00"), 0, Decimal("0")]
-    ]
+    assert wb.sheetnames == ["Por ubicación", "No encontrados", "Por categoría", "Resumen"]
+    for nombre in ("Por ubicación", "Por categoría"):
+        assert filas_desglose(wb[nombre], nombre) == [
+            ["Total", Decimal("0.00"), 0, Decimal("0.00"), 0, Decimal("0.00"), 0, Decimal("0")]
+        ]
     assert all(h._images == [] for h in wb.worksheets)
 
 
@@ -696,10 +721,10 @@ def test_session_closed_before_013_has_no_category_sheets_and_says_so(client, ex
         conn.execute(text("delete from sesion_detalle"))
         conn.execute(text("delete from sesion_empresa"))
     wb = libro(excel(client, sesion))
-    assert wb.sheetnames == ["Resumen", "No encontrados"]
+    assert wb.sheetnames == ["Por ubicación", "No encontrados", "Por categoría", "Resumen"]
     textos = [c for fila in wb["Resumen"].iter_rows(values_only=True) for c in fila if c]
-    assert exportar.SIN_DETALLE in textos
-    assert exportar.EMPRESA_VIGENTE in wb["Resumen"]["B4"].value
+    # Spec 019 (Q7): los dos avisos, al final del Resumen.
+    assert textos[-2:] == [exportar.SIN_DETALLE, exportar.EMPRESA_VIGENTE]
 
 
 def test_excel_reads_the_frozen_report_after_later_changes(client):
@@ -904,6 +929,25 @@ def test_contador_and_previous_errors_do_not_touch_the_store(client, exp_app, mo
     assert almacen.lecturas == 0
 
 
+def test_contador_gets_403_without_figures_nor_company_data(client):
+    """Spec 019 (req. 4): el libro con «Por ubicación» y «Por categoría» lleva precios; el
+    contador sigue con ``403`` y la respuesta no trae cifras, nombres ni datos de la empresa."""
+    sesion, informe, _, _ = cerrada_con_logo(client)
+    prohibido = excel(client, sesion, CONTADOR)
+    assert prohibido.status_code == 403
+    assert prohibido.mimetype == "application/json"
+    assert prohibido.get_json()["error"]["code"] == "prohibido"
+    cuerpo = prohibido.get_data(as_text=True)
+    for dato in [
+        *EMPRESA_CON_LOGO.values(),
+        "1390000",
+        "389900",
+        "Conteo nov",
+        *(f["etiqueta"] for f in informe["desglose"]["ubicaciones"]),
+    ]:
+        assert dato not in cuerpo, dato
+
+
 def test_list_sheets_carry_the_frozen_block_not_the_current_company(client):
     """El bloque de las hojas de lista es el de la empresa congelada al cierre: cambiar la
     empresa después no cambia el archivo; tampoco aparece la de otro tenant."""
@@ -913,7 +957,8 @@ def test_list_sheets_carry_the_frozen_block_not_the_current_company(client):
     nueva = {"nombre": "Nombre nuevo", "direccion": "Otra dirección"}
     assert client.put("/empresa", json=nueva, headers=ADMIN).status_code == 200
     wb = libro(excel(client, sesion))
-    for hoja in wb.worksheets[1:]:
+    assert len(wb.worksheets) == len(LIBRO)
+    for hoja in wb.worksheets:
         assert hoja["C3"].value == EMPRESA_CON_LOGO["nombre"], hoja.title
     with zipfile.ZipFile(io.BytesIO(excel(client, sesion).data)) as z:
         xml = "".join(z.read(n).decode() for n in z.namelist() if n.endswith(".xml"))

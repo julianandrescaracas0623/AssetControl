@@ -12,8 +12,9 @@
 - Imagen: se prueba primero en T1 (L1). Si `xlsxwriter` logra `oneCellAnchor`, se usa; si no, se acepta `twoCellAnchor editAs="oneCell"` con las mismas dimensiones visibles (decisión Q13). Cualquier otra propiedad no reproducible detiene T1 y se pregunta (D-2).
 - Logo: se escala por factor único para caber en la caja de la hoja (Q10), conservando proporción, anclado en el desplazamiento de la plantilla.
 - Resumen: lo de la plantilla (C2:D2, 4 tarjetas en filas 6–8) y, desde la fila 10, filas de contexto: sesión, cerró y cuándo, moneda, estado «Informe congelado», `NOTA`, `SIN_DETALLE`, `EMPRESA_VIGENTE`; sin la lista de las filas 9–13 de la plantilla.
+- Decisiones del humano 2026-11-22 (T5): (a) los valores por omisión que la plantilla escribe y xlsxwriter no (`<b val="1"/>`, `<i val="1"/>`, `fitToWidth="1"`, `sheet@state="visible"`, `outlinePr`, `col@style`) se aceptan como equivalentes; (b) las filas de contexto del Resumen se aceptan con el estilo `nota`, sin combinar y con la altura por defecto, con «Cerrada» y «Corte» como texto en hora de Colombia, y se revisan en Excel real en T6; (c) Sesión, Cerró, Cerrada, Moneda, Estado y los avisos `EMPRESA_VIGENTE` van solo en el Resumen, sin repetirse en cada hoja.
 - Impresión: Ubic., PorCat y Res. con `fit_to_pages(1, 1)`; Todos, Cat, NoEnc y A con `fit_to_pages(1, 0)` (Q12).
-- Reservas de nombres de hoja: `nombres_de_hoja` suma `Por ubicación` y `Por categoría` a los reservados (spec B16).
+- Reservas de nombres de hoja: `nombres_de_hoja` suma `Por ubicación` y `Por categoría` a los reservados (spec B16). También elimina los caracteres de control `\x00-\x1f` (T5, defensa en profundidad: rompían el XML del libro).
 - El `Documento` y `cierre.informe` no cambian; el generador del informe recibe los mismos datos que hoy. Para el Excel de activos, si se aprueba Q9, la ruta lee la empresa vigente y su logo con el servicio existente (`empresa_service`), sin migración.
 
 ## Tablas afectadas, endpoints, permisos, migraciones

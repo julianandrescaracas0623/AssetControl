@@ -35,6 +35,7 @@ from xlsxwriter.color import Color
 EMU_POR_PX = 9525
 PX_POR_CARACTER = 7  # ancho guardado exacto con set_column_pixels (T1)
 PT_POR_PX = 0.75
+CIFRAS_SIGNIFICATIVAS = 16  # xlsxwriter escribe los números con «{:.16G}» (T5)
 
 # --- Paleta (matriz filas 5–7, 23) -------------------------------------------------------
 AZUL = "#1D4ED8"  # banda, pestaña, empresa, línea de la fila 5, rótulos de tarjeta
@@ -422,6 +423,8 @@ def _desglose(caja: CajaLogo) -> Plantilla:
         estilos_cabecera=("cabecera",) * 8 + ("cabecera_fuera",) * 2,
         estilos_datos=_DATOS_DESGLOSE,
         estilos_total=_TOTAL_DESGLOSE,
+        # Fila 6 (T5): título con su línea en A–H; I6 y J6 con el estilo por defecto.
+        estilos_titulo_lista=("titulo_lista",) + ("linea_titulo",) * 7 + ("base",) * 2,
     )
 
 
@@ -574,7 +577,9 @@ def escribir_celda(hoja: Any, fila: int, col: int, valor: Any, formato: Any) -> 
     """Texto con ``write_string``, números desde ``Decimal``/``int``, fechas como fechas.
 
     ``None`` deja la celda vacía con su formato (bordes y alineación de la plantilla).
-    Un ``float`` se rechaza: el dinero llega como ``Decimal`` exacto.
+    Un ``float`` se rechaza: el dinero llega como ``Decimal`` exacto. Un ``Decimal`` de más
+    de 16 cifras significativas también: ``xlsxwriter`` lo escribe con ``{:.16G}`` y lo
+    redondearía en silencio (``NUMERIC(14,2)`` nunca llega a ese tope).
     """
     if valor is None:
         hoja.write_blank(fila, col, None, formato)
@@ -582,6 +587,11 @@ def escribir_celda(hoja: Any, fila: int, col: int, valor: Any, formato: Any) -> 
         hoja.write_string(fila, col, valor, formato)
     elif isinstance(valor, bool) or isinstance(valor, float):
         raise TypeError(f"Valor no admitido en el Excel: {type(valor).__name__}")
+    elif isinstance(valor, Decimal) and len(valor.as_tuple().digits) > CIFRAS_SIGNIFICATIVAS:
+        raise ValueError(
+            f"Valor con más de {CIFRAS_SIGNIFICATIVAS} cifras significativas: el Excel lo "
+            "redondearía"
+        )
     elif isinstance(valor, Decimal | int):
         hoja.write_number(fila, col, valor, formato)
     elif isinstance(valor, date | datetime):

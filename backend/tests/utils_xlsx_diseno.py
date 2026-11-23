@@ -1054,6 +1054,78 @@ DECISIONES_T4 = {
 }
 
 
+# Decisiones de T5 (desglose, Resumen y libro completo del informe). Cada una tiene su prueba
+# en ``test_exportar_documento.py`` o ``test_exportar_api.py``.
+DECISIONES_T5 = {
+    "orden_libro": "Q6 (humano 2026-11-22): Todos los activos, Por ubicación, No encontrados, "
+    "una hoja por categoría, Por categoría, Resumen. Sin detalle (sesión anterior a la 013): "
+    "Por ubicación, No encontrados, Por categoría, Resumen. Prueba: "
+    "`test_el_libro_sigue_el_orden_de_la_plantilla_y_abre_en_la_primera_hoja`.",
+    "hoja_activa": "Q11 (humano 2026-11-22): el libro abre en la primera hoja (`activeTab` "
+    "ausente = 0; solo ella con `tabSelected`), en A1 y sin `topLeftCell`; la hoja activa "
+    "(«No encontrados»), las celdas activas y el desplazamiento del Resumen (A7) de la "
+    "plantilla son residuo de edición y no se generan.",
+    "desglose_cifras": "Criterio 8: «Por ubicación» y «Por categoría» escriben una fila por "
+    "etiqueta del desglose congelado de `cierre.informe` y la fila Total con sus `totales` "
+    "(nunca la suma de las filas), desde el `Decimal` exacto (`precio_al_contar`). Prueba: "
+    "`test_desglose_escribe_el_decimal_congelado_sin_sumar_ni_pasar_por_float`.",
+    "desglose_disposicion": "Título en A6 (I6 y J6 con el estilo por defecto), cabecera en la "
+    "fila 7 (I7 y J7 vacías con su estilo), datos desde la 8 con el estilo de la fila 8 de la "
+    "plantilla y Total justo debajo con el de la fila 9 (fondo `DBEAFE`, I y J vacías con su "
+    "estilo). Barras de datos `BFDBFE` en F y H de las filas de datos, sin extensión 2010, "
+    "extendidas hasta la última fila (req. 5); sin filas, sin barras.",
+    "resumen_tarjetas": "Filas 6–8 de la plantilla: rótulos en A6, C6, E6 (Arial 9 N "
+    "`1D4ED8`) y G6 (Arial 9 `6B7280`, sin negrita, como la plantilla); valores congelados "
+    "en A7, C7, E7 (COP) y G7 (`0.0 %`); unidades y «de las unidades registradas» en la fila "
+    "8; las demás celdas de A–J con el estilo por defecto centrado de la plantilla.",
+    "resumen_contexto": "Q7 (humano 2026-11-22) y plan, fila 25g: desde la fila 10, «Sesión» "
+    "y su nombre; «Cerró» y quién, «Cerrada» y cuándo; «Moneda» COP; «Estado» «Informe "
+    "congelado»; la `NOTA`; `SIN_DETALLE` y `EMPRESA_VIGENTE` solo si aplican. Rótulo en A y "
+    "valor en B (D para «Cerrada»). Estilo: el de la nota de lista de la plantilla (Arial 9 "
+    "`6B7280`, centro vertical, ajuste de texto), sin combinar y con la altura por defecto "
+    "(plan, filas 11b y 12). «Cerrada» va como texto (hora de Colombia, igual que el PDF): "
+    "la plantilla no tiene un formato de fecha y hora. Prueba: "
+    "`test_resumen_replica_la_huella_con_tarjetas_y_filas_de_contexto`. Decisión del humano "
+    "2026-11-22: ACEPTADAS (estilo `nota`, sin combinar, altura por defecto; «Cerrada» y "
+    "«Corte» como texto con hora de Colombia); se revisan visualmente en Excel real en T6.",
+    "contexto_solo_resumen": "Decisión del humano 2026-11-22: Sesión, Cerró, Cerrada, Moneda, "
+    "Estado y los avisos `EMPRESA_VIGENTE` van solo en el Resumen; no se repiten en cada "
+    "hoja (las demás hojas llevan solo el bloque de la plantilla).",
+    "resumen_lista_omitida": "Q7 (humano 2026-11-22): la lista «Todos los activos» duplicada "
+    "del Resumen (filas 9–13, combinada A10:J10 y regla A13:J13) no se genera; la fila 9 queda "
+    "vacía.",
+    "impresion_hojas_cortas": "Q12 (humano 2026-11-22): Por ubicación, Por categoría y "
+    "Resumen a 1 × 1 página (como la plantilla); área de impresión hasta la última fila.",
+    "encabezado_impresion_resumen": "El Resumen pierde el encabezado de impresión con la "
+    "empresa y la sesión (B5, Q7): ninguna hoja del libro tiene encabezado; el pie es el de "
+    "la plantilla.",
+    "propiedades_informe": "Fila 26: título «Informe · {sesion}» y `creator` = "
+    "`lastModifiedBy` = `AssetControl`; se quita el comentario «Informe congelado» que "
+    "escribía el generador (sin asunto, palabras clave ni comentarios).",
+    "corte_congelado": "«Corte dd/mm/aaaa» (E3) en todas las hojas, Resumen incluido: la "
+    "fecha de corte de la sesión de `cierre.informe` (B17), no la de hoy ni la del cierre. "
+    "Prueba: `test_corte_es_la_fecha_de_corte_congelada_no_la_de_hoy`.",
+    "decimal_16_cifras": "xlsxwriter escribe los números con `{:.16G}`: un `Decimal` de más "
+    "de 16 cifras significativas se rechaza (`ValueError`) en vez de redondearse en "
+    "silencio; `NUMERIC(14,2)` nunca llega a ese tope. Prueba: "
+    "`test_un_decimal_de_mas_de_16_cifras_se_rechaza_en_vez_de_redondearse`.",
+    "ancho_base_comparado": "`defaultColWidth`/`baseColWidth` se comparan como el equivalente "
+    "`ancho_base` (Q13) en todas las hojas: la plantilla declara 9.140625 y 10; el generado no "
+    "los escribe (mismo ancho por defecto efectivo).",
+    "valores_por_omision": "Cobertura en las dos direcciones (fila 27): la plantilla escribe "
+    'atributos con su valor por omisión que xlsxwriter no escribe: `<b val="1"/>` y '
+    '`<i val="1"/>` (xlsxwriter: `<b/>` y `<i/>`; `val` vale `true` por omisión en '
+    'ECMA-376), `fitToWidth="1"`, `sheet@state="visible"`, `outlinePr` por defecto y '
+    "`col@style` que resuelve al estilo por defecto. La propiedad se compara resuelta "
+    "(negrita, cursiva del dxf, ajuste de ancho, visibilidad, agrupación, estilo de columna) "
+    "y coincide. Decisión del humano 2026-11-22: ACEPTADOS como equivalentes.",
+    "regla_discrepancia_vacia": "Cambio semántico menor (T4, documentado en T5): la regla de "
+    'fila completa sigue la fórmula de la plantilla `AND($F10<>"",$G10<>"",$F10<>$G10)`; con '
+    "«Ubicación esperada» vacía la fila ya no se marca (antes el generador marcaba la celda "
+    "«Encontrado en» si difería). La ubicación esperada sale del cierre y no suele faltar.",
+}
+
+
 def normalizar_color(c: Any) -> Any:
     """Quita el canal alfa de un color ARGB (equivalente no idéntico, Q13)."""
     if isinstance(c, dict) and isinstance(c.get("rgb"), str) and len(c["rgb"]) == 8:
@@ -1553,6 +1625,10 @@ def generar_matriz(huellas: dict[str, dict[str, Any]]) -> str:
         "## Hojas de lista del informe (T4)",
         "",
         *[f"- `{k}`: {v}" for k, v in DECISIONES_T4.items()],
+        "",
+        "## Libro del informe (T5)",
+        "",
+        *[f"- `{k}`: {v}" for k, v in DECISIONES_T5.items()],
         "",
     ]
     return "\n".join(lineas)
