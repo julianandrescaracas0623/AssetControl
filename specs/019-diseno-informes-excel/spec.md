@@ -1,6 +1,6 @@
 # Spec 019 — Diseño de los Excel según las plantillas del humano
 
-> Estado: medición real incorporada (`medicion-plantillas.md`) y preguntas Q6–Q13 CERRADAS por decisión del humano 2026-11-22 (sección «Decisiones del humano»). AVISO DE PRIVACIDAD: `specs/019-diseno-informes-excel/medicion-plantillas.md` contiene datos reales de la clínica (dirección, correo, teléfono, NIT) y NO debe versionarse ni publicarse; queda excluido del commit y de cualquier publicación de la spec (la exclusión en `.gitignore` la hace el humano; el planner no lo edita). Lo mismo aplica a `informes/` y a cualquier `matriz.md` con valores reales. Decisiones del humano ya tomadas: D-1 la plantilla manda en anchos, alturas, nombres de hoja y rótulos (datos y reglas de dominio no cambian); D-2 si algo no se puede reproducir con `xlsxwriter` se PARA y se pregunta, sin aproximaciones silenciosas, y cambiar a plantilla base + openpyxl ya no es opción sin decisión humana; D-3 se versiona una huella JSON de propiedades de diseño, sin datos reales, para que CI compare (`informes/` es local).
+> Estado: medición real incorporada (`medicion-plantillas.md`) y preguntas Q6–Q13 CERRADAS por decisión del humano 2026-11-22 (sección «Decisiones del humano»). AVISO DE PRIVACIDAD: `specs/019-diseno-informes-excel/medicion-plantillas.md` contiene datos reales de la clínica (dirección, correo, teléfono, NIT) y NO debe versionarse ni publicarse; queda excluido del commit y de cualquier publicación de la spec (la exclusión en `.gitignore` la hace el humano; el planner no lo edita). Lo mismo aplica a `informes/` y a cualquier `matriz.md` con valores reales. Q14 CERRADA por el humano 2026-11-22 («Corte» y «Cerrada» del Resumen como texto). Decisiones del humano ya tomadas: D-1 la plantilla manda en anchos, alturas, nombres de hoja y rótulos (datos y reglas de dominio no cambian); D-2 si algo no se puede reproducir con `xlsxwriter` se PARA y se pregunta, sin aproximaciones silenciosas, y cambiar a plantilla base + openpyxl ya no es opción sin decisión humana; D-3 se versiona una huella JSON de propiedades de diseño, sin datos reales, para que CI compare (`informes/` es local).
 
 ## Problema
 
@@ -171,7 +171,7 @@ Cerradas por decisión del humano:
 - **Q4 (anchos y alturas): CERRADA por D-1.** Prevalecen los de la plantilla (celdas sin ajuste de texto; el texto largo se corta; ver R4).
 - **Q5 (nombres de hoja y rótulos): CERRADA por D-1.** Se adoptan los de la plantilla (en su mayoría ya coinciden con los actuales).
 
-## Decisiones del humano (2026-11-22) — Q6 a Q13 CERRADAS
+## Decisiones del humano (2026-11-22) — Q6 a Q14 CERRADAS
 
 Respondidas explícitamente por el humano en sesión el 2026-11-22. Cada una conserva debajo el planteamiento original como registro. Sin `[PENDIENTE]` restantes.
 
@@ -183,6 +183,8 @@ Respondidas explícitamente por el humano en sesión el 2026-11-22. Cada una con
 - **Q11: CERRADA, decisión del humano 2026-11-22: opción A.** Hoja activa, selección y desplazamiento = residuo de edición: primera hoja, A1; se registra en la matriz.
 - **Q12: CERRADA, decisión del humano 2026-11-22: opción B.** Ajuste 1×1 en hojas cortas; 1 página de ancho × alto automático en las listas.
 - **Q13: CERRADA, decisión del humano 2026-11-22.** Se acepta `twoCellAnchor editAs="oneCell"` con las mismas dimensiones visibles, y no se comparan metadatos invisibles (`calcId`, `baseColWidth`, canal alfa del borde, medios duplicados), listados en la matriz como «equivalente no idéntico». Si la sonda L1 de T1 demuestra que `xlsxwriter` sí puede `oneCellAnchor`, se usa. Cualquier otra propiedad que `xlsxwriter` no reproduzca: T1 se detiene y pregunta (sin aproximaciones silenciosas; cambiar de método exige decisión humana).
+
+- **Q14: CERRADA, decisión del humano 2026-11-22.** «Corte» y «Cerrada» del Resumen se mantienen como TEXTO, no como fecha real de Excel. «Corte» es `Corte dd/mm/aaaa` y «Cerrada» es la fecha y hora de cierre en hora de Colombia, en texto. Motivo: coincide con la plantilla y es el comportamiento ya implementado y cubierto por la matriz y las pruebas.
 
 ### Decisiones del humano tras las sondas de T1 (2026-11-22)
 
