@@ -17,6 +17,11 @@ import { cn } from '@/lib/utils'
 // teléfono; object-cover) y al tocarla se amplía en un Dialogo del kit. Botones del kit
 // (48 px en el teléfono y en el conteo; antes «Agregar foto» medía 28 px) y Confirmar del
 // kit para quitarla. Mismas llamadas y mismos textos.
+// `lateral` (spec 015, R8): la columna derecha del conteo en escritorio (240 px desde xl).
+// Desde xl la imagen (o «Sin foto») va a lo ancho en 4:3 y los botones debajo, a lo ancho
+// de la tarjeta: nunca se cortan. Por debajo de xl la columna ocupa todo el panel y se
+// conserva la miniatura con los botones al lado (pasan debajo si no caben). Sin
+// `lateral` (teléfono, Verificar móvil) nada cambia.
 
 const fechaFoto = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' })
 
@@ -66,10 +71,13 @@ export function FotoActivo({
   activo,
   editable = true,
   grande = false,
+  lateral = false,
 }: {
   activo: { id: string; nombre: string; foto?: Foto | null }
   editable?: boolean
   grande?: boolean
+  /** Columna lateral del conteo en escritorio: imagen a lo ancho y botones apilados desde xl. */
+  lateral?: boolean
 }) {
   const entrada = useRef<HTMLInputElement>(null)
   const pendiente = useFotoPendiente()
@@ -91,13 +99,27 @@ export function FotoActivo({
       <MarcoImagen variante="foto" alt="" vacio={SIN_FOTO} />
     )
   ) : foto ? (
-    <FotoGuardada key={foto.id} fotoId={foto.id} descripcion={activo.nombre} />
+    <FotoGuardada
+      key={foto.id}
+      fotoId={foto.id}
+      descripcion={activo.nombre}
+      className={cn(lateral && 'shrink-0 xl:block xl:aspect-[4/3] xl:h-auto xl:w-full')}
+      imagenClassName={cn(lateral && 'xl:block xl:size-full')}
+    />
   ) : (
-    <div className="flex size-24 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-xs text-muted-foreground">
-      <ImageOff className="size-5" aria-hidden="true" />
+    <div
+      data-foto="imagen"
+      className={cn(
+        'flex size-24 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-xs text-muted-foreground',
+        lateral && 'xl:aspect-[4/3] xl:h-auto xl:w-full xl:gap-2 xl:bg-muted/40 xl:text-etiqueta xl:font-normal',
+      )}
+    >
+      <ImageOff className={cn('size-5', lateral && 'xl:size-6')} aria-hidden="true" />
       Sin foto
     </div>
   )
+  // En la columna lateral los botones nunca pasan del ancho de la tarjeta.
+  const ajusteBoton = lateral ? 'max-w-full' : undefined
 
   const acciones = editable && (
     <>
@@ -117,17 +139,20 @@ export function FotoActivo({
           await elegir(archivo)
         }}
       />
-      <div className="flex flex-wrap items-center gap-separacion">
+      <div data-foto="acciones" className={cn('flex flex-wrap items-center gap-separacion', lateral && 'xl:flex-col xl:items-stretch')}>
         {pendiente.archivo && pendiente.estado === 'sin_foto' ? (
           <>
-            <Boton onClick={() => subir(pendiente.archivo)}>Guardar foto</Boton>
-            <Boton variante="fantasma" onClick={() => pendiente.limpiar()}>
+            <Boton className={ajusteBoton} onClick={() => subir(pendiente.archivo)}>
+              Guardar foto
+            </Boton>
+            <Boton variante="fantasma" className={ajusteBoton} onClick={() => pendiente.limpiar()}>
               Cancelar
             </Boton>
           </>
         ) : (
           <Boton
             variante="secundario"
+            className={ajusteBoton}
             icono={<Camera />}
             cargando={pendiente.estado === 'subiendo'}
             onClick={() => entrada.current?.click()}
@@ -138,6 +163,7 @@ export function FotoActivo({
         {foto && (
           <Boton
             variante="fantasma"
+            className={ajusteBoton}
             icono={<Trash2 />}
             disabled={quitar.isPending || pendiente.estado === 'subiendo'}
             onClick={() => setConfirmando(true)}
@@ -156,11 +182,26 @@ export function FotoActivo({
   )
 
   return (
-    <Panel role="region" aria-label="Foto del activo">
-      <div className={cn('flex gap-4', grande ? 'flex-col md:flex-row md:items-start' : 'flex-wrap items-start')}>
+    <Panel role="region" aria-label="Foto del activo" data-disposicion={lateral ? 'lateral' : undefined}>
+      <div
+        data-foto="contenido"
+        className={cn(
+          'flex gap-4',
+          grande ? 'flex-col md:flex-row md:items-start' : 'flex-wrap items-start',
+          lateral && 'xl:flex-col xl:flex-nowrap xl:items-stretch xl:gap-3',
+        )}
+      >
         {imagen}
         {(editable || (grande && foto)) && (
-          <div className="flex min-w-0 flex-1 flex-col items-start gap-3">
+          <div
+            data-foto="bloque-acciones"
+            className={cn(
+              'flex flex-1 flex-col items-start gap-3',
+              // Lateral: con un ancho mínimo, el bloque pasa debajo de la miniatura en vez de
+              // encogerse y cortar el botón; desde xl ocupa todo el ancho y estira los botones.
+              lateral ? 'min-w-40 xl:w-full xl:flex-none xl:items-stretch' : 'min-w-0',
+            )}
+          >
             {grande && (foto || editable) && (
               <div className="flex flex-col gap-0.5">
                 {foto && <p className="text-cuerpo font-medium">Foto principal · {fechaFoto.format(new Date(foto.creada_en))}</p>}

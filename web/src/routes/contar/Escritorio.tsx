@@ -1,4 +1,4 @@
-import { Archive, ArrowLeft, ArrowLeftRight, Camera, Check, CircleAlert, History, Info, Lock, MapPin, Plus, RefreshCw, ScanBarcode, SearchX, TriangleAlert, Usb } from 'lucide-react'
+import { Archive, ArrowLeft, ArrowLeftRight, Camera, Check, ChevronRight, CircleAlert, History, Info, Lock, MapPin, Plus, RefreshCw, ScanBarcode, SearchX, TriangleAlert, Usb } from 'lucide-react'
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, Outlet, useMatch, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -872,31 +872,49 @@ function PanelActivo({
   )
 }
 
+// Spec 015, R8: la columna derecha del panel (240 px desde xl) apila la foto y, debajo, el
+// historial como una fila a lo ancho de la columna (antes, un enlace suelto bajo la tarjeta).
 function EnlaceHistorial({ codigo }: { codigo: string }) {
   return (
-    <Boton asChild variante="fantasma" className="self-start px-2 text-brand-strong">
+    <Boton asChild variante="secundario" anchoCompleto className="justify-start text-brand-strong">
       <Link to={`/contar/activo/${encodeURIComponent(codigo)}/historial`}>
         <History />
         Ver historial del activo
+        <ChevronRight className="ml-auto text-muted-foreground" />
       </Link>
     </Boton>
   )
 }
 
+function ColumnaLateral({ activo, editable }: { activo: Activo; editable: boolean }) {
+  return (
+    <div data-verificacion="lateral" className="flex min-w-0 flex-col gap-3">
+      <FotoActivo activo={activo} editable={editable} lateral />
+      <EnlaceHistorial codigo={activo.codigo} />
+    </div>
+  )
+}
+
+/**
+ * Filas rótulo/valor («Ubicación esperada», «Encontrada en») del panel de escritorio: el
+ * kit les da 56 px de alto mínimo en el conteo pero alinea el texto arriba, lo que dejaba
+ * un hueco bajo cada fila. Aquí la fila centra su contenido en esa altura y conserva la
+ * línea base entre rótulo y valor. Solo en este panel: el teléfono no cambia.
+ */
+const FILAS_CENTRADAS =
+  '[&_[data-kit=lista-datos][data-disposicion=filas]>div]:grid [&_[data-kit=lista-datos][data-disposicion=filas]>div]:grid-cols-[auto_minmax(0,1fr)] [&_[data-kit=lista-datos][data-disposicion=filas]>div]:content-center'
+
 function ConsultaEscritorio({ activo }: { activo: Activo }) {
   const rol = useRol()
   return (
-    <div className="grid gap-6 p-5 xl:grid-cols-[minmax(0,1fr)_240px]">
+    <div className={cn('grid gap-6 p-5 xl:grid-cols-[minmax(0,1fr)_240px]', FILAS_CENTRADAS)}>
       <div className="flex min-w-0 flex-col gap-5">
         <AssetCard activo={aTarjeta(activo)} rol={rol} titulo="h1" />
         <Aviso tono="info" icono={<Info aria-hidden="true" />} titulo="No hay una sesión abierta">
           Puedes consultar el activo; para verificarlo, el administrador debe abrir una sesión de conteo.
         </Aviso>
       </div>
-      <div className="flex flex-col gap-3">
-        <FotoActivo activo={activo} editable={activo.estado !== 'dado_de_baja'} />
-        <EnlaceHistorial codigo={activo.codigo} />
-      </div>
+      <ColumnaLateral activo={activo} editable={activo.estado !== 'dado_de_baja'} />
     </div>
   )
 }
@@ -1045,7 +1063,7 @@ function VerificandoEscritorio({
 
   return (
     <div className="flex flex-col">
-      <div className="grid gap-6 p-5 xl:grid-cols-[minmax(0,1fr)_240px]">
+      <div className={cn('grid gap-6 p-5 xl:grid-cols-[minmax(0,1fr)_240px]', FILAS_CENTRADAS)}>
         <div className="flex min-w-0 flex-col gap-5">
           <AssetCard activo={aTarjeta(activo)} rol={rol} titulo="h1" />
           {deBaja ? (
@@ -1068,9 +1086,15 @@ function VerificandoEscritorio({
                         {
                           rotulo: 'Encontrada en',
                           valor: (
-                            <span className={cn('flex min-w-0 items-center justify-end gap-1.5 font-medium', otra ? 'text-warning' : 'text-success')}>
-                              {otra ? <ArrowLeftRight className="size-4 shrink-0" aria-hidden="true" /> : <Check className="size-4 shrink-0" aria-hidden="true" />}
-                              <span className="truncate">{rutaDe(lista, encontrada!)}</span>
+                            // Ícono en línea dentro del texto: la fila toma la línea base del
+                            // texto (con un contenedor flex la tomaba del ícono y se desalineaba).
+                            <span data-verificacion="encontrada" className={cn('block truncate font-medium', otra ? 'text-warning' : 'text-success')}>
+                              {otra ? (
+                                <ArrowLeftRight className="mr-1.5 inline size-4 align-[-0.1875rem]" aria-hidden="true" />
+                              ) : (
+                                <Check className="mr-1.5 inline size-4 align-[-0.1875rem]" aria-hidden="true" />
+                              )}
+                              {rutaDe(lista, encontrada!)}
                             </span>
                           ),
                         },
@@ -1115,10 +1139,7 @@ function VerificandoEscritorio({
             </>
           )}
         </div>
-        <div className="flex flex-col gap-3">
-          <FotoActivo activo={activo} editable={!deBaja} />
-          <EnlaceHistorial codigo={activo.codigo} />
-        </div>
+        <ColumnaLateral activo={activo} editable={!deBaja} />
       </div>
       {!deBaja && (
         <div data-verificacion="acciones" className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/40 px-5 py-3">
