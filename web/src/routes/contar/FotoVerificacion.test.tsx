@@ -64,6 +64,25 @@ describe('foto al verificar', () => {
     expect(await screen.findByRole('button', { name: 'Ver la foto de Impresora multifuncional' })).toBeTruthy()
     expect(catalogo.principales.get(IMPRESORA)).toBeTruthy()
   })
+
+  it('con foto principal, contar muestra esa foto y no sube ninguna al confirmar', async () => {
+    simularAncho({ movil: true })
+    guardarSala(ADMINISTRACION)
+    const catalogo = catalogoDemo('contador', { sesiones: [sesionDe()] })
+    const principal = '00000000-0000-4000-8000-00000000f0a1'
+    catalogo.principales.set(IMPRESORA, { id: principal, creada_en: '2026-11-15T12:00:00+00:00', ancho: 1600, alto: 1200 })
+    catalogo.fotos.set(principal, new Uint8Array([0xff, 0xd8, 0xff]))
+    const f = simularSesion('contador', catalogo.manejador)
+    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/contar/activo/000215'] })} />)
+    expect(await screen.findByRole('button', { name: 'Ver la foto de Impresora multifuncional' })).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Verificado' })).toBeTruthy()
+    expect(screen.getByText(/ya tiene su foto principal/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Agregar foto (opcional)' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Tomar foto nueva de este conteo' })).toBeTruthy()
+    expect(f.mock.calls.some(([url]) => String(url).endsWith('/foto'))).toBe(false)
+    expect(catalogo.verificaciones[0].foto_id).toBeNull()
+  })
 })
 
 describe('historial con fotos', () => {

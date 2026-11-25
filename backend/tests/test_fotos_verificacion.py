@@ -150,3 +150,68 @@ def test_closed_session_refuses_new_photos(client, escenario, ver_app):
     assert cierre.status_code == 200, cierre.get_json()
     cerrada = _subir(client, escenario, vid, ADMIN)
     assert (cerrada.status_code, cerrada.get_json()["error"]["code"]) == (409, "sesion_cerrada")
+
+
+@pytest.fixture(scope="module")
+def sesion_abierta(ver_app, escenario) -> dict[str, str]:
+    """Sesión abierta propia para estos casos (la del escenario ya se cerró arriba)."""
+    client = ver_app.test_client(use_cookies=False)
+    cuerpo = {"nombre": "Conteo con principal", "fecha_corte": "2026-11-15"}
+    sesion = _post(client, "/sesiones", cuerpo)
+    return {**escenario, "sid": sesion["sesion"]["id"]}
+
+
+def _subir_principal(client, activo_id, headers=ADMIN) -> str:
+    buffer = io.BytesIO()
+    Image.new("RGB", (60, 40), (10, 120, 200)).save(buffer, "JPEG")
+    buffer.seek(0)
+    foto_id = str(uuid.uuid4())
+    form = {"foto_id": foto_id, "archivo": (buffer, "principal.jpg")}
+    respuesta = client.put(
+        f"/activos/{activo_id}/foto", data=form, headers=headers, content_type="multipart/form-data"
+    )
+    assert respuesta.status_code == 201, respuesta.get_json()
+    return foto_id
+
+
+def _principal_de(client, activo_id) -> str | None:
+    foto = client.get(f"/activos/{activo_id}", headers=ADMIN).get_json()["activo"]["foto"]
+    return foto["id"] if foto else None
+
+
+def _verificacion_de(client, sesion_abierta, activo_id) -> dict:
+    return client.get(
+        f"/sesiones/{sesion_abierta['sid']}/verificaciones?activo_id={activo_id}", headers=CONTADOR
+    ).get_json()["verificacion"]
+
+
+def test_contar_sin_elegir_foto_no_crea_foto_de_verificacion(client, sesion_abierta):
+    activo = _activo(client, sesion_abierta)
+    principal = _subir_principal(client, activo)
+    _verificar(client, sesion_abierta, activo, CONTADOR)
+    assert _verificacion_de(client, sesion_abierta, activo)["foto_id"] is None
+    assert _principal_de(client, activo) == principal
+
+
+def test_foto_de_conteo_con_principal_queda_como_evidencia(client, sesion_abierta):
+    activo = _activo(client, sesion_abierta)
+    principal = _subir_principal(client, activo)
+    vid = _verificar(client, sesion_abierta, activo, CONTADOR)
+    subida = _subir(client, sesion_abierta, vid, CONTADOR)
+    assert subida.status_code == 201, subida.get_json()
+    foto_evidencia = subida.get_json()["foto"]["id"]
+    assert _verificacion_de(client, sesion_abierta, activo)["foto_id"] == foto_evidencia
+    assert _principal_de(client, activo) == principal
+    assert client.get(f"/fotos/{foto_evidencia}", headers=CONTADOR).status_code == 200
+
+
+def test_quitar_la_principal_no_borra_la_foto_de_la_verificacion(client, sesion_abierta):
+    activo = _activo(client, sesion_abierta)
+    _subir_principal(client, activo)
+    vid = _verificar(client, sesion_abierta, activo, CONTADOR)
+    foto_evidencia = _subir(client, sesion_abierta, vid, CONTADOR).get_json()["foto"]["id"]
+    quitada = client.delete(f"/activos/{activo}/foto", headers=ADMIN)
+    assert quitada.status_code == 204, quitada.get_json()
+    assert _principal_de(client, activo) is None
+    assert client.get(f"/fotos/{foto_evidencia}", headers=CONTADOR).status_code == 200
+    assert _verificacion_de(client, sesion_abierta, activo)["foto_id"] == foto_evidencia

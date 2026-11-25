@@ -403,6 +403,24 @@ describe('atajos y confirmar', () => {
     expect(catalogo.verificaciones).toHaveLength(1)
   })
 
+  it('con foto principal, tras verificar la franja ofrece «Tomar foto nueva de este conteo» y no sube ninguna', async () => {
+    const IMPRESORA = '00000000-0000-4000-8000-0000000000d1'
+    const { f } = abrir('/contar/escanear', {
+      preparar: (c) => c.principales.set(IMPRESORA, { id: '00000000-0000-4000-8000-00000000f0d1', creada_en: '2026-11-01T10:00:00Z', ancho: 800, alto: 600 }),
+    })
+    await abrirActivo()
+    await waitFor(() => expect(document.activeElement).toBe(panel()))
+    fireEvent.keyDown(panel(), { key: 'Enter' })
+    fireEvent.keyDown(panel(), { key: 'Enter' })
+
+    await screen.findByText(/^Verificado:/)
+    expect(await screen.findByRole('button', { name: 'Tomar foto nueva de este conteo' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Agregar foto' })).toBeNull()
+    expect(screen.getByText(/ya tiene su foto principal/)).toBeTruthy()
+    const subidas = f.mock.calls.filter(([url, init]) => String(url).includes('/foto') && init?.method === 'POST')
+    expect(subidas).toHaveLength(0)
+  })
+
   it('D y Enter de inmediato confirman «Dañado» (sin ventana con el estado viejo)', async () => {
     const { f } = abrir()
     await abrirActivo()
