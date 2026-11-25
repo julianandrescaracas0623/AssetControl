@@ -71,7 +71,7 @@ export default function Login() {
 
   const enviando = entrar.isPending || entrar.isSuccess
   return (
-    <MarcoAcceso titulo="Iniciar sesión" descripcion="Entra con el correo con el que te invitó tu clínica.">
+    <MarcoAcceso titulo="Iniciar sesión" descripcion="Entra con el correo con el que te invitó tu empresa.">
       <form className="flex flex-col gap-4" onSubmit={alEnviar}>
         {aviso && entrar.isIdle && (
           <Aviso ref={avisoRef} tabIndex={-1} tono="exito" titulo={TEXTO_CONTRASENA_ACTUALIZADA} className="outline-none" />
