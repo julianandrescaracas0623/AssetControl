@@ -641,15 +641,14 @@ def comprobar_lista(gen: dict, nombre: str, cuerpo: dict[str, str | None], filas
     assert u_diseno.comparar(pagina, hoja["pagina"], f"{nombre}.pagina") == []
     assert hoja["pagina"]["encabezado_pie"] == {"oddFooter": est.PIE}  # sin encabezado (B5)
     assert hoja["pagina"]["papel"] is None  # L3
-    # Vista: congelado bajo la cabecera, sin cuadrícula; Q11: sin la selección de edición
-    # (la hoja activa del libro es de T5).
+    # Vista: sin paneles inmovilizados (2026-11-24) ni cuadrícula; Q11: sin la selección de
+    # edición (la hoja activa del libro es de T5).
     vista_esp = {k: v for k, v in esp["vista"].items() if k not in ("seleccion",)}
     vista_esp["tab_seleccionada"] = hoja["vista"]["tab_seleccionada"]
     vista_gen = {k: v for k, v in hoja["vista"].items() if k != "seleccion"}
     assert u_diseno.comparar(vista_esp, vista_gen, f"{nombre}.vista") == []
-    assert hoja["vista"]["seleccion"] == [
-        {"panel": "bottomLeft", "celda_activa": None, "rango": None}
-    ]
+    assert hoja["vista"]["panel"] is None
+    assert hoja["vista"]["seleccion"] == []  # Excel abre en A1
 
     ultima = 9 + len(filas)  # última fila escrita (1-based): cabecera 9, datos desde 10
     area = esp["impresion"]["area"].split("!")[1]

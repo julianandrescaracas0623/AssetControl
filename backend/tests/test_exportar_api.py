@@ -422,7 +422,7 @@ def test_flat_sheet_squares_with_the_report_to_the_cent(client):
     assert total[1] == "Todos los activos"
 
 
-def test_flat_sheet_is_a_table_with_frozen_header_filters_and_print_setup(client):
+def test_flat_sheet_is_a_table_with_header_filters_and_print_setup(client):
     _, sesion, _, _ = cerrada(client)
     response = excel(client, sesion)
     hoja = libro(response)["Todos los activos"]
@@ -430,9 +430,9 @@ def test_flat_sheet_is_a_table_with_frozen_header_filters_and_print_setup(client
     tabla = hoja.tables["Activos"]
     assert tabla.ref == f"A{cabecera}:J{cabecera + 4}"
     assert tabla.totalsRowCount in (None, 0)
-    # Encabezado y fila de total fijos (encima de la cabecera, dentro del panel congelado);
-    # spec 019 (B12): solo filas, sin columnas congeladas, como la plantilla.
-    assert hoja.freeze_panes == f"A{cabecera + 1}"
+    # Total encima de la cabecera; sin paneles inmovilizados (decisión del humano 2026-11-24:
+    # la línea del corte no se puede ocultar). Al imprimir, la cabecera se repite.
+    assert hoja.freeze_panes is None
     assert fila_de(hoja, "Total") < cabecera
     assert hoja.print_title_rows.replace("$", "") == f"{cabecera}:{cabecera}"
     assert hoja.page_setup.orientation == "landscape"
@@ -446,16 +446,14 @@ def test_flat_sheet_is_a_table_with_frozen_header_filters_and_print_setup(client
     assert isinstance(precio.value, (int, float)) and "#,##0.00" in precio.number_format
 
 
-def test_list_sheets_keep_their_total_fixed_above_the_header(client):
+def test_list_sheets_keep_their_total_above_the_header(client):
     _, sesion, _, _ = cerrada(client)
     wb = libro(excel(client, sesion))
     for nombre in ("Todos los activos", "Biomédicos", "No encontrados"):
         hoja = wb[nombre]
         cabecera = fila_de(hoja, "Código")
         assert fila_de(hoja, "Total") == cabecera - 1, nombre
-        assert hoja.freeze_panes is not None, nombre
-        congelada = int(re.sub(r"[A-Z]", "", hoja.freeze_panes))
-        assert congelada == cabecera + 1, nombre
+        assert hoja.freeze_panes is None, nombre  # sin paneles inmovilizados (2026-11-24)
         assert hoja.auto_filter.ref or hoja.tables, nombre
         # Nada después de la última fila de datos: el total ya no va al final.
         filas, _ = activos_de_hoja(hoja)

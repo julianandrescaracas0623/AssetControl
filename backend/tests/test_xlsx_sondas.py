@@ -443,8 +443,8 @@ def test_l9_vista_reproducible(clave, nombre, hoja):
             ws.freeze_panes(fila, int(v["panel"]["x_split"] or 0))
         if v["celda_superior_izquierda"]:
             ws.set_top_left_cell(v["celda_superior_izquierda"])
-        sel = v["seleccion"][0]
-        ws.set_selection(sel["rango"])
+        if v["seleccion"]:
+            ws.set_selection(v["seleccion"][0]["rango"])
         ws.hide_gridlines(2)
         if v["tab_seleccionada"]:
             ws.activate()

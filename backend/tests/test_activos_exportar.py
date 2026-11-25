@@ -11,9 +11,10 @@
 
 Spec 019 (T3): el archivo replica la plantilla A (``Activos_20261122_diseno.xlsx``) a
 través de su huella versionada (``tests/plantillas/activos.json``): bloque de empresa
-vigente del tenant con logo (Q9, Q10), cabecera en la fila 7, datos desde la 8, congelado,
-filtro, impresión y formatos; los datos, el orden de filas y las columnas no cambian. Las
-pruebas de diseño comparan propiedad por propiedad con ``utils_xlsx_diseno.comparar``.
+vigente del tenant con logo (Q9, Q10), cabecera en la fila 7, datos desde la 8, sin paneles
+inmovilizados (2026-11-24), filtro, impresión y formatos; los datos, el orden de filas y las
+columnas no cambian. Las pruebas de diseño comparan propiedad por propiedad con
+``utils_xlsx_diseno.comparar``.
 
 El archivo se lee con ``openpyxl`` (otra librería que la que lo escribe) y con la utilidad
 de diseño (ZIP + XML). Empresa, logo y activos de las pruebas son FICTICIOS.
@@ -297,14 +298,15 @@ def test_with_no_results_the_file_has_only_the_header(client):
     assert not [r for r in hoja["celdas"] if u.ref_a_rc(r)[0] >= FILA_DATOS]
 
 
-def test_sheet_has_a_filter_and_a_frozen_header(client):
+def test_sheet_has_a_filter_and_no_frozen_panes(client):
     c = Catalogo(client)
     c.activo("Autoclave")
     c.activo("Silla")
     hoja = load_workbook(io.BytesIO(exportar_(client).data)).worksheets[0]
     assert hoja.title == "Activos"
-    # Spec 019 (A9): congela hasta la cabecera (fila 7) y filtra desde ella.
-    assert hoja.freeze_panes == "A8"
+    # Filtra desde la cabecera (fila 7). Sin paneles inmovilizados (decisión del humano
+    # 2026-11-24): la línea del corte no se puede ocultar en Excel.
+    assert hoja.freeze_panes is None
     assert hoja.auto_filter.ref == "A7:L9"
 
 
@@ -742,15 +744,13 @@ def test_el_libro_replica_la_huella_de_la_plantilla_a(client):
         assert u.comparar(esp[k], hoja[k], k) == []
     for k in ("alto_fila_defecto", "filas_ocultas_defecto", "alto_propio_defecto"):
         assert hoja["formato_hoja"][k] == esp["formato_hoja"][k], k
-    # Vista: congelado y cuadrícula como la plantilla; Q11: primera hoja, sin desplazamiento
-    # ni la celda activa de edición de la plantilla (J17).
+    # Vista: sin paneles inmovilizados (2026-11-24) y sin cuadrícula; Q11: primera hoja, sin
+    # desplazamiento ni la celda activa de edición de la plantilla (J17).
     vista_esp = {k: v for k, v in esp["vista"].items() if k != "seleccion"}
     vista_gen = {k: v for k, v in hoja["vista"].items() if k != "seleccion"}
     assert u.comparar(vista_esp, vista_gen, "vista") == []
-    # Sin celda activa declarada en el panel congelado: Excel abre en la celda por defecto.
-    assert hoja["vista"]["seleccion"] == [
-        {"panel": "bottomLeft", "celda_activa": None, "rango": None}
-    ]
+    assert hoja["vista"]["panel"] is None
+    assert hoja["vista"]["seleccion"] == []  # Excel abre en A1
 
     # Rangos que se extienden hasta la última fila escrita (req. 5).
     assert hoja["autofiltro"] == f"A7:L{ultima}"

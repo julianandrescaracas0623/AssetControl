@@ -1539,7 +1539,9 @@ DECISIONES_ENCABEZADO = {
     "Se quitan los rótulos «Exportado» y «Correo» de la plantilla. Alturas: fila 4 = 16 y "
     "fila 5 = 30. El logo conserva su caja y su tamaño (`CajaLogo`, en EMU) y lleva un "
     "marco gris fino (`D1D5DB`, 0,75 pt, sin relleno) a 3 px de la imagen; el marco depende "
-    "del logo, así que no va en la huella y lo cubre su propia prueba. Las huellas "
+    "del logo, así que no va en la huella y lo cubre su propia prueba. Ninguna hoja "
+    "inmoviliza paneles: Excel dibuja una línea en el corte que no se puede ocultar (al "
+    "imprimir, la cabecera se sigue repitiendo). Las huellas "
     "`activos.json` e `informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.",
 }
 

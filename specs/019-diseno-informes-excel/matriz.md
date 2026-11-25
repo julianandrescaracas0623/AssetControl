@@ -29,8 +29,8 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 
 ### Hoja `Activos`
 
-- Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `{'x_split': None, 'y_split': 7, 'celda_superior_izquierda': 'A8', 'panel_activo': 'bottomLeft', 'estado': 'frozen'}`
-- Selección `[{'panel': 'bottomLeft', 'celda_activa': 'J17', 'rango': 'J17'}]`, tabSelected True, topLeftCell `None` (Q11: no se reproduce)
+- Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `None`
+- Selección `[]`, tabSelected True, topLeftCell `None` (Q11: no se reproduce)
 - Formato de hoja `{'alto_fila_defecto': 15, 'ancho_col_defecto': 9.140625, 'ancho_base': 10, 'filas_ocultas_defecto': False, 'alto_propio_defecto': False}`
 - Combinadas: ['C5:D5', 'E5:F5', 'G5:L5']
 - Autofiltro `A7:L8`; tablas `[]`; validaciones ninguna; hipervínculos ninguno; protección None
@@ -336,14 +336,8 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 | `sheet:worksheet/sheetPr/tabColor@rgb` | 2 color de pestaña |
 | `sheet:worksheet/sheetViews` | estructura |
 | `sheet:worksheet/sheetViews/sheetView` | estructura |
-| `sheet:worksheet/sheetViews/sheetView/pane` | 14 congelados |
-| `sheet:worksheet/sheetViews/sheetView/pane@activePane` | 14 congelados |
-| `sheet:worksheet/sheetViews/sheetView/pane@state` | 14 congelados |
-| `sheet:worksheet/sheetViews/sheetView/pane@topLeftCell` | 14 congelados |
-| `sheet:worksheet/sheetViews/sheetView/pane@ySplit` | 14 congelados |
 | `sheet:worksheet/sheetViews/sheetView/selection` | 3 selección (Q11) |
 | `sheet:worksheet/sheetViews/sheetView/selection@activeCell` | 3 selección (Q11) |
-| `sheet:worksheet/sheetViews/sheetView/selection@pane` | 3 selección (Q11) |
 | `sheet:worksheet/sheetViews/sheetView/selection@sqref` | 3 selección (Q11) |
 | `sheet:worksheet/sheetViews/sheetView@showGridLines` | 20 cuadrícula |
 | `sheet:worksheet/sheetViews/sheetView@tabSelected` | 3 hoja activa y desplazamiento (Q11) |
@@ -404,8 +398,8 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 
 ### Hoja `Todos los activos`
 
-- Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `{'x_split': None, 'y_split': 9, 'celda_superior_izquierda': 'A10', 'panel_activo': 'bottomLeft', 'estado': 'frozen'}`
-- Selección `[{'panel': 'bottomLeft', 'celda_activa': 'C18', 'rango': 'C18'}]`, tabSelected False, topLeftCell `None` (Q11: no se reproduce)
+- Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `None`
+- Selección `[]`, tabSelected False, topLeftCell `None` (Q11: no se reproduce)
 - Formato de hoja `{'alto_fila_defecto': 15, 'ancho_col_defecto': 9.140625, 'ancho_base': 10, 'filas_ocultas_defecto': False, 'alto_propio_defecto': False}`
 - Combinadas: ['A7:J7', 'C5:D5', 'E5:F5', 'G5:J5']
 - Autofiltro `None`; tablas `[]`; validaciones ninguna; hipervínculos ninguno; protección None
@@ -649,8 +643,8 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 
 ### Hoja `No encontrados`
 
-- Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `{'x_split': None, 'y_split': 9, 'celda_superior_izquierda': 'A10', 'panel_activo': 'bottomLeft', 'estado': 'frozen'}`
-- Selección `[{'panel': 'bottomLeft', 'celda_activa': 'E15', 'rango': 'E15'}]`, tabSelected True, topLeftCell `None` (Q11: no se reproduce)
+- Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `None`
+- Selección `[]`, tabSelected True, topLeftCell `None` (Q11: no se reproduce)
 - Formato de hoja `{'alto_fila_defecto': 15, 'ancho_col_defecto': 9.140625, 'ancho_base': 10, 'filas_ocultas_defecto': False, 'alto_propio_defecto': False}`
 - Combinadas: ['A7:F7', 'C5:D5']
 - Autofiltro `None`; tablas `[]`; validaciones ninguna; hipervínculos ninguno; protección None
@@ -764,8 +758,8 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 
 ### Hoja `{categoria}`
 
-- Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `{'x_split': None, 'y_split': 9, 'celda_superior_izquierda': 'A10', 'panel_activo': 'bottomLeft', 'estado': 'frozen'}`
-- Selección `[{'panel': 'bottomLeft', 'celda_activa': 'E19', 'rango': 'E19'}]`, tabSelected False, topLeftCell `None` (Q11: no se reproduce)
+- Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `None`
+- Selección `[]`, tabSelected False, topLeftCell `None` (Q11: no se reproduce)
 - Formato de hoja `{'alto_fila_defecto': 15, 'ancho_col_defecto': 9.140625, 'ancho_base': 10, 'filas_ocultas_defecto': False, 'alto_propio_defecto': False}`
 - Combinadas: ['A7:I7', 'C5:D5', 'E5:F5', 'G5:I5']
 - Autofiltro `None`; tablas `[]`; validaciones ninguna; hipervínculos ninguno; protección None
@@ -1374,14 +1368,8 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 | `sheet:worksheet/sheetPr/tabColor@rgb` | 2 color de pestaña |
 | `sheet:worksheet/sheetViews` | estructura |
 | `sheet:worksheet/sheetViews/sheetView` | estructura |
-| `sheet:worksheet/sheetViews/sheetView/pane` | 14 congelados |
-| `sheet:worksheet/sheetViews/sheetView/pane@activePane` | 14 congelados |
-| `sheet:worksheet/sheetViews/sheetView/pane@state` | 14 congelados |
-| `sheet:worksheet/sheetViews/sheetView/pane@topLeftCell` | 14 congelados |
-| `sheet:worksheet/sheetViews/sheetView/pane@ySplit` | 14 congelados |
 | `sheet:worksheet/sheetViews/sheetView/selection` | 3 selección (Q11) |
 | `sheet:worksheet/sheetViews/sheetView/selection@activeCell` | 3 selección (Q11) |
-| `sheet:worksheet/sheetViews/sheetView/selection@pane` | 3 selección (Q11) |
 | `sheet:worksheet/sheetViews/sheetView/selection@sqref` | 3 selección (Q11) |
 | `sheet:worksheet/sheetViews/sheetView@showGridLines` | 20 cuadrícula |
 | `sheet:worksheet/sheetViews/sheetView@tabSelected` | 3 hoja activa y desplazamiento (Q11) |
@@ -1489,4 +1477,4 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 
 ## Encabezado junto al logo (decisión del humano 2026-11-24)
 
-- `encabezado_junto_al_logo`: Decisión del humano 2026-11-24: el bloque de las dos exportaciones (activos e informe) pone el título junto al logo y debajo la línea «Informe · empresa · exportado|corte fecha» (C3) con una línea fina gris. En la fila 4, los rótulos «Empresa», «Contacto» y «Dirección»; en la fila 5, bajo cada uno, sus datos (nombre y NIT; correo y teléfono; dirección) en celdas combinadas con ajuste de texto, hasta el fin de la banda. Un dato ausente se omite y un grupo sin datos va sin rótulo. Se quitan los rótulos «Exportado» y «Correo» de la plantilla. Alturas: fila 4 = 16 y fila 5 = 30. El logo conserva su caja y su tamaño (`CajaLogo`, en EMU) y lleva un marco gris fino (`D1D5DB`, 0,75 pt, sin relleno) a 3 px de la imagen; el marco depende del logo, así que no va en la huella y lo cubre su propia prueba. Las huellas `activos.json` e `informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.
+- `encabezado_junto_al_logo`: Decisión del humano 2026-11-24: el bloque de las dos exportaciones (activos e informe) pone el título junto al logo y debajo la línea «Informe · empresa · exportado|corte fecha» (C3) con una línea fina gris. En la fila 4, los rótulos «Empresa», «Contacto» y «Dirección»; en la fila 5, bajo cada uno, sus datos (nombre y NIT; correo y teléfono; dirección) en celdas combinadas con ajuste de texto, hasta el fin de la banda. Un dato ausente se omite y un grupo sin datos va sin rótulo. Se quitan los rótulos «Exportado» y «Correo» de la plantilla. Alturas: fila 4 = 16 y fila 5 = 30. El logo conserva su caja y su tamaño (`CajaLogo`, en EMU) y lleva un marco gris fino (`D1D5DB`, 0,75 pt, sin relleno) a 3 px de la imagen; el marco depende del logo, así que no va en la huella y lo cubre su propia prueba. Ninguna hoja inmoviliza paneles: Excel dibuja una línea en el corte que no se puede ocultar (al imprimir, la cabecera se sigue repitiendo). Las huellas `activos.json` e `informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.

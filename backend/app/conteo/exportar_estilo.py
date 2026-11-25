@@ -228,7 +228,6 @@ class Plantilla:
     margen_encabezado: float
     ajuste_alto: int  # 0 = alto automático (Q12)
     fila_repetida: int | None = None  # índice de fila a repetir al imprimir
-    filas_congeladas: int = 0
     combinar_titulo: str | None = None
     altos: Mapping[int, float] = field(default_factory=dict)  # filas fijas bajo el bloque
     estilos_fila: Mapping[int, str] = field(default_factory=dict)  # estilo de fila propio
@@ -329,7 +328,6 @@ def _lista(**kw: Any) -> Plantilla:
         ultima_columna_bloque=9,
         ajuste_alto=0,  # lista: 1 página de ancho × alto automático (Q12)
         fila_repetida=8,
-        filas_congeladas=9,
         fila_cabecera=8,
         fila_total=7,
         alto_datos=21.95,
@@ -361,7 +359,6 @@ PLANTILLAS: dict[str, Plantilla] = {
         margen_encabezado=0.5,
         ajuste_alto=0,
         fila_repetida=6,
-        filas_congeladas=7,
         altos={6: 30},
         fila_cabecera=6,
         fila_datos=7,
@@ -526,8 +523,8 @@ def preparar_hoja(hoja: Any, plantilla: Plantilla, ultima_fila: int) -> None:
         alto_fila(hoja, fila, alto)
     hoja.set_tab_color(AZUL)
     hoja.hide_gridlines(2)
-    if plantilla.filas_congeladas:
-        hoja.freeze_panes(plantilla.filas_congeladas, 0)
+    # Sin paneles inmovilizados (decisión del humano 2026-11-24): Excel dibuja una línea en
+    # el corte que no se puede ocultar. Al imprimir, la cabecera se repite (``repeat_rows``).
     hoja.set_landscape()
     hoja.fit_to_pages(1, plantilla.ajuste_alto)
     hoja.set_margins(**MARGENES)

@@ -151,20 +151,8 @@
     "tipo": null,
     "tab_seleccionada": true,
     "celda_superior_izquierda": null,
-    "panel": {
-     "x_split": null,
-     "y_split": 7,
-     "celda_superior_izquierda": "A8",
-     "panel_activo": "bottomLeft",
-     "estado": "frozen"
-    },
-    "seleccion": [
-     {
-      "panel": "bottomLeft",
-      "celda_activa": "J17",
-      "rango": "J17"
-     }
-    ]
+    "panel": null,
+    "seleccion": []
    },
    "formato_hoja": {
     "alto_fila_defecto": 15,
@@ -4520,14 +4508,8 @@
    "worksheet/sheetPr/tabColor@rgb",
    "worksheet/sheetViews",
    "worksheet/sheetViews/sheetView",
-   "worksheet/sheetViews/sheetView/pane",
-   "worksheet/sheetViews/sheetView/pane@activePane",
-   "worksheet/sheetViews/sheetView/pane@state",
-   "worksheet/sheetViews/sheetView/pane@topLeftCell",
-   "worksheet/sheetViews/sheetView/pane@ySplit",
    "worksheet/sheetViews/sheetView/selection",
    "worksheet/sheetViews/sheetView/selection@activeCell",
-   "worksheet/sheetViews/sheetView/selection@pane",
    "worksheet/sheetViews/sheetView/selection@sqref",
    "worksheet/sheetViews/sheetView@showGridLines",
    "worksheet/sheetViews/sheetView@tabSelected",
