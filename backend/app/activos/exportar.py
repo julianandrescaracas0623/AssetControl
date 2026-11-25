@@ -5,10 +5,22 @@ Una hoja «Activos» con las columnas de Q3, encabezado fijo y filtro; sin fila 
 filtrados por ``service.buscar_todos`` (la misma consulta que la lista) y no lee nada
 más que su categoría y su ubicación.
 
+Diseño (spec 019, T3): replica la plantilla A (``Activos_20261122_diseno.xlsx``) con el
+estilo común de ``app.conteo.exportar_estilo``: banda y bloque de la empresa VIGENTE del
+tenant en las filas 1–5 (logo, nombre, «Exportado dd/mm/aaaa», NIT, teléfono, correo y
+dirección; los campos ausentes se omiten, Q9; logo ajustado a la caja con su proporción,
+Q10), cabecera en la fila 7, datos desde la 8, congelado bajo la cabecera, filtro, impresión
+horizontal de 1 página de ancho, anchos, alturas y formatos medidos. Datos, orden de filas y
+columnas, sin cambios.
+
+Celda vacía (decisión de T3): lleva el estilo de su columna en la fila de datos de la
+plantilla (req. 5); la plantilla A no tiene un estilo «vacía» propio (F8 e I8, vacías,
+tienen el estilo de las celdas de texto). Así cada celda conserva su borde.
+
 Reglas (R1a): todo texto va con ``write_string`` y el libro se abre con
 ``strings_to_formulas=False`` (un nombre como ``=1+1`` queda como texto); el precio va
-con ``write_number`` desde el ``Decimal`` exacto, con formato COP; las fechas son fechas
-de Excel. Nada se registra en los logs.
+con ``write_number`` desde el ``Decimal`` exacto (un ``float`` se rechaza), con formato
+COP; las fechas son fechas de Excel. Nada se registra en los logs.
 """
 
 import io
@@ -20,27 +32,27 @@ from sqlalchemy.orm import Session
 from app.activos.models import Activo
 from app.activos.service import _ruta as _ruta_de_ubicacion
 from app.catalogo.models import Categoria, Ubicacion
-from app.conteo.exportar import FORMATO_COP, HORA_COLOMBIA, XLSX
+from app.conteo import exportar_estilo as est
+from app.conteo.exportar import HORA_COLOMBIA, XLSX
 
 __all__ = ["HORA_COLOMBIA", "XLSX", "a_excel", "nombre_archivo"]
 
 HOJA = "Activos"
-FORMATO_FECHA = "dd/mm/yyyy"
+PLANTILLA = est.PLANTILLAS["activos"]
 ESTADOS = {"activo": "Activo", "en_reparacion": "En reparación", "dado_de_baja": "Dado de baja"}
-# (encabezado, ancho en caracteres)
 COLUMNAS = (
-    ("Código", 14),
-    ("Nombre", 36),
-    ("Categoría", 20),
-    ("Ubicación", 30),
-    ("Estado", 14),
-    ("Serial", 18),
-    ("Marca", 16),
-    ("Modelo", 16),
-    ("Subtipo", 16),
-    ("Fecha de compra", 15),
-    ("Precio de compra", 18),
-    ("Registrado el", 14),
+    "Código",
+    "Nombre",
+    "Categoría",
+    "Ubicación",
+    "Estado",
+    "Serial",
+    "Marca",
+    "Modelo",
+    "Subtipo",
+    "Fecha de compra",
+    "Precio de compra",
+    "Registrado el",
 )
 
 
@@ -55,7 +67,37 @@ def _ruta(session: Session, activo: Activo) -> str:
     return _ruta_de_ubicacion(session, ubicacion) if ubicacion else ""
 
 
-def a_excel(session: Session, activos: Sequence[Activo]) -> bytes:
+def _texto(valor: str | None) -> str | None:
+    """Un texto vacío o solo de espacios es una celda vacía (con su borde)."""
+    return valor if valor and valor.strip() else None
+
+
+def _valores(session: Session, a: Activo) -> tuple:
+    categoria = session.get(Categoria, a.categoria_id)
+    return (
+        a.codigo,
+        a.nombre,
+        _texto(categoria.nombre if categoria else None),
+        _texto(_ruta(session, a)),
+        ESTADOS[a.estado],
+        _texto(a.serial),
+        _texto(a.marca),
+        _texto(a.modelo),
+        _texto(a.subtipo),
+        a.fecha_compra,
+        a.precio_compra,
+        a.creado_en.astimezone(HORA_COLOMBIA).date(),
+    )
+
+
+def a_excel(
+    session: Session,
+    activos: Sequence[Activo],
+    empresa: est.DatosEmpresa,
+    hoy: date,
+) -> bytes:
+    """El libro de la lista; ``empresa`` es la vigente del tenant y ``hoy``, la fecha de
+    exportación en Colombia (la misma del nombre del archivo)."""
     import xlsxwriter  # Import local: solo quien exporta carga la librería.
 
     salida = io.BytesIO()
@@ -63,38 +105,25 @@ def a_excel(session: Session, activos: Sequence[Activo]) -> bytes:
         salida,
         {"in_memory": True, "strings_to_formulas": False, "strings_to_urls": False},
     )
-    libro.set_properties({"title": "Activos"})
-
-    def formato(**kw):
-        return libro.add_format({"font_name": "Calibri", "font_size": 10, **kw})
-
-    cabecera = formato(bold=True, bottom=1)
-    texto = formato()
-    codigo = formato(font_name="Consolas")
-    cop = formato(num_format=FORMATO_COP)
-    fecha = formato(num_format=FORMATO_FECHA)
-
+    libro.set_properties(est.propiedades(HOJA))
+    estilos = est.Estilos(libro)
     hoja = libro.add_worksheet(HOJA)
-    for col, (titulo, ancho) in enumerate(COLUMNAS):
-        hoja.set_column(col, col, ancho)
-        hoja.write_string(0, col, titulo, cabecera)
 
-    for fila, a in enumerate(activos, start=1):
-        categoria = session.get(Categoria, a.categoria_id)
-        hoja.write_string(fila, 0, a.codigo, codigo)
-        hoja.write_string(fila, 1, a.nombre, texto)
-        hoja.write_string(fila, 2, categoria.nombre if categoria else "", texto)
-        hoja.write_string(fila, 3, _ruta(session, a), texto)
-        hoja.write_string(fila, 4, ESTADOS[a.estado], texto)
-        for col, valor in enumerate((a.serial, a.marca, a.modelo, a.subtipo), start=5):
-            if valor:
-                hoja.write_string(fila, col, valor, texto)
-        if a.fecha_compra is not None:
-            hoja.write_datetime(fila, 9, a.fecha_compra, fecha)
-        hoja.write_number(fila, 10, a.precio_compra, cop)
-        hoja.write_datetime(fila, 11, a.creado_en.astimezone(HORA_COLOMBIA).date(), fecha)
-
-    hoja.freeze_panes(1, 0)
-    hoja.autofilter(0, 0, len(activos), len(COLUMNAS) - 1)
+    cabecera = PLANTILLA.fila_cabecera
+    ultima_fila = cabecera + len(activos)
+    est.preparar_hoja(hoja, PLANTILLA, ultima_fila)
+    est.dibujar_bloque(hoja, estilos, PLANTILLA, empresa, hoy)
+    est.escribir_fila(
+        hoja, estilos, cabecera, list(zip(COLUMNAS, PLANTILLA.estilos_cabecera, strict=True))
+    )
+    for fila, a in enumerate(activos, start=PLANTILLA.fila_datos):
+        est.escribir_fila(
+            hoja,
+            estilos,
+            fila,
+            list(zip(_valores(session, a), PLANTILLA.estilos_datos, strict=True)),
+            PLANTILLA.alto_datos,
+        )
+    hoja.autofilter(cabecera, 0, ultima_fila, len(COLUMNAS) - 1)
     libro.close()
     return salida.getvalue()

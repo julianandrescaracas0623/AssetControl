@@ -107,7 +107,7 @@ export function useBuscarActivos(
 /**
  * Exportar la lista (spec 015, T4): el servidor arma el Excel con los mismos filtros de
  * la lista (sin página) y decide quién puede (solo admin). Devuelve el archivo; quien
- * llama lo entrega con `guardarArchivo` (la misma descarga del informe, spec 009).
+ * llama lo entrega con `entregarConAviso` (descarga, o la hoja de Compartir en iPhone).
  */
 export function useExportarActivos() {
   const conToken = useApiAutenticada()

@@ -6,18 +6,26 @@ Cambiar un activo existente es solo del admin y exige ``If-Match`` (spec 005, R2
 Cuerpos JSON de 4 KB como máximo (``app.auth.http``).
 """
 
+import logging
 import uuid
+from datetime import datetime
 
-from flask import Blueprint, Response, jsonify, request
+from botocore.exceptions import BotoCoreError, ClientError
+from flask import Blueprint, Response, current_app, jsonify, request
 from flask.typing import ResponseReturnValue
+from sqlalchemy.orm import Session
 
 from app.activos import cambios, exportar, historial, service
 from app.activos.models import Activo
 from app.auth.decorators import current_session, current_user, require_auth, require_role
+from app.conteo.exportar import Empresa
+from app.empresa import service as empresa_service
 from app.errors import current_request_id, error_response
 from app.fotos import service as fotos_service
+from app.fotos.almacen import EXTENSION_KEY
 
 bp = Blueprint("activos", __name__, url_prefix="/activos")
+logger = logging.getLogger(__name__)
 
 
 def _es_admin() -> bool:
@@ -128,6 +136,41 @@ def buscar() -> ResponseReturnValue:
     )
 
 
+def _empresa_vigente(session: Session) -> Empresa:
+    """La empresa vigente del tenant para el Excel (spec 019, Q9): la misma lectura que
+    ``GET /empresa`` (sin fila guardada, el nombre del tenant) bajo la sesión del tenant
+    (RLS), y los bytes de su logo; sin logo o si no se puede leer (no existe, almacén
+    sin configurar, disco o S3 con error), el archivo sale sin imagen (req. 8): el logo es
+    decorativo y no tumba la exportación. Un fallo del almacén deja un WARNING con el tipo
+    del error y, en S3, su código; sin clave, ruta, endpoint ni datos de la empresa."""
+    datos = empresa_service.vista(session, current_user().tenant_id)
+    logo: bytes | None = None
+    if datos["logo"]:
+        try:
+            logo = empresa_service.leer_logo(
+                session, current_app.extensions.get(EXTENSION_KEY), uuid.UUID(datos["logo"]["id"])
+            )
+        except empresa_service.ErrorEmpresa:
+            logo = None
+        except (OSError, ClientError, BotoCoreError) as exc:
+            # Solo el tipo y, en S3, el código del error (un enum, sin datos); nunca la
+            # clave, la ruta, el endpoint, el bucket ni datos de la empresa.
+            detalle = type(exc).__name__
+            if isinstance(exc, ClientError):
+                detalle += f" {exc.response.get('Error', {}).get('Code', '')}".rstrip()
+            logger.warning("Excel de activos sin logo: el almacén falló (%s).", detalle)
+            logo = None
+    return Empresa(
+        nombre=datos["nombre"],
+        direccion=datos["direccion"],
+        nit=datos["nit"],
+        telefono=datos["telefono"],
+        correo=datos["correo"],
+        vigente=True,
+        logo=logo,
+    )
+
+
 @bp.get("/exportar")
 @require_role("admin")
 def exportar_lista() -> ResponseReturnValue:
@@ -143,8 +186,10 @@ def exportar_lista() -> ResponseReturnValue:
         )
     except service.ErrorActivo as exc:
         return _error(exc)
-    nombre = exportar.nombre_archivo()
-    respuesta = Response(exportar.a_excel(session, activos), mimetype=exportar.XLSX)
+    hoy = datetime.now(exportar.HORA_COLOMBIA).date()
+    nombre = exportar.nombre_archivo(hoy)
+    contenido = exportar.a_excel(session, activos, _empresa_vigente(session), hoy)
+    respuesta = Response(contenido, mimetype=exportar.XLSX)
     respuesta.headers["Content-Disposition"] = (
         f"attachment; filename=\"{nombre}\"; filename*=UTF-8''{nombre}"
     )
