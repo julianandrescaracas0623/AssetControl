@@ -26,6 +26,7 @@ tags:
   - name: meta
   - name: auth
   - name: invitaciones
+  - name: usuarios
   - name: catalogo
   - name: activos
   - name: empresa
@@ -377,6 +378,28 @@ paths:
           x-codigos: [error_interno]
         "503":
           $ref: "#/components/responses/ServicioNoDisponible"
+
+  /usuarios:
+    get:
+      tags: [usuarios]
+      operationId: listarUsuarios
+      summary: Usuarios de la empresa con su rol y estado (solo admin)
+      description: >-
+        Por membresía de la empresa de la sesión: nombre, correo, rol, si la membresía está
+        activa y si la persona debe cambiar su contraseña. Nunca trae contraseñas ni hashes.
+        Solo ve la empresa de la sesión.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista de usuarios de la empresa.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaUsuarios" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
 
   /ubicaciones:
     get:
@@ -2759,6 +2782,25 @@ components:
         id: { type: string, format: uuid }
         email: { type: string, format: email }
         nombre: { type: string }
+    UsuarioEmpresa:
+      type: object
+      required: [id, nombre, email, rol, activa, debe_cambiar_password]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        email: { type: string, format: email }
+        rol: { $ref: "#/components/schemas/Rol" }
+        activa: { type: boolean, description: Si la membresía de la empresa está activa. }
+        debe_cambiar_password: { type: boolean }
+    ListaUsuarios:
+      type: object
+      required: [usuarios]
+      additionalProperties: false
+      properties:
+        usuarios:
+          type: array
+          items: { $ref: "#/components/schemas/UsuarioEmpresa" }
     Tenant:
       type: object
       required: [id, nombre]

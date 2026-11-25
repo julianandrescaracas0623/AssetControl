@@ -3,14 +3,16 @@ import { Copy, MailPlus, ShieldCheck, TriangleAlert, UserPlus, Users } from 'luc
 import { type FormEvent, useState } from 'react'
 import { toast } from 'sonner'
 
-import { Aviso, Boton, Campo, EncabezadoPagina, Panel } from '@/components/kit'
+import { Aviso, Boton, Campo, EncabezadoPagina, Estado, Insignia, Panel } from '@/components/kit'
 import { api, ErrorApi, type InvitacionCreada, mensajeDeError, type Rol } from '@/lib/api/cliente'
+import { type UsuarioEmpresa, useUsuarios } from '@/lib/usuarios'
 import { etiquetaRol, useApiAutenticada } from '@/lib/sesion'
 import { cn } from '@/lib/utils'
 
 // /admin/usuarios (spec 002b, T5; plan §7): invitar con correo y rol. El enlace sale
 // una sola vez (el servidor no lo vuelve a dar) y se copia para enviarlo por un canal
-// privado. La lista de usuarios llega con una spec posterior: aquí no se inventa.
+// privado. La lista de personas con acceso sale de GET /usuarios (solo lectura: cambiar
+// el rol y dar de baja llegan en una spec posterior).
 // Spec 016, T9 (R2, R5): presentación con el kit (Panel, Campo, Aviso, Boton). El rol lo
 // decide el servidor; el enlace no se guarda ni se escribe en ningún registro.
 
@@ -109,6 +111,33 @@ function Resultado({ creada, onOtra }: { creada: InvitacionCreada; onOtra: () =>
   )
 }
 
+function ListaPersonas() {
+  const usuarios = useUsuarios()
+  if (usuarios.isPending) return <Estado.Cargando etiqueta="Cargando personas con acceso" />
+  if (usuarios.isError)
+    return (
+      <Estado.Error titulo="No se pudo cargar la lista" onReintentar={() => void usuarios.refetch()} reintentando={usuarios.isRefetching} />
+    )
+  const lista: UsuarioEmpresa[] = usuarios.data
+  if (lista.length === 0)
+    return <Estado.Vacio titulo="Todavía no hay personas con acceso" descripcion="Invita a la primera con el formulario." />
+  return (
+    <ul aria-label="Personas con acceso" className="flex flex-col divide-y">
+      {lista.map((persona) => (
+        <li key={persona.id} className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0">
+          <span className="text-cuerpo font-medium break-all">{persona.nombre}</span>
+          <span className="text-etiqueta font-normal break-all text-muted-foreground">{persona.email}</span>
+          <div className="flex flex-wrap gap-1.5">
+            <Insignia tono={persona.rol === 'admin' ? 'fuerte' : 'neutro'}>{etiquetaRol(persona.rol)}</Insignia>
+            {!persona.activa && <Insignia tono="error">Desactivada</Insignia>}
+            {persona.debe_cambiar_password && <Insignia tono="aviso">Debe cambiar su contraseña</Insignia>}
+          </div>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export default function Usuarios() {
   const conToken = useApiAutenticada()
   const [rol, setRol] = useState<Rol>('contador')
@@ -138,7 +167,7 @@ export default function Usuarios() {
     <div className="flex flex-col gap-6">
       <EncabezadoPagina
         titulo="Usuarios"
-        descripcion="Invita a las personas de tu clínica. Cada invitación es para un correo y un rol, y vence en 72 horas."
+        descripcion="Invita a las personas de tu empresa. Cada invitación es para un correo y un rol, y vence en 72 horas."
       />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,40rem)_minmax(0,1fr)] lg:items-start">
         <Panel titulo="Invitar a una persona" descripcion="La persona crea su cuenta con el enlace: solo escribe su nombre y una contraseña.">
@@ -174,11 +203,9 @@ export default function Usuarios() {
               Personas con acceso
             </span>
           }
-          className="border-dashed shadow-none"
+          descripcion="Quién tiene acceso a la empresa, con su rol y su estado."
         >
-          <p className="text-cuerpo text-muted-foreground">
-            La lista de personas con acceso llega con una spec posterior, junto con cambiar el rol y dar de baja.
-          </p>
+          <ListaPersonas />
         </Panel>
       </div>
     </div>

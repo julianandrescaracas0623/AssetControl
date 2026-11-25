@@ -217,6 +217,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/usuarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Usuarios de la empresa con su rol y estado (solo admin)
+         * @description Por membresía de la empresa de la sesión: nombre, correo, rol, si la membresía está activa y si la persona debe cambiar su contraseña. Nunca trae contraseñas ni hashes. Solo ve la empresa de la sesión.
+         */
+        get: operations["listarUsuarios"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ubicaciones": {
         parameters: {
             query?: never;
@@ -1165,6 +1185,20 @@ export interface components {
             /** Format: email */
             email: string;
             nombre: string;
+        };
+        UsuarioEmpresa: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+            /** Format: email */
+            email: string;
+            rol: components["schemas"]["Rol"];
+            /** @description Si la membresía de la empresa está activa. */
+            activa: boolean;
+            debe_cambiar_password: boolean;
+        };
+        ListaUsuarios: {
+            usuarios: components["schemas"]["UsuarioEmpresa"][];
         };
         Tenant: {
             /** Format: uuid */
@@ -2701,6 +2735,28 @@ export interface operations {
                 };
             };
             503: components["responses"]["ServicioNoDisponible"];
+        };
+    };
+    listarUsuarios: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lista de usuarios de la empresa. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaUsuarios"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
         };
     };
     listarUbicaciones: {

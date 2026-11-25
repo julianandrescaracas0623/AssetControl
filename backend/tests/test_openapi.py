@@ -419,6 +419,13 @@ def test_me_responses(client):
     check("get", "/auth/me", client.get("/auth/me"))
 
 
+def test_usuarios_responses(client):
+    body = check("get", "/usuarios", client.get("/usuarios", headers=bearer(ADMIN_A, TENANT_A)))
+    assert body["usuarios"]
+    check("get", "/usuarios", client.get("/usuarios", headers=bearer(CONTADOR_A, TENANT_A)))
+    check("get", "/usuarios", client.get("/usuarios"))
+
+
 def test_refresh_and_logout_responses(client):
     cookie = refresh_cookie(login(client))
     renewed = client.post("/auth/refresh", headers={**CSRF, "Cookie": cookie})

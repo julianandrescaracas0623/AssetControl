@@ -27,6 +27,7 @@ from app.inicio.routes import bp as inicio_bp
 from app.invitaciones.routes import bp as invitaciones_bp
 from app.meta.routes import bp as meta_bp
 from app.plataforma import register_plataforma
+from app.usuarios.routes import bp as usuarios_bp
 from app.version import __version__
 
 __all__ = ["__version__", "create_app"]
@@ -74,6 +75,7 @@ def create_app(config: Config | None = None) -> Flask:
     app.register_blueprint(meta_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(invitaciones_bp)
+    app.register_blueprint(usuarios_bp)
     app.register_blueprint(ubicaciones_bp)
     app.register_blueprint(categorias_bp)
     app.register_blueprint(activos_bp)

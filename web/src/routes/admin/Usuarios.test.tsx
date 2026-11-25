@@ -41,7 +41,7 @@ describe('/admin/usuarios', () => {
     const rol = screen.getByRole('group', { name: 'Rol' })
     expect((within(rol).getByRole('radio', { name: /Contador/ }) as HTMLInputElement).checked).toBe(true)
     expect((within(rol).getByRole('radio', { name: /Admin/ }) as HTMLInputElement).checked).toBe(false)
-    expect(screen.getByText(/La lista de personas con acceso llega con una spec posterior/)).toBeTruthy()
+    expect(screen.queryByText(/llega con una spec posterior/)).toBeNull()
   })
 
   it('crea la invitación con el token de la sesión y muestra el enlace completo una vez', async () => {
@@ -113,5 +113,68 @@ describe('/admin/usuarios', () => {
     await screen.findByLabelText('Enlace de invitación')
     expect(invitaciones).toBe(2)
     expect(llamadas(f, '/api/auth/refresh')).toHaveLength(2)
+  })
+})
+
+// Spec 002b (lista de personas con acceso, GET /usuarios): solo lectura, solo admin.
+const PERSONAS = {
+  usuarios: [
+    {
+      id: '00000000-0000-4000-8000-0000000a0081',
+      nombre: 'Ana Admin',
+      email: 'ana@ejemplo.test',
+      rol: 'admin',
+      activa: true,
+      debe_cambiar_password: false,
+    },
+    {
+      id: '00000000-0000-4000-8000-0000000a0082',
+      nombre: 'Carlos Contador',
+      email: 'carlos@ejemplo.test',
+      rol: 'contador',
+      activa: false,
+      debe_cambiar_password: true,
+    },
+  ],
+}
+
+function abrirConLista(respuesta: () => Response) {
+  const f = simularSesion('admin', (url) => (url === '/api/usuarios' ? respuesta() : undefined))
+  render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/admin/usuarios'] })} />)
+  return f
+}
+
+describe('/admin/usuarios: personas con acceso', () => {
+  it('lista a cada persona con su rol, su estado y si debe cambiar la contraseña', async () => {
+    abrirConLista(() => json(200, PERSONAS))
+    const lista = await screen.findByRole('list', { name: 'Personas con acceso' })
+    const filas = within(lista).getAllByRole('listitem')
+    expect(filas).toHaveLength(2)
+    expect(within(filas[0]).getByText('Ana Admin')).toBeTruthy()
+    expect(within(filas[0]).getByText('ana@ejemplo.test')).toBeTruthy()
+    expect(within(filas[0]).getByText('Admin')).toBeTruthy()
+    expect(within(filas[1]).getByText('Contador')).toBeTruthy()
+    expect(within(filas[1]).getByText('Desactivada')).toBeTruthy()
+    expect(within(filas[1]).getByText('Debe cambiar su contraseña')).toBeTruthy()
+    expect(within(filas[0]).queryByText('Desactivada')).toBeNull()
+  })
+
+  it('pide la lista con el token de la sesión y por GET', async () => {
+    const f = abrirConLista(() => json(200, PERSONAS))
+    await screen.findByRole('list', { name: 'Personas con acceso' })
+    const [url, init] = llamadas(f, '/api/usuarios')[0]
+    expect(url).toBe('/api/usuarios')
+    expect(init?.method ?? 'GET').toBe('GET')
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer jwt.admin')
+  })
+
+  it('sin personas muestra el estado vacío', async () => {
+    abrirConLista(() => json(200, { usuarios: [] }))
+    expect(await screen.findByText('Todavía no hay personas con acceso')).toBeTruthy()
+  })
+
+  it('si falla la carga ofrece reintentar', async () => {
+    abrirConLista(() => errorApi(500, 'error_interno'))
+    expect(await screen.findByText('No se pudo cargar la lista')).toBeTruthy()
   })
 })
