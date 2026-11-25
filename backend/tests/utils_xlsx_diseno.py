@@ -569,12 +569,14 @@ def _hoja(p: Paquete, parte: str, estilos: Estilos, compartidas: list[str]) -> d
         "saltos_columna": len(_hijos(_hijo(raiz, "colBreaks"), "brk")),
     }
 
-    imagenes = []
+    objetos = []
     dibujo = _hijo(raiz, "drawing")
     if dibujo is not None:
         dparte = rels[_attr(dibujo, "id") or ""][1]
-        imagenes = _dibujo(p, dparte)
-    h["imagenes"] = imagenes
+        objetos = _dibujo(p, dparte)
+    # Imágenes (el logo) y formas (su marco, 2026-11-24) por separado.
+    h["imagenes"] = [o for o in objetos if o.get("objeto") != "forma"]
+    h["formas"] = [o for o in objetos if o.get("objeto") == "forma"]
     return h
 
 
@@ -596,6 +598,38 @@ def _png(datos: bytes) -> dict[str, Any]:
     return info
 
 
+def _forma(ancla: ET.Element, pos: Any) -> dict[str, Any]:
+    """Una forma (``xdr:sp``) del dibujo: el marco del logo (decisión 2026-11-24)."""
+    sp = _hijo(ancla, "sp")
+    sppr = _hijo(sp, "spPr")
+    xfrm = _hijo(sppr, "xfrm")
+    off, ext = _hijo(xfrm, "off"), _hijo(xfrm, "ext")
+    ln = _hijo(sppr, "ln")
+    color = _hijo(_hijo(ln, "solidFill"), "srgbClr")
+    nv = _hijo(_hijo(sp, "nvSpPr"), "cNvPr")
+    return {
+        "edit_as": ancla.get("editAs"),
+        "desde": pos(_hijo(ancla, "from")),
+        "hasta": pos(_hijo(ancla, "to")),
+        "xfrm": {
+            "x": int(off.get("x", 0)) if off is not None else None,
+            "y": int(off.get("y", 0)) if off is not None else None,
+            "cx": int(ext.get("cx", 0)) if ext is not None else None,
+            "cy": int(ext.get("cy", 0)) if ext is not None else None,
+        },
+        "geometria": _attr(_hijo(sppr, "prstGeom"), "prst"),
+        "sin_relleno": _hijo(sppr, "noFill") is not None,
+        "linea": {
+            "ancho": int(ln.get("w", 0)) if ln is not None else None,
+            "color": _attr(color, "val"),
+        },
+        "texto": "".join(t.text or "" for t in sp.iter() if _local(t.tag) == "t")
+        if sp is not None
+        else "",
+        "decorativa": nv is not None and b"decorative" in ET.tostring(nv),
+    }
+
+
 def _dibujo(p: Paquete, parte: str) -> list[dict[str, Any]]:
     raiz = p.xml(parte)
     rels = p.relaciones(parte)
@@ -603,10 +637,6 @@ def _dibujo(p: Paquete, parte: str) -> list[dict[str, Any]]:
     for ancla in raiz if raiz is not None else []:
         tipo = _local(ancla.tag)
         if tipo not in ("oneCellAnchor", "twoCellAnchor", "absoluteAnchor"):
-            continue
-        pic = _hijo(ancla, "pic")
-        if pic is None:
-            salida.append({"ancla": tipo, "objeto": "no-imagen"})
             continue
 
         def pos(el: ET.Element | None) -> dict[str, int] | None:
@@ -618,6 +648,11 @@ def _dibujo(p: Paquete, parte: str) -> list[dict[str, Any]]:
                 "fila": int(_hijo(el, "row").text or 0),  # type: ignore[union-attr]
                 "fila_off": int(_hijo(el, "rowOff").text or 0),  # type: ignore[union-attr]
             }
+
+        pic = _hijo(ancla, "pic")
+        if pic is None:
+            salida.append({"ancla": tipo, "objeto": "forma", **_forma(ancla, pos)})
+            continue
 
         ext = _hijo(ancla, "ext")
         nv = _hijo(_hijo(pic, "nvPicPr"), "cNvPr")
@@ -1502,7 +1537,9 @@ DECISIONES_ENCABEZADO = {
     "(nombre y NIT; correo y teléfono; dirección) en celdas combinadas con ajuste de texto, "
     "hasta el fin de la banda. Un dato ausente se omite y un grupo sin datos va sin rótulo. "
     "Se quitan los rótulos «Exportado» y «Correo» de la plantilla. Alturas: fila 4 = 16 y "
-    "fila 5 = 30. El logo conserva su caja y su tamaño (`CajaLogo`, en EMU). Las huellas "
+    "fila 5 = 30. El logo conserva su caja y su tamaño (`CajaLogo`, en EMU) y lleva un "
+    "marco gris fino (`D1D5DB`, 0,75 pt, sin relleno) a 3 px de la imagen; el marco depende "
+    "del logo, así que no va en la huella y lo cubre su propia prueba. Las huellas "
     "`activos.json` e `informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.",
 }
 

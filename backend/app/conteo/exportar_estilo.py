@@ -43,6 +43,7 @@ GRIS_ACTIVOS = "#4B5563"  # activos: fecha, «Correo», contacto, dirección (R7
 FONDO_CABECERA = "#1F2937"
 BLANCO = "#FFFFFF"
 DIVISOR = "#E5E7EB"  # línea fina bajo «Informe · …» (encabezado, 2026-11-24)
+MARCO_LOGO = "#D1D5DB"  # marco fino del logo (2026-11-24)
 LINEA = "#9CA3AF"  # bordes finos de cabecera, datos y total
 FONDO_TOTAL = "#DBEAFE"  # Total de «Por ubicación» y «Por categoría»
 BARRA = "#BFDBFE"  # barras de datos (T5)
@@ -66,6 +67,10 @@ TEXTO_ALTERNATIVO_LOGO = "Picture"  # L8
 # el logo no cambia: su tamaño va en EMU (``CajaLogo``) y no depende del alto de las filas.
 ALTOS_BLOQUE = {0: 6, 1: 44.1, 2: 18, 3: 16, 4: 30}
 FILA_LOGO = 1  # el logo se ancla en la fila 2, columna A
+# Marco del logo (decisión del humano 2026-11-24): línea gris fina a 3 px de la imagen. Con
+# 3 px cabe en todas las hojas sin pasar a la columna C (en «Activos» quedan 3 px libres).
+MARGEN_MARCO_PX = 3
+ANCHO_LINEA_MARCO = 0.75  # puntos
 
 
 def _arial(tamano: int, color: str, negrita: bool = False) -> dict[str, Any]:
@@ -670,6 +675,28 @@ def ajustar_logo(
     return AjusteLogo(cx / natural_cx, cy / natural_cy, cx, cy)
 
 
+def dibujar_marco_logo(hoja: Any, caja: CajaLogo, ajuste: AjusteLogo) -> None:
+    """Marco gris del logo: rectángulo sin relleno ni texto, ajustado a la imagen (no a la
+    caja) con ``MARGEN_MARCO_PX`` de margen. Va antes de la imagen, que queda encima; el
+    logo no cambia de tamaño ni de posición."""
+    m = MARGEN_MARCO_PX
+    hoja.insert_textbox(
+        FILA_LOGO,
+        0,
+        "",
+        {
+            "x_offset": max(0, caja.col_off / EMU_POR_PX - m),
+            "y_offset": max(0, caja.fila_off / EMU_POR_PX - m),
+            "width": ajuste.cx / EMU_POR_PX + 2 * m,
+            "height": ajuste.cy / EMU_POR_PX + 2 * m,
+            "object_position": 2,
+            "line": {"color": MARCO_LOGO, "width": ANCHO_LINEA_MARCO},
+            "fill": {"none": True},
+            "decorative": True,
+        },
+    )
+
+
 def insertar_logo(hoja: Any, logo: bytes | None, caja: CajaLogo) -> bool:
     """Inserta el logo ajustado a la caja; sin logo o ilegible, no inserta nada (req. 8)."""
     if not logo:
@@ -683,6 +710,7 @@ def insertar_logo(hoja: Any, logo: bytes | None, caja: CajaLogo) -> bool:
     if not imagen.width or not imagen.height:
         return False
     ajuste = ajustar_logo(imagen.width, imagen.height, imagen.x_dpi, imagen.y_dpi, caja)
+    dibujar_marco_logo(hoja, caja, ajuste)
     hoja.insert_image(
         FILA_LOGO,
         0,

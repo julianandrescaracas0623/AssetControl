@@ -312,6 +312,27 @@ def test_ajustar_logo(ancho, alto, esperado):
 def test_logo_ausente_o_ilegible_genera_sin_imagen(logo):
     hoja = _generar("todos", EmpresaFicticia(logo=logo))
     assert hoja["imagenes"] == []
+    assert hoja["formas"] == []  # sin logo no hay marco
+
+
+@pytest.mark.parametrize("clave", CLAVES)
+@pytest.mark.parametrize(("ancho", "alto"), [(600, 240), (200, 200), (1000, 100)])
+def test_el_logo_lleva_un_marco_gris_ajustado_a_la_imagen(clave, ancho, alto):
+    """Decisión del humano 2026-11-24: marco gris fino a 3 px de la imagen, sin relleno ni
+    texto, debajo del logo; no cambia el tamaño ni la posición del logo y no pasa a C."""
+    hoja = _generar(clave, EmpresaFicticia(logo=_png(ancho, alto)))
+    (img,) = hoja["imagenes"]
+    (marco,) = hoja["formas"]
+    m = est.MARGEN_MARCO_PX * EMU
+    i, f = img["xfrm"], marco["xfrm"]
+    assert abs(f["x"] - (i["x"] - m)) <= 1 and abs(f["y"] - (i["y"] - m)) <= 1
+    assert abs(f["cx"] - (i["cx"] + 2 * m)) <= 1 and abs(f["cy"] - (i["cy"] + 2 * m)) <= 1
+    assert marco["linea"] == {"ancho": round(est.ANCHO_LINEA_MARCO * 12700), "color": "D1D5DB"}
+    assert (marco["geometria"], marco["sin_relleno"], marco["texto"]) == ("rect", True, "")
+    assert marco["decorativa"] is True
+    assert marco["edit_as"] == img["edit_as"] == "oneCell"  # se mueve con el logo
+    hasta = marco["hasta"]
+    assert hasta["col"] < 2 or (hasta["col"], hasta["col_off"]) == (2, 0), hasta
 
 
 # ---------------------------------------------------------------------------
