@@ -74,7 +74,12 @@ PLATAFORMA_EDICION = "0030_plataforma_edicion_empresa"
 PLATAFORMA_EDITAR_USUARIO = "0031_plataforma_editar_usuario"
 # Spec 017, C1b (T16): contraseña temporal de un usuario.
 PLATAFORMA_PASSWORD_USUARIO = "0032_plataforma_password_usuario"
-HEAD = PLATAFORMA_PASSWORD_USUARIO
+# Usuarios de la empresa (0033): el admin cambia rol y activación de una persona.
+USUARIOS_CAMBIAR_MEMBRESIA = "0033_usuarios_cambiar_membresia"
+# Auditoría de cambios de rol y activación de la empresa (0034): tabla inmutable.
+MEMBRESIA_AUDITORIA = "0034_membresia_auditoria"
+AUDIT_TABLES = ["membresia_auditoria"]
+HEAD = MEMBRESIA_AUDITORIA
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
 MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
@@ -229,6 +234,8 @@ def test_revision_chain():
 
     assert script.get_heads() == [HEAD]
     assert [r.revision for r in revisions] == [
+        MEMBRESIA_AUDITORIA,
+        USUARIOS_CAMBIAR_MEMBRESIA,
         PLATAFORMA_PASSWORD_USUARIO,
         PLATAFORMA_EDITAR_USUARIO,
         PLATAFORMA_EDICION,
@@ -258,34 +265,36 @@ def test_revision_chain():
         ACCESO,
         BASELINE,
     ]
-    assert revisions[0].down_revision == PLATAFORMA_EDITAR_USUARIO
-    assert revisions[1].down_revision == PLATAFORMA_EDICION
-    assert revisions[2].down_revision == PLATAFORMA_LOGO
-    assert revisions[3].down_revision == PLATAFORMA_ACTIVIDAD
-    assert revisions[4].down_revision == PLATAFORMA_USUARIOS
-    assert revisions[5].down_revision == SESIONES_VALIDAS_DESDE
-    assert revisions[6].down_revision == LIMITE_TASA_PLATAFORMA
-    assert revisions[7].down_revision == CAMBIO_PASSWORD
-    assert revisions[8].down_revision == INVITACION_TENANT_ACTIVO
-    assert revisions[9].down_revision == FUNCIONES_PLATAFORMA
-    assert revisions[10].down_revision == PLATAFORMA
-    assert revisions[11].down_revision == FUNCIONES_RECUPERACION
-    assert revisions[12].down_revision == RECUPERACION
-    assert revisions[13].down_revision == EMPRESA
-    assert revisions[14].down_revision == FOTOS
-    assert revisions[15].down_revision == SUPABASE_FUNCIONES
-    assert revisions[16].down_revision == CIERRE
-    assert revisions[17].down_revision == DISCREPANCIAS
-    assert revisions[18].down_revision == CONTEO
-    assert revisions[19].down_revision == CAMBIOS
-    assert revisions[20].down_revision == ACTIVOS
-    assert revisions[21].down_revision == CATALOGO
-    assert revisions[22].down_revision == LIMITE_TASA
-    assert revisions[23].down_revision == FUNCIONES
-    assert revisions[24].down_revision == POLITICAS
-    assert revisions[25].down_revision == ACCESO
-    assert revisions[26].down_revision == BASELINE
-    assert revisions[27].down_revision is None
+    assert revisions[0].down_revision == USUARIOS_CAMBIAR_MEMBRESIA
+    assert revisions[1].down_revision == PLATAFORMA_PASSWORD_USUARIO
+    assert revisions[2].down_revision == PLATAFORMA_EDITAR_USUARIO
+    assert revisions[3].down_revision == PLATAFORMA_EDICION
+    assert revisions[4].down_revision == PLATAFORMA_LOGO
+    assert revisions[5].down_revision == PLATAFORMA_ACTIVIDAD
+    assert revisions[6].down_revision == PLATAFORMA_USUARIOS
+    assert revisions[7].down_revision == SESIONES_VALIDAS_DESDE
+    assert revisions[8].down_revision == LIMITE_TASA_PLATAFORMA
+    assert revisions[9].down_revision == CAMBIO_PASSWORD
+    assert revisions[10].down_revision == INVITACION_TENANT_ACTIVO
+    assert revisions[11].down_revision == FUNCIONES_PLATAFORMA
+    assert revisions[12].down_revision == PLATAFORMA
+    assert revisions[13].down_revision == FUNCIONES_RECUPERACION
+    assert revisions[14].down_revision == RECUPERACION
+    assert revisions[15].down_revision == EMPRESA
+    assert revisions[16].down_revision == FOTOS
+    assert revisions[17].down_revision == SUPABASE_FUNCIONES
+    assert revisions[18].down_revision == CIERRE
+    assert revisions[19].down_revision == DISCREPANCIAS
+    assert revisions[20].down_revision == CONTEO
+    assert revisions[21].down_revision == CAMBIOS
+    assert revisions[22].down_revision == ACTIVOS
+    assert revisions[23].down_revision == CATALOGO
+    assert revisions[24].down_revision == LIMITE_TASA
+    assert revisions[25].down_revision == FUNCIONES
+    assert revisions[26].down_revision == POLITICAS
+    assert revisions[27].down_revision == ACCESO
+    assert revisions[28].down_revision == BASELINE
+    assert revisions[29].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -402,6 +411,7 @@ def test_upgrade_downgrade_upgrade_on_an_empty_database(migrate_env):
             "alembic_version",
             "limite_tasa",
             *AUTH_TABLES,
+            *AUDIT_TABLES,
             *CATALOG_TABLES,
             *ASSET_TABLES,
             *COUNT_TABLES,
@@ -1230,9 +1240,10 @@ def test_downgrade_0003_removes_only_the_owner_policies_and_grants(migrate_env):
     config = alembic_config()
     command.upgrade(config, "head")
     policies, grants = _owner_state(migrate_env)
-    # 10 de 0003, 13 de 0016 (spec 014, T2), 1 de 0018 (spec 017, T3a), 2 de 0023 (T3b) y
-    # 5 de 0024 (T4).
-    assert len(policies) == 31
+    # 10 de 0003, 13 de 0016 (spec 014, T2), 1 de 0018 (spec 017, T3a), 2 de 0023 (T3b),
+    # 5 de 0024 (T4), 4 de 0033 (cambio de membresía de la empresa) y 1 de 0034 (INSERT de
+    # la auditoría de ese cambio).
+    assert len(policies) == 36
     assert grants > 0
 
     command.downgrade(config, ACCESO)
@@ -1516,9 +1527,12 @@ EDITAR_USUARIO_HEAD_FUNCTION_NAMES = sorted(
     [*EDICION_HEAD_FUNCTION_NAMES, "plataforma_cambiar_usuario"]
 )
 # Spec 017, C1b/T16 (0032): la de la contraseña temporal.
-HEAD_FUNCTION_NAMES = sorted(
+PASSWORD_USUARIO_HEAD_FUNCTION_NAMES = sorted(
     [*EDITAR_USUARIO_HEAD_FUNCTION_NAMES, "plataforma_restablecer_password_usuario"]
 )
+# Usuarios de la empresa (0033): el admin cambia el rol y activa o desactiva a una persona.
+# 0034 reemplaza cambiar_membresia (misma firma y misma lista de funciones): no añade ninguna.
+HEAD_FUNCTION_NAMES = sorted([*PASSWORD_USUARIO_HEAD_FUNCTION_NAMES, "cambiar_membresia"])
 
 
 def test_0004_creates_the_functions_and_leaves_no_create_nor_membership(migrate_env):
@@ -3712,6 +3726,7 @@ def test_0031_body_clears_every_platform_guc_and_reuses_the_0027_lock_and_checks
 
 # --- Spec 017, C1b (T16): 0032_plataforma_password_usuario ---------------------------------
 
+MIGRATION_0033 = BACKEND_DIR / "migrations" / "versions" / "0033_usuarios_cambiar_membresia.py"
 MIGRATION_0032 = BACKEND_DIR / "migrations" / "versions" / "0032_plataforma_password_usuario.py"
 MIGRATION_0031_FOR_0032 = MIGRATION_0031
 _ACCION_C1B = "usuario_contrasena_restablecida"
@@ -3727,7 +3742,7 @@ def test_0032_up_down_up_touches_only_its_objects(migrate_env):
     command.upgrade(config, PLATAFORMA_PASSWORD_USUARIO)
     after = _empresas_state(migrate_env)
     assert _public_state(migrate_env) == (tables_before, [PLATAFORMA_PASSWORD_USUARIO])
-    assert sorted(after["bodies"]) == HEAD_FUNCTION_NAMES
+    assert sorted(after["bodies"]) == PASSWORD_USUARIO_HEAD_FUNCTION_NAMES
     for name in before["bodies"]:
         assert after["bodies"][name] == before["bodies"][name], name
         assert after["acls"][name] == before["acls"][name], name
@@ -3953,3 +3968,70 @@ def test_0032_body_clears_every_platform_guc_and_reuses_the_0027_lock_and_checks
         "u.password_hash",
     ):
         assert prohibido not in cuerpo, prohibido
+
+
+# --- 0034_membresia_auditoria (spec usuarios): auditoría de cambios de rol y activación --
+
+
+def _load_migration_0034():
+    path = BACKEND_DIR / "migrations" / "versions" / "0034_membresia_auditoria.py"
+    spec = importlib.util.spec_from_file_location("migration_0034_under_test", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_0034_body_is_exactly_0033_plus_the_audit_inserts():
+    migration_0033 = _load_migration(MIGRATION_0033, "migration_0033_for_0034_test")
+    migration = _load_migration_0034()
+    # Quitar solo el bloque de auditoría da el cuerpo de 0033 (y la cabecera de reemplazo).
+    antes = migration_0033.CREATE_FUNCTION.replace(
+        "CREATE FUNCTION", "CREATE OR REPLACE FUNCTION", 1
+    )
+    assert migration.CREATE_FUNCTION.replace(migration._AUDITORIA, "") == antes
+    # El bloque solo inserta en la auditoría, con columnas fijas y sin datos personales.
+    assert migration._AUDITORIA.count("INSERT INTO public.membresia_auditoria") == 2
+    assert "'rol_cambiado', v_rol, p_rol" in migration._AUDITORIA
+    assert "'usuario_reactivado' ELSE 'usuario_desactivado'" in migration._AUDITORIA
+    for personal in ("email", "nombre", "password", "token"):
+        assert personal not in migration._AUDITORIA
+    # El INSERT va después de la revocación y antes de la limpieza final de las GUC.
+    cuerpo = migration.CREATE_FUNCTION
+    assert cuerpo.index("v_revocados <> 0") < cuerpo.index("INSERT INTO public.membresia_auditoria")
+    assert cuerpo.index("INSERT INTO public.membresia_auditoria") < cuerpo.rindex(
+        "RETURN QUERY SELECT p_rol, p_activa, true;"
+    )
+
+
+def _function_source(url: URL) -> str:
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            return conn.scalar(
+                text(
+                    "select p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+                    "where n.nspname = 'acceso' and p.proname = 'cambiar_membresia'"
+                )
+            )
+    finally:
+        engine.dispose()
+
+
+def test_downgrade_0034_restores_the_0033_body_and_drops_the_audit_table(migrate_env):
+    config = alembic_config()
+    command.upgrade(config, "head")
+    nuevo = _function_source(migrate_env)
+    assert "membresia_auditoria" in nuevo
+    assert "membresia_auditoria" in _public_state(migrate_env)[0]
+
+    command.downgrade(config, USUARIOS_CAMBIAR_MEMBRESIA)
+
+    # El cuerpo vuelve al de 0033 (lo que hay entre las dos marcas $fn$), sin auditoría.
+    migration_0033 = _load_migration(MIGRATION_0033, "migration_0033_for_0034_down")
+    assert _function_source(migrate_env) == migration_0033.CREATE_FUNCTION.split("$fn$")[1]
+    assert "membresia_auditoria" not in _public_state(migrate_env)[0]
+
+    command.upgrade(config, "head")
+    assert _function_source(migrate_env) == nuevo
+    assert "membresia_auditoria" in _public_state(migrate_env)[0]

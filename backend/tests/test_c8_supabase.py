@@ -128,6 +128,8 @@ def test_access_functions_belong_to_their_owner_and_only_the_app_runs_them():
         "restablecer_contrasena",
         # Spec 017 (0024/0026): dueña auth_owner.
         "cambiar_password_propio",
+        # Usuarios (0033): cambio de rol y activación, dueña auth_owner.
+        "cambiar_membresia",
         *PLATAFORMA,
         *PLATAFORMA_APP,
     }

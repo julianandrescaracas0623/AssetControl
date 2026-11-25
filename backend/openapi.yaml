@@ -26,6 +26,7 @@ tags:
   - name: meta
   - name: auth
   - name: invitaciones
+  - name: usuarios
   - name: catalogo
   - name: activos
   - name: empresa
@@ -375,6 +376,72 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
           x-codigos: [error_interno]
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /usuarios:
+    get:
+      tags: [usuarios]
+      operationId: listarUsuarios
+      summary: Usuarios de la empresa con su rol y estado (solo admin)
+      description: >-
+        Por membresía de la empresa de la sesión: nombre, correo, rol, si la membresía está
+        activa y si la persona debe cambiar su contraseña. Nunca trae contraseñas ni hashes.
+        Solo ve la empresa de la sesión.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista de usuarios de la empresa.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaUsuarios" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+
+  /usuarios/{usuario_id}:
+    put:
+      tags: [usuarios]
+      operationId: cambiarUsuario
+      summary: Cambiar el rol y activar o desactivar a una persona de la empresa (solo admin)
+      description: >-
+        Exactamente rol y activa; cualquier otra clave da 400. No edita nombre, correo ni
+        contraseña. Cambia la membresía de esta empresa, no la de otras. No se cambia el
+        propio rol ni se desactiva uno mismo (409 cambio_propio_no_permitido). Quitar el rol
+        admin o desactivar al último admin activo da 409 ultimo_admin. Si se desactiva o
+        cambia el rol, se revocan las sesiones renovables de esa membresía: desactivada, su
+        siguiente petición recibe 401; con rol nuevo, lo aplica en la siguiente petición. Si
+        nada cambia, responde 200 sin escribir.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: usuario_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CambiarUsuarioBody" }
+      responses:
+        "200":
+          description: El rol y la activación resultantes (los mismos de antes si no cambió nada).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UsuarioEmpresaCambiado" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/UsuarioNoCambiable"
         "503":
           $ref: "#/components/responses/ServicioNoDisponible"
 
@@ -2557,6 +2624,14 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
       x-codigos: [prohibido]
+    UsuarioNoCambiable:
+      description: >-
+        No se puede cambiar: es tu propia cuenta (no cambias tu rol ni te desactivas) o
+        quitaría el rol admin o desactivaría al último admin activo de la empresa.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [cambio_propio_no_permitido, ultimo_admin]
     ActivoDadoDeBaja:
       description: El activo está dado de baja; solo se puede reactivar.
       content:
@@ -2729,6 +2804,7 @@ components:
         - contrasena_repetida
         - empresa_inactiva
         - ultimo_admin
+        - cambio_propio_no_permitido
         - empresa_sin_admin
         - logos_no_disponibles
     Error:
@@ -2759,6 +2835,40 @@ components:
         id: { type: string, format: uuid }
         email: { type: string, format: email }
         nombre: { type: string }
+    UsuarioEmpresa:
+      type: object
+      required: [id, nombre, email, rol, activa, debe_cambiar_password]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        email: { type: string, format: email }
+        rol: { $ref: "#/components/schemas/Rol" }
+        activa: { type: boolean, description: Si la membresía de la empresa está activa. }
+        debe_cambiar_password: { type: boolean }
+    ListaUsuarios:
+      type: object
+      required: [usuarios]
+      additionalProperties: false
+      properties:
+        usuarios:
+          type: array
+          items: { $ref: "#/components/schemas/UsuarioEmpresa" }
+    CambiarUsuarioBody:
+      type: object
+      required: [rol, activa]
+      additionalProperties: false
+      properties:
+        rol: { $ref: "#/components/schemas/Rol" }
+        activa: { type: boolean, description: Si la membresía de la empresa queda activa. }
+    UsuarioEmpresaCambiado:
+      type: object
+      required: [id, rol, activa]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        rol: { $ref: "#/components/schemas/Rol" }
+        activa: { type: boolean }
     Tenant:
       type: object
       required: [id, nombre]

@@ -1232,7 +1232,6 @@ def test_the_app_still_has_no_direct_access_to_the_table(db, statement, tenant):
         "update usuario set email = 'x@ejemplo.test' where id = :u",
         "delete from usuario where id = :u",
         "delete from membresia where usuario_id = :u",
-        "update membresia set activa = false where usuario_id = :u",
         "delete from refresh_token where membresia_id = :m",
         "update refresh_token set usado_en = now() where membresia_id = :m",
         f"delete from {TABLE} where usuario_id = :u",  # noqa: S608
@@ -1255,6 +1254,27 @@ def test_auth_owner_can_only_update_the_password_hash(db, statement):
             )
         nested.rollback()
     assert excinfo.value.orig.sqlstate == INSUFFICIENT_PRIVILEGE
+
+
+def test_auth_owner_reset_cannot_change_membresia_activa(db):
+    # auth_owner puede actualizar membresia.rol y activa (0033, para el cambio de rol y
+    # activación del admin), pero la política exige la GUC de tenant y de usuario de esa
+    # función: con solo la GUC de restablecer no alcanza ninguna fila.
+    c = cuenta(db)
+    with migrator_tx(db) as conn:
+        conn.exec_driver_sql(f"SET LOCAL ROLE {AUTH_OWNER}")
+        set_gucs(conn, {"app.auth_reset_usuario": str(c.id)})
+        nested = conn.begin_nested()
+        touched = conn.execute(
+            text("update membresia set activa = false where usuario_id = :u"), {"u": c.id}
+        )
+        assert touched.rowcount == 0
+        nested.rollback()
+    with migrator_tx(db) as conn:
+        activa = conn.scalar(
+            text("select activa from membresia where usuario_id = :u"), {"u": c.id}
+        )
+    assert activa is True
 
 
 def test_the_password_update_needs_a_link_consumed_in_the_same_transaction(db):

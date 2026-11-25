@@ -15,6 +15,7 @@ export type Sesion = Esquemas['Sesion']
 export type UsuarioActual = Esquemas['UsuarioActual']
 export type Rol = Esquemas['Rol']
 export type InvitacionCreada = Esquemas['InvitacionCreada']
+export type UsuarioEmpresa = Esquemas['UsuarioEmpresa']
 export type Ubicacion = Esquemas['Ubicacion']
 export type TipoUbicacion = Esquemas['TipoUbicacion']
 export type Categoria = Esquemas['Categoria']
@@ -294,6 +295,10 @@ export const api = {
     pedir('post', '/auth/cambiar-contrasena', { token, cuerpo }),
   crearInvitacion: (token: string, cuerpo: Esquemas['InvitarBody']) =>
     pedir('post', '/invitaciones', { token, cuerpo }),
+  listarUsuarios: (token: string) => pedir('get', '/usuarios', { token }),
+  // 0033: el admin cambia el rol y activa o desactiva a una persona de su empresa.
+  cambiarUsuario: (token: string, usuarioId: string, cuerpo: Esquemas['CambiarUsuarioBody']) =>
+    pedir('put', '/usuarios/{usuario_id}', { token, cuerpo, parametros: { usuario_id: usuarioId } }),
   validarInvitacion: (token: string) => pedir('post', '/invitaciones/validar', { cuerpo: { token } }),
   aceptarInvitacion: (cuerpo: Esquemas['AceptarBody']) => pedir('post', '/invitaciones/aceptar', { cuerpo }),
   // Spec 014: recuperar contraseña (público, con CSRF). El token va solo en el cuerpo;
