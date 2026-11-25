@@ -71,7 +71,7 @@ export default function Login() {
 
   const enviando = entrar.isPending || entrar.isSuccess
   return (
-    <MarcoAcceso titulo="Iniciar sesión" descripcion="Entra con el correo con el que te invitó tu clínica.">
+    <MarcoAcceso titulo="Iniciar sesión" descripcion="Entra con el correo con el que te invitó tu empresa.">
       <form className="flex flex-col gap-4" onSubmit={alEnviar}>
         {aviso && entrar.isIdle && (
           <Aviso ref={avisoRef} tabIndex={-1} tono="exito" titulo={TEXTO_CONTRASENA_ACTUALIZADA} className="outline-none" />
@@ -101,7 +101,7 @@ export default function Login() {
         <Link
           to="/recuperar"
           onClick={alOlvidar}
-          className="-my-2 inline-flex min-h-11 items-center self-end rounded-sm px-1 text-etiqueta font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="-my-2 inline-flex min-h-11 items-center self-center rounded-sm px-1 text-etiqueta font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           ¿Olvidaste tu contraseña?
         </Link>

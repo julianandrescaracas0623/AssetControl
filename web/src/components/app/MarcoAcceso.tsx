@@ -7,7 +7,9 @@ import { cn } from '@/lib/utils'
 // Marco de las pantallas fuera de los shells (spec 002b; spec 016, T4): login,
 // invitación y mensajes de sistema (sin permiso, no encontrado, sin conexión). Fondo de
 // página (--page, D1) que pinta toda la altura, marca arriba y una sola superficie blanca
-// de 400 px como máximo; a 375 px ocupa el ancho con 16 px de margen.
+// de 400 px como máximo; a 375 px ocupa el ancho con 16 px de margen. Título, descripción
+// e ícono van centrados en todas estas pantallas, sin excepción (decisión del humano,
+// 2026-11-25); los campos y botones del formulario conservan su alineación.
 
 export type TonoIconoSistema = 'neutro' | 'aviso'
 
@@ -37,7 +39,7 @@ export function MarcoAcceso({ titulo, descripcion, icono, tonoIcono = 'neutro', 
       </div>
       <Panel relleno={false} className="w-full max-w-[400px]">
         <div className="flex flex-col gap-6 p-6 sm:p-8">
-          <div className="flex flex-col gap-2">
+          <div data-encabezado-acceso="" className="flex flex-col items-center gap-2 text-center">
             {icono && (
               <span
                 data-icono-sistema=""

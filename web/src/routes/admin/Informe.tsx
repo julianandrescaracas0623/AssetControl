@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { ThreeFiguresCard } from '@/components/app/FigureCards'
 import { Aviso, Boton, type ColumnaTabla, EncabezadoPagina, Esqueleto, Estado, Insignia, Pestanas, TablaDatos } from '@/components/kit'
 import { ErrorApi, mensajeDeError } from '@/lib/api/cliente'
+import { entregarConAviso } from '@/lib/descarga'
 import { formatCOP, formatEntero } from '@/lib/format'
 import type { FormatoInforme } from '@/lib/api/cliente'
 import { type FilaDesglose, type Informe as InformeSesion, type NoEncontrado, useExportarInforme, useInforme } from '@/lib/informe'
@@ -172,7 +173,7 @@ function Exportar({ id }: { id: string }) {
   const enCurso = exportar.isPending ? exportar.variables : undefined
   const pedir = (formato: FormatoInforme) =>
     exportar.mutate(formato, {
-      onSuccess: ({ nombre }) => toast.success(`Se descargó «${nombre}»`),
+      onSuccess: (archivo) => void entregarConAviso(archivo),
       onError: (error) => toast.error(`No se pudo exportar: ${mensajeDeError(error)}`),
     })
   const boton = (formato: FormatoInforme, rotulo: string, variante: 'secundario' | 'principal') => (
