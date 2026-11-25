@@ -591,15 +591,26 @@ def empresa_en_linea(hoja: dict[str, Any]) -> str:
 
 
 def textos_bloque(fecha: date, nombre, nit=None, telefono=None, correo=None, direccion=None):
-    """Lo que debe decir cada marcador del bloque (filas 1–5); ``None`` = celda vacía."""
+    """Lo que debe decir cada marcador del bloque (filas 1–5); ``None`` = celda vacía.
+
+    Empresa, Contacto y Dirección (2026-11-24): cada grupo une sus datos presentes en
+    líneas; un grupo sin datos queda vacío y sin su rótulo (Q9)."""
+
+    def lineas(*partes):
+        return "\n".join(p for p in partes if p) or None
+
+    empresa = lineas(nombre, f"NIT {nit}" if nit else None)
+    contacto = lineas(correo, f"Tel. {telefono}" if telefono else None)
+    direccion = direccion or None
     return {
-        "{empresa.nombre}": nombre,
         "Informe · {empresa.nombre} · exportado {fecha}": (
             f"Informe · {nombre} · exportado {fecha:%d/%m/%Y}"
         ),
-        "NIT {empresa.nit}": f"NIT {nit}" if nit else None,
-        "Tel. {empresa.telefono}": f"Tel. {telefono}" if telefono else None,
-        "{empresa.correo}": correo,
+        "Empresa": "Empresa" if empresa else None,
+        "Contacto": "Contacto" if contacto else None,
+        "Dirección": "Dirección" if direccion else None,
+        "{empresa.nombre}\nNIT {empresa.nit}": empresa,
+        "{empresa.correo}\nTel. {empresa.telefono}": contacto,
         "{empresa.direccion}": direccion,
     }
 
@@ -938,12 +949,12 @@ def test_campos_opcionales_ausentes_se_omiten_con_su_rotulo(client, ausentes):
         ),
     )
     textos = [c["valor"] for c in hoja["celdas"].values() if c["tipo"] == "s"]
-    if "correo" in ausentes:
-        assert "Correo" not in textos
     if "nit" in ausentes:
-        assert not any(t.startswith("NIT") for t in textos)
+        assert not any("NIT" in t for t in textos)
     if "telefono" in ausentes:
-        assert not any(t.startswith("Tel.") for t in textos)
+        assert not any("Tel." in t for t in textos)
+    if {"correo", "telefono"} <= set(ausentes):
+        assert "Contacto" not in textos
 
 
 @pytest.mark.parametrize(("ancho", "alto"), [(600, 240), (200, 200), (600, 100)])
@@ -1061,7 +1072,8 @@ def test_correo_hostil_queda_como_texto_sin_formula_ni_hipervinculo(client):
     con_empresa(client, {**EMPRESA, "correo": hostil})
     response = exportar_(client)
     celdas = hoja_de(response)["celdas"]
-    con_correo = [c for c in celdas.values() if c["valor"] == hostil]
+    # El correo es la primera línea del grupo «Contacto» (fila 5).
+    con_correo = [c for c in celdas.values() if (c["valor"] or "").split("\n")[0] == hostil]
     assert len(con_correo) == 1
     assert con_correo[0]["tipo"] == "s"
     with zipfile.ZipFile(io.BytesIO(response.data)) as z:

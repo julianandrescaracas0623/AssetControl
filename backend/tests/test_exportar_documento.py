@@ -422,7 +422,11 @@ def test_hostile_text_stays_text_in_every_sheet():
         assert wb[nombre]["A8"].value == HOSTIL and wb[nombre]["A8"].data_type == "s", nombre
     # NIT, teléfono, correo y dirección de la empresa (bloque de cada hoja) salen como texto
     # literal; ``comprobar_libro_seguro`` ya exige que no haya ``<f>`` ni hipervínculos.
-    contacto = {f"NIT {HOSTIL}", f"Tel. {EMPRESA_HOSTIL}", HOSTIL}
+    contacto = {
+        f"{EMPRESA_HOSTIL}\nNIT {HOSTIL}",
+        f"{HOSTIL}\nTel. {EMPRESA_HOSTIL}",
+        EMPRESA_HOSTIL,
+    }
     for hoja in wb.worksheets:
         textos = {
             c.value
@@ -562,9 +566,9 @@ def _textos_del_bloque() -> dict:
     # Línea junto al logo (C3): «Informe · empresa · corte fecha» con la fecha de corte (B17).
     return {
         "Informe · {empresa.nombre} · corte {fecha}": f"Informe · {e['nombre']} · corte 30/11/2026",
-        "NIT {empresa.nit}": f"NIT {e['nit']}",
-        "Tel. {empresa.telefono}": f"Tel. {e['telefono']}",
-        "{empresa.correo}": e["correo"],
+        # Empresa, Contacto y Dirección (filas 4 y 5), cada grupo con sus dos líneas.
+        "{empresa.nombre}\nNIT {empresa.nit}": f"{e['nombre']}\nNIT {e['nit']}",
+        "{empresa.correo}\nTel. {empresa.telefono}": f"{e['correo']}\nTel. {e['telefono']}",
         "{empresa.direccion}": e["direccion"],
     }
 
@@ -968,6 +972,15 @@ def _valor_numerico(celda: dict) -> Decimal:
     return Decimal(str(celda["valor"]))
 
 
+# Fila 5 del encabezado (2026-11-24): Empresa, Contacto y Dirección combinadas hasta el fin
+# de la banda de cada hoja.
+BLOQUE_COMBINADAS = {
+    "Por ubicación": ["C5:D5", "E5:F5", "G5:H5"],
+    "Por categoría": ["C5:D5", "E5:F5", "G5:H5"],
+    "Resumen": ["C5:D5", "E5:F5", "G5:J5"],
+}
+
+
 def comprobar_hoja_corta(hoja: dict, esp: dict, nombre: str, combinadas: list[str]) -> None:
     """Lo común de «Por ubicación», «Por categoría» y Resumen: pestaña, columnas, página
     1 × 1 (Q12: igual que la plantilla), pie sin encabezado, sin congelar, sin tabla ni
@@ -1000,7 +1013,7 @@ def comprobar_desglose(gen: dict, nombre: str, filas: list[list], total: list) -
     Total con el de la fila 9 (fondo ``DBEAFE``); barras de datos en F y H hasta la última
     fila; cada cifra, la de ``cierre.informe`` exacta."""
     hoja, esp = gen["hojas"][nombre], _esperada_informe(nombre)
-    comprobar_hoja_corta(hoja, esp, nombre, [])
+    comprobar_hoja_corta(hoja, esp, nombre, BLOQUE_COMBINADAS[nombre])
     n = len(filas)
     fila_total = 8 + n  # 1-based: cabecera 7, datos desde 8
     area = esp["impresion"]["area"].split("!")[1]
@@ -1162,9 +1175,10 @@ def comprobar_resumen(gen: dict, informe: dict, contexto: list[list]) -> None:
     las cifras de ``totales``; nada en la fila 9; desde la 10, las filas de contexto (Q7) con
     el estilo de la nota de lista; sin la lista duplicada ni su regla (Q7)."""
     hoja, esp = gen["hojas"]["Resumen"], _esperada_informe("Resumen")
-    # Q7: A10:J10 es de la lista omitida; queda el título combinado C2:D2.
-    assert esp["combinadas"] == ["A10:J10", "C2:D2"]
-    comprobar_hoja_corta(hoja, esp, "Resumen", ["C2:D2"])
+    # Q7: A10:J10 es de la lista omitida; quedan el título combinado C2:D2 y los datos de
+    # Empresa, Contacto y Dirección de la fila 5 (encabezado, 2026-11-24).
+    assert esp["combinadas"] == ["A10:J10", "C2:D2", *BLOQUE_COMBINADAS["Resumen"]]
+    comprobar_hoja_corta(hoja, esp, "Resumen", ["C2:D2", *BLOQUE_COMBINADAS["Resumen"]])
     ultima = FILA_CONTEXTO + len(contexto)  # 1-based
     area = esp["impresion"]["area"].split("!")[1]
     assert hoja["impresion"]["area"].split("!")[1] == re.sub(r"\d+$", str(ultima), area)

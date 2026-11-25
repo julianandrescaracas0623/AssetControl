@@ -32,7 +32,7 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 - Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `{'x_split': None, 'y_split': 7, 'celda_superior_izquierda': 'A8', 'panel_activo': 'bottomLeft', 'estado': 'frozen'}`
 - Selección `[{'panel': 'bottomLeft', 'celda_activa': 'J17', 'rango': 'J17'}]`, tabSelected True, topLeftCell `None` (Q11: no se reproduce)
 - Formato de hoja `{'alto_fila_defecto': 15, 'ancho_col_defecto': 9.140625, 'ancho_base': 10, 'filas_ocultas_defecto': False, 'alto_propio_defecto': False}`
-- Combinadas: ninguna
+- Combinadas: ['C5:D5', 'E5:F5', 'G5:L5']
 - Autofiltro `A7:L8`; tablas `[]`; validaciones ninguna; hipervínculos ninguno; protección None
 - Impresión `{'area': 'Activos!$A$1:$L$8', 'titulos': 'Activos!$7:$7', 'filtro': 'Activos!$A$7:$L$8'}`
 - Página `{'margenes': {'left': 0.4, 'right': 0.4, 'top': 0.6, 'bottom': 0.6, 'header': 0.5, 'footer': 0.5}, 'orientacion': 'landscape', 'papel': None, 'escala': None, 'ajustar_a_pagina': True, 'ajuste_ancho': 1, 'ajuste_alto': 0, 'primera_pagina': None, 'orden': None, 'blanco_y_negro': False, 'cuadricula_impresa': False, 'encabezados_impresos': False, 'centrado_horizontal': False, 'centrado_vertical': False, 'encabezado_pie': {'oddFooter': '&L&8 Generado con AssetControl&R&8 Página &P de &N'}, 'encabezado_pie_distinto_primera': False, 'encabezado_pie_pares_impares': False, 'saltos_fila': 0, 'saltos_columna': 0}`
@@ -54,8 +54,8 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | 1 | 6 | True | - |
 | 2 | 44.1 | True | - |
 | 3 | 18 | True | - |
-| 4 | 18 | True | - |
-| 5 | 15.95 | True | - |
+| 4 | 16 | True | - |
+| 5 | 30 | True | - |
 | 7 | 30 | True | - |
 | 8 | 20.1 | True | - |
 
@@ -74,32 +74,40 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | K1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | L1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | C2 | Inventario de activos | Arial 19 N FF111827; alin general/center | 5–9, 25 |
-| C3 | Informe · {empresa.nombre} · exportado {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
-| D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
-| D4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E4 | Tel. {empresa.telefono} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
-| F4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G4 | {empresa.correo} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
-| H4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| I4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · exportado {fecha} | Arial 10 FF4B5563; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| D3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| F3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| G3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| H3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| I3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| J3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| K3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| L3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| C4 | Empresa | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| D4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| E4 | Contacto | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| F4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| G4 | Dirección | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| H4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| I4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| J4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| K4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| L4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
 | A5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
 | B5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C5 | {empresa.direccion} | Arial 9 FF4B5563; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| D5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| E5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| F5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| G5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| H5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| I5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| J5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| K5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| L5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
+| C5 | {empresa.nombre}
+NIT {empresa.nit} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| D5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| E5 | {empresa.correo}
+Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| F5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| G5 | {empresa.direccion} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| H5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| I5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| J5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| K5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| L5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
 | A7 | Código | Arial 10 N FFFFFFFF; relleno solid FF1F2937; borde L:thin FF9CA3AF, R:thin FF9CA3AF, T:thin FF9CA3AF, B:thin FF9CA3AF; alin center/center ajuste | 5–9, 25 |
 | B7 | Nombre | Arial 10 N FFFFFFFF; relleno solid FF1F2937; borde L:thin FF9CA3AF, R:thin FF9CA3AF, T:thin FF9CA3AF, B:thin FF9CA3AF; alin center/center ajuste | 5–9, 25 |
 | C7 | Categoría | Arial 10 N FFFFFFFF; relleno solid FF1F2937; borde L:thin FF9CA3AF, R:thin FF9CA3AF, T:thin FF9CA3AF, B:thin FF9CA3AF; alin center/center ajuste | 5–9, 25 |
@@ -290,6 +298,10 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | `sheet:worksheet/drawing@id` | 13 imágenes |
 | `sheet:worksheet/headerFooter` | 17 encabezado y pie |
 | `sheet:worksheet/headerFooter/oddFooter` | 17 encabezado y pie |
+| `sheet:worksheet/mergeCells` | 12 combinadas |
+| `sheet:worksheet/mergeCells/mergeCell` | 12 combinadas |
+| `sheet:worksheet/mergeCells/mergeCell@ref` | 12 combinadas |
+| `sheet:worksheet/mergeCells@count` | 12 combinadas |
 | `sheet:worksheet/pageMargins` | 16 márgenes |
 | `sheet:worksheet/pageMargins@bottom` | 16 márgenes |
 | `sheet:worksheet/pageMargins@footer` | 16 márgenes |
@@ -395,7 +407,7 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 - Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `{'x_split': None, 'y_split': 9, 'celda_superior_izquierda': 'A10', 'panel_activo': 'bottomLeft', 'estado': 'frozen'}`
 - Selección `[{'panel': 'bottomLeft', 'celda_activa': 'C18', 'rango': 'C18'}]`, tabSelected False, topLeftCell `None` (Q11: no se reproduce)
 - Formato de hoja `{'alto_fila_defecto': 15, 'ancho_col_defecto': 9.140625, 'ancho_base': 10, 'filas_ocultas_defecto': False, 'alto_propio_defecto': False}`
-- Combinadas: ['A7:J7']
+- Combinadas: ['A7:J7', 'C5:D5', 'E5:F5', 'G5:J5']
 - Autofiltro `None`; tablas `[]`; validaciones ninguna; hipervínculos ninguno; protección None
 - Impresión `{'area': "'Todos los activos'!$A$1:$J$10", 'titulos': "'Todos los activos'!$9:$9", 'filtro': None}`
 - Página `{'margenes': {'left': 0.4, 'right': 0.4, 'top': 0.6, 'bottom': 0.6, 'header': 0.3, 'footer': 0.3}, 'orientacion': 'landscape', 'papel': None, 'escala': None, 'ajustar_a_pagina': True, 'ajuste_ancho': 1, 'ajuste_alto': 1, 'primera_pagina': None, 'orden': None, 'blanco_y_negro': False, 'cuadricula_impresa': False, 'encabezados_impresos': False, 'centrado_horizontal': False, 'centrado_vertical': False, 'encabezado_pie': {'oddFooter': '&L&8 Generado con AssetControl&R&8 Página &P de &N'}, 'encabezado_pie_distinto_primera': False, 'encabezado_pie_pares_impares': False, 'saltos_fila': 0, 'saltos_columna': 0}`
@@ -415,8 +427,8 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | 1 | 6 | True | - |
 | 2 | 44.1 | True | - |
 | 3 | 18 | True | - |
-| 4 | 18 | True | - |
-| 5 | 15.95 | True | - |
+| 4 | 16 | True | - |
+| 5 | 30 | True | - |
 | 6 | 26.1 | True | - |
 | 7 | 26.1 | True | - |
 | 8 | 21.95 | True | - |
@@ -436,30 +448,34 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | I1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | J1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | C2 | Informe de activos | Arial 19 N FF111827; alin general/center | 5–9, 25 |
-| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
-| D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
-| D4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E4 | Tel. {empresa.telefono} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
-| F4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G4 | {empresa.correo} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
-| H4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| I4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| D3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| F3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| G3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| H3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| I3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| J3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| C4 | Empresa | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| D4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| E4 | Contacto | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| F4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| G4 | Dirección | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| H4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| I4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| J4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
 | A5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
 | B5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C5 | {empresa.direccion} | Arial 9 FF4B5563; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| D5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| E5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| F5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| G5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| H5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| I5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| J5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
+| C5 | {empresa.nombre}
+NIT {empresa.nit} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| D5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| E5 | {empresa.correo}
+Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| F5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| G5 | {empresa.direccion} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| H5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| I5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| J5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
 | A6 | Todos los activos del cierre | Arial 12 N FF111827; borde B:thin FF111827; alin left/center | 5–9, 25 |
 | B6 |  | Calibri 11 tema 1; borde B:thin FF111827; alin left/center | 5–9, 25 |
 | C6 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | 5–9, 25 |
@@ -515,7 +531,7 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 - Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `None`
 - Selección `[{'panel': None, 'celda_activa': 'A7', 'rango': 'A7:H9'}]`, tabSelected False, topLeftCell `None` (Q11: no se reproduce)
 - Formato de hoja `{'alto_fila_defecto': 15, 'ancho_col_defecto': 9.140625, 'ancho_base': 10, 'filas_ocultas_defecto': False, 'alto_propio_defecto': False}`
-- Combinadas: ninguna
+- Combinadas: ['C5:D5', 'E5:F5', 'G5:H5']
 - Autofiltro `None`; tablas `[]`; validaciones ninguna; hipervínculos ninguno; protección None
 - Impresión `{'area': "'Por ubicación'!$A$1:$H$9", 'titulos': None, 'filtro': None}`
 - Página `{'margenes': {'left': 0.4, 'right': 0.4, 'top': 0.6, 'bottom': 0.6, 'header': 0.3, 'footer': 0.3}, 'orientacion': 'landscape', 'papel': None, 'escala': None, 'ajustar_a_pagina': True, 'ajuste_ancho': 1, 'ajuste_alto': 1, 'primera_pagina': None, 'orden': None, 'blanco_y_negro': False, 'cuadricula_impresa': False, 'encabezados_impresos': False, 'centrado_horizontal': False, 'centrado_vertical': False, 'encabezado_pie': {'oddFooter': '&L&8 Generado con AssetControl&R&8 Página &P de &N'}, 'encabezado_pie_distinto_primera': False, 'encabezado_pie_pares_impares': False, 'saltos_fila': 0, 'saltos_columna': 0}`
@@ -535,8 +551,8 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | 1 | 6 | True | - |
 | 2 | 44.1 | True | - |
 | 3 | 18 | True | - |
-| 4 | 18 | True | - |
-| 5 | 15.95 | True | - |
+| 4 | 16 | True | - |
+| 5 | 30 | True | - |
 | 6 | 26.1 | True | - |
 | 7 | 27.95 | True | - |
 | 8 | 21.95 | True | - |
@@ -555,29 +571,33 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | I1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | J1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | C2 | Informe de activos | Arial 19 N FF111827; alin general/center | 5–9, 25 |
-| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
-| D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| D3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| F3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| G3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| H3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
 | I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
-| D4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E4 | Tel. {empresa.telefono} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
-| F4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G4 | {empresa.correo} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
-| H4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| J3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C4 | Empresa | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| D4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| E4 | Contacto | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| F4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| G4 | Dirección | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| H4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
 | I4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| J4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | A5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
 | B5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C5 | {empresa.direccion} | Arial 9 FF4B5563; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| D5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| E5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| F5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| G5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| H5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| I5 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C5 | {empresa.nombre}
+NIT {empresa.nit} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| D5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| E5 | {empresa.correo}
+Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| F5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| G5 | {empresa.direccion} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| H5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| I5 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | J5 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | A6 | Por ubicación | Arial 12 N FF111827; borde B:thin FF111827; alin general/bottom | 5–9, 25 |
 | B6 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | 5–9, 25 |
@@ -632,7 +652,7 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 - Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `{'x_split': None, 'y_split': 9, 'celda_superior_izquierda': 'A10', 'panel_activo': 'bottomLeft', 'estado': 'frozen'}`
 - Selección `[{'panel': 'bottomLeft', 'celda_activa': 'E15', 'rango': 'E15'}]`, tabSelected True, topLeftCell `None` (Q11: no se reproduce)
 - Formato de hoja `{'alto_fila_defecto': 15, 'ancho_col_defecto': 9.140625, 'ancho_base': 10, 'filas_ocultas_defecto': False, 'alto_propio_defecto': False}`
-- Combinadas: ['A7:F7']
+- Combinadas: ['A7:F7', 'C5:D5']
 - Autofiltro `None`; tablas `[]`; validaciones ninguna; hipervínculos ninguno; protección None
 - Impresión `{'area': "'No encontrados'!$A$1:$F$9", 'titulos': "'No encontrados'!$9:$9", 'filtro': None}`
 - Página `{'margenes': {'left': 0.4, 'right': 0.4, 'top': 0.6, 'bottom': 0.6, 'header': 0.3, 'footer': 0.3}, 'orientacion': 'landscape', 'papel': None, 'escala': None, 'ajustar_a_pagina': True, 'ajuste_ancho': 1, 'ajuste_alto': 1, 'primera_pagina': None, 'orden': None, 'blanco_y_negro': False, 'cuadricula_impresa': False, 'encabezados_impresos': False, 'centrado_horizontal': False, 'centrado_vertical': False, 'encabezado_pie': {'oddFooter': '&L&8 Generado con AssetControl&R&8 Página &P de &N'}, 'encabezado_pie_distinto_primera': False, 'encabezado_pie_pares_impares': False, 'saltos_fila': 0, 'saltos_columna': 0}`
@@ -653,8 +673,8 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | 1 | 6 | True | - |
 | 2 | 44.1 | True | - |
 | 3 | 18 | True | - |
-| 4 | 18 | True | - |
-| 5 | 15.95 | True | - |
+| 4 | 16 | True | - |
+| 5 | 30 | True | - |
 | 6 | 26.1 | True | - |
 | 7 | 26.1 | True | - |
 | 8 | 21.95 | True | - |
@@ -675,29 +695,33 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | I1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | J1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | C2 | Informe de activos | Arial 19 N FF111827; alin general/center | 5–9, 25 |
-| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
-| D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| D3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| F3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
 | G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
-| D4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E4 | Tel. {empresa.telefono} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
-| F4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G4 | {empresa.correo} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
+| J3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C4 | Empresa | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| D4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| E4 | Contacto | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| F4 | Dirección | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| G4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | H4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| J4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | A5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
 | B5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C5 | {empresa.direccion} | Arial 9 FF4B5563; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| D5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| E5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| F5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| G5 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| H5 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| I5 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C5 | {empresa.nombre}
+NIT {empresa.nit} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| D5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| E5 | {empresa.correo}
+Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| F5 | {empresa.direccion} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| G5 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
+| H5 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
+| I5 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | J5 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | A6 | No encontrados (lista congelada al cierre) | Arial 12 N FF111827; borde B:thin FF111827; alin general/center | 5–9, 25 |
 | B6 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | 5–9, 25 |
@@ -743,7 +767,7 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 - Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `{'x_split': None, 'y_split': 9, 'celda_superior_izquierda': 'A10', 'panel_activo': 'bottomLeft', 'estado': 'frozen'}`
 - Selección `[{'panel': 'bottomLeft', 'celda_activa': 'E19', 'rango': 'E19'}]`, tabSelected False, topLeftCell `None` (Q11: no se reproduce)
 - Formato de hoja `{'alto_fila_defecto': 15, 'ancho_col_defecto': 9.140625, 'ancho_base': 10, 'filas_ocultas_defecto': False, 'alto_propio_defecto': False}`
-- Combinadas: ['A7:I7']
+- Combinadas: ['A7:I7', 'C5:D5', 'E5:F5', 'G5:I5']
 - Autofiltro `None`; tablas `[]`; validaciones ninguna; hipervínculos ninguno; protección None
 - Impresión `{'area': "'{categoria}'!$A$1:$I$10", 'titulos': "'{categoria}'!$9:$9", 'filtro': None}`
 - Página `{'margenes': {'left': 0.4, 'right': 0.4, 'top': 0.6, 'bottom': 0.6, 'header': 0.3, 'footer': 0.3}, 'orientacion': 'landscape', 'papel': None, 'escala': None, 'ajustar_a_pagina': True, 'ajuste_ancho': 1, 'ajuste_alto': 1, 'primera_pagina': None, 'orden': None, 'blanco_y_negro': False, 'cuadricula_impresa': False, 'encabezados_impresos': False, 'centrado_horizontal': False, 'centrado_vertical': False, 'encabezado_pie': {'oddFooter': '&L&8 Generado con AssetControl&R&8 Página &P de &N'}, 'encabezado_pie_distinto_primera': False, 'encabezado_pie_pares_impares': False, 'saltos_fila': 0, 'saltos_columna': 0}`
@@ -763,8 +787,8 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | 1 | 6 | True | - |
 | 2 | 44.1 | True | - |
 | 3 | 18 | True | - |
-| 4 | 18 | True | - |
-| 5 | 15.95 | True | - |
+| 4 | 16 | True | - |
+| 5 | 30 | True | - |
 | 6 | 26.1 | True | Calibri 11 tema 1; alin general/center |
 | 7 | 26.1 | True | - |
 | 8 | 21.95 | True | - |
@@ -784,29 +808,33 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | I1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | J1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | C2 | Informe de activos | Arial 19 N FF111827; alin general/center | 5–9, 25 |
-| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
-| D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
-| D4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E4 | Tel. {empresa.telefono} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
-| F4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G4 | {empresa.correo} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
-| H4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| I4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| D3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| F3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| G3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| H3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| I3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| J3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C4 | Empresa | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| D4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| E4 | Contacto | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| F4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| G4 | Dirección | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| H4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| I4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| J4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | A5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
 | B5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C5 | {empresa.direccion} | Arial 9 FF4B5563; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| D5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| E5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| F5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| G5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| H5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| I5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
+| C5 | {empresa.nombre}
+NIT {empresa.nit} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| D5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| E5 | {empresa.correo}
+Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| F5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| G5 | {empresa.direccion} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| H5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| I5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
 | J5 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | A6 | Categoría: {categoria} | Arial 12 N FF111827; borde B:thin FF111827; alin general/center | 5–9, 25 |
 | B6 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/center | 5–9, 25 |
@@ -861,7 +889,7 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 - Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `None`
 - Selección `[{'panel': None, 'celda_activa': 'D22', 'rango': 'D22'}]`, tabSelected False, topLeftCell `None` (Q11: no se reproduce)
 - Formato de hoja `{'alto_fila_defecto': 15, 'ancho_col_defecto': 9.140625, 'ancho_base': 10, 'filas_ocultas_defecto': False, 'alto_propio_defecto': False}`
-- Combinadas: ninguna
+- Combinadas: ['C5:D5', 'E5:F5', 'G5:H5']
 - Autofiltro `None`; tablas `[]`; validaciones ninguna; hipervínculos ninguno; protección None
 - Impresión `{'area': "'Por categoría'!$A$1:$H$9", 'titulos': None, 'filtro': None}`
 - Página `{'margenes': {'left': 0.4, 'right': 0.4, 'top': 0.6, 'bottom': 0.6, 'header': 0.3, 'footer': 0.3}, 'orientacion': 'landscape', 'papel': None, 'escala': None, 'ajustar_a_pagina': True, 'ajuste_ancho': 1, 'ajuste_alto': 1, 'primera_pagina': None, 'orden': None, 'blanco_y_negro': False, 'cuadricula_impresa': False, 'encabezados_impresos': False, 'centrado_horizontal': False, 'centrado_vertical': False, 'encabezado_pie': {'oddFooter': '&L&8 Generado con AssetControl&R&8 Página &P de &N'}, 'encabezado_pie_distinto_primera': False, 'encabezado_pie_pares_impares': False, 'saltos_fila': 0, 'saltos_columna': 0}`
@@ -881,8 +909,8 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | 1 | 6 | True | - |
 | 2 | 44.1 | True | - |
 | 3 | 18 | True | - |
-| 4 | 18 | True | - |
-| 5 | 15.95 | True | - |
+| 4 | 16 | True | - |
+| 5 | 30 | True | - |
 | 6 | 26.1 | True | - |
 | 7 | 27.95 | True | - |
 | 8 | 21.95 | True | - |
@@ -901,29 +929,33 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | I1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | J1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | C2 | Informe de activos | Arial 19 N FF111827; alin general/center | 5–9, 25 |
-| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
-| D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| D3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| F3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| G3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| H3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
 | I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
-| D4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E4 | Tel. {empresa.telefono} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
-| F4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G4 | {empresa.correo} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
-| H4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| J3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C4 | Empresa | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| D4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| E4 | Contacto | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| F4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| G4 | Dirección | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| H4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
 | I4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| J4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | A5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
 | B5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C5 | {empresa.direccion} | Arial 9 FF4B5563; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| D5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| E5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| F5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| G5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| H5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| I5 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C5 | {empresa.nombre}
+NIT {empresa.nit} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| D5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| E5 | {empresa.correo}
+Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| F5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| G5 | {empresa.direccion} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| H5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| I5 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | J5 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | A6 | Por categoría | Arial 12 N FF111827; borde B:thin FF111827; alin general/bottom | 5–9, 25 |
 | B6 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | 5–9, 25 |
@@ -978,7 +1010,7 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 - Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `None`
 - Selección `[{'panel': None, 'celda_activa': 'B17', 'rango': 'B17'}]`, tabSelected False, topLeftCell `A7` (Q11: no se reproduce)
 - Formato de hoja `{'alto_fila_defecto': 15, 'ancho_col_defecto': 9.140625, 'ancho_base': 10, 'filas_ocultas_defecto': False, 'alto_propio_defecto': False}`
-- Combinadas: ['A10:J10', 'C2:D2'] (A10:J10 es de la lista omitida por Q7)
+- Combinadas: ['A10:J10', 'C2:D2', 'C5:D5', 'E5:F5', 'G5:J5'] (A10:J10 es de la lista omitida por Q7)
 - Autofiltro `None`; tablas `[]`; validaciones ninguna; hipervínculos ninguno; protección None
 - Impresión `{'area': "'Resumen'!$A$1:$J$13", 'titulos': None, 'filtro': None}`
 - Página `{'margenes': {'left': 0.4, 'right': 0.4, 'top': 0.6, 'bottom': 0.6, 'header': 0.3, 'footer': 0.3}, 'orientacion': 'landscape', 'papel': None, 'escala': None, 'ajustar_a_pagina': True, 'ajuste_ancho': 1, 'ajuste_alto': 1, 'primera_pagina': None, 'orden': None, 'blanco_y_negro': False, 'cuadricula_impresa': False, 'encabezados_impresos': False, 'centrado_horizontal': False, 'centrado_vertical': False, 'encabezado_pie': {'oddFooter': '&L&8 Generado con AssetControl&R&8 Página &P de &N'}, 'encabezado_pie_distinto_primera': False, 'encabezado_pie_pares_impares': False, 'saltos_fila': 0, 'saltos_columna': 0}`
@@ -998,8 +1030,8 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | 1 | 6 | True | - |
 | 2 | 44.1 | True | - |
 | 3 | 18 | True | - |
-| 4 | 18 | True | - |
-| 5 | 15.95 | True | - |
+| 4 | 16 | True | - |
+| 5 | 30 | True | - |
 | 6 | 15.95 | True | - |
 | 7 | 30 | True | - |
 | 8 | 15.95 | True | - |
@@ -1022,30 +1054,34 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | I1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | J1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | C2 | Informe de activos | Arial 19 N FF111827; alin center/center | 5–9, 25 |
-| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
-| D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
-| D4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E4 | Tel. {empresa.telefono} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
-| F4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G4 | {empresa.correo} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
-| H4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| I4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| D3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| F3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| G3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| H3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| I3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| J3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| C4 | Empresa | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| D4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| E4 | Contacto | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| F4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| G4 | Dirección | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| H4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| I4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
+| J4 |  | Arial 8 FF6B7280; alin general/bottom | 5–9, 25 |
 | A5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
 | B5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C5 | {empresa.direccion} | Arial 9 FF4B5563; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| D5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| E5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| F5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| G5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| H5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| I5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
-| J5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
+| C5 | {empresa.nombre}
+NIT {empresa.nit} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| D5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| E5 | {empresa.correo}
+Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| F5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| G5 | {empresa.direccion} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| H5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| I5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
+| J5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
 | A6 | Encontrado | Arial 9 N FF1D4ED8; alin center/center | 5–9, 25 |
 | B6 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
 | C6 | No encontrado | Arial 9 N FF1D4ED8; alin center/center | 5–9, 25 |
@@ -1453,4 +1489,4 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 
 ## Encabezado junto al logo (decisión del humano 2026-11-24)
 
-- `encabezado_junto_al_logo`: Decisión del humano 2026-11-24: el bloque de las dos exportaciones (activos e informe) pone el título junto al logo, alineado a la izquierda, y debajo la línea «Informe · empresa · exportado|corte fecha» (C3). NIT, teléfono y correo van en la fila 4 (C4, E4, G4); la dirección, en la fila 5. Se quitan los rótulos «Exportado» y «Correo» de la plantilla. El logo conserva su caja y altos (`CajaLogo`, `ALTOS_BLOQUE`); el bloque usa Arial y un gris único. Las huellas `activos.json` e `informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.
+- `encabezado_junto_al_logo`: Decisión del humano 2026-11-24: el bloque de las dos exportaciones (activos e informe) pone el título junto al logo y debajo la línea «Informe · empresa · exportado|corte fecha» (C3) con una línea fina gris. En la fila 4, los rótulos «Empresa», «Contacto» y «Dirección»; en la fila 5, bajo cada uno, sus datos (nombre y NIT; correo y teléfono; dirección) en celdas combinadas con ajuste de texto, hasta el fin de la banda. Un dato ausente se omite y un grupo sin datos va sin rótulo. Se quitan los rótulos «Exportado» y «Correo» de la plantilla. Alturas: fila 4 = 16 y fila 5 = 30. El logo conserva su caja y su tamaño (`CajaLogo`, en EMU). Las huellas `activos.json` e `informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.

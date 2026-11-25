@@ -84,21 +84,30 @@ def _ultima_fila_plantilla(clave: str) -> int:
 
 
 def _texto_esperado(valor: Any, empresa: EmpresaFicticia, plantilla: est.Plantilla) -> Any:
-    """El valor de la huella con los marcadores sustituidos por los datos ficticios."""
+    """El valor de la huella con los marcadores sustituidos por los datos ficticios.
+
+    Un dato ausente se omite (Q9): en la línea «Informe · …» y en cada línea de un grupo
+    (Empresa, Contacto, Dirección); un grupo sin datos queda vacío y sin su rótulo."""
     if not isinstance(valor, str):
         return valor
-    if valor.startswith("Informe · "):  # línea junto al logo: se omiten los datos ausentes
+    if valor.startswith("Informe · "):  # línea junto al logo
         partes = ["Informe", empresa.nombre, f"{plantilla.rotulo_fecha.lower()} 22/11/2026"]
         return " · ".join(p for p in partes if p)
-    exactos = {
-        "{empresa.nombre}": empresa.nombre,
+    lineas = {
+        "{empresa.nombre}": empresa.nombre or None,
         "NIT {empresa.nit}": f"NIT {empresa.nit}" if empresa.nit else None,
         "Tel. {empresa.telefono}": f"Tel. {empresa.telefono}" if empresa.telefono else None,
-        "{empresa.correo}": empresa.correo,
-        "{empresa.direccion}": empresa.direccion,
+        "{empresa.correo}": empresa.correo or None,
+        "{empresa.direccion}": empresa.direccion or None,
     }
-    if valor in exactos:
-        return exactos[valor]
+    grupos = {"Empresa": "{empresa.nombre}\nNIT {empresa.nit}"}
+    grupos["Contacto"] = "{empresa.correo}\nTel. {empresa.telefono}"
+    grupos["Dirección"] = "{empresa.direccion}"
+    if valor in grupos:  # rótulo: solo si su grupo tiene algún dato
+        return valor if _texto_esperado(grupos[valor], empresa, plantilla) else None
+    if valor.split("\n")[0] in lineas:
+        presentes = [lineas[linea] for linea in valor.split("\n")]
+        return "\n".join(p for p in presentes if p) or None
     return valor.replace("{fecha}", "22/11/2026")
 
 
@@ -224,17 +233,19 @@ def test_campos_ausentes_se_omiten_con_su_rotulo(clave):
     gen = _bloque(gen_hoja["celdas"])
     esp = _bloque(_esperada(clave)["celdas"])
     plantilla = est.PLANTILLAS[clave]
-    presentes = {"{empresa.nombre}", "Informe de activos", "Inventario de activos"}
     assert sorted(gen) == sorted(esp)  # mismas celdas: el estilo (bordes) no se pierde
     for ref, celda in esp.items():
         assert u.comparar(celda["estilo"], gen[ref]["estilo"], ref) == []
-        if celda["valor"] in presentes or (celda["valor"] or "").startswith("Informe · "):
-            assert gen[ref]["valor"] == _texto_esperado(celda["valor"], empresa, plantilla)
-        else:
+        esperado = _texto_esperado(celda["valor"], empresa, plantilla)
+        if esperado is None:
             assert gen[ref]["tipo"] == "vacia", (ref, gen[ref])
+        else:
+            assert (gen[ref]["tipo"], gen[ref]["valor"]) == ("s", esperado), ref
     textos = [c["valor"] for c in gen.values() if c["tipo"] == "s"]
-    assert "Correo" not in textos
-    assert not any(t.startswith(("NIT", "Tel.")) for t in textos)
+    # Solo queda el nombre en «Empresa»; «Contacto» y «Dirección» quedan sin rótulo.
+    assert empresa.nombre in textos and "Empresa" in textos
+    assert "Contacto" not in textos and "Dirección" not in textos
+    assert not any("NIT" in t or "Tel." in t for t in textos)
     assert gen_hoja["imagenes"] == []
 
 

@@ -30,6 +30,11 @@ PERMITIDOS_BLOQUE = {
     # Línea junto al logo (decisión del humano 2026-11-24).
     "Informe · {empresa.nombre} · exportado {fecha}",
     "Informe · {empresa.nombre} · corte {fecha}",
+    "Empresa",
+    "Contacto",
+    "Dirección",
+    "{empresa.nombre}\nNIT {empresa.nit}",
+    "{empresa.correo}\nTel. {empresa.telefono}",
 }
 
 

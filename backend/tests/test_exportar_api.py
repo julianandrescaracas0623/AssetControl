@@ -584,8 +584,11 @@ def test_every_sheet_carries_the_frozen_company_and_its_logo(client):
         assert hoja["C3"].value == "Informe · Clínica & Ejemplo S.A.S. · corte 30/11/2026", (
             hoja.title
         )
-        assert hoja["C4"].value == "NIT 900.123.456-8", hoja.title
-        assert hoja["C5"].value == "Calle 10 # 5-20, Cartago", hoja.title
+        # Empresa (C), Contacto (E) y Dirección (G o F) bajo sus rótulos (2026-11-24).
+        assert hoja["C4"].value == "Empresa", hoja.title
+        assert hoja["C5"].value == "Clínica & Ejemplo S.A.S.\nNIT 900.123.456-8", hoja.title
+        direccion = "F5" if hoja.title == "No encontrados" else "G5"
+        assert hoja[direccion].value == "Calle 10 # 5-20, Cartago", hoja.title
         assert hoja.HeaderFooter.oddFooter.left.text.strip() == "Generado con AssetControl"
         assert hoja.HeaderFooter.oddFooter.right.text.strip() == "Página &P de &N", hoja.title
         assert not hoja.HeaderFooter.oddHeader.left.text, hoja.title

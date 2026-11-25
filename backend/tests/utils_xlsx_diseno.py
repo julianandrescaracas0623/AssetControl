@@ -1496,12 +1496,14 @@ def _resumen_estilo(e: dict[str, Any]) -> str:
 
 DECISIONES_ENCABEZADO = {
     "encabezado_junto_al_logo": "Decisión del humano 2026-11-24: el bloque de las dos "
-    "exportaciones (activos e informe) pone el título junto al logo, alineado a la izquierda, "
-    "y debajo la línea «Informe · empresa · exportado|corte fecha» (C3). NIT, teléfono y "
-    "correo van en la fila 4 (C4, E4, G4); la dirección, en la fila 5. Se quitan los rótulos "
-    "«Exportado» y «Correo» de la plantilla. El logo conserva su caja y altos (`CajaLogo`, "
-    "`ALTOS_BLOQUE`); el bloque usa Arial y un gris único. Las huellas `activos.json` e "
-    "`informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.",
+    "exportaciones (activos e informe) pone el título junto al logo y debajo la línea "
+    "«Informe · empresa · exportado|corte fecha» (C3) con una línea fina gris. En la fila 4, "
+    "los rótulos «Empresa», «Contacto» y «Dirección»; en la fila 5, bajo cada uno, sus datos "
+    "(nombre y NIT; correo y teléfono; dirección) en celdas combinadas con ajuste de texto, "
+    "hasta el fin de la banda. Un dato ausente se omite y un grupo sin datos va sin rótulo. "
+    "Se quitan los rótulos «Exportado» y «Correo» de la plantilla. Alturas: fila 4 = 16 y "
+    "fila 5 = 30. El logo conserva su caja y su tamaño (`CajaLogo`, en EMU). Las huellas "
+    "`activos.json` e `informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.",
 }
 
 

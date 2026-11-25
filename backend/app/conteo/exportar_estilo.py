@@ -42,6 +42,7 @@ GRIS = "#6B7280"  # informe: fecha, contacto, dirección, notas
 GRIS_ACTIVOS = "#4B5563"  # activos: fecha, «Correo», contacto, dirección (R7)
 FONDO_CABECERA = "#1F2937"
 BLANCO = "#FFFFFF"
+DIVISOR = "#E5E7EB"  # línea fina bajo «Informe · …» (encabezado, 2026-11-24)
 LINEA = "#9CA3AF"  # bordes finos de cabecera, datos y total
 FONDO_TOTAL = "#DBEAFE"  # Total de «Por ubicación» y «Por categoría»
 BARRA = "#BFDBFE"  # barras de datos (T5)
@@ -61,7 +62,9 @@ AUTOR = "AssetControl"  # creator = lastModifiedBy (xlsxwriter no permite omitir
 TEXTO_ALTERNATIVO_LOGO = "Picture"  # L8
 
 # Alturas del bloque común, en puntos (índice de fila de xlsxwriter, 0 = fila 1).
-ALTOS_BLOQUE = {0: 6, 1: 44.1, 2: 18, 3: 18, 4: 15.95}
+# Fila 4 (rótulos) y fila 5 (datos en dos líneas) del encabezado junto al logo (2026-11-24);
+# el logo no cambia: su tamaño va en EMU (``CajaLogo``) y no depende del alto de las filas.
+ALTOS_BLOQUE = {0: 6, 1: 44.1, 2: 18, 3: 16, 4: 30}
 FILA_LOGO = 1  # el logo se ancla en la fila 2, columna A
 
 
@@ -85,6 +88,7 @@ _IZQ = {"align": "left", "valign": "vcenter"}
 _BORDE = {"border": 1, "border_color": LINEA}
 _LINEA_BLOQUE = {"bottom": 2, "bottom_color": AZUL}
 _LINEA_TITULO = {"bottom": 1, "bottom_color": TINTA}
+_DIVISOR = {"bottom": 1, "bottom_color": DIVISOR}
 _AJUSTE = {"text_wrap": True}
 
 # Catálogo: un formato por cada estilo medido en las plantillas (y ninguno más). «base» es
@@ -97,15 +101,14 @@ ESTILOS: dict[str, dict[str, Any]] = {
     # Bloque común (filas 1–5).
     "banda": _solido(AZUL),
     "linea_bloque": _LINEA_BLOQUE,
-    "linea_bloque_vcentro": {**_LINEA_BLOQUE, **_VC},
     "titulo": {**_arial(19, TINTA, True), **_VC},
     "titulo_resumen": {**_arial(19, TINTA, True), **_CC},
-    # Ajuste visual (2026-11-24): línea junto al logo; NIT, teléfono, correo y dirección con
-    # un solo gris en todas las hojas. Sin rótulos de «Correo» ni de «Exportado».
-    "nit": {**_arial(9, TINTA, True), **_VC},
-    "subtitulo": {**_arial(10, GRIS_ACTIVOS), **_VC},
-    "contacto": {**_arial(9, GRIS_ACTIVOS), **_VC},
-    "direccion": {**_arial(9, GRIS_ACTIVOS), **_LINEA_BLOQUE, **_VC},
+    # Encabezado junto al logo (2026-11-24): «Informe · …» con una línea fina debajo, rótulos
+    # «Empresa», «Contacto» y «Dirección» y, bajo cada uno, sus datos en dos líneas.
+    "subtitulo": {**_arial(10, GRIS_ACTIVOS), **_DIVISOR, **_VC},
+    "divisor": {**_DIVISOR, **_VC},
+    "rotulo_bloque": {**_arial(8, GRIS), "valign": "bottom"},
+    "dato_bloque": {**_arial(9, TINTA), **_LINEA_BLOQUE, "valign": "top", **_AJUSTE},
     # Título y nota de las hojas de lista (T4).
     "titulo_lista": {**_arial(12, TINTA, True), **_LINEA_TITULO},
     "titulo_lista_vcentro": {**_arial(12, TINTA, True), **_LINEA_TITULO, **_VC},
@@ -209,23 +212,12 @@ class CajaLogo:
 
 
 @dataclass(frozen=True)
-class CeldaBloque:
-    """Celda de las filas 3–4: qué dato lleva (o ``None``) y con qué estilo."""
-
-    ref: str
-    contenido: str | None
-    estilo: str
-
-
-@dataclass(frozen=True)
 class Plantilla:
     titulo: str
     rotulo_fecha: str
     estilo_titulo: str
     ultima_columna_banda: int  # banda, línea de la fila 5 y área de impresión
     ultima_columna_bloque: int  # hasta dónde llevan estilo las filas 1 y 5
-    estilo_direccion: str
-    celdas_bloque: tuple[CeldaBloque, ...]
     caja_logo: CajaLogo
     columnas: tuple[Columnas, ...]
     margen_encabezado: float
@@ -252,31 +244,7 @@ class Plantilla:
     ultima_columna_datos: int | None = None  # rango del formato condicional
 
 
-def _bloque(*celdas: tuple[str, str | None, str]) -> tuple[CeldaBloque, ...]:
-    return tuple(CeldaBloque(*c) for c in celdas)
-
-
 _BV = "base_vcentro"
-
-# Encabezado común de todas las hojas (ajuste visual, 2026-11-24): el título va junto al
-# logo (C2) y debajo, en C3, la línea «Informe · empresa · exportado|corte fecha». La fila 4
-# lleva NIT, teléfono y correo, sin rótulos; la dirección va en la fila 5 (Plantilla).
-_BLOQUE_COMUN = _bloque(
-    ("C3", "subtitulo", "subtitulo"),
-    ("D3", None, _BV),
-    ("E3", None, _BV),
-    ("F3", None, _BV),
-    ("G3", None, _BV),
-    ("H3", None, _BV),
-    ("I3", None, _BV),
-    ("C4", "nit", "nit"),
-    ("D4", None, _BV),
-    ("E4", "telefono", "contacto"),
-    ("F4", None, _BV),
-    ("G4", "correo", "contacto"),
-    ("H4", None, _BV),
-    ("I4", None, _BV),
-)
 
 
 _COLUMNAS_INFORME = (
@@ -332,8 +300,6 @@ def _desglose(caja: CajaLogo) -> Plantilla:
         estilo_titulo="titulo",
         ultima_columna_banda=7,
         ultima_columna_bloque=9,
-        estilo_direccion="direccion",
-        celdas_bloque=_BLOQUE_COMUN,
         caja_logo=caja,
         columnas=_COLUMNAS_INFORME,
         ajuste_alto=1,  # hoja corta: 1 × 1 (Q12)
@@ -356,7 +322,6 @@ def _lista(**kw: Any) -> Plantilla:
         **_INFORME,
         estilo_titulo="titulo",
         ultima_columna_bloque=9,
-        estilo_direccion="direccion",
         ajuste_alto=0,  # lista: 1 página de ancho × alto automático (Q12)
         fila_repetida=8,
         filas_congeladas=9,
@@ -376,8 +341,6 @@ PLANTILLAS: dict[str, Plantilla] = {
         estilo_titulo="titulo",
         ultima_columna_banda=11,
         ultima_columna_bloque=11,
-        estilo_direccion="direccion",
-        celdas_bloque=_BLOQUE_COMUN,
         caja_logo=CajaLogo(76199, 47625, 2828926, 1104900),
         columnas=(
             Columnas(0, 0, 14),
@@ -403,7 +366,6 @@ PLANTILLAS: dict[str, Plantilla] = {
     ),
     "todos": _lista(
         ultima_columna_banda=9,
-        celdas_bloque=_BLOQUE_COMUN,
         caja_logo=CajaLogo(80010, 102870, 2537460, 1108710),
         columnas=_COLUMNAS_INFORME,
         altos={5: 26.1, 6: 26.1, 7: 21.95, 8: 27.95},
@@ -420,7 +382,6 @@ PLANTILLAS: dict[str, Plantilla] = {
     "por_ubicacion": _desglose(CajaLogo(171450, 114300, 2388870, 1013460)),
     "no_encontrados": _lista(
         ultima_columna_banda=5,
-        celdas_bloque=_BLOQUE_COMUN,
         caja_logo=CajaLogo(112395, 91440, 2411730, 1083944),
         columnas=_COLUMNAS_NO_ENCONTRADOS,
         altos={5: 26.1, 6: 26.1, 7: 21.95, 8: 27.95},
@@ -438,7 +399,6 @@ PLANTILLAS: dict[str, Plantilla] = {
     ),
     "categoria": _lista(
         ultima_columna_banda=8,
-        celdas_bloque=_BLOQUE_COMUN,
         caja_logo=CajaLogo(152400, 62865, 2396490, 1082040),
         columnas=_COLUMNAS_INFORME,
         altos={5: 26.1, 6: 26.1, 7: 21.95, 8: 27.95},
@@ -461,8 +421,6 @@ PLANTILLAS: dict[str, Plantilla] = {
         combinar_titulo="C2:D2",
         ultima_columna_banda=9,
         ultima_columna_bloque=9,
-        estilo_direccion="direccion",
-        celdas_bloque=_BLOQUE_COMUN,
         caja_logo=CajaLogo(205740, 68580, 2606040, 1074420),
         columnas=_COLUMNAS_RESUMEN,
         ajuste_alto=1,  # hoja corta: 1 × 1 (Q12)
@@ -590,33 +548,58 @@ class DatosEmpresa(Protocol):
 
 
 def _textos(empresa: DatosEmpresa, plantilla: Plantilla, fecha: date) -> dict[str, str | None]:
-    """Texto de cada dato del bloque; ``None`` si falta (Q9: se omite)."""
+    """Texto de cada dato del bloque; un dato ausente se omite (Q9) y un grupo sin datos
+    queda en ``None`` (sin rótulo)."""
 
     def limpio(v: str | None) -> str | None:
         return v if v and v.strip() else None
 
-    nit, telefono, correo = limpio(empresa.nit), limpio(empresa.telefono), limpio(empresa.correo)
-    partes = [
-        "Informe",
-        limpio(empresa.nombre),
-        f"{plantilla.rotulo_fecha.lower()} {fecha:%d/%m/%Y}",
-    ]
+    def lineas(*partes: str | None) -> str | None:
+        return "\n".join(p for p in partes if p) or None
+
+    nit, telefono = limpio(empresa.nit), limpio(empresa.telefono)
+    nombre = limpio(empresa.nombre)
+    fecha_txt = f"{plantilla.rotulo_fecha.lower()} {fecha:%d/%m/%Y}"
     return {
-        "subtitulo": " · ".join(p for p in partes if p),
-        "nit": f"NIT {nit}" if nit else None,
-        "telefono": f"Tel. {telefono}" if telefono else None,
-        "correo": correo,
+        "subtitulo": " · ".join(p for p in ("Informe", nombre, fecha_txt) if p),
+        "empresa": lineas(nombre, f"NIT {nit}" if nit else None),
+        "contacto": lineas(limpio(empresa.correo), f"Tel. {telefono}" if telefono else None),
         "direccion": limpio(empresa.direccion),
     }
+
+
+@dataclass(frozen=True)
+class GrupoBloque:
+    """Rótulo de la fila 4 y dato de la fila 5, de la columna ``primera`` a ``ultima``."""
+
+    rotulo: str
+    clave: str
+    primera: int
+    ultima: int
+
+
+def grupos_bloque(banda: int) -> tuple[GrupoBloque, ...]:
+    """Empresa, Contacto y Dirección a la derecha del logo (desde C), hasta el fin de la
+    banda. «No encontrados» (banda hasta F, G–K ocultas) les da una columna a los dos últimos."""
+    if banda <= 5:
+        contacto, direccion = (4, 4), (5, banda)
+    else:
+        contacto, direccion = (4, 5), (6, banda)
+    return (
+        GrupoBloque("Empresa", "empresa", 2, 3),
+        GrupoBloque("Contacto", "contacto", *contacto),
+        GrupoBloque("Dirección", "direccion", *direccion),
+    )
 
 
 def dibujar_bloque(
     hoja: Any, estilos: Estilos, plantilla: Plantilla, empresa: DatosEmpresa, fecha: date
 ) -> None:
-    """Filas 1–5: banda, logo, título, empresa, fecha, NIT, teléfono, correo y dirección.
+    """Filas 1–5: banda, logo, título y «Informe · empresa · fecha» junto al logo y, debajo,
+    Empresa (nombre y NIT), Contacto (correo y teléfono) y Dirección (decisión 2026-11-24).
 
-    Un dato ausente deja su celda vacía con el estilo de la plantilla (la línea azul de la
-    fila 5 sigue entera); el rótulo «Correo» se omite si no hay correo (Q9).
+    Un dato ausente se omite y un grupo sin datos queda sin rótulo; las celdas conservan su
+    estilo (la línea azul de la fila 5 sigue entera). El logo conserva su caja.
     """
     textos = _textos(empresa, plantilla, fecha)
     banda, bloque = plantilla.ultima_columna_banda, plantilla.ultima_columna_bloque
@@ -625,18 +608,25 @@ def dibujar_bloque(
     if plantilla.combinar_titulo:
         hoja.merge_range(plantilla.combinar_titulo, None)  # sin formato: no escribe D2
     hoja.write_string(1, 2, plantilla.titulo, estilos(plantilla.estilo_titulo))
-    for celda in plantilla.celdas_bloque:
-        valor = textos[celda.contenido] if celda.contenido else None
-        escribir_celda(hoja, *_rc(celda.ref), valor, estilos(celda.estilo))
-    for col in range(bloque + 1):
-        if col == 2:
-            estilo = plantilla.estilo_direccion
-        elif 3 <= col <= 8:
-            estilo = "linea_bloque_vcentro" if col <= banda else "base_vcentro"
-        else:
-            estilo = "linea_bloque" if col <= banda else "base"
-        valor = textos["direccion"] if col == 2 else None
-        escribir_celda(hoja, 4, col, valor, estilos(estilo))
+    # Fila 3: «Informe · …» y la línea fina hasta el fin de la banda.
+    escribir_celda(hoja, 2, 2, textos["subtitulo"], estilos("subtitulo"))
+    for col in range(3, bloque + 1):
+        hoja.write_blank(2, col, None, estilos("divisor" if col <= banda else _BV))
+    # Filas 4 y 5: rótulo y datos de cada grupo; la fila 5 lleva la línea azul.
+    for col in range(2):
+        hoja.write_blank(4, col, None, estilos("linea_bloque"))
+    for g in grupos_bloque(banda):
+        valor = textos[g.clave]
+        rotulo, dato = estilos("rotulo_bloque"), estilos("dato_bloque")
+        escribir_celda(hoja, 3, g.primera, g.rotulo if valor else None, rotulo)
+        for col in range(g.primera + 1, g.ultima + 1):
+            hoja.write_blank(3, col, None, rotulo)
+        if g.ultima > g.primera:
+            hoja.merge_range(4, g.primera, 4, g.ultima, None, dato)
+        escribir_celda(hoja, 4, g.primera, valor, dato)  # texto literal (nunca fórmula)
+    for col in range(banda + 1, bloque + 1):
+        hoja.write_blank(3, col, None, estilos(_BV))
+        hoja.write_blank(4, col, None, estilos("base"))
     for fila, nombre in plantilla.estilos_fila.items():
         alto_fila(hoja, fila, plantilla.altos[fila], estilos(nombre))
     insertar_logo(hoja, empresa.logo, plantilla.caja_logo)
