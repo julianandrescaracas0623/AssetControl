@@ -243,6 +243,8 @@ Rutas **propuestas** (`[PENDIENTE]` de fijar en las specs 002–010). "Precios" 
 | `/contar/activo/:codigo/historial` | Línea de tiempo del activo | HIS-01 | **Contador no ve eventos ni valores de precio** |
 | (estado en todas) | "No se pudo confirmar / Reintentar"; "La sesión se cerró" | VER-06, SES-04 | — |
 
+**Pantallas de acceso y de sistema** (`MarcoAcceso`: iniciar sesión, invitación, recuperar, nueva y cambiar contraseña, la entrada de Plataforma y los mensajes de sistema): título, descripción e ícono **centrados**, sin excepción (decisión del humano, 2026-11-25). Los campos y botones del formulario conservan su alineación.
+
 ### 6.2 Administración (`/admin/**`, responsive: celular y computador; solo `admin`)
 
 | Ruta | Pantalla | CU | Precios |
