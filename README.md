@@ -1,17 +1,24 @@
-# Inventario de Activos
+# AssetControl
 
-Sistema para llevar el inventario de activos (equipos y mobiliario) de una clínica odontológica, con conteos periódicos, historial y valor total para informes.
+Sistema para que las empresas de cualquier sector lleven el inventario de sus activos fijos (equipos, computadores, mobiliario, maquinaria y similares) con conteos periódicos desde el celular o el computador, historial por activo y un informe de valor total.
 
-Primer cliente: Biotecnologia Dental (Cartago, Colombia). El diseño es multi-tenant desde el inicio.
+Es multi-tenant desde el inicio: los datos de cada empresa están aislados de las demás.
 
 ## Estado
 
-Fase: definición de arquitectura y alcance del MVP. Fundación técnica en curso (spec 001).
+Las [specs](specs/) del 001 al 015 y la [017](specs/017-consola-plataforma/spec.md) están implementadas, con los pasos pendientes que cada una indica; la [014](specs/014-recuperar-contrasena/spec.md) está cerrada. Pendientes:
+
+- Rediseño de componentes y de la interfaz de conteo ([016](specs/016-rediseno-ui-componentes/spec.md), propuesta).
+- Despliegue en un servidor propio ([018](specs/018-despliegue-vps/spec.md), borrador).
+- Piloto con una empresa real.
 
 ## Estructura
 
 - `backend/` — API Flask.
-- `web/` — cliente React responsive.
+- `web/` — cliente React responsive (conteo en celular y administración en escritorio).
+- `docs/` — alcance, arquitectura, modelo de datos y decisiones de arquitectura (ADR).
+- `specs/` — una especificación por entrega.
+- `scripts/`, `docker/`, `.github/` — herramientas de desarrollo, base local y CI.
 
 ## Documentos
 
@@ -23,12 +30,14 @@ Fase: definición de arquitectura y alcance del MVP. Fundación técnica en curs
 | [docs/03-modelo-datos.md](docs/03-modelo-datos.md) | Entidades, relaciones e historial |
 | [docs/04-metodologia.md](docs/04-metodologia.md) | Estructura del repo, ramas, ADR, definición de terminado, fases |
 | [docs/05-preguntas-abiertas.md](docs/05-preguntas-abiertas.md) | Decisiones pendientes |
-| [docs/06-importacion-excel.md](docs/06-importacion-excel.md) | Análisis del Excel actual y plan de importación |
+| [docs/06-importacion-excel.md](docs/06-importacion-excel.md) | Análisis de inventarios en Excel y plan de importación |
+| [docs/07-casos-de-uso-y-modulos.md](docs/07-casos-de-uso-y-modulos.md) | Casos de uso y módulos |
+| [docs/08-diseno-visual.md](docs/08-diseno-visual.md) | Sistema de diseño visual |
 | [docs/09-despliegue.md](docs/09-despliegue.md) | Producción: imagen, Supabase, migrar, respaldos |
 | [docs/10-entorno-local.md](docs/10-entorno-local.md) | **Empieza aquí:** entorno local paso a paso, conexiones, pruebas y e2e |
 | [docs/adr/](docs/adr/) | Decisiones de arquitectura registradas |
 | [Orquestacion/](Orquestacion/README.md) | Método de trabajo: roles, agentes, compuertas, plan y arneses de Claude Code y Cursor |
-| [specs/](specs/001-fundacion-tecnica/spec.md) | Specs SDD de cada entrega (la primera: fundación técnica) |
+| [specs/](specs/) | Especificaciones de cada entrega (de la 001 a la 018) |
 
 ## Stack
 
@@ -100,7 +109,7 @@ Desde la raíz del repositorio (bash/Git Bash), dentro de un subshell `( ... )` 
   set -a; . ./.env; set +a
   export MIGRATION_DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
   docker compose run --rm -e MIGRATION_DATABASE_URL \
-    api uv run flask --app app create-tenant "Clínica de ejemplo" admin@ejemplo.test
+    api uv run flask --app app create-tenant "Empresa de ejemplo" admin@ejemplo.test
   unset MIGRATION_DATABASE_URL
 )
 ```
@@ -128,7 +137,7 @@ Login, refresh, validar y aceptar invitación cuentan intentos en la tabla `limi
 | `TRUSTED_PROXY_HOPS` | `0` | Proxies de confianza delante de la API (0–5). Con `0` la IP es la del par TCP y `X-Forwarded-For` se ignora; con `N`, la que añadió el proxy `N` contando desde la API. Fíjalo al número exacto de proxies: uno de más deja que el cliente elija su IP. |
 | `ARGON2_MAX_CONCURRENCY` | `4` | Hashes Argon2 simultáneos por proceso (1–64); el resto espera hasta 2 s y luego recibe `503`. |
 
-Login y refresh devuelven el intento si la petición termina bien (solo cuentan los fallos); el logout no se limita. IPv6 se agrupa por `/64`. Una clínica detrás de un NAT comparte IP: con 30 usuarios, el umbral de refresh solo se alcanza con 30 refresh **fallidos** en 15 min; si se queda corto, sube `RATE_LIMIT_*` en el entorno. Los valores no numéricos o fuera de rango impiden arrancar.
+Login y refresh devuelven el intento si la petición termina bien (solo cuentan los fallos); el logout no se limita. IPv6 se agrupa por `/64`. Una empresa detrás de un NAT comparte IP: con 30 usuarios, el umbral de refresh solo se alcanza con 30 refresh **fallidos** en 15 min; si se queda corto, sube `RATE_LIMIT_*` en el entorno. Los valores no numéricos o fuera de rango impiden arrancar.
 
 Las ventanas vencidas se ignoran; para que la tabla no crezca, el operador las purga de vez en cuando con el rol migrador (el único con `DELETE`, y solo sobre ventanas de más de un día). Como `create-tenant`, la URL llega solo por entorno y el comando no acepta argumentos:
 
@@ -190,13 +199,13 @@ Los workflows de `.github/workflows/` corren en cada PR hacia `main`, `develop` 
 
 - **Backend:** `ruff`, rol de la aplicación creado con `bash docker/postgres/init/01-app-role.sh`, comprobación de que `TEST_DATABASE_URL` no es superusuario ni tiene `BYPASSRLS`, migraciones con el rol migrador (subir, bajar, subir) y `pytest` sobre PostgreSQL 17.
 - **Web (Node 24.x):** `npm ci`, `lint`, `typecheck`, `test` y `build`.
-- **Repositorio:** enlaces de la documentación, índice de ADR, ausencia de datos de la clínica y del arnés local, `scripts/check-attribution.sh` sobre los commits del PR y que el servicio `api` del compose no reciba la URL del rol migrador.
+- **Repositorio:** enlaces de la documentación, índice de ADR, ausencia de datos reales de clientes y del arnés local, `scripts/check-attribution.sh` sobre los commits del PR y que el servicio `api` del compose no reciba la URL del rol migrador.
 
 Las credenciales del CI son valores efímeros de un PostgreSQL desechable; no hay secretos reales en los workflows.
 
 ## Producción (antes del piloto)
 
-No hay despliegue en esta fase; esto queda escrito para cuando lo haya.
+El despliegue está en definición: la base sería Supabase y la plataforma donde corre la API queda por decidir en la [spec 018](specs/018-despliegue-vps/spec.md). Lo que sigue describe el objetivo, no un entorno existente.
 
 ### Rol de la aplicación en Supabase
 
@@ -238,7 +247,7 @@ Además, desactiva la Data API en el panel del proyecto (*Project Settings → D
 - **`/health` es anónimo y hace ping a la base:** limita su tasa en el proxy inverso (p. ej. unas pocas peticiones por segundo por IP) para que no sirva para saturar la base. Para las sondas de disponibilidad usa **`GET /ready`** (`200 {"status": "ok"}` o `503 {"status": "error"}`, sin detalles), que guarda el resultado del ping 5 s por proceso.
 - **Proxy y límites de tasa:** fija `TRUSTED_PROXY_HOPS` al número exacto de proxies (ver "Límites de tasa"); limita además `/auth/*` e `/invitaciones/*` en el proxy inverso.
 - **Logs:** pueden arrastrar detalles de PostgreSQL (valores de fila, host). Restringe el acceso a quien opera el servicio y fija una retención acotada (p. ej. 14–30 días) en el alojamiento; nunca los copies a canales abiertos.
-- **Qué no se registra nunca:** la cabecera `Authorization`, cookies, tokens de invitación, URLs de conexión (`DATABASE_URL`, `MIGRATION_DATABASE_URL`), correos, teléfonos ni seriales de activos de la clínica. Sin `echo=True` en SQLAlchemy y con `log_statement = none` en PostgreSQL.
+- **Qué no se registra nunca:** la cabecera `Authorization`, cookies, tokens de invitación, URLs de conexión (`DATABASE_URL`, `MIGRATION_DATABASE_URL`), correos, teléfonos ni seriales de activos de las empresas. Sin `echo=True` en SQLAlchemy y con `log_statement = none` en PostgreSQL.
 
 ## Trabajo con asistentes de IA
 
