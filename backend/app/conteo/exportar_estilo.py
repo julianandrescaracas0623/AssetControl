@@ -30,8 +30,6 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Protocol
 
-from xlsxwriter.color import Color
-
 EMU_POR_PX = 9525
 PX_POR_CARACTER = 7  # ancho guardado exacto con set_column_pixels (T1)
 PT_POR_PX = 0.75
@@ -96,30 +94,18 @@ ESTILOS: dict[str, dict[str, Any]] = {
     "base": {},
     "base_vcentro": _VC,
     "base_centro": {"align": "center"},
-    "base_centro_vcentro": _CC,
     # Bloque común (filas 1–5).
     "banda": _solido(AZUL),
     "linea_bloque": _LINEA_BLOQUE,
     "linea_bloque_vcentro": {**_LINEA_BLOQUE, **_VC},
     "titulo": {**_arial(19, TINTA, True), **_VC},
     "titulo_resumen": {**_arial(19, TINTA, True), **_CC},
-    "empresa": {**_arial(10, AZUL, True), **_VC},
+    # Ajuste visual (2026-11-24): línea junto al logo; NIT, teléfono, correo y dirección con
+    # un solo gris en todas las hojas. Sin rótulos de «Correo» ni de «Exportado».
     "nit": {**_arial(9, TINTA, True), **_VC},
-    "fecha": {**_arial(10, GRIS), **_VC},
-    "contacto": {**_arial(9, GRIS), **_VC},
-    "direccion": {**_arial(9, GRIS), **_LINEA_BLOQUE, **_VC},
-    "fecha_activos": {**_arial(10, GRIS_ACTIVOS), **_VC},
-    "rotulo_correo_activos": {**_arial(10, GRIS_ACTIVOS), **_CC},
-    "contacto_activos": {**_arial(9, GRIS_ACTIVOS), **_VC},
-    "direccion_activos": {**_arial(9, GRIS_ACTIVOS), **_LINEA_BLOQUE, **_VC},
-    # «Correo» de la hoja por categoría: Arial 11 con el color de tema 1 y familia 2 (R7).
-    "rotulo_correo_arial": {
-        "font_name": "Arial",
-        "font_family": 2,
-        "font_size": 11,
-        "font_color": Color.theme(1, 0),
-        **_CC,
-    },
+    "subtitulo": {**_arial(10, GRIS_ACTIVOS), **_VC},
+    "contacto": {**_arial(9, GRIS_ACTIVOS), **_VC},
+    "direccion": {**_arial(9, GRIS_ACTIVOS), **_LINEA_BLOQUE, **_VC},
     # Título y nota de las hojas de lista (T4).
     "titulo_lista": {**_arial(12, TINTA, True), **_LINEA_TITULO},
     "titulo_lista_vcentro": {**_arial(12, TINTA, True), **_LINEA_TITULO, **_VC},
@@ -272,90 +258,26 @@ def _bloque(*celdas: tuple[str, str | None, str]) -> tuple[CeldaBloque, ...]:
 
 _BV = "base_vcentro"
 
-# Filas 3 y 4 de cada hoja, tal como las trae la plantilla (cada hoja difiere: R7).
-_BLOQUE_ACTIVOS = _bloque(
-    ("C3", "empresa", "empresa"),
+# Encabezado común de todas las hojas (ajuste visual, 2026-11-24): el título va junto al
+# logo (C2) y debajo, en C3, la línea «Informe · empresa · exportado|corte fecha». La fila 4
+# lleva NIT, teléfono y correo, sin rótulos; la dirección va en la fila 5 (Plantilla).
+_BLOQUE_COMUN = _bloque(
+    ("C3", "subtitulo", "subtitulo"),
     ("D3", None, _BV),
-    ("E3", "fecha", "fecha_activos"),
+    ("E3", None, _BV),
     ("F3", None, _BV),
-    ("G3", "rotulo_correo", "rotulo_correo_activos"),
-    ("H3", None, _BV),
-    ("I3", None, _BV),
-    ("C4", "nit", "nit"),
-    ("D4", None, _BV),
-    ("E4", "telefono", "contacto_activos"),
-    ("F4", None, _BV),
-    ("G4", "correo", "contacto_activos"),
-    ("H4", None, _BV),
-    ("I4", None, _BV),
-)
-_BLOQUE_TODOS = _bloque(
-    ("C3", "empresa", "empresa"),
-    ("D3", None, _BV),
-    ("E3", "fecha", "fecha"),
-    ("F3", "rotulo_correo", "base_centro"),
     ("G3", None, _BV),
     ("H3", None, _BV),
     ("I3", None, _BV),
     ("C4", "nit", "nit"),
     ("D4", None, _BV),
     ("E4", "telefono", "contacto"),
-    ("F4", "correo", _BV),
-    ("G4", None, "contacto"),
-    ("H4", None, _BV),
-    ("I4", None, _BV),
-)
-
-
-def _bloque_corto(estilo_rotulo: str) -> tuple[CeldaBloque, ...]:
-    """Por ubicación, hoja por categoría y Por categoría: sin G3 ni G4."""
-    return _bloque(
-        ("C3", "empresa", "empresa"),
-        ("D3", None, _BV),
-        ("E3", "fecha", "fecha"),
-        ("F3", "rotulo_correo", estilo_rotulo),
-        ("H3", None, _BV),
-        ("I3", None, _BV),
-        ("C4", "nit", "nit"),
-        ("D4", None, _BV),
-        ("E4", "telefono", "contacto"),
-        ("F4", "correo", "contacto"),
-        ("H4", None, _BV),
-        ("I4", None, _BV),
-    )
-
-
-_BLOQUE_NO_ENCONTRADOS = _bloque(
-    ("C3", "empresa", "empresa"),
-    ("D3", None, _BV),
-    ("E3", "fecha", "fecha"),
-    ("F3", None, _BV),
-    ("G3", None, _BV),
-    ("H3", None, _BV),
-    ("I3", None, _BV),
-    ("C4", "nit", "nit"),
-    ("D4", "telefono", "contacto"),
-    ("E4", "correo", "contacto"),
     ("F4", None, _BV),
-    ("G4", None, _BV),
+    ("G4", "correo", "contacto"),
     ("H4", None, _BV),
     ("I4", None, _BV),
 )
-_BLOQUE_RESUMEN = _bloque(
-    ("C3", "empresa", "empresa"),
-    ("D3", None, _BV),
-    ("E3", "fecha", "fecha"),
-    ("F3", "rotulo_correo", "base_centro_vcentro"),
-    ("G3", None, _BV),
-    ("H3", None, _BV),
-    ("I3", None, _BV),
-    ("C4", "nit", "nit"),
-    ("D4", None, _BV),
-    ("E4", "telefono", "contacto"),
-    ("F4", "correo", "contacto"),
-    ("H4", None, _BV),
-    ("I4", None, _BV),
-)
+
 
 _COLUMNAS_INFORME = (
     Columnas(0, 0, 14),
@@ -411,7 +333,7 @@ def _desglose(caja: CajaLogo) -> Plantilla:
         ultima_columna_banda=7,
         ultima_columna_bloque=9,
         estilo_direccion="direccion",
-        celdas_bloque=_bloque_corto("base_centro_vcentro"),
+        celdas_bloque=_BLOQUE_COMUN,
         caja_logo=caja,
         columnas=_COLUMNAS_INFORME,
         ajuste_alto=1,  # hoja corta: 1 × 1 (Q12)
@@ -454,8 +376,8 @@ PLANTILLAS: dict[str, Plantilla] = {
         estilo_titulo="titulo",
         ultima_columna_banda=11,
         ultima_columna_bloque=11,
-        estilo_direccion="direccion_activos",
-        celdas_bloque=_BLOQUE_ACTIVOS,
+        estilo_direccion="direccion",
+        celdas_bloque=_BLOQUE_COMUN,
         caja_logo=CajaLogo(76199, 47625, 2828926, 1104900),
         columnas=(
             Columnas(0, 0, 14),
@@ -481,7 +403,7 @@ PLANTILLAS: dict[str, Plantilla] = {
     ),
     "todos": _lista(
         ultima_columna_banda=9,
-        celdas_bloque=_BLOQUE_TODOS,
+        celdas_bloque=_BLOQUE_COMUN,
         caja_logo=CajaLogo(80010, 102870, 2537460, 1108710),
         columnas=_COLUMNAS_INFORME,
         altos={5: 26.1, 6: 26.1, 7: 21.95, 8: 27.95},
@@ -498,7 +420,7 @@ PLANTILLAS: dict[str, Plantilla] = {
     "por_ubicacion": _desglose(CajaLogo(171450, 114300, 2388870, 1013460)),
     "no_encontrados": _lista(
         ultima_columna_banda=5,
-        celdas_bloque=_BLOQUE_NO_ENCONTRADOS,
+        celdas_bloque=_BLOQUE_COMUN,
         caja_logo=CajaLogo(112395, 91440, 2411730, 1083944),
         columnas=_COLUMNAS_NO_ENCONTRADOS,
         altos={5: 26.1, 6: 26.1, 7: 21.95, 8: 27.95},
@@ -516,7 +438,7 @@ PLANTILLAS: dict[str, Plantilla] = {
     ),
     "categoria": _lista(
         ultima_columna_banda=8,
-        celdas_bloque=_bloque_corto("rotulo_correo_arial"),
+        celdas_bloque=_BLOQUE_COMUN,
         caja_logo=CajaLogo(152400, 62865, 2396490, 1082040),
         columnas=_COLUMNAS_INFORME,
         altos={5: 26.1, 6: 26.1, 7: 21.95, 8: 27.95},
@@ -540,7 +462,7 @@ PLANTILLAS: dict[str, Plantilla] = {
         ultima_columna_banda=9,
         ultima_columna_bloque=9,
         estilo_direccion="direccion",
-        celdas_bloque=_BLOQUE_RESUMEN,
+        celdas_bloque=_BLOQUE_COMUN,
         caja_logo=CajaLogo(205740, 68580, 2606040, 1074420),
         columnas=_COLUMNAS_RESUMEN,
         ajuste_alto=1,  # hoja corta: 1 × 1 (Q12)
@@ -668,19 +590,22 @@ class DatosEmpresa(Protocol):
 
 
 def _textos(empresa: DatosEmpresa, plantilla: Plantilla, fecha: date) -> dict[str, str | None]:
-    """Texto de cada dato del bloque; ``None`` si falta (Q9: se omite con su rótulo)."""
+    """Texto de cada dato del bloque; ``None`` si falta (Q9: se omite)."""
 
     def limpio(v: str | None) -> str | None:
         return v if v and v.strip() else None
 
     nit, telefono, correo = limpio(empresa.nit), limpio(empresa.telefono), limpio(empresa.correo)
+    partes = [
+        "Informe",
+        limpio(empresa.nombre),
+        f"{plantilla.rotulo_fecha.lower()} {fecha:%d/%m/%Y}",
+    ]
     return {
-        "empresa": limpio(empresa.nombre),
-        "fecha": f"{plantilla.rotulo_fecha} {fecha:%d/%m/%Y}",
+        "subtitulo": " · ".join(p for p in partes if p),
         "nit": f"NIT {nit}" if nit else None,
         "telefono": f"Tel. {telefono}" if telefono else None,
         "correo": correo,
-        "rotulo_correo": "Correo" if correo else None,
         "direccion": limpio(empresa.direccion),
     }
 

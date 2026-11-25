@@ -569,9 +569,10 @@ def _fila(ref: str) -> int:
 
 
 def fecha_exportada(hoja: dict[str, Any], antes: date, despues: date) -> date:
-    """La fecha de E3 («Exportado dd/mm/aaaa»): la de hoy en Colombia (Q9)."""
-    texto = hoja["celdas"]["E3"]["valor"]
-    fecha = datetime.strptime(texto, "Exportado %d/%m/%Y").date()
+    """La fecha de la línea junto al logo (C3, «Informe · empresa · exportado dd/mm/aaaa»):
+    la de hoy en Colombia (Q9)."""
+    texto = hoja["celdas"]["C3"]["valor"]
+    fecha = datetime.strptime(texto.rsplit(" ", 1)[-1], "%d/%m/%Y").date()
     assert fecha in (antes, despues), texto
     return fecha
 
@@ -580,11 +581,12 @@ def textos_bloque(fecha: date, nombre, nit=None, telefono=None, correo=None, dir
     """Lo que debe decir cada marcador del bloque (filas 1–5); ``None`` = celda vacía."""
     return {
         "{empresa.nombre}": nombre,
-        "Exportado {fecha}": f"Exportado {fecha:%d/%m/%Y}",
+        "Informe · {empresa.nombre} · exportado {fecha}": (
+            f"Informe · {nombre} · exportado {fecha:%d/%m/%Y}"
+        ),
         "NIT {empresa.nit}": f"NIT {nit}" if nit else None,
         "Tel. {empresa.telefono}": f"Tel. {telefono}" if telefono else None,
         "{empresa.correo}": correo,
-        "Correo": "Correo" if correo else None,
         "{empresa.direccion}": direccion,
     }
 
@@ -1157,7 +1159,7 @@ def test_dos_exportaciones_seguidas_tienen_el_mismo_formato(client):
     for d in (a, b):
         for k in ("created", "modified"):
             d["libro"]["propiedades"]["core"].pop(k)
-    if a["hojas"][HOJA]["celdas"]["E3"] != b["hojas"][HOJA]["celdas"]["E3"]:
+    if a["hojas"][HOJA]["celdas"]["C3"] != b["hojas"][HOJA]["celdas"]["C3"]:
         pytest.skip("las dos exportaciones cruzaron la medianoche")
     assert u.comparar(a, b) == []
     with (

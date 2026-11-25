@@ -996,15 +996,15 @@
     },
     "C3": {
      "tipo": "s",
-     "valor": "{empresa.nombre}",
+     "valor": "Informe · {empresa.nombre} · exportado {fecha}",
      "estilo": {
       "fuente": {
-       "negrita": true,
        "tamano": 10,
        "color": {
-        "rgb": "FF1D4ED8"
+        "rgb": "FF4B5563"
        },
        "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
@@ -1089,15 +1089,17 @@
      }
     },
     "E3": {
-     "tipo": "s",
-     "valor": "Exportado {fecha}",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "tamano": 10,
+       "tamano": 11,
        "color": {
-        "rgb": "FF4B5563"
+        "theme": 1
        },
-       "nombre": "Arial",
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -1183,15 +1185,17 @@
      }
     },
     "G3": {
-     "tipo": "s",
-     "valor": "Correo",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "tamano": 10,
+       "tamano": 11,
        "color": {
-        "rgb": "FF4B5563"
+        "theme": 1
        },
-       "nombre": "Arial",
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -1211,7 +1215,7 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
        "vertical": "center",
        "ajuste": false,
        "sangria": 0,

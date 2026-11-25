@@ -735,12 +735,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -787,12 +787,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -839,12 +839,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -891,12 +891,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -943,12 +943,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -995,12 +995,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1047,12 +1047,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1099,12 +1099,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1151,12 +1151,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1203,12 +1203,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1255,12 +1255,12 @@
      "valor": "Informe de activos",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 19,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 19,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -1298,15 +1298,15 @@
     },
     "C3": {
      "tipo": "s",
-     "valor": "{empresa.nombre}",
+     "valor": "Informe · {empresa.nombre} · corte {fecha}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FF1D4ED8"
-       },
        "tamano": 10,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
@@ -1347,12 +1347,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1391,15 +1391,17 @@
      }
     },
     "E3": {
-     "tipo": "s",
-     "valor": "Corte {fecha}",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 11,
        "color": {
-        "rgb": "FF6B7280"
+        "theme": 1
        },
-       "tamano": 10,
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -1437,16 +1439,16 @@
      }
     },
     "F3": {
-     "tipo": "s",
-     "valor": "Correo",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1467,8 +1469,8 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
+       "horizontal": "general",
+       "vertical": "center",
        "ajuste": false,
        "sangria": 0,
        "rotacion": 0,
@@ -1489,12 +1491,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1537,12 +1539,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1585,12 +1587,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1633,12 +1635,12 @@
      "valor": "NIT {empresa.nit}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 9,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 9,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -1679,12 +1681,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1727,11 +1729,11 @@
      "valor": "Tel. {empresa.telefono}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -1769,16 +1771,16 @@
      }
     },
     "F4": {
-     "tipo": "s",
-     "valor": "{empresa.correo}",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1817,15 +1819,15 @@
      }
     },
     "G4": {
-     "tipo": "vacia",
-     "valor": null,
+     "tipo": "s",
+     "valor": "{empresa.correo}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -1867,12 +1869,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1915,12 +1917,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -1963,12 +1965,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -2016,12 +2018,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -2069,11 +2071,11 @@
      "valor": "{empresa.direccion}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -2120,12 +2122,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -2173,12 +2175,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -2226,12 +2228,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -2279,12 +2281,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -2332,12 +2334,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -2385,12 +2387,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -2438,12 +2440,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -5684,12 +5686,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -5736,12 +5738,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -5788,12 +5790,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -5840,12 +5842,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -5892,12 +5894,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -5944,12 +5946,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -5996,12 +5998,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -6048,12 +6050,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -6100,12 +6102,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -6148,12 +6150,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -6196,12 +6198,12 @@
      "valor": "Informe de activos",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 19,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 19,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -6239,15 +6241,15 @@
     },
     "C3": {
      "tipo": "s",
-     "valor": "{empresa.nombre}",
+     "valor": "Informe · {empresa.nombre} · corte {fecha}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FF1D4ED8"
-       },
        "tamano": 10,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
@@ -6288,12 +6290,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -6332,15 +6334,17 @@
      }
     },
     "E3": {
-     "tipo": "s",
-     "valor": "Corte {fecha}",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 11,
        "color": {
-        "rgb": "FF6B7280"
+        "theme": 1
        },
-       "tamano": 10,
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -6378,16 +6382,16 @@
      }
     },
     "F3": {
-     "tipo": "s",
-     "valor": "Correo",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -6408,7 +6412,55 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
+       "vertical": "center",
+       "ajuste": false,
+       "sangria": 0,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "G3": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 11,
+       "color": {
+        "theme": 1
+       },
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "none",
+       "fg": null,
+       "bg": null
+      },
+      "borde": {
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "general",
        "vertical": "center",
        "ajuste": false,
        "sangria": 0,
@@ -6430,12 +6482,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -6478,12 +6530,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -6526,12 +6578,12 @@
      "valor": "NIT {empresa.nit}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 9,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 9,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -6572,12 +6624,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -6620,11 +6672,11 @@
      "valor": "Tel. {empresa.telefono}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -6662,15 +6714,63 @@
      }
     },
     "F4": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 11,
+       "color": {
+        "theme": 1
+       },
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "none",
+       "fg": null,
+       "bg": null
+      },
+      "borde": {
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "general",
+       "vertical": "center",
+       "ajuste": false,
+       "sangria": 0,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "G4": {
      "tipo": "s",
      "valor": "{empresa.correo}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -6712,12 +6812,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -6760,12 +6860,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -6808,12 +6908,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -6861,12 +6961,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -6914,11 +7014,11 @@
      "valor": "{empresa.direccion}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -6965,12 +7065,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -7018,12 +7118,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -7071,12 +7171,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -7124,12 +7224,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -7177,12 +7277,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -7230,12 +7330,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -7278,12 +7378,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -10370,12 +10470,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -10422,12 +10522,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -10474,12 +10574,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -10526,12 +10626,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -10578,12 +10678,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -10630,12 +10730,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -10682,12 +10782,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -10730,12 +10830,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -10778,12 +10878,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -10826,12 +10926,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -10874,12 +10974,12 @@
      "valor": "Informe de activos",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 19,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 19,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -10917,15 +11017,15 @@
     },
     "C3": {
      "tipo": "s",
-     "valor": "{empresa.nombre}",
+     "valor": "Informe · {empresa.nombre} · corte {fecha}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FF1D4ED8"
-       },
        "tamano": 10,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
@@ -10966,12 +11066,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11010,15 +11110,17 @@
      }
     },
     "E3": {
-     "tipo": "s",
-     "valor": "Corte {fecha}",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 11,
        "color": {
-        "rgb": "FF6B7280"
+        "theme": 1
        },
-       "tamano": 10,
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -11060,12 +11162,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11108,12 +11210,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11156,12 +11258,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11204,12 +11306,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11252,12 +11354,12 @@
      "valor": "NIT {empresa.nit}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 9,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 9,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -11294,15 +11396,17 @@
      }
     },
     "D4": {
-     "tipo": "s",
-     "valor": "Tel. {empresa.telefono}",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 11,
        "color": {
-        "rgb": "FF6B7280"
+        "theme": 1
        },
-       "tamano": 9,
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -11341,14 +11445,14 @@
     },
     "E4": {
      "tipo": "s",
-     "valor": "{empresa.correo}",
+     "valor": "Tel. {empresa.telefono}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -11390,12 +11494,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11434,17 +11538,15 @@
      }
     },
     "G4": {
-     "tipo": "vacia",
-     "valor": null,
+     "tipo": "s",
+     "valor": "{empresa.correo}",
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 9,
        "color": {
-        "theme": 1
+        "rgb": "FF4B5563"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -11486,12 +11588,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11534,12 +11636,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11582,12 +11684,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11635,12 +11737,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11688,11 +11790,11 @@
      "valor": "{empresa.direccion}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -11739,12 +11841,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11792,12 +11894,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11845,12 +11947,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11898,12 +12000,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11946,12 +12048,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -11994,12 +12096,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -12042,12 +12144,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -14456,12 +14558,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -14508,12 +14610,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -14560,12 +14662,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -14612,12 +14714,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -14664,12 +14766,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -14716,12 +14818,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -14768,12 +14870,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -14820,12 +14922,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -14872,12 +14974,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -14924,12 +15026,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -14972,12 +15074,12 @@
      "valor": "Informe de activos",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 19,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 19,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -15015,15 +15117,15 @@
     },
     "C3": {
      "tipo": "s",
-     "valor": "{empresa.nombre}",
+     "valor": "Informe · {empresa.nombre} · corte {fecha}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FF1D4ED8"
-       },
        "tamano": 10,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
@@ -15064,12 +15166,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -15108,15 +15210,17 @@
      }
     },
     "E3": {
-     "tipo": "s",
-     "valor": "Corte {fecha}",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 11,
        "color": {
-        "rgb": "FF6B7280"
+        "theme": 1
        },
-       "tamano": 10,
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -15154,16 +15258,17 @@
      }
     },
     "F3": {
-     "tipo": "s",
-     "valor": "Correo",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -15183,7 +15288,55 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
+       "vertical": "center",
+       "ajuste": false,
+       "sangria": 0,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "G3": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 11,
+       "color": {
+        "theme": 1
+       },
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "none",
+       "fg": null,
+       "bg": null
+      },
+      "borde": {
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "general",
        "vertical": "center",
        "ajuste": false,
        "sangria": 0,
@@ -15205,12 +15358,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -15253,12 +15406,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -15301,12 +15454,12 @@
      "valor": "NIT {empresa.nit}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 9,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 9,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -15347,12 +15500,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -15395,11 +15548,11 @@
      "valor": "Tel. {empresa.telefono}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -15437,15 +15590,63 @@
      }
     },
     "F4": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 11,
+       "color": {
+        "theme": 1
+       },
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "none",
+       "fg": null,
+       "bg": null
+      },
+      "borde": {
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "general",
+       "vertical": "center",
+       "ajuste": false,
+       "sangria": 0,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "G4": {
      "tipo": "s",
      "valor": "{empresa.correo}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -15487,12 +15688,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -15535,12 +15736,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -15583,12 +15784,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -15636,12 +15837,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -15689,11 +15890,11 @@
      "valor": "{empresa.direccion}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -15740,12 +15941,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -15793,12 +15994,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -15846,12 +16047,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -15899,12 +16100,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -15952,12 +16153,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -16005,12 +16206,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -16058,12 +16259,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19138,12 +19339,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19190,12 +19391,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19242,12 +19443,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19294,12 +19495,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19346,12 +19547,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19398,12 +19599,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19450,12 +19651,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19502,12 +19703,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19554,12 +19755,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19602,12 +19803,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19650,12 +19851,12 @@
      "valor": "Informe de activos",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 19,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 19,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -19693,15 +19894,15 @@
     },
     "C3": {
      "tipo": "s",
-     "valor": "{empresa.nombre}",
+     "valor": "Informe · {empresa.nombre} · corte {fecha}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FF1D4ED8"
-       },
        "tamano": 10,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
@@ -19742,12 +19943,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19786,15 +19987,17 @@
      }
     },
     "E3": {
-     "tipo": "s",
-     "valor": "Corte {fecha}",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 11,
        "color": {
-        "rgb": "FF6B7280"
+        "theme": 1
        },
-       "tamano": 10,
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -19832,16 +20035,16 @@
      }
     },
     "F3": {
-     "tipo": "s",
-     "valor": "Correo",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19862,7 +20065,55 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
+       "vertical": "center",
+       "ajuste": false,
+       "sangria": 0,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "G3": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 11,
+       "color": {
+        "theme": 1
+       },
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "none",
+       "fg": null,
+       "bg": null
+      },
+      "borde": {
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "general",
        "vertical": "center",
        "ajuste": false,
        "sangria": 0,
@@ -19884,12 +20135,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19932,12 +20183,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -19980,12 +20231,12 @@
      "valor": "NIT {empresa.nit}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 9,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 9,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -20026,12 +20277,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -20074,11 +20325,11 @@
      "valor": "Tel. {empresa.telefono}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -20116,15 +20367,63 @@
      }
     },
     "F4": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 11,
+       "color": {
+        "theme": 1
+       },
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "none",
+       "fg": null,
+       "bg": null
+      },
+      "borde": {
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "general",
+       "vertical": "center",
+       "ajuste": false,
+       "sangria": 0,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "G4": {
      "tipo": "s",
      "valor": "{empresa.correo}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -20166,12 +20465,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -20214,12 +20513,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -20262,12 +20561,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -20315,12 +20614,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -20368,11 +20667,11 @@
      "valor": "{empresa.direccion}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -20419,12 +20718,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -20472,12 +20771,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -20525,12 +20824,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -20578,12 +20877,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -20631,12 +20930,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -20684,12 +20983,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -20732,12 +21031,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -23781,12 +24080,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -23833,12 +24132,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -23885,12 +24184,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -23937,12 +24236,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -23989,12 +24288,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24041,12 +24340,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24093,12 +24392,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24145,12 +24444,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24197,12 +24496,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24249,12 +24548,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24301,12 +24600,12 @@
      "valor": "Informe de activos",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 19,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 19,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -24344,15 +24643,15 @@
     },
     "C3": {
      "tipo": "s",
-     "valor": "{empresa.nombre}",
+     "valor": "Informe · {empresa.nombre} · corte {fecha}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FF1D4ED8"
-       },
        "tamano": 10,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
@@ -24393,12 +24692,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24437,15 +24736,17 @@
      }
     },
     "E3": {
-     "tipo": "s",
-     "valor": "Corte {fecha}",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 11,
        "color": {
-        "rgb": "FF6B7280"
+        "theme": 1
        },
-       "tamano": 10,
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -24483,16 +24784,16 @@
      }
     },
     "F3": {
-     "tipo": "s",
-     "valor": "Correo",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24513,7 +24814,7 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
        "vertical": "center",
        "ajuste": false,
        "sangria": 0,
@@ -24535,12 +24836,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24583,12 +24884,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24631,12 +24932,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24679,12 +24980,12 @@
      "valor": "NIT {empresa.nit}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 9,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 9,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -24725,12 +25026,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24773,11 +25074,11 @@
      "valor": "Tel. {empresa.telefono}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -24815,15 +25116,63 @@
      }
     },
     "F4": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 11,
+       "color": {
+        "theme": 1
+       },
+       "nombre": "Calibri",
+       "familia": 2,
+       "esquema": "minor",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "none",
+       "fg": null,
+       "bg": null
+      },
+      "borde": {
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "general",
+       "vertical": "center",
+       "ajuste": false,
+       "sangria": 0,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "G4": {
      "tipo": "s",
      "valor": "{empresa.correo}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -24865,12 +25214,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24913,12 +25262,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -24961,12 +25310,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -25014,12 +25363,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -25067,11 +25416,11 @@
      "valor": "{empresa.direccion}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF4B5563"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -25118,12 +25467,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -25171,12 +25520,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -25224,12 +25573,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -25277,12 +25626,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -25330,12 +25679,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -25383,12 +25732,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,
@@ -25436,12 +25785,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 11,
        "color": {
         "theme": 1
        },
-       "tamano": 11,
+       "nombre": "Calibri",
+       "familia": 2,
        "esquema": "minor",
        "negrita": false,
        "cursiva": false,

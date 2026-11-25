@@ -350,7 +350,9 @@ def comprobar_libro_seguro(contenido: bytes, empresa: str, sesion: str) -> None:
     # (empresa en C3); el nombre de la sesión va como texto en las filas de contexto del
     # Resumen (Q7), que es la última hoja (Q6).
     for hoja in wb.worksheets:
-        assert hoja["C3"].value == empresa and hoja["C3"].data_type == "s", hoja.title
+        linea = hoja["C3"].value
+        assert linea.startswith("Informe · ") and empresa in linea, hoja.title
+        assert hoja["C3"].data_type == "s", hoja.title
     resumen = wb.worksheets[-1]
     assert resumen.title == "Resumen"
     sesion_ref = f"B{FILA_CONTEXTO + 1}"
@@ -420,7 +422,7 @@ def test_hostile_text_stays_text_in_every_sheet():
         assert wb[nombre]["A8"].value == HOSTIL and wb[nombre]["A8"].data_type == "s", nombre
     # NIT, teléfono, correo y dirección de la empresa (bloque de cada hoja) salen como texto
     # literal; ``comprobar_libro_seguro`` ya exige que no haya ``<f>`` ni hipervínculos.
-    contacto = {f"NIT {HOSTIL}", f"Tel. {EMPRESA_HOSTIL}", HOSTIL, EMPRESA_HOSTIL}
+    contacto = {f"NIT {HOSTIL}", f"Tel. {EMPRESA_HOSTIL}", HOSTIL}
     for hoja in wb.worksheets:
         textos = {
             c.value
@@ -429,6 +431,8 @@ def test_hostile_text_stays_text_in_every_sheet():
             if isinstance(c.value, str) and c.data_type == "s"
         }
         assert contacto <= textos, hoja.title
+        # El nombre de la empresa va dentro de la línea «Informe · … · corte …» (C3).
+        assert any(EMPRESA_HOSTIL in t for t in textos if t.startswith("Informe · ")), hoja.title
     # El título del libro (fila 26) lleva el nombre hostil escapado, nunca como código.
     core = u_diseno.extraer(contenido)["libro"]["propiedades"]["core"]
     assert core["title"] == f"Informe · {SESION_HOSTIL}"
@@ -555,9 +559,9 @@ def _num_fila(ref: str) -> int:
 
 def _textos_del_bloque() -> dict:
     e = EMPRESA_DISENO
+    # Línea junto al logo (C3): «Informe · empresa · corte fecha» con la fecha de corte (B17).
     return {
-        "{empresa.nombre}": e["nombre"],
-        "Corte {fecha}": "Corte 30/11/2026",  # fecha de corte de la sesión (B17)
+        "Informe · {empresa.nombre} · corte {fecha}": f"Informe · {e['nombre']} · corte 30/11/2026",
         "NIT {empresa.nit}": f"NIT {e['nit']}",
         "Tel. {empresa.telefono}": f"Tel. {e['telefono']}",
         "{empresa.correo}": e["correo"],
@@ -1262,9 +1266,10 @@ def test_corte_es_la_fecha_de_corte_congelada_no_la_de_hoy():
     gen = _generar_informe(informe)
     hoy = date.today().strftime("%d/%m/%Y")
     for nombre, hoja in gen["hojas"].items():
-        assert hoja["celdas"]["E3"]["valor"] == "Corte 31/01/2025", nombre
-        assert hoy not in hoja["celdas"]["E3"]["valor"], nombre
-        assert "14/11/2026" not in hoja["celdas"]["E3"]["valor"], nombre
+        linea = hoja["celdas"]["C3"]["valor"]
+        assert linea.endswith("· corte 31/01/2025"), nombre
+        assert hoy not in linea, nombre
+        assert "14/11/2026" not in linea, nombre
 
 
 def test_el_libro_sigue_el_orden_de_la_plantilla_y_abre_en_la_primera_hoja():

@@ -317,7 +317,7 @@ def test_summary_has_the_template_cards_and_the_closing_context(client):
     _, sesion, informe, _ = cerrada(client)
     resumen = libro(excel(client, sesion))["Resumen"]
     assert resumen["C2"].value == "Informe de activos"
-    assert resumen["E3"].value == "Corte 30/11/2026"
+    assert resumen["C3"].value.endswith("· corte 30/11/2026")
     contexto = exportar.FILA_CONTEXTO_RESUMEN + 1
     filas = [
         [c for c in fila if c is not None]
@@ -582,7 +582,7 @@ def test_every_sheet_carries_the_frozen_company_and_its_logo(client):
     for hoja in wb.worksheets:
         assert hoja["C2"].value == "Informe de activos", hoja.title
         assert hoja["C3"].value == "Clínica & Ejemplo S.A.S.", hoja.title
-        assert hoja["E3"].value == "Corte 30/11/2026", hoja.title
+        assert hoja["C3"].value.endswith("· corte 30/11/2026"), hoja.title
         assert hoja["C4"].value == "NIT 900.123.456-8", hoja.title
         assert hoja["C5"].value == "Calle 10 # 5-20, Cartago", hoja.title
         assert hoja.HeaderFooter.oddFooter.left.text.strip() == "Generado con AssetControl"

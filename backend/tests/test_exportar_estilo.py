@@ -85,15 +85,21 @@ def _ultima_fila_plantilla(clave: str) -> int:
 
 def _texto_esperado(valor: Any, empresa: EmpresaFicticia, plantilla: est.Plantilla) -> Any:
     """El valor de la huella con los marcadores sustituidos por los datos ficticios."""
-    reemplazos = {
+    if not isinstance(valor, str):
+        return valor
+    if valor.startswith("Informe · "):  # línea junto al logo: se omiten los datos ausentes
+        partes = ["Informe", empresa.nombre, f"{plantilla.rotulo_fecha.lower()} 22/11/2026"]
+        return " · ".join(p for p in partes if p)
+    exactos = {
         "{empresa.nombre}": empresa.nombre,
-        "NIT {empresa.nit}": f"NIT {empresa.nit}",
-        "Tel. {empresa.telefono}": f"Tel. {empresa.telefono}",
+        "NIT {empresa.nit}": f"NIT {empresa.nit}" if empresa.nit else None,
+        "Tel. {empresa.telefono}": f"Tel. {empresa.telefono}" if empresa.telefono else None,
         "{empresa.correo}": empresa.correo,
         "{empresa.direccion}": empresa.direccion,
-        f"{plantilla.rotulo_fecha} {{fecha}}": f"{plantilla.rotulo_fecha} 22/11/2026",
     }
-    return reemplazos.get(valor, valor)
+    if valor in exactos:
+        return exactos[valor]
+    return valor.replace("{fecha}", "22/11/2026")
 
 
 def _libro(construir) -> dict[str, Any]:
@@ -219,11 +225,10 @@ def test_campos_ausentes_se_omiten_con_su_rotulo(clave):
     esp = _bloque(_esperada(clave)["celdas"])
     plantilla = est.PLANTILLAS[clave]
     presentes = {"{empresa.nombre}", "Informe de activos", "Inventario de activos"}
-    presentes.add(f"{plantilla.rotulo_fecha} {{fecha}}")
     assert sorted(gen) == sorted(esp)  # mismas celdas: el estilo (bordes) no se pierde
     for ref, celda in esp.items():
         assert u.comparar(celda["estilo"], gen[ref]["estilo"], ref) == []
-        if celda["valor"] in presentes:
+        if celda["valor"] in presentes or (celda["valor"] or "").startswith("Informe · "):
             assert gen[ref]["valor"] == _texto_esperado(celda["valor"], empresa, plantilla)
         else:
             assert gen[ref]["tipo"] == "vacia", (ref, gen[ref])
@@ -235,7 +240,7 @@ def test_campos_ausentes_se_omiten_con_su_rotulo(clave):
 
 def test_sin_nombre_de_empresa_la_celda_queda_vacia():
     gen = _bloque(_generar("activos", EmpresaFicticia(nombre=None))["celdas"])
-    assert gen["C3"]["tipo"] == "vacia"
+    assert gen["C3"]["valor"] == "Informe · exportado 22/11/2026"
 
 
 # ---------------------------------------------------------------------------
