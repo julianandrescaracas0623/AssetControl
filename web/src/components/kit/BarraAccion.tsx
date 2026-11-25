@@ -38,7 +38,7 @@ export function BarraAccion({ principal, secundaria, nota, etiqueta, elemento = 
           {etiqueta}
         </span>
       )}
-      <div className="mx-auto flex w-full max-w-[480px] flex-col gap-separacion px-4 pt-3">
+      <div className="mx-auto flex w-full max-w-[480px] flex-col gap-separacion px-4 pt-3 md:max-w-3xl md:px-6 xl:max-w-6xl">
         {nota}
         {secundaria && <div className="flex flex-col gap-separacion [&_[data-slot=button]]:h-control">{secundaria}</div>}
         <div className="flex flex-col [&_[data-slot=button]]:h-accion [&_[data-slot=button]]:text-base [&_[data-slot=button]]:font-semibold">

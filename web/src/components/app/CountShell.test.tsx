@@ -63,9 +63,16 @@ describe('CountShell', () => {
     expect(malo).toBeTruthy()
   })
 
-  it('limita el ancho en computador a una columna de 480 px (D5)', () => {
+  it('en teléfono usa una columna de 480 px', () => {
     renderShell()
     expect(screen.getByRole('main').classList.contains('max-w-[480px]')).toBe(true)
+  })
+
+  it('en computador se ensancha (768 px desde md y 1152 px desde xl), sin quedar en 480 px', () => {
+    renderShell()
+    const principal = screen.getByRole('main').classList
+    expect(principal.contains('md:max-w-3xl')).toBe(true)
+    expect(principal.contains('xl:max-w-6xl')).toBe(true)
   })
 })
 
