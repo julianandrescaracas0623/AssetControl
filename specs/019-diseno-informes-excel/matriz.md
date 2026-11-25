@@ -74,11 +74,11 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | K1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | L1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | C2 | Inventario de activos | Arial 19 N FF111827; alin general/center | 5–9, 25 |
-| C3 | {empresa.nombre} | Arial 10 N FF1D4ED8; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · exportado {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
 | D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 | Exportado {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G3 | Correo | Arial 10 FF4B5563; alin center/center | 5–9, 25 |
+| G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
@@ -436,23 +436,23 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | I1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | J1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | C2 | Informe de activos | Arial 19 N FF111827; alin general/center | 5–9, 25 |
-| C3 | {empresa.nombre} | Arial 10 N FF1D4ED8; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
 | D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 | Corte {fecha} | Arial 10 FF6B7280; alin general/center | 5–9, 25 |
-| F3 | Correo | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
 | D4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E4 | Tel. {empresa.telefono} | Arial 9 FF6B7280; alin general/center | 5–9, 25 |
-| F4 | {empresa.correo} | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G4 |  | Arial 9 FF6B7280; alin general/center | 5–9, 25 |
+| E4 | Tel. {empresa.telefono} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
+| F4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| G4 | {empresa.correo} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
 | H4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | A5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
 | B5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C5 | {empresa.direccion} | Arial 9 FF6B7280; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
+| C5 | {empresa.direccion} | Arial 9 FF4B5563; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | D5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | E5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | F5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
@@ -555,21 +555,23 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | I1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | J1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | C2 | Informe de activos | Arial 19 N FF111827; alin general/center | 5–9, 25 |
-| C3 | {empresa.nombre} | Arial 10 N FF1D4ED8; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
 | D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 | Corte {fecha} | Arial 10 FF6B7280; alin general/center | 5–9, 25 |
-| F3 | Correo | Calibri 11 tema 1; alin center/center | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
 | D4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E4 | Tel. {empresa.telefono} | Arial 9 FF6B7280; alin general/center | 5–9, 25 |
-| F4 | {empresa.correo} | Arial 9 FF6B7280; alin general/center | 5–9, 25 |
+| E4 | Tel. {empresa.telefono} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
+| F4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| G4 | {empresa.correo} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
 | H4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | A5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
 | B5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C5 | {empresa.direccion} | Arial 9 FF6B7280; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
+| C5 | {empresa.direccion} | Arial 9 FF4B5563; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | D5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | E5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | F5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
@@ -673,23 +675,23 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | I1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | J1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | C2 | Informe de activos | Arial 19 N FF111827; alin general/center | 5–9, 25 |
-| C3 | {empresa.nombre} | Arial 10 N FF1D4ED8; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
 | D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 | Corte {fecha} | Arial 10 FF6B7280; alin general/center | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
-| D4 | Tel. {empresa.telefono} | Arial 9 FF6B7280; alin general/center | 5–9, 25 |
-| E4 | {empresa.correo} | Arial 9 FF6B7280; alin general/center | 5–9, 25 |
+| D4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| E4 | Tel. {empresa.telefono} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
 | F4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| G4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| G4 | {empresa.correo} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
 | H4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | A5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
 | B5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C5 | {empresa.direccion} | Arial 9 FF6B7280; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
+| C5 | {empresa.direccion} | Arial 9 FF4B5563; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | D5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | E5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | F5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
@@ -782,21 +784,23 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | I1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | J1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | C2 | Informe de activos | Arial 19 N FF111827; alin general/center | 5–9, 25 |
-| C3 | {empresa.nombre} | Arial 10 N FF1D4ED8; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
 | D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 | Corte {fecha} | Arial 10 FF6B7280; alin general/center | 5–9, 25 |
-| F3 | Correo | Arial 11 tema 1; alin center/center | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
 | D4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E4 | Tel. {empresa.telefono} | Arial 9 FF6B7280; alin general/center | 5–9, 25 |
-| F4 | {empresa.correo} | Arial 9 FF6B7280; alin general/center | 5–9, 25 |
+| E4 | Tel. {empresa.telefono} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
+| F4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| G4 | {empresa.correo} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
 | H4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | A5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
 | B5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C5 | {empresa.direccion} | Arial 9 FF6B7280; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
+| C5 | {empresa.direccion} | Arial 9 FF4B5563; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | D5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | E5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | F5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
@@ -897,21 +901,23 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | I1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | J1 |  | Calibri 11 tema 1; alin general/bottom | 5–9, 25 |
 | C2 | Informe de activos | Arial 19 N FF111827; alin general/center | 5–9, 25 |
-| C3 | {empresa.nombre} | Arial 10 N FF1D4ED8; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
 | D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 | Corte {fecha} | Arial 10 FF6B7280; alin general/center | 5–9, 25 |
-| F3 | Correo | Calibri 11 tema 1; alin center/center | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
 | D4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E4 | Tel. {empresa.telefono} | Arial 9 FF6B7280; alin general/center | 5–9, 25 |
-| F4 | {empresa.correo} | Arial 9 FF6B7280; alin general/center | 5–9, 25 |
+| E4 | Tel. {empresa.telefono} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
+| F4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| G4 | {empresa.correo} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
 | H4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | A5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
 | B5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C5 | {empresa.direccion} | Arial 9 FF6B7280; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
+| C5 | {empresa.direccion} | Arial 9 FF4B5563; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | D5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | E5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | F5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
@@ -1016,22 +1022,23 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 | I1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | J1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | C2 | Informe de activos | Arial 19 N FF111827; alin center/center | 5–9, 25 |
-| C3 | {empresa.nombre} | Arial 10 N FF1D4ED8; alin general/center | 5–9, 25 |
+| C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; alin general/center | 5–9, 25 |
 | D3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E3 | Corte {fecha} | Arial 10 FF6B7280; alin general/center | 5–9, 25 |
-| F3 | Correo | Calibri 11 tema 1; alin center/center | 5–9, 25 |
+| E3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| F3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | G3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | H3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I3 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | C4 | NIT {empresa.nit} | Arial 9 N FF111827; alin general/center | 5–9, 25 |
 | D4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| E4 | Tel. {empresa.telefono} | Arial 9 FF6B7280; alin general/center | 5–9, 25 |
-| F4 | {empresa.correo} | Arial 9 FF6B7280; alin general/center | 5–9, 25 |
+| E4 | Tel. {empresa.telefono} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
+| F4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
+| G4 | {empresa.correo} | Arial 9 FF4B5563; alin general/center | 5–9, 25 |
 | H4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | I4 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
 | A5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
 | B5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C5 | {empresa.direccion} | Arial 9 FF6B7280; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
+| C5 | {empresa.direccion} | Arial 9 FF4B5563; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | D5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | E5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
 | F5 |  | Calibri 11 tema 1; borde B:medium FF1D4ED8; alin general/center | 5–9, 25 |
@@ -1443,4 +1450,7 @@ Leyenda: `N` = negrita (confirmado en T1: `<b val="1"/>` / `<b/>`), `K` = cursiv
 - `ancho_base_comparado`: `defaultColWidth`/`baseColWidth` se comparan como el equivalente `ancho_base` (Q13) en todas las hojas: la plantilla declara 9.140625 y 10; el generado no los escribe (mismo ancho por defecto efectivo).
 - `valores_por_omision`: Cobertura en las dos direcciones (fila 27): la plantilla escribe atributos con su valor por omisión que xlsxwriter no escribe: `<b val="1"/>` y `<i val="1"/>` (xlsxwriter: `<b/>` y `<i/>`; `val` vale `true` por omisión en ECMA-376), `fitToWidth="1"`, `sheet@state="visible"`, `outlinePr` por defecto y `col@style` que resuelve al estilo por defecto. La propiedad se compara resuelta (negrita, cursiva del dxf, ajuste de ancho, visibilidad, agrupación, estilo de columna) y coincide. Decisión del humano 2026-11-22: ACEPTADOS como equivalentes.
 - `regla_discrepancia_vacia`: Cambio semántico menor (T4, documentado en T5): la regla de fila completa sigue la fórmula de la plantilla `AND($F10<>"",$G10<>"",$F10<>$G10)`; con «Ubicación esperada» vacía la fila ya no se marca (antes el generador marcaba la celda «Encontrado en» si difería). La ubicación esperada sale del cierre y no suele faltar.
-- `encabezado_junto_al_logo`: Decisión del humano 2026-11-24: el encabezado de las exportaciones (activos e informe) pone «Inventario de activos» junto al logo, alineado a la izquierda, y debajo la línea «Informe · empresa · exportado|corte fecha» (C3). NIT, teléfono y correo van en la fila 4 (C4, E4, G4); la dirección, en la fila 5. Se quitan los rótulos «Exportado» y «Correo» de la plantilla. Logo sin cambios (`CajaLogo`, `ALTOS_BLOQUE`), gris unificado y Arial en el bloque. Desviación de la plantilla aceptada por el humano; las huellas `activos.json` e `informe.json` se regeneraron con los marcadores nuevos. Pruebas: `test_exportar_estilo.py` y `test_exportar_documento.py` (156 pasan); `test_activos_exportar.py` y `test_exportar_api.py` actualizados, pendientes de correr con PostgreSQL.
+
+## Encabezado junto al logo (decisión del humano 2026-11-24)
+
+- `encabezado_junto_al_logo`: Decisión del humano 2026-11-24: el bloque de las dos exportaciones (activos e informe) pone el título junto al logo, alineado a la izquierda, y debajo la línea «Informe · empresa · exportado|corte fecha» (C3). NIT, teléfono y correo van en la fila 4 (C4, E4, G4); la dirección, en la fila 5. Se quitan los rótulos «Exportado» y «Correo» de la plantilla. El logo conserva su caja y altos (`CajaLogo`, `ALTOS_BLOQUE`); el bloque usa Arial y un gris único. Las huellas `activos.json` e `informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.

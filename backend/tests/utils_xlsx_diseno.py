@@ -1494,6 +1494,17 @@ def _resumen_estilo(e: dict[str, Any]) -> str:
     return "; ".join(partes).replace("|", "\\|")
 
 
+DECISIONES_ENCABEZADO = {
+    "encabezado_junto_al_logo": "Decisión del humano 2026-11-24: el bloque de las dos "
+    "exportaciones (activos e informe) pone el título junto al logo, alineado a la izquierda, "
+    "y debajo la línea «Informe · empresa · exportado|corte fecha» (C3). NIT, teléfono y "
+    "correo van en la fila 4 (C4, E4, G4); la dirección, en la fila 5. Se quitan los rótulos "
+    "«Exportado» y «Correo» de la plantilla. El logo conserva su caja y altos (`CajaLogo`, "
+    "`ALTOS_BLOQUE`); el bloque usa Arial y un gris único. Las huellas `activos.json` e "
+    "`informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.",
+}
+
+
 def generar_matriz(huellas: dict[str, dict[str, Any]]) -> str:
     """``matriz.md``: detalle por celda y cobertura XML, solo con marcadores."""
     lineas = [
@@ -1629,6 +1640,10 @@ def generar_matriz(huellas: dict[str, dict[str, Any]]) -> str:
         "## Libro del informe (T5)",
         "",
         *[f"- `{k}`: {v}" for k, v in DECISIONES_T5.items()],
+        "",
+        "## Encabezado junto al logo (decisión del humano 2026-11-24)",
+        "",
+        *[f"- `{k}`: {v}" for k, v in DECISIONES_ENCABEZADO.items()],
         "",
     ]
     return "\n".join(lineas)

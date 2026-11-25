@@ -27,6 +27,9 @@ PERMITIDOS_BLOQUE = {
     "Corte {fecha}",
     "Exportado {fecha}",
     "Categoría: {categoria}",
+    # Línea junto al logo (decisión del humano 2026-11-24).
+    "Informe · {empresa.nombre} · exportado {fecha}",
+    "Informe · {empresa.nombre} · corte {fecha}",
 }
 
 

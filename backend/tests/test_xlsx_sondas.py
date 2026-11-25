@@ -290,7 +290,9 @@ def test_l6_hay_fuentes_con_color_de_tema():
         for ref, e in ESTILOS
         if "theme" in (e["fuente"].get("color") or {})
     ]
-    assert any(nombre == "Arial" for _, nombre in con_tema)
+    # El único Arial con color de tema era el rótulo «Correo», que el encabezado junto al
+    # logo quitó (decisión del humano 2026-11-24); la capacidad sigue probada en
+    # ``test_l6_color_de_tema_con_arial``.
     assert any(nombre == "Calibri" for _, nombre in con_tema)
 
 

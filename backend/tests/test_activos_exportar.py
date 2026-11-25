@@ -577,6 +577,19 @@ def fecha_exportada(hoja: dict[str, Any], antes: date, despues: date) -> date:
     return fecha
 
 
+LINEA_EMPRESA = re.compile(r"^Informe · (.*) · exportado \d{2}/\d{2}/\d{4}$")
+
+
+def empresa_en_linea(hoja: dict[str, Any]) -> str:
+    """El nombre de la empresa dentro de la línea junto al logo (C3): «Informe · empresa ·
+    exportado dd/mm/aaaa». Exige el formato completo y que la celda sea texto."""
+    celda = hoja["celdas"]["C3"]
+    assert celda["tipo"] == "s", celda
+    coincide = LINEA_EMPRESA.match(celda["valor"])
+    assert coincide, celda["valor"]
+    return coincide.group(1)
+
+
 def textos_bloque(fecha: date, nombre, nit=None, telefono=None, correo=None, direccion=None):
     """Lo que debe decir cada marcador del bloque (filas 1–5); ``None`` = celda vacía."""
     return {
@@ -949,7 +962,7 @@ def test_logo_que_no_esta_en_el_almacen_sale_sin_imagen(client, almacen_dir):
     _archivo_logo(almacen_dir, logo_id).unlink()
     hoja = hoja_de(exportar_(client))
     assert hoja["imagenes"] == []
-    assert hoja["celdas"]["C3"]["valor"] == EMPRESA["nombre"]
+    assert empresa_en_linea(hoja) == EMPRESA["nombre"]
 
 
 def test_logo_ilegible_sale_sin_imagen(client, almacen_dir):
@@ -957,7 +970,7 @@ def test_logo_ilegible_sale_sin_imagen(client, almacen_dir):
     _archivo_logo(almacen_dir, logo_id).write_bytes(b"esto no es una imagen")
     hoja = hoja_de(exportar_(client))
     assert hoja["imagenes"] == []
-    assert hoja["celdas"]["C3"]["valor"] == EMPRESA["nombre"]
+    assert empresa_en_linea(hoja) == EMPRESA["nombre"]
 
 
 def test_sin_almacen_configurado_sale_sin_imagen(client, exa_app, monkeypatch):
@@ -965,7 +978,7 @@ def test_sin_almacen_configurado_sale_sin_imagen(client, exa_app, monkeypatch):
     monkeypatch.setitem(exa_app.extensions, EXTENSION_KEY, None)
     hoja = hoja_de(exportar_(client))
     assert hoja["imagenes"] == []
-    assert hoja["celdas"]["C3"]["valor"] == EMPRESA["nombre"]
+    assert empresa_en_linea(hoja) == EMPRESA["nombre"]
 
 
 class AlmacenQueFalla:
@@ -1012,7 +1025,7 @@ def test_si_el_almacen_falla_el_excel_sale_completo_sin_imagen(
     assert almacen.lecturas == 1
     hoja = hoja_de(response)
     assert hoja["imagenes"] == []
-    assert hoja["celdas"]["C3"]["valor"] == EMPRESA["nombre"]
+    assert empresa_en_linea(hoja) == EMPRESA["nombre"]
     assert [f[0] for f in filas(response)] == [propio["codigo"]]
     registros = " ".join(r.getMessage() for r in caplog.records)
     for dato in [logo_id, str(TENANT_A), "almacen.invalido", *EMPRESA.values()]:
@@ -1112,7 +1125,7 @@ def test_la_empresa_y_el_logo_de_otro_tenant_no_aparecen(client):
     # Y el otro tenant ve lo suyo, sin lo de A.
     otro = exportar_(client, ADMIN_OTRO)
     hoja_otro = hoja_de(otro)
-    assert hoja_otro["celdas"]["C3"]["valor"] == EMPRESA_AJENA["nombre"]
+    assert empresa_en_linea(hoja_otro) == EMPRESA_AJENA["nombre"]
     (imagen_otro,) = hoja_otro["imagenes"]
     assert (imagen_otro["imagen"]["ancho"], imagen_otro["imagen"]["alto"]) == (120, 100)
     xml_otro = _todo_el_xml(otro.data)
@@ -1139,8 +1152,8 @@ def test_los_datos_de_la_empresa_que_parecen_formulas_quedan_como_texto(client, 
     con_empresa(client, {"nombre": hostil, "direccion": hostil, "correo": "a@b.test"})
     response = exportar_(client)
     hoja = hoja_de(response)
-    for ref in ("C3", "C5"):
-        assert (hoja["celdas"][ref]["tipo"], hoja["celdas"][ref]["valor"]) == ("s", hostil)
+    assert empresa_en_linea(hoja) == hostil
+    assert (hoja["celdas"]["C5"]["tipo"], hoja["celdas"]["C5"]["valor"]) == ("s", hostil)
     xml = _todo_el_xml(response.data)
     assert "<f>" not in xml and "<f " not in xml
     assert "<hyperlink" not in xml and "relationships/hyperlink" not in xml

@@ -581,8 +581,9 @@ def test_every_sheet_carries_the_frozen_company_and_its_logo(client):
     # la empresa congelada y el pie «Página &P de &N»; ninguna, encabezado de impresión.
     for hoja in wb.worksheets:
         assert hoja["C2"].value == "Informe de activos", hoja.title
-        assert hoja["C3"].value == "Clínica & Ejemplo S.A.S.", hoja.title
-        assert hoja["C3"].value.endswith("· corte 30/11/2026"), hoja.title
+        assert hoja["C3"].value == "Informe · Clínica & Ejemplo S.A.S. · corte 30/11/2026", (
+            hoja.title
+        )
         assert hoja["C4"].value == "NIT 900.123.456-8", hoja.title
         assert hoja["C5"].value == "Calle 10 # 5-20, Cartago", hoja.title
         assert hoja.HeaderFooter.oddFooter.left.text.strip() == "Generado con AssetControl"
@@ -959,7 +960,8 @@ def test_list_sheets_carry_the_frozen_block_not_the_current_company(client):
     wb = libro(excel(client, sesion))
     assert len(wb.worksheets) == len(LIBRO)
     for hoja in wb.worksheets:
-        assert hoja["C3"].value == EMPRESA_CON_LOGO["nombre"], hoja.title
+        linea = f"Informe · {EMPRESA_CON_LOGO['nombre']} · corte 30/11/2026"
+        assert hoja["C3"].value == linea, hoja.title
     with zipfile.ZipFile(io.BytesIO(excel(client, sesion).data)) as z:
         xml = "".join(z.read(n).decode() for n in z.namelist() if n.endswith(".xml"))
     assert "Empresa Ajena" not in xml and "800.197.268" not in xml and "Nombre nuevo" not in xml
