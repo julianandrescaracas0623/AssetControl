@@ -28,7 +28,9 @@ from acceso_db import (
     temporary_acceso_db,
 )
 from flask import Flask
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.pool import NullPool
 
 ADMIN = bearer(ADMIN_A, TENANT_A)
 CONTADOR = bearer(CONTADOR_A, TENANT_A, rol="contador")
@@ -57,6 +59,7 @@ def client(cambio_app):
 def membresias_originales(cambio_db):
     """Cada prueba parte de las membresías del seed y las deja así al terminar."""
     estado = _estado_membresias(cambio_db)
+    _borrar_auditoria(cambio_db)
     yield
     for usuario_id, (rol, activa) in estado.items():
         migrator_execute(
@@ -65,6 +68,7 @@ def membresias_originales(cambio_db):
             {"r": rol, "a": activa, "u": usuario_id},
         )
     _borrar_refresh(cambio_db)
+    _borrar_auditoria(cambio_db)
 
 
 def _estado_membresias(db: AccesoDb) -> dict:
@@ -218,3 +222,131 @@ def test_sin_cambios_responde_200_sin_revocar(cambio_db, client):
     assert respuesta.status_code == 200
     assert respuesta.get_json()["rol"] == "contador"
     assert _refresh_vivos(cambio_db, CONTADOR_A) == 1
+
+
+# --- Auditoría de cambios (0034) ----------------------------------------------------------
+
+
+def _borrar_auditoria(db: AccesoDb) -> None:
+    # Solo el migrador (dueño de la tabla) puede borrar: es para limpiar entre pruebas.
+    migrator_execute(db, "delete from membresia_auditoria")
+
+
+def _auditoria(db: AccesoDb, tenant=TENANT_A) -> list[tuple]:
+    """Filas de auditoría que ve la aplicación en ``tenant`` (lectura con RLS, no migrador)."""
+    engine = create_engine(db.app_url, poolclass=NullPool)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("select set_config('app.tenant_id', :t, true)"), {"t": str(tenant)})
+            filas = conn.execute(
+                text(
+                    "select actor_usuario_id, usuario_id, accion, rol_anterior, rol_nuevo "
+                    "from membresia_auditoria order by creado_en, accion"
+                )
+            ).all()
+    finally:
+        engine.dispose()
+    return [tuple(fila) for fila in filas]
+
+
+def test_cambio_de_rol_queda_en_la_auditoria(cambio_db, client):
+    rol_antes, _ = _membresia(cambio_db, CONTADOR_A)
+    assert rol_antes == "contador"
+
+    assert _put(client, CONTADOR_A, {"rol": "admin", "activa": True}).status_code == 200
+
+    assert _auditoria(cambio_db) == [
+        (ADMIN_A.usuario_id, CONTADOR_A.usuario_id, "rol_cambiado", "contador", "admin")
+    ]
+
+
+def test_desactivar_queda_en_la_auditoria_sin_roles(cambio_db, client):
+    assert _put(client, CONTADOR_A, {"rol": "contador", "activa": False}).status_code == 200
+
+    assert _auditoria(cambio_db) == [
+        (ADMIN_A.usuario_id, CONTADOR_A.usuario_id, "usuario_desactivado", None, None)
+    ]
+
+
+def test_reactivar_queda_en_la_auditoria(cambio_db, client):
+    _put(client, CONTADOR_A, {"rol": "contador", "activa": False})
+    assert _put(client, CONTADOR_A, {"rol": "contador", "activa": True}).status_code == 200
+
+    assert _auditoria(cambio_db) == [
+        (ADMIN_A.usuario_id, CONTADOR_A.usuario_id, "usuario_desactivado", None, None),
+        (ADMIN_A.usuario_id, CONTADOR_A.usuario_id, "usuario_reactivado", None, None),
+    ]
+
+
+def test_rol_y_activacion_en_una_peticion_dan_dos_filas(cambio_db, client):
+    assert _put(client, CONTADOR_A, {"rol": "admin", "activa": False}).status_code == 200
+
+    assert sorted(_auditoria(cambio_db)) == sorted(
+        [
+            (ADMIN_A.usuario_id, CONTADOR_A.usuario_id, "rol_cambiado", "contador", "admin"),
+            (ADMIN_A.usuario_id, CONTADOR_A.usuario_id, "usuario_desactivado", None, None),
+        ]
+    )
+
+
+def test_cambio_que_no_hace_nada_no_escribe_auditoria(cambio_db, client):
+    assert _put(client, CONTADOR_A, {"rol": "contador", "activa": True}).status_code == 200
+    assert _auditoria(cambio_db) == []
+
+
+@pytest.mark.parametrize(
+    "cuerpo, cuenta, headers",
+    [
+        ({"rol": "contador", "activa": True}, ADMIN_A, ADMIN),  # propio: 409
+        ({"rol": "admin", "activa": False}, ADMIN_A, ADMIN),  # propio: 409
+        ({"rol": "admin", "activa": True, "nombre": "x"}, CONTADOR_A, ADMIN),  # cuerpo: 400
+        ({"rol": "admin", "activa": True}, CONTADOR_A, CONTADOR),  # sin permiso: 403
+    ],
+)
+def test_intento_rechazado_no_deja_filas(cambio_db, client, cuerpo, cuenta, headers):
+    respuesta = _put(client, cuenta, cuerpo, headers=headers)
+    assert respuesta.status_code in (400, 403, 409)
+    assert _auditoria(cambio_db) == []
+
+
+def test_persona_de_otra_empresa_no_deja_filas(cambio_db, client):
+    respuesta = client.put(
+        f"/usuarios/{CONTADOR_B.usuario_id}",
+        json={"rol": "admin", "activa": False},
+        headers={**ADMIN, **CSRF},
+    )
+    assert respuesta.status_code == 404
+    assert _auditoria(cambio_db, TENANT_B) == []
+    assert _auditoria(cambio_db, TENANT_A) == []
+
+
+def test_auditoria_de_una_empresa_no_aparece_en_otra(cambio_db, client):
+    assert _put(client, CONTADOR_A, {"rol": "admin", "activa": False}).status_code == 200
+
+    assert len(_auditoria(cambio_db, TENANT_A)) == 2
+    assert _auditoria(cambio_db, TENANT_B) == []
+
+
+def test_la_app_no_puede_modificar_ni_borrar_la_auditoria(cambio_db, client):
+    assert _put(client, CONTADOR_A, {"rol": "contador", "activa": False}).status_code == 200
+    engine = create_engine(cambio_db.app_url, poolclass=NullPool)
+    try:
+        for sql in (
+            "update membresia_auditoria set accion = 'usuario_reactivado'",
+            "delete from membresia_auditoria",
+            "insert into membresia_auditoria (tenant_id, actor_usuario_id, usuario_id, accion) "
+            "values (current_setting('app.tenant_id')::uuid, gen_random_uuid(), "
+            "gen_random_uuid(), 'usuario_desactivado')",
+        ):
+            with engine.begin() as conn:
+                conn.execute(
+                    text("select set_config('app.tenant_id', :t, true)"),
+                    {"t": str(TENANT_A)},
+                )
+                with pytest.raises(ProgrammingError) as excinfo:
+                    conn.execute(text(sql))
+                assert excinfo.value.orig.sqlstate == "42501", sql
+    finally:
+        engine.dispose()
+    # Ninguna de las tres sentencias cambió ni borró la fila de la auditoría.
+    assert [fila[2] for fila in _auditoria(cambio_db)] == ["usuario_desactivado"]

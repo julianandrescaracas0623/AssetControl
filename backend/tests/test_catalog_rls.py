@@ -109,6 +109,9 @@ EXCEPTIONS = frozenset({"alembic_version", "tenant", "usuario", "limite_tasa"}) 
 TENANT_TABLES = frozenset(
     {
         "membresia",
+        # Spec usuarios (0034): registro de cambios de rol y activación; solo SELECT de la
+        # app y solo INSERT del dueño (inmutable).
+        "membresia_auditoria",
         "invitacion",
         "refresh_token",
         "ubicacion",
@@ -127,6 +130,9 @@ TENANT_TABLES = frozenset(
         "recuperacion_contrasena",
     }
 )
+
+# Tablas de empresa de solo lectura para la app (sin política de escritura): 0034.
+SOLO_LECTURA_APP = frozenset({"membresia_auditoria"})
 
 TENANT_EXPR = "(NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid"
 ISOLATION_EXPR = f"(tenant_id = {TENANT_EXPR})"
@@ -155,6 +161,13 @@ EXPECTED_POLICIES = {
         "{app}",
         ISOLATION_EXPR,
         ISOLATION_EXPR,
+    ),
+    ("membresia_auditoria", "tenant_isolation"): (
+        "PERMISSIVE",
+        "SELECT",
+        "{app}",
+        ISOLATION_EXPR,
+        None,
     ),
     ("invitacion", "tenant_isolation"): (
         "PERMISSIVE",
@@ -576,6 +589,7 @@ EXPECTED_APP_TABLE_PRIVILEGES = {
     "tenant": set(),
     "usuario": set(),
     "membresia": {"SELECT"},
+    "membresia_auditoria": {"SELECT"},
     "invitacion": set(),
     "refresh_token": {"SELECT", "INSERT"},
     "limite_tasa": {"SELECT", "INSERT"},
@@ -817,6 +831,16 @@ MEMBRESIA_OWNER_POLICIES = {
     ),
 }
 
+# Spec usuarios (0034): el dueño solo inserta en la auditoría, acotado a la GUC de tenant.
+AUDITORIA_OWNER_POLICIES = {
+    ("membresia_auditoria", "dueno_auditoria_insertar"): (
+        "PERMISSIVE",
+        "INSERT",
+        None,
+        f"(tenant_id = {_MEM_TENANT})",
+    ),
+}
+
 EXPECTED_OWNER_POLICIES = {
     ("invitacion", "dueno_invitacion_validar"): (
         "PERMISSIVE",
@@ -919,6 +943,7 @@ EXPECTED_OWNER_POLICIES = {
     **RECOVERY_OWNER_POLICIES,
     **CAMBIO_OWNER_POLICIES,
     **MEMBRESIA_OWNER_POLICIES,
+    **AUDITORIA_OWNER_POLICIES,
 }
 
 # Catálogo cerrado C6 (T3): funciones de acceso (0004).
@@ -994,7 +1019,7 @@ EXPECTED_FUNCTIONS = {
         "p_tenant uuid, p_actor uuid, p_usuario uuid, p_rol text, p_activa boolean",
         "TABLE(rol_resultado text, activa_resultado boolean, cambiado boolean)",
         {"app.auth_membresia_tenant", "app.auth_membresia_usuario"},
-        "95bda94f456498242d10ba64f9e15ae4e48963270eb55604c8e3825dcbce0d78",
+        "7bb249f9903bc9beb7e29d0c58ed8ec140e4ca9a57a63fdbb156d0375fd3f0a8",
         "app",
     ),
 }
@@ -1038,6 +1063,18 @@ EXPECTED_OWNER_COLUMNS = {
         "SELECT": {"id", "tenant_id", "usuario_id", "rol", "activa"},
         "INSERT": {"tenant_id", "usuario_id", "rol"},
         "UPDATE": {"rol", "activa"},
+    },
+    # Spec usuarios (0034): solo INSERT de las columnas que escribe la función; id y
+    # creado_en los pone el DEFAULT. Sin UPDATE ni DELETE para ningún rol (inmutable).
+    "membresia_auditoria": {
+        "INSERT": {
+            "tenant_id",
+            "actor_usuario_id",
+            "usuario_id",
+            "accion",
+            "rol_anterior",
+            "rol_nuevo",
+        },
     },
     "invitacion": {
         "SELECT": {"tenant_id", "email", "rol", "token_hash", "expira_en", "usada_en"},
@@ -1362,10 +1399,31 @@ def test_every_non_exception_table_is_tenant_isolated(conn, catalog):
         if _rls_flags(conn, table) != (True, True):
             problems.append(f"{table}: RLS no habilitada y forzada")
         policy = policies.get((table, "tenant_isolation"))
-        expected = ("PERMISSIVE", "ALL", f"{{{catalog.app_role}}}", ISOLATION_EXPR, ISOLATION_EXPR)
+        if table in SOLO_LECTURA_APP:
+            # Spec usuarios (0034): la app solo lee; sin política de escritura.
+            expected = ("PERMISSIVE", "SELECT", f"{{{catalog.app_role}}}", ISOLATION_EXPR, None)
+        else:
+            expected = (
+                "PERMISSIVE",
+                "ALL",
+                f"{{{catalog.app_role}}}",
+                ISOLATION_EXPR,
+                ISOLATION_EXPR,
+            )
         if policy != expected:
             problems.append(f"{table}: tenant_isolation distinta: {policy}")
     assert problems == []
+
+
+def test_membresia_auditoria_is_immutable_for_every_role(conn, catalog):
+    # Spec usuarios (0034): nadie hace UPDATE, DELETE ni TRUNCATE; la app no hace INSERT.
+    for role in (catalog.app_role, AUTH_OWNER, *SUPABASE_ROLES):
+        tabla = _acl_table_privileges(conn, role, "membresia_auditoria")
+        columnas = set(_column_privileges(conn, role, "membresia_auditoria"))
+        assert not tabla & {"UPDATE", "DELETE", "TRUNCATE", "INSERT"}, role
+        assert not columnas & {"UPDATE", "DELETE"}, role
+    politicas = [key for key, value in _policies(conn).items() if key[0] == "membresia_auditoria"]
+    assert all(_policies(conn)[key][1] in ("SELECT", "INSERT") for key in politicas)
 
 
 def test_no_role_but_the_owner_can_delete_or_truncate(conn, catalog):
