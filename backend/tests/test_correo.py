@@ -65,6 +65,8 @@ BASE_ENV = {
     "DATABASE_URL": OFFLINE_DB,
     "SECRET_KEY": "s" * 40,
     "ENVIRONMENT": "production",
+    # SEC-01: en producción la app exige TRUSTED_PROXY_HOPS explícito (1 detrás del proxy).
+    "TRUSTED_PROXY_HOPS": "1",
 }
 
 

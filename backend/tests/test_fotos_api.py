@@ -12,6 +12,7 @@ Sobre una base temporal con dos tenants y el almacenamiento en una carpeta tempo
 """
 
 import io
+import threading
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -33,6 +34,8 @@ from flask import Flask
 from PIL import Image
 from sqlalchemy import text
 
+from app.fotos import cupo as fotos_cupo
+from app.fotos import imagen as fotos_imagen
 from app.fotos import service as fotos_service
 from app.fotos.almacen import EXTENSION_KEY, CarpetaLocal
 
@@ -269,5 +272,46 @@ def test_a_failed_transaction_leaves_no_images(client, cat, carpeta, monkeypatch
 
     monkeypatch.setattr(fotos_service, "_evento", falla)
     assert subir(client, activo["id"]).status_code == 500
+    assert archivos(carpeta) == antes
+    assert ficha(client, activo["id"])["foto"] is None
+
+
+def test_a_removed_photo_is_not_restored_by_a_retry(client, cat, carpeta):
+    # SEC-04: reintentar con el id de una foto quitada no la devuelve a la ficha.
+    activo = nuevo_activo(client, cat)
+    foto_id = str(uuid.uuid4())
+    assert subir(client, activo["id"], foto_id=foto_id).status_code == 201
+    assert client.delete(f"/activos/{activo['id']}/foto", headers=ADMIN).status_code == 204
+    antes = archivos(carpeta)
+    reintento = subir(client, activo["id"], foto_id=foto_id)
+    assert _codigo(reintento) == (409, "foto_retirada")
+    assert ficha(client, activo["id"])["foto"] is None
+    assert archivos(carpeta) == antes
+
+
+def test_the_upload_limit_per_user_answers_429_before_reading_the_file(
+    client, cat, carpeta, monkeypatch
+):
+    # SEC-02: con tope 2 por ventana, la tercera subida del usuario se rechaza sin guardar.
+    monkeypatch.setattr(fotos_cupo, "SUBIDAS", fotos_cupo.VentanaDeSubidas(2, 600.0))
+    activo = nuevo_activo(client, cat)
+    assert subir(client, activo["id"]).status_code == 201
+    assert subir(client, activo["id"], headers=ADMIN).status_code == 201  # reemplaza
+    antes = archivos(carpeta)
+    assert _codigo(subir(client, activo["id"])) == (429, "demasiadas_subidas")
+    assert archivos(carpeta) == antes
+    otro = subir(client, activo["id"], headers=CONTADOR)
+    assert otro.status_code != 429  # el límite es por usuario, no global
+
+
+def test_a_busy_decoder_answers_503_instead_of_queueing_forever(client, cat, carpeta, monkeypatch):
+    # SEC-02: si todos los cupos de decodificación del proceso están ocupados, 503 tras la espera.
+    ocupado = threading.BoundedSemaphore(1)
+    ocupado.acquire()
+    monkeypatch.setattr(fotos_imagen, "_CUPO_DECODIFICACION", ocupado)
+    monkeypatch.setattr(fotos_imagen, "ESPERA_DECODIFICACION_SEGUNDOS", 0.05)
+    activo = nuevo_activo(client, cat)
+    antes = archivos(carpeta)
+    assert _codigo(subir(client, activo["id"])) == (503, "procesado_ocupado")
     assert archivos(carpeta) == antes
     assert ficha(client, activo["id"])["foto"] is None

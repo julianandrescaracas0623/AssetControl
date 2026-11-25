@@ -7,10 +7,13 @@ imágenes rotas y bombas de descompresión.
 """
 
 import io
+import threading
+import uuid
 
 import pytest
 from PIL import Image
 
+from app.fotos import cupo as fotos_cupo
 from app.fotos import imagen
 from app.fotos.imagen import ImagenDemasiadoGrande, ImagenInvalida, TipoNoAdmitido
 
@@ -123,3 +126,47 @@ def test_decompression_bomb_is_refused_before_decoding():
     assert len(bomba) < imagen.MAX_BYTES
     with pytest.raises(ImagenInvalida):
         imagen.procesar(bomba)
+
+
+def test_photo_just_under_the_pixel_limit_is_processed_within_bounds():
+    # SEC-02: 4999 x 5000 (≈ 25 MP, justo bajo el tope) se procesa y sale con lado ≤ 1600.
+    resultado = imagen.procesar(_imagen("JPEG", (4999, 5000), color=(90, 90, 90)))
+    assert max(resultado.ancho, resultado.alto) == 1600
+    assert _abrir(resultado.completa).size == (resultado.ancho, resultado.alto)
+    assert max(_abrir(resultado.mini).size) == 320
+
+
+def test_photo_just_above_the_pixel_limit_is_refused_before_decoding():
+    # SEC-02: 5001 x 5000 (≈ 25,005 MP) se rechaza al leer la cabecera, sin decodificar.
+    assert imagen.MAX_PIXELES == 25_000_000
+    with pytest.raises(ImagenInvalida):
+        imagen.procesar(_imagen("PNG", (5001, 5000), "L", 0))
+
+
+def test_decoder_slots_are_limited_per_process_and_released(monkeypatch):
+    # SEC-02: sin cupo libre, 503 tras la espera; al liberarse, vuelve a procesar.
+    ocupado = threading.BoundedSemaphore(1)
+    ocupado.acquire()
+    monkeypatch.setattr(imagen, "_CUPO_DECODIFICACION", ocupado)
+    monkeypatch.setattr(imagen, "ESPERA_DECODIFICACION_SEGUNDOS", 0.01)
+    with pytest.raises(imagen.ImagenOcupada) as excinfo:
+        imagen.procesar(_imagen())
+    assert excinfo.value.status == 503
+    with pytest.raises(imagen.ImagenOcupada):
+        imagen.procesar_logo(_imagen("PNG"))
+    ocupado.release()
+    assert imagen.procesar(_imagen()).completa
+
+
+def test_per_user_upload_window_slides_and_is_per_user():
+    # SEC-02: tope por usuario en una ventana deslizante; otro usuario no se ve afectado.
+    instante = [0.0]
+    ventana = fotos_cupo.VentanaDeSubidas(2, 600.0, reloj=lambda: instante[0])
+    usuario = uuid.uuid4()
+    ventana.registrar(usuario)
+    ventana.registrar(usuario)
+    with pytest.raises(fotos_cupo.SubidasExcedidas):
+        ventana.registrar(usuario)
+    ventana.registrar(uuid.uuid4())
+    instante[0] = 600.0
+    ventana.registrar(usuario)

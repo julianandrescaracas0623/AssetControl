@@ -130,13 +130,20 @@ def test_local_folder_can_be_moved():
 
 
 def test_production_without_storage_starts_with_photos_off():
-    config = load_config({**BASE_ENV, "ENVIRONMENT": "production"})
+    config = load_config({**BASE_ENV, "ENVIRONMENT": "production", "TRUSTED_PROXY_HOPS": "1"})
     assert config.almacen is None
 
 
 def test_production_refuses_the_local_folder():
     with pytest.raises(almacen.AlmacenNoValido) as exc:
-        load_config({**BASE_ENV, "ENVIRONMENT": "production", "ALMACEN": "carpeta"})
+        load_config(
+            {
+                **BASE_ENV,
+                "ENVIRONMENT": "production",
+                "TRUSTED_PROXY_HOPS": "1",
+                "ALMACEN": "carpeta",
+            }
+        )
     assert "s3" in str(exc.value)
 
 
@@ -147,7 +154,9 @@ def test_unknown_storage_is_refused_without_echoing_it():
 
 
 def test_s3_reads_its_five_variables():
-    config = load_config({**BASE_ENV, "ENVIRONMENT": "production", **S3_ENV})
+    config = load_config(
+        {**BASE_ENV, "ENVIRONMENT": "production", "TRUSTED_PROXY_HOPS": "1", **S3_ENV}
+    )
     a = config.almacen
     assert (a.tipo, a.s3_region, a.s3_bucket) == ("s3", "us-west-2", "fotos")
     assert a.s3_endpoint_url == S3_ENV["S3_ENDPOINT_URL"]
@@ -155,7 +164,7 @@ def test_s3_reads_its_five_variables():
 
 @pytest.mark.parametrize("falta", [k for k in S3_ENV if k != "ALMACEN"])
 def test_s3_names_the_missing_variable(falta):
-    env = {**BASE_ENV, "ENVIRONMENT": "production", **S3_ENV}
+    env = {**BASE_ENV, "ENVIRONMENT": "production", "TRUSTED_PROXY_HOPS": "1", **S3_ENV}
     del env[falta]
     with pytest.raises(MissingConfigError) as exc:
         load_config(env)
@@ -165,7 +174,9 @@ def test_s3_names_the_missing_variable(falta):
 
 
 def test_storage_config_never_shows_the_keys():
-    config = load_config({**BASE_ENV, "ENVIRONMENT": "production", **S3_ENV})
+    config = load_config(
+        {**BASE_ENV, "ENVIRONMENT": "production", "TRUSTED_PROXY_HOPS": "1", **S3_ENV}
+    )
     for texto in (repr(config), repr(config.almacen), str(config.almacen)):
         assert S3_ENV["S3_SECRET_ACCESS_KEY"] not in texto
         assert S3_ENV["S3_ACCESS_KEY_ID"] not in texto

@@ -122,3 +122,11 @@ def test_install_manifest_and_icons_are_served_with_their_types(api, dist):
     assert manifest.mimetype == "application/manifest+json"
     icono = cliente.get("/icono-192.png")
     assert (icono.status_code, icono.mimetype) == (200, "image/png")
+
+
+def test_sensitive_routes_send_no_referrer_only_once(cliente):
+    # SEC-05: restablecer, invitación y consola no filtran la URL; el resto, same-origin.
+    for ruta in ("/restablecer", "/invitacion", "/plataforma", "/plataforma/entrar"):
+        assert cliente.get(ruta).headers.getlist("Referrer-Policy") == ["no-referrer"], ruta
+    for ruta in ("/", "/login", "/plataformas", "/contar/nuevo"):
+        assert cliente.get(ruta).headers.getlist("Referrer-Policy") == ["same-origin"], ruta
