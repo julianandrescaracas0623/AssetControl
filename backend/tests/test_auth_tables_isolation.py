@@ -1054,8 +1054,11 @@ def test_owner_cannot_delete_or_truncate(acceso, table):
 def test_owner_cannot_update_usuario_membresia_or_tenant(acceso):
     with owner_tx(acceso, app_auth_email=EMAIL_A, app_auth_usuario=str(USER_A)) as conn:
         assert_denied(conn, "update usuario set nombre = 'x'")
-        assert_denied(conn, "update membresia set activa = false")
         assert_denied(conn, "update tenant set nombre = 'x'")
+        # 0033: solo rol y activa de membresia, y la RLS acota las filas a las de la GUC de
+        # acceso.cambiar_membresia. Sin esa GUC no hay filas: no hay error, cero filas.
+        assert_denied(conn, "update membresia set usuario_id = usuario_id")
+        assert conn.execute(text("update membresia set activa = false")).rowcount == 0
 
 
 # --- 9 (nivel SQL). Las GUC no sobreviven a la transacción ni al savepoint -----------

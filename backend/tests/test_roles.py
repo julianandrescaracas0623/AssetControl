@@ -418,6 +418,7 @@ PROTECTED_ENDPOINTS = {
     "auth.cambiar_contrasena": frozenset({"admin", "contador"}),
     "invitaciones.crear": frozenset({"admin"}),  # test_contador_*, test_invitaciones_crear
     "usuarios.listar": frozenset({"admin"}),  # test_usuarios_api.py
+    "usuarios.cambiar": frozenset({"admin"}),  # test_usuarios_cambio_api.py
     # Spec 003 (T2): roles y aislamiento en test_ubicaciones_api.py.
     "ubicaciones.listar": frozenset({"admin", "contador"}),
     "ubicaciones.crear": frozenset({"admin"}),

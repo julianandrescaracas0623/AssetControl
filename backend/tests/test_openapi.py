@@ -27,6 +27,7 @@ import yaml
 from acceso_db import (
     ADMIN_A,
     CONTADOR_A,
+    CONTADOR_B,
     PASSWORD,
     TENANT_A,
     AccesoDb,
@@ -71,6 +72,7 @@ from app.plataforma.config import PlataformaConfig
 from app.plataforma.modulos.actividad import service as plataforma_actividad_service
 from app.plataforma.modulos.empresas import service as plataforma_empresas_service
 from app.plataforma.modulos.usuarios import service as plataforma_usuarios_service
+from app.usuarios import routes as usuarios_routes
 
 CONTRACT_FILE = Path(__file__).resolve().parent.parent / "openapi.yaml"
 CSRF = {CSRF_HEADER: CSRF_HEADER_VALUE}
@@ -424,6 +426,51 @@ def test_usuarios_responses(client):
     assert body["usuarios"]
     check("get", "/usuarios", client.get("/usuarios", headers=bearer(CONTADOR_A, TENANT_A)))
     check("get", "/usuarios", client.get("/usuarios"))
+
+
+def test_usuarios_cambiar_responses(client, monkeypatch):
+    """Cada código de ``PUT /usuarios/{usuario_id}`` del contrato, sin cambiar nada."""
+    csrf = {"X-AssetControl-CSRF": "1"}
+    admin = {**bearer(ADMIN_A, TENANT_A), **csrf}
+    ruta = f"/usuarios/{CONTADOR_A.usuario_id}"
+    sin_cambios = {"rol": "contador", "activa": True}
+
+    check("put", "/usuarios/{usuario_id}", client.put(ruta, json=sin_cambios, headers=admin))
+    check(
+        "put",
+        "/usuarios/{usuario_id}",
+        client.put(ruta, json={"rol": "admin"}, headers=admin),
+    )
+    check(
+        "put",
+        "/usuarios/{usuario_id}",
+        client.put(ruta, json=sin_cambios, headers={**bearer(CONTADOR_A, TENANT_A), **csrf}),
+    )
+    check("put", "/usuarios/{usuario_id}", client.put(ruta, json=sin_cambios, headers=csrf))
+    check(
+        "put",
+        "/usuarios/{usuario_id}",
+        client.put(
+            f"/usuarios/{ADMIN_A.usuario_id}",
+            json={"rol": "contador", "activa": True},
+            headers=admin,
+        ),
+    )
+    check(
+        "put",
+        "/usuarios/{usuario_id}",
+        client.put(f"/usuarios/{CONTADOR_B.usuario_id}", json=sin_cambios, headers=admin),
+    )
+
+    # 503: el candado de membresías de la empresa sigue ocupado (no se puede provocar aquí).
+    from app import db as db_module
+    from app.db import MembresiaRechazada
+
+    def ocupado(*args, **kwargs):
+        raise MembresiaRechazada("membresia_ocupada")
+
+    monkeypatch.setattr(db_module, "cambiar_membresia", ocupado)
+    check("put", "/usuarios/{usuario_id}", client.put(ruta, json=sin_cambios, headers=admin))
 
 
 def test_refresh_and_logout_responses(client):
@@ -1986,6 +2033,8 @@ def backend_error_codes() -> set[str]:
             fotos_imagen.ImagenInvalida,
         )
     }
+    # Rechazos de PUT /usuarios/{usuario_id} (0033): mapa código de la base -> respuesta.
+    codes |= {code for _, code, _ in usuarios_routes.RECHAZOS.values()}
     return codes | _policy_codes()
 
 

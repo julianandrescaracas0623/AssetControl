@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -176,5 +176,97 @@ describe('/admin/usuarios: personas con acceso', () => {
   it('si falla la carga ofrece reintentar', async () => {
     abrirConLista(() => errorApi(500, 'error_interno'))
     expect(await screen.findByText('No se pudo cargar la lista')).toBeTruthy()
+  })
+})
+
+// Spec 0033: el admin cambia el rol y activa o desactiva a una persona de su empresa.
+const ANA = '00000000-0000-4000-8000-0000000a0081'
+const CARLOS = '00000000-0000-4000-8000-0000000a0082'
+const YO = {
+  id: '00000000-0000-4000-8000-000000000a01',
+  nombre: 'Ana Torres',
+  email: 'ana.torres@ejemplo.test',
+  rol: 'admin',
+  activa: true,
+  debe_cambiar_password: false,
+}
+
+function abrirConGestion(lista: unknown = PERSONAS, alCambiar: (url: string, init: RequestInit) => Response | undefined = () => undefined) {
+  const f = simularSesion('admin', (url, init) => {
+    if (url === '/api/usuarios') return json(200, lista)
+    if (url.startsWith('/api/usuarios/')) return alCambiar(url, init)
+    return undefined
+  })
+  render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/admin/usuarios'] })} />)
+  return f
+}
+
+async function filasDeLaLista() {
+  const lista = await screen.findByRole('list', { name: 'Personas con acceso' })
+  return within(lista).getAllByRole('listitem')
+}
+
+describe('/admin/usuarios: cambiar rol y estado', () => {
+  it('ofrece acciones a las demás personas y ninguna sobre la propia cuenta', async () => {
+    abrirConGestion({ usuarios: [YO, ...PERSONAS.usuarios] })
+    const [yo, ana, carlos] = await filasDeLaLista()
+    expect(within(yo).getByText('Tú')).toBeTruthy()
+    expect(within(yo).queryByRole('button')).toBeNull()
+    expect(within(ana).getByRole('button', { name: 'Pasar a contador' })).toBeTruthy()
+    expect(within(ana).getByRole('button', { name: 'Desactivar' })).toBeTruthy()
+    expect(within(carlos).getByRole('button', { name: 'Hacer administrador' })).toBeTruthy()
+    expect(within(carlos).getByRole('button', { name: 'Reactivar' })).toBeTruthy()
+  })
+
+  it('cambia el rol con PUT al id de la persona y vuelve a pedir la lista', async () => {
+    const f = abrirConGestion(undefined, (url) =>
+      url === `/api/usuarios/${ANA}` ? json(200, { id: ANA, rol: 'contador', activa: true }) : undefined,
+    )
+    const [ana] = await filasDeLaLista()
+    fireEvent.click(within(ana).getByRole('button', { name: 'Pasar a contador' }))
+
+    expect(await screen.findByText('Ana Admin ahora es Contador')).toBeTruthy()
+    const [, init] = llamadas(f, `/api/usuarios/${ANA}`)[0]
+    expect(init?.method).toBe('PUT')
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer jwt.admin')
+    expect(JSON.parse(String(init?.body))).toEqual({ rol: 'contador', activa: true })
+    await waitFor(() => expect(llamadas(f, '/api/usuarios')).toHaveLength(2))
+  })
+
+  it('desactivar pide confirmación y envía activa en falso', async () => {
+    const f = abrirConGestion(undefined, (url) =>
+      url === `/api/usuarios/${ANA}` ? json(200, { id: ANA, rol: 'admin', activa: false }) : undefined,
+    )
+    const [ana] = await filasDeLaLista()
+    fireEvent.click(within(ana).getByRole('button', { name: 'Desactivar' }))
+    const confirmar = await screen.findByRole('alertdialog', { name: '¿Desactivar a Ana Admin?' })
+    expect(llamadas(f, `/api/usuarios/${ANA}`)).toHaveLength(0)
+
+    fireEvent.click(within(confirmar).getByRole('button', { name: 'Sí, desactivar' }))
+    expect(await screen.findByText('Ana Admin quedó desactivada')).toBeTruthy()
+    expect(JSON.parse(String(llamadas(f, `/api/usuarios/${ANA}`)[0][1]?.body))).toEqual({ rol: 'admin', activa: false })
+  })
+
+  it('reactivar no pide confirmación y envía activa en verdadero', async () => {
+    const f = abrirConGestion(undefined, (url) =>
+      url === `/api/usuarios/${CARLOS}` ? json(200, { id: CARLOS, rol: 'contador', activa: true }) : undefined,
+    )
+    const [, carlos] = await filasDeLaLista()
+    fireEvent.click(within(carlos).getByRole('button', { name: 'Reactivar' }))
+    expect(await screen.findByText('Carlos Contador vuelve a tener acceso')).toBeTruthy()
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(JSON.parse(String(llamadas(f, `/api/usuarios/${CARLOS}`)[0][1]?.body))).toEqual({ rol: 'contador', activa: true })
+  })
+
+  it('si el servidor rechaza el cambio, muestra su mensaje y no cambia la lista en pantalla', async () => {
+    abrirConGestion(undefined, (url) =>
+      url === `/api/usuarios/${ANA}`
+        ? errorApi(409, 'ultimo_admin', 'Debe quedar al menos un administrador activo en la empresa.')
+        : undefined,
+    )
+    const [ana] = await filasDeLaLista()
+    fireEvent.click(within(ana).getByRole('button', { name: 'Pasar a contador' }))
+    expect(await screen.findByText('Debe quedar al menos un administrador activo en la empresa.')).toBeTruthy()
+    expect(within(ana).getByText('Admin')).toBeTruthy()
   })
 })

@@ -74,7 +74,9 @@ PLATAFORMA_EDICION = "0030_plataforma_edicion_empresa"
 PLATAFORMA_EDITAR_USUARIO = "0031_plataforma_editar_usuario"
 # Spec 017, C1b (T16): contraseña temporal de un usuario.
 PLATAFORMA_PASSWORD_USUARIO = "0032_plataforma_password_usuario"
-HEAD = PLATAFORMA_PASSWORD_USUARIO
+# Usuarios de la empresa (0033): el admin cambia rol y activación de una persona.
+USUARIOS_CAMBIAR_MEMBRESIA = "0033_usuarios_cambiar_membresia"
+HEAD = USUARIOS_CAMBIAR_MEMBRESIA
 MIGRATION_0002 = BACKEND_DIR / "migrations" / "versions" / "0002_acceso_y_usuarios.py"
 MIGRATION_0003 = BACKEND_DIR / "migrations" / "versions" / "0003_politicas_del_dueno.py"
 MIGRATION_0004 = BACKEND_DIR / "migrations" / "versions" / "0004_funciones_de_acceso.py"
@@ -229,6 +231,7 @@ def test_revision_chain():
 
     assert script.get_heads() == [HEAD]
     assert [r.revision for r in revisions] == [
+        USUARIOS_CAMBIAR_MEMBRESIA,
         PLATAFORMA_PASSWORD_USUARIO,
         PLATAFORMA_EDITAR_USUARIO,
         PLATAFORMA_EDICION,
@@ -258,34 +261,35 @@ def test_revision_chain():
         ACCESO,
         BASELINE,
     ]
-    assert revisions[0].down_revision == PLATAFORMA_EDITAR_USUARIO
-    assert revisions[1].down_revision == PLATAFORMA_EDICION
-    assert revisions[2].down_revision == PLATAFORMA_LOGO
-    assert revisions[3].down_revision == PLATAFORMA_ACTIVIDAD
-    assert revisions[4].down_revision == PLATAFORMA_USUARIOS
-    assert revisions[5].down_revision == SESIONES_VALIDAS_DESDE
-    assert revisions[6].down_revision == LIMITE_TASA_PLATAFORMA
-    assert revisions[7].down_revision == CAMBIO_PASSWORD
-    assert revisions[8].down_revision == INVITACION_TENANT_ACTIVO
-    assert revisions[9].down_revision == FUNCIONES_PLATAFORMA
-    assert revisions[10].down_revision == PLATAFORMA
-    assert revisions[11].down_revision == FUNCIONES_RECUPERACION
-    assert revisions[12].down_revision == RECUPERACION
-    assert revisions[13].down_revision == EMPRESA
-    assert revisions[14].down_revision == FOTOS
-    assert revisions[15].down_revision == SUPABASE_FUNCIONES
-    assert revisions[16].down_revision == CIERRE
-    assert revisions[17].down_revision == DISCREPANCIAS
-    assert revisions[18].down_revision == CONTEO
-    assert revisions[19].down_revision == CAMBIOS
-    assert revisions[20].down_revision == ACTIVOS
-    assert revisions[21].down_revision == CATALOGO
-    assert revisions[22].down_revision == LIMITE_TASA
-    assert revisions[23].down_revision == FUNCIONES
-    assert revisions[24].down_revision == POLITICAS
-    assert revisions[25].down_revision == ACCESO
-    assert revisions[26].down_revision == BASELINE
-    assert revisions[27].down_revision is None
+    assert revisions[0].down_revision == PLATAFORMA_PASSWORD_USUARIO
+    assert revisions[1].down_revision == PLATAFORMA_EDITAR_USUARIO
+    assert revisions[2].down_revision == PLATAFORMA_EDICION
+    assert revisions[3].down_revision == PLATAFORMA_LOGO
+    assert revisions[4].down_revision == PLATAFORMA_ACTIVIDAD
+    assert revisions[5].down_revision == PLATAFORMA_USUARIOS
+    assert revisions[6].down_revision == SESIONES_VALIDAS_DESDE
+    assert revisions[7].down_revision == LIMITE_TASA_PLATAFORMA
+    assert revisions[8].down_revision == CAMBIO_PASSWORD
+    assert revisions[9].down_revision == INVITACION_TENANT_ACTIVO
+    assert revisions[10].down_revision == FUNCIONES_PLATAFORMA
+    assert revisions[11].down_revision == PLATAFORMA
+    assert revisions[12].down_revision == FUNCIONES_RECUPERACION
+    assert revisions[13].down_revision == RECUPERACION
+    assert revisions[14].down_revision == EMPRESA
+    assert revisions[15].down_revision == FOTOS
+    assert revisions[16].down_revision == SUPABASE_FUNCIONES
+    assert revisions[17].down_revision == CIERRE
+    assert revisions[18].down_revision == DISCREPANCIAS
+    assert revisions[19].down_revision == CONTEO
+    assert revisions[20].down_revision == CAMBIOS
+    assert revisions[21].down_revision == ACTIVOS
+    assert revisions[22].down_revision == CATALOGO
+    assert revisions[23].down_revision == LIMITE_TASA
+    assert revisions[24].down_revision == FUNCIONES
+    assert revisions[25].down_revision == POLITICAS
+    assert revisions[26].down_revision == ACCESO
+    assert revisions[27].down_revision == BASELINE
+    assert revisions[28].down_revision is None
 
 
 def test_migrations_readme_documents_the_business_table_pattern():
@@ -1230,9 +1234,9 @@ def test_downgrade_0003_removes_only_the_owner_policies_and_grants(migrate_env):
     config = alembic_config()
     command.upgrade(config, "head")
     policies, grants = _owner_state(migrate_env)
-    # 10 de 0003, 13 de 0016 (spec 014, T2), 1 de 0018 (spec 017, T3a), 2 de 0023 (T3b) y
-    # 5 de 0024 (T4).
-    assert len(policies) == 31
+    # 10 de 0003, 13 de 0016 (spec 014, T2), 1 de 0018 (spec 017, T3a), 2 de 0023 (T3b),
+    # 5 de 0024 (T4) y 4 de 0033 (cambio de membresía de la empresa).
+    assert len(policies) == 35
     assert grants > 0
 
     command.downgrade(config, ACCESO)
@@ -1516,9 +1520,11 @@ EDITAR_USUARIO_HEAD_FUNCTION_NAMES = sorted(
     [*EDICION_HEAD_FUNCTION_NAMES, "plataforma_cambiar_usuario"]
 )
 # Spec 017, C1b/T16 (0032): la de la contraseña temporal.
-HEAD_FUNCTION_NAMES = sorted(
+PASSWORD_USUARIO_HEAD_FUNCTION_NAMES = sorted(
     [*EDITAR_USUARIO_HEAD_FUNCTION_NAMES, "plataforma_restablecer_password_usuario"]
 )
+# Usuarios de la empresa (0033): el admin cambia el rol y activa o desactiva a una persona.
+HEAD_FUNCTION_NAMES = sorted([*PASSWORD_USUARIO_HEAD_FUNCTION_NAMES, "cambiar_membresia"])
 
 
 def test_0004_creates_the_functions_and_leaves_no_create_nor_membership(migrate_env):
@@ -3727,7 +3733,7 @@ def test_0032_up_down_up_touches_only_its_objects(migrate_env):
     command.upgrade(config, PLATAFORMA_PASSWORD_USUARIO)
     after = _empresas_state(migrate_env)
     assert _public_state(migrate_env) == (tables_before, [PLATAFORMA_PASSWORD_USUARIO])
-    assert sorted(after["bodies"]) == HEAD_FUNCTION_NAMES
+    assert sorted(after["bodies"]) == PASSWORD_USUARIO_HEAD_FUNCTION_NAMES
     for name in before["bodies"]:
         assert after["bodies"][name] == before["bodies"][name], name
         assert after["acls"][name] == before["acls"][name], name

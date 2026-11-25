@@ -780,6 +780,43 @@ CAMBIO_OWNER_POLICIES = {
 # Catálogo cerrado C6 (T3): políticas del dueño (0003) con su texto exacto, tal como lo
 # devuelve pg_policies con los espacios normalizados.
 # (tabla, nombre) -> (permissive, cmd, USING, WITH CHECK).
+# Spec usuarios (0033): el admin cambia rol y activación de una persona de su empresa. Las
+# políticas del dueño se acotan por las dos GUC de la función (tenant y usuario objetivo).
+_MEM_TENANT = _uuid_guc("app.auth_membresia_tenant")
+_MEM_USUARIO = _uuid_guc("app.auth_membresia_usuario")
+_REFRESH_DE_LA_MEMBRESIA = (
+    "(EXISTS ( SELECT 1 FROM membresia m "  # noqa: S608
+    "WHERE ((m.id = refresh_token.membresia_id) "
+    "AND (m.tenant_id = refresh_token.tenant_id) "
+    f"AND (m.tenant_id = {_MEM_TENANT}) AND (m.usuario_id = {_MEM_USUARIO}))))"
+)
+MEMBRESIA_OWNER_POLICIES = {
+    ("membresia", "dueno_membresia_cambiar_leer"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"(tenant_id = {_MEM_TENANT})",
+        None,
+    ),
+    ("membresia", "dueno_membresia_cambiar"): (
+        "PERMISSIVE",
+        "UPDATE",
+        f"((tenant_id = {_MEM_TENANT}) AND (usuario_id = {_MEM_USUARIO}))",
+        f"((tenant_id = {_MEM_TENANT}) AND (usuario_id = {_MEM_USUARIO}))",
+    ),
+    ("refresh_token", "dueno_refresh_cambiar_leer"): (
+        "PERMISSIVE",
+        "SELECT",
+        _REFRESH_DE_LA_MEMBRESIA,
+        None,
+    ),
+    ("refresh_token", "dueno_refresh_cambiar_revocar"): (
+        "PERMISSIVE",
+        "UPDATE",
+        f"((revocado_en IS NULL) AND {_REFRESH_DE_LA_MEMBRESIA})",
+        "(revocado_en = now())",
+    ),
+}
+
 EXPECTED_OWNER_POLICIES = {
     ("invitacion", "dueno_invitacion_validar"): (
         "PERMISSIVE",
@@ -881,12 +918,16 @@ EXPECTED_OWNER_POLICIES = {
     ),
     **RECOVERY_OWNER_POLICIES,
     **CAMBIO_OWNER_POLICIES,
+    **MEMBRESIA_OWNER_POLICIES,
 }
 
 # Catálogo cerrado C6 (T3): funciones de acceso (0004).
 # nombre -> (argumentos, resultado, GUC que fija, huella sha256 de prosrc, rol con EXECUTE).
 # La huella obliga a que todo cambio del cuerpo se revise también aquí.
 SEARCH_PATH = ["search_path=pg_catalog, pg_temp"]
+# Configuración adicional de funciones concretas: cambiar_membresia (0033) acota su espera
+# de candado con lock_timeout = 5s, como las de 0027.
+EXTRA_CONFIG = {"cambiar_membresia": ["lock_timeout=5s"]}
 EXPECTED_FUNCTIONS = {
     "buscar_login": (
         "p_email text",
@@ -948,6 +989,14 @@ EXPECTED_FUNCTIONS = {
         "cb733ca49a196da4be0966807af73ad7a5800bbfd135b6d58dd4cabf3a7f097b",
         "app",
     ),
+    # Spec usuarios (0033): cambio de rol y activación de una persona de la empresa (admin).
+    "cambiar_membresia": (
+        "p_tenant uuid, p_actor uuid, p_usuario uuid, p_rol text, p_activa boolean",
+        "TABLE(rol_resultado text, activa_resultado boolean, cambiado boolean)",
+        {"app.auth_membresia_tenant", "app.auth_membresia_usuario"},
+        "95bda94f456498242d10ba64f9e15ae4e48963270eb55604c8e3825dcbce0d78",
+        "app",
+    ),
 }
 FUNCTION_CALLS = {
     "buscar_login": "select * from acceso.buscar_login('x@ejemplo.test')",
@@ -960,6 +1009,10 @@ FUNCTION_CALLS = {
     "restablecer_contrasena": "select acceso.restablecer_contrasena('" + "0" * 64 + "', 'h')",
     "cambiar_password_propio": (
         "select acceso.cambiar_password_propio(gen_random_uuid(), gen_random_uuid(), 'a', 'b')"
+    ),
+    "cambiar_membresia": (
+        "select * from acceso.cambiar_membresia("
+        "gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'contador', true)"
     ),
 }
 # GRANT de auth_owner (0003): tabla -> privilegio -> columnas; nada a nivel de tabla.
@@ -980,9 +1033,11 @@ EXPECTED_OWNER_COLUMNS = {
         "UPDATE": {"password_hash", "debe_cambiar_password", "sesiones_validas_desde"},
     },
     # Sin INSERT de id en membresia ni invitacion (M3): lo pone el DEFAULT.
+    # Spec usuarios (0033): cambiar rol y activa solo desde acceso.cambiar_membresia.
     "membresia": {
         "SELECT": {"id", "tenant_id", "usuario_id", "rol", "activa"},
         "INSERT": {"tenant_id", "usuario_id", "rol"},
+        "UPDATE": {"rol", "activa"},
     },
     "invitacion": {
         "SELECT": {"tenant_id", "email", "rol", "token_hash", "expira_en", "usada_en"},
@@ -1660,7 +1715,7 @@ def test_acceso_function_signature_and_attributes(conn, name):
     assert function["lang"] == "plpgsql"
     assert function["volatile"] == "v"
     assert function["owner"] == AUTH_OWNER
-    assert function["config"] == SEARCH_PATH
+    assert sorted(function["config"]) == sorted([*SEARCH_PATH, *EXTRA_CONFIG.get(name, [])])
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED_FUNCTIONS))

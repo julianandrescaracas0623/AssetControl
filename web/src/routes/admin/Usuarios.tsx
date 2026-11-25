@@ -1,18 +1,19 @@
 import { useMutation } from '@tanstack/react-query'
-import { Copy, MailPlus, ShieldCheck, TriangleAlert, UserPlus, Users } from 'lucide-react'
+import { Copy, MailPlus, Power, PowerOff, ShieldCheck, TriangleAlert, UserPlus, Users } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { toast } from 'sonner'
 
-import { Aviso, Boton, Campo, EncabezadoPagina, Estado, Insignia, Panel } from '@/components/kit'
+import { Aviso, Boton, Campo, Confirmar, EncabezadoPagina, Estado, Insignia, Panel } from '@/components/kit'
 import { api, ErrorApi, type InvitacionCreada, mensajeDeError, type Rol } from '@/lib/api/cliente'
-import { type UsuarioEmpresa, useUsuarios } from '@/lib/usuarios'
-import { etiquetaRol, useApiAutenticada } from '@/lib/sesion'
+import { type UsuarioEmpresa, useCambiarUsuario, useUsuarios } from '@/lib/usuarios'
+import { etiquetaRol, useApiAutenticada, useSesion } from '@/lib/sesion'
 import { cn } from '@/lib/utils'
 
 // /admin/usuarios (spec 002b, T5; plan §7): invitar con correo y rol. El enlace sale
 // una sola vez (el servidor no lo vuelve a dar) y se copia para enviarlo por un canal
-// privado. La lista de personas con acceso sale de GET /usuarios (solo lectura: cambiar
-// el rol y dar de baja llegan en una spec posterior).
+// privado. La lista de personas con acceso sale de GET /usuarios; el admin cambia el rol y
+// activa o desactiva a una persona con PUT /usuarios/{usuario_id} (0033). El servidor decide
+// y avisa: no deja cambiar el propio rol ni desactivarse, ni quitar al último admin activo.
 // Spec 016, T9 (R2, R5): presentación con el kit (Panel, Campo, Aviso, Boton). El rol lo
 // decide el servidor; el enlace no se guarda ni se escribe en ningún registro.
 
@@ -111,8 +112,19 @@ function Resultado({ creada, onOtra }: { creada: InvitacionCreada; onOtra: () =>
   )
 }
 
+/** Lo que pasó, en una frase, tras un cambio que el servidor aceptó. */
+function mensajeDeCambio(persona: UsuarioEmpresa, despues: { rol: Rol; activa: boolean }): string {
+  if (!despues.activa) return `${persona.nombre} quedó desactivada`
+  if (!persona.activa) return `${persona.nombre} vuelve a tener acceso`
+  return `${persona.nombre} ahora es ${etiquetaRol(despues.rol)}`
+}
+
 function ListaPersonas() {
   const usuarios = useUsuarios()
+  const cambiar = useCambiarUsuario()
+  const { sesion } = useSesion()
+  const [aDesactivar, setADesactivar] = useState<UsuarioEmpresa | null>(null)
+
   if (usuarios.isPending) return <Estado.Cargando etiqueta="Cargando personas con acceso" />
   if (usuarios.isError)
     return (
@@ -121,20 +133,87 @@ function ListaPersonas() {
   const lista: UsuarioEmpresa[] = usuarios.data
   if (lista.length === 0)
     return <Estado.Vacio titulo="Todavía no hay personas con acceso" descripcion="Invita a la primera con el formulario." />
+
+  const miId = sesion?.usuario.id
+
+  function cambio(persona: UsuarioEmpresa, valores: { rol?: Rol; activa?: boolean }) {
+    const despues = { rol: valores.rol ?? persona.rol, activa: valores.activa ?? persona.activa }
+    cambiar.mutate(
+      { id: persona.id, ...despues },
+      {
+        onSuccess: () => toast.success(mensajeDeCambio(persona, despues)),
+        // El texto llega del servidor en español (p. ej. «no puedes cambiar tu propio rol»).
+        onError: (error) => toast.error(mensajeDeError(error)),
+      },
+    )
+  }
+
   return (
-    <ul aria-label="Personas con acceso" className="flex flex-col divide-y">
-      {lista.map((persona) => (
-        <li key={persona.id} className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0">
-          <span className="text-cuerpo font-medium break-all">{persona.nombre}</span>
-          <span className="text-etiqueta font-normal break-all text-muted-foreground">{persona.email}</span>
-          <div className="flex flex-wrap gap-1.5">
-            <Insignia tono={persona.rol === 'admin' ? 'fuerte' : 'neutro'}>{etiquetaRol(persona.rol)}</Insignia>
-            {!persona.activa && <Insignia tono="error">Desactivada</Insignia>}
-            {persona.debe_cambiar_password && <Insignia tono="aviso">Debe cambiar su contraseña</Insignia>}
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul aria-label="Personas con acceso" className="flex flex-col divide-y">
+        {lista.map((persona) => {
+          const esYo = persona.id === miId
+          const otroRol: Rol = persona.rol === 'admin' ? 'contador' : 'admin'
+          return (
+            <li key={persona.id} className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0">
+              <span className="text-cuerpo font-medium break-all">{persona.nombre}</span>
+              <span className="text-etiqueta font-normal break-all text-muted-foreground">{persona.email}</span>
+              <div className="flex flex-wrap gap-1.5">
+                {esYo && <Insignia tono="info">Tú</Insignia>}
+                <Insignia tono={persona.rol === 'admin' ? 'fuerte' : 'neutro'}>{etiquetaRol(persona.rol)}</Insignia>
+                {!persona.activa && <Insignia tono="error">Desactivada</Insignia>}
+                {persona.debe_cambiar_password && <Insignia tono="aviso">Debe cambiar su contraseña</Insignia>}
+              </div>
+              {!esYo && (
+                <div className="mt-1 flex flex-wrap gap-2">
+                  <Boton
+                    variante="secundario"
+                    icono={persona.rol === 'admin' ? <Users /> : <ShieldCheck />}
+                    disabled={cambiar.isPending}
+                    onClick={() => cambio(persona, { rol: otroRol })}
+                  >
+                    {persona.rol === 'admin' ? 'Pasar a contador' : 'Hacer administrador'}
+                  </Boton>
+                  {persona.activa ? (
+                    <Boton
+                      variante="secundario"
+                      icono={<PowerOff />}
+                      disabled={cambiar.isPending}
+                      onClick={() => setADesactivar(persona)}
+                    >
+                      Desactivar
+                    </Boton>
+                  ) : (
+                    <Boton
+                      variante="secundario"
+                      icono={<Power />}
+                      disabled={cambiar.isPending}
+                      onClick={() => cambio(persona, { activa: true })}
+                    >
+                      Reactivar
+                    </Boton>
+                  )}
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+      <Confirmar
+        abierto={aDesactivar !== null}
+        onAbiertoChange={(abierto) => {
+          if (!abierto) setADesactivar(null)
+        }}
+        titulo={`¿Desactivar a ${aDesactivar?.nombre ?? 'esta persona'}?`}
+        descripcion="Deja de tener acceso a la empresa desde su siguiente petición y no puede renovar su sesión. Puedes reactivarla después."
+        textoConfirmar="Sí, desactivar"
+        peligro
+        onConfirmar={() => {
+          if (aDesactivar) cambio(aDesactivar, { activa: false })
+          setADesactivar(null)
+        }}
+      />
+    </>
   )
 }
 
@@ -203,7 +282,7 @@ export default function Usuarios() {
               Personas con acceso
             </span>
           }
-          descripcion="Quién tiene acceso a la empresa, con su rol y su estado."
+          descripcion="Quién tiene acceso a la empresa, con su rol y su estado. Puedes cambiar el rol o activar y desactivar a cada persona."
         >
           <ListaPersonas />
         </Panel>

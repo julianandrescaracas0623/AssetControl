@@ -237,6 +237,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/usuarios/{usuario_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Cambiar el rol y activar o desactivar a una persona de la empresa (solo admin)
+         * @description Exactamente rol y activa; cualquier otra clave da 400. No edita nombre, correo ni contraseña. Cambia la membresía de esta empresa, no la de otras. No se cambia el propio rol ni se desactiva uno mismo (409 cambio_propio_no_permitido). Quitar el rol admin o desactivar al último admin activo da 409 ultimo_admin. Si se desactiva o cambia el rol, se revocan las sesiones renovables de esa membresía: desactivada, su siguiente petición recibe 401; con rol nuevo, lo aplica en la siguiente petición. Si nada cambia, responde 200 sin escribir.
+         */
+        put: operations["cambiarUsuario"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ubicaciones": {
         parameters: {
             query?: never;
@@ -1165,7 +1185,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "enlace_invalido" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta" | "fotos_no_disponibles" | "sin_foto" | "foto_id_en_uso" | "empresa_sin_datos" | "sin_logo" | "logo_id_en_uso" | "foto_existente" | "imagen_demasiado_grande" | "tipo_no_admitido" | "imagen_invalida" | "exportacion_demasiado_grande" | "campo_invalido" | "contrasenas_distintas" | "empresa_existente" | "email_en_uso" | "cambio_password_requerido" | "contrasena_repetida" | "empresa_inactiva" | "ultimo_admin" | "empresa_sin_admin" | "logos_no_disponibles";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "enlace_invalido" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta" | "fotos_no_disponibles" | "sin_foto" | "foto_id_en_uso" | "empresa_sin_datos" | "sin_logo" | "logo_id_en_uso" | "foto_existente" | "imagen_demasiado_grande" | "tipo_no_admitido" | "imagen_invalida" | "exportacion_demasiado_grande" | "campo_invalido" | "contrasenas_distintas" | "empresa_existente" | "email_en_uso" | "cambio_password_requerido" | "contrasena_repetida" | "empresa_inactiva" | "ultimo_admin" | "cambio_propio_no_permitido" | "empresa_sin_admin" | "logos_no_disponibles";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -1199,6 +1219,17 @@ export interface components {
         };
         ListaUsuarios: {
             usuarios: components["schemas"]["UsuarioEmpresa"][];
+        };
+        CambiarUsuarioBody: {
+            rol: components["schemas"]["Rol"];
+            /** @description Si la membresía de la empresa queda activa. */
+            activa: boolean;
+        };
+        UsuarioEmpresaCambiado: {
+            /** Format: uuid */
+            id: string;
+            rol: components["schemas"]["Rol"];
+            activa: boolean;
         };
         Tenant: {
             /** Format: uuid */
@@ -2208,6 +2239,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description No se puede cambiar: es tu propia cuenta (no cambias tu rol ni te desactivas) o quitaría el rol admin o desactivaría al último admin activo de la empresa. */
+        UsuarioNoCambiable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description El activo está dado de baja; solo se puede reactivar. */
         ActivoDadoDeBaja: {
             headers: {
@@ -2757,6 +2797,38 @@ export interface operations {
             };
             401: components["responses"]["NoAutenticado"];
             403: components["responses"]["Prohibido"];
+        };
+    };
+    cambiarUsuario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuario_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambiarUsuarioBody"];
+            };
+        };
+        responses: {
+            /** @description El rol y la activación resultantes (los mismos de antes si no cambió nada). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsuarioEmpresaCambiado"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            409: components["responses"]["UsuarioNoCambiable"];
+            503: components["responses"]["ServicioNoDisponible"];
         };
     };
     listarUbicaciones: {
