@@ -3118,7 +3118,7 @@
     },
     "A7": {
      "tipo": "s",
-     "valor": "{n} activo · encontrados {n} ({pct}) por {cop} · no encontrados {n} por {cop} · tabla «Activos», lista para filtrar o hacer una tabla dinámica. En cursiva y fondo ámbar: se encontró en otra ubicación.",
+     "valor": "{n} activos · {n} encontrados ({pct}) por {cop} · {n} no encontrados por {cop}\n{n} discrepancias en amarillo: activos encontrados en una ubicación distinta de la registrada.",
      "estilo": {
       "fuente": {
        "nombre": "Arial",
@@ -17240,7 +17240,7 @@
     },
     "A7": {
      "tipo": "s",
-     "valor": "{n} activo · encontrados {n} ({pct}) por {cop} · no encontrados {n} por {cop} · En cursiva y fondo ámbar: se encontró en otra ubicación.",
+     "valor": "{n} activos · {n} encontrados ({pct}) por {cop} · {n} no encontrados por {cop}\n{n} discrepancias en amarillo: activos encontrados en una ubicación distinta de la registrada.",
      "estilo": {
       "fuente": {
        "nombre": "Arial",

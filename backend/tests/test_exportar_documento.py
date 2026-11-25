@@ -725,10 +725,11 @@ def _filas_todos(detalle) -> list[list]:
 def test_todos_los_activos_replica_la_huella():
     gen = _generar_informe()
     filas = _filas_todos(_detalle_diseno())
+    # Opción C (2026-11-24): cifras y, como hay una discrepancia (la lámpara, esperada en
+    # Bodega y encontrada en el Box 2), la segunda línea en singular.
     nota = (
-        "2 activos · encontrados 1 (50 %) por $ 1.390.000,50 · no encontrados 1 por "
-        "$ 389.900,00 · tabla «Activos», lista para filtrar o hacer una tabla dinámica. "
-        f"{exportar.LEYENDA}"
+        "2 activos · 1 encontrado (50 %) por $ 1.390.000,50 · 1 no encontrado por "
+        f"$ 389.900,00\n{exportar.DISCREPANCIAS_UNA}"
     )
     comprobar_lista(
         gen,
@@ -752,6 +753,27 @@ def test_todos_los_activos_replica_la_huella():
     assert regla_esp["formulas"] == [FORMULAS["Todos los activos"]]
 
 
+def test_la_linea_de_discrepancias_solo_sale_si_las_hay_y_dice_cuantas():
+    """Opción C (2026-11-24): sin discrepancias, solo las cifras; con una, en singular; con
+    varias, su número. Discrepancia = esperada y encontrada llenas y distintas (la misma
+    regla que pinta el ámbar); un no encontrado nunca lo es."""
+    doc = exportar.documento(INFORME, _detalle_diseno())
+    (otra,) = [a for a in doc.detalle if exportar.es_discrepancia(a)]
+    misma = dataclasses.replace(otra, encontrada=otra.ubicacion)
+    sin_ver = dataclasses.replace(otra, encontrada=None, encontrado=False)
+    cifras = doc.totales
+    base = exportar._resumen_de_lista(cifras)
+    assert exportar._nota_de_lista(cifras, [misma, sin_ver]) == base
+    assert exportar._nota_de_lista(cifras, [otra, misma]) == f"{base}\n{exportar.DISCREPANCIAS_UNA}"
+    varias = exportar._nota_de_lista(cifras, [otra] * 3 + [misma])
+    assert varias == f"{base}\n" + exportar.DISCREPANCIAS_VARIAS.format(n="3")
+    assert varias.endswith(
+        "3 discrepancias en amarillo: activos encontrados en una ubicación "
+        "distinta de la registrada."
+    )
+    assert "tabla dinámica" not in base
+
+
 @pytest.mark.parametrize("nombre", ["Electrónica", "Mobiliario"])
 def test_hoja_por_categoria_replica_la_huella(nombre):
     gen = _generar_informe()
@@ -759,13 +781,19 @@ def test_hoja_por_categoria_replica_la_huella(nombre):
     filas = [f[:2] + f[3:] for f in _filas_todos(detalle)]
     cifras = next(c for c in INFORME["desglose"]["categorias"] if c["etiqueta"] == nombre)
     pct = exportar.porcentaje(cifras["unidades_encontrado"], cifras["unidades_registrado"])
+    encontrados, no_encontrados = cifras["unidades_encontrado"], cifras["unidades_no_encontrado"]
     nota = (
-        f"{exportar._activos(cifras['unidades_registrado'])} · encontrados "
-        f"{cifras['unidades_encontrado']} ({pct}) por "
-        f"{exportar.formato_cop(Decimal(cifras['total_encontrado']))} · no encontrados "
-        f"{cifras['unidades_no_encontrado']} por "
-        f"{exportar.formato_cop(Decimal(cifras['total_no_encontrado']))} · {exportar.LEYENDA}"
+        f"{exportar._activos(cifras['unidades_registrado'])} · {encontrados} "
+        f"{'encontrado' if encontrados == 1 else 'encontrados'} ({pct}) por "
+        f"{exportar.formato_cop(Decimal(cifras['total_encontrado']))} · {no_encontrados} "
+        f"{'no encontrado' if no_encontrados == 1 else 'no encontrados'} por "
+        f"{exportar.formato_cop(Decimal(cifras['total_no_encontrado']))}"
     )
+    # La segunda línea solo si la categoría tiene discrepancias (la lámpara es Electrónica).
+    if any(exportar.es_discrepancia(a) for a in exportar.documento(INFORME, detalle).detalle):
+        nota += f"\n{exportar.DISCREPANCIAS_UNA}"
+    else:
+        assert nombre == "Mobiliario"
     comprobar_lista(
         gen,
         nombre,

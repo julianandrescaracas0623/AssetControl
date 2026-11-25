@@ -866,11 +866,11 @@ ROTULOS_FIJOS = frozenset(
 # Frases fijas con cifras: se versionan con las cifras ya sustituidas por marcadores.
 FRASES_CON_MARCADORES = frozenset(
     {
-        "{n} activo · encontrados {n} ({pct}) por {cop} · no encontrados {n} por {cop} · "
-        "tabla «Activos», lista para filtrar o hacer una tabla dinámica. "
-        "En cursiva y fondo ámbar: se encontró en otra ubicación.",
-        "{n} activo · encontrados {n} ({pct}) por {cop} · no encontrados {n} por {cop} · "
-        "En cursiva y fondo ámbar: se encontró en otra ubicación.",
+        # Nota de las listas (opción C, 2026-11-24): la segunda línea solo si hay
+        # discrepancias (``exportar._nota_de_lista``).
+        "{n} activos · {n} encontrados ({pct}) por {cop} · {n} no encontrados por {cop}\n"
+        "{n} discrepancias en amarillo: activos encontrados en una ubicación distinta de la "
+        "registrada.",
         "{n} activos no encontrados por {cop}.",
         "{n} activo",
         "{n} activos no encontrados",
@@ -1543,6 +1543,13 @@ DECISIONES_ENCABEZADO = {
     "inmoviliza paneles: Excel dibuja una línea en el corte que no se puede ocultar (al "
     "imprimir, la cabecera se sigue repitiendo). Las huellas "
     "`activos.json` e `informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.",
+    "nota_de_lista": "Decisión del humano 2026-11-24 (opción C): la nota de «Todos los "
+    "activos» y de cada categoría da las cifras en la primera línea («N activos · n "
+    "encontrados (pct) por $ … · n no encontrados por $ …», con singular y plural) y, solo si "
+    "la hoja tiene discrepancias, una segunda con cuántas son: «N discrepancias en amarillo: "
+    "activos encontrados en una ubicación distinta de la registrada». Discrepancia = "
+    "ubicación esperada y «Encontrado en» llenas y distintas, la misma regla que pinta la fila "
+    "de ámbar. Se quita la frase de la tabla dinámica.",
     "resumen_opcion_c": "Decisión del humano 2026-11-24 (opción C): el Resumen deja la "
     "plantilla. Título junto al logo, sin combinar. Tarjetas 2 × 2 con fondo `F3F4F6` en "
     "A:B y C:D (filas 7–12, 24 pt): Encontrado, No encontrado, Total registrado y % "

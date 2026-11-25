@@ -357,7 +357,14 @@ SIN_DETALLE = (
 EMPRESA_VIGENTE = (
     "Datos de la empresa vigentes: la sesión se cerró antes de guardarlos con el informe."
 )
-LEYENDA = "En cursiva y fondo ámbar: se encontró en otra ubicación."
+# Nota de las hojas de lista (opción C, decisión del humano 2026-11-24): cifras en la primera
+# línea y, solo si hay discrepancias, cuántas son y qué significa el amarillo en la segunda.
+DISCREPANCIAS_UNA = (
+    "1 discrepancia en amarillo: activo encontrado en una ubicación distinta de la registrada."
+)
+DISCREPANCIAS_VARIAS = (
+    "{n} discrepancias en amarillo: activos encontrados en una ubicación distinta de la registrada."
+)
 # Resumen, opción C (decisión del humano 2026-11-24), en índices de xlsxwriter (0 = fila 1):
 # tarjetas 2 × 2 en A:B y C:D y el panel de la sesión en F:J (filas 7–12); la nota y los
 # avisos, a todo el ancho desde la fila 14.
@@ -453,8 +460,7 @@ def a_excel(doc: Documento) -> bytes:
             est.PLANTILLAS["todos"],
             doc,
             titulo="Todos los activos del cierre",
-            nota=f"{_resumen_de_lista(t)} · tabla «{TABLA_ACTIVOS}», lista para filtrar o "
-            f"hacer una tabla dinámica. {LEYENDA}",
+            nota=_nota_de_lista(t, doc.detalle),
             total=(
                 "Total",
                 HOJA_TODOS,
@@ -546,7 +552,7 @@ def a_excel(doc: Documento) -> bytes:
             plantilla,
             doc,
             titulo=f"Categoría: {cifras.etiqueta}",
-            nota=f"{_resumen_de_lista(cifras)} · {LEYENDA}",
+            nota=_nota_de_lista(cifras, activos),
             total=(
                 "Total",
                 cifras.etiqueta,
@@ -773,14 +779,30 @@ def _hoja_resumen(libro: Any, estilos: Any, doc: Documento) -> Any:
 
 
 def _resumen_de_lista(cifras: Fila) -> str:
-    """``N activos · encontrados n (pct) por $ … · no encontrados n por $ …`` (congeladas)."""
+    """``N activos · n encontrados (pct) por $ … · n no encontrados por $ …`` (congeladas)."""
+    encontrados, no_encontrados = cifras.encontrado.unidades, cifras.no_encontrado.unidades
     return (
-        f"{_activos(cifras.registrado.unidades)} · encontrados "
-        f"{formato_entero(cifras.encontrado.unidades)} ({cifras.porcentaje}) por "
-        f"{formato_cop(cifras.encontrado.valor)} · no encontrados "
-        f"{formato_entero(cifras.no_encontrado.unidades)} por "
+        f"{_activos(cifras.registrado.unidades)} · {formato_entero(encontrados)} "
+        f"{'encontrado' if encontrados == 1 else 'encontrados'} ({cifras.porcentaje}) por "
+        f"{formato_cop(cifras.encontrado.valor)} · {formato_entero(no_encontrados)} "
+        f"{'no encontrado' if no_encontrados == 1 else 'no encontrados'} por "
         f"{formato_cop(cifras.no_encontrado.valor)}"
     )
+
+
+def es_discrepancia(a: Detalle) -> bool:
+    """Encontrado en una ubicación distinta de la registrada: la misma regla que pinta la
+    fila de ámbar en el Excel (formato condicional ``formula_otra_ubicacion``)."""
+    return bool(a.ubicacion) and bool(a.encontrada) and a.ubicacion != a.encontrada
+
+
+def _nota_de_lista(cifras: Fila, activos: Sequence[Detalle]) -> str:
+    """Las cifras de la hoja y, solo si hay discrepancias, la segunda línea con cuántas son."""
+    n = sum(1 for a in activos if es_discrepancia(a))
+    if n == 0:
+        return _resumen_de_lista(cifras)
+    leyenda = DISCREPANCIAS_UNA if n == 1 else DISCREPANCIAS_VARIAS.format(n=formato_entero(n))
+    return f"{_resumen_de_lista(cifras)}\n{leyenda}"
 
 
 def _o_vacia(texto: str | None) -> str | None:

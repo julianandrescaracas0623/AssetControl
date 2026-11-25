@@ -480,7 +480,8 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 | H6 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | 5–9, 25 |
 | I6 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | 5–9, 25 |
 | J6 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | 5–9, 25 |
-| A7 | {n} activo · encontrados {n} ({pct}) por {cop} · no encontrados {n} por {cop} · tabla «Activos», lista para filtrar o hacer una tabla dinámica. En cursiva y fondo ámbar: se encontró en otra ubicación. | Arial 9 FF6B7280; alin general/center ajuste | 5–9, 25 |
+| A7 | {n} activos · {n} encontrados ({pct}) por {cop} · {n} no encontrados por {cop}
+{n} discrepancias en amarillo: activos encontrados en una ubicación distinta de la registrada. | Arial 9 FF6B7280; alin general/center ajuste | 5–9, 25 |
 | A8 | Total | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | 5–9, 25 |
 | B8 | Todos los activos | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | 5–9, 25 |
 | C8 |  | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin left/center | 5–9, 25 |
@@ -840,7 +841,8 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 | H6 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/center | 5–9, 25 |
 | I6 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/center | 5–9, 25 |
 | J6 |  | Calibri 11 tema 1; alin general/center | 5–9, 25 |
-| A7 | {n} activo · encontrados {n} ({pct}) por {cop} · no encontrados {n} por {cop} · En cursiva y fondo ámbar: se encontró en otra ubicación. | Arial 9 FF6B7280; alin general/center ajuste | 5–9, 25 |
+| A7 | {n} activos · {n} encontrados ({pct}) por {cop} · {n} no encontrados por {cop}
+{n} discrepancias en amarillo: activos encontrados en una ubicación distinta de la registrada. | Arial 9 FF6B7280; alin general/center ajuste | 5–9, 25 |
 | A8 | Total | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | 5–9, 25 |
 | B8 | {texto} | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | 5–9, 25 |
 | C8 |  | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | 5–9, 25 |
@@ -1475,4 +1477,5 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 ## Encabezado junto al logo (decisión del humano 2026-11-24)
 
 - `encabezado_junto_al_logo`: Decisión del humano 2026-11-24: el bloque de las dos exportaciones (activos e informe) pone el título junto al logo y debajo la línea «Informe · empresa · exportado|corte fecha» (C3) con una línea fina gris. En la fila 4, los rótulos «Empresa», «Contacto» y «Dirección»; en la fila 5, bajo cada uno, sus datos (nombre y NIT; correo y teléfono; dirección) en celdas combinadas con ajuste de texto, hasta el fin de la banda. Un dato ausente se omite y un grupo sin datos va sin rótulo. Se quitan los rótulos «Exportado» y «Correo» de la plantilla. Alturas: fila 4 = 16 y fila 5 = 30. El logo conserva su caja y su tamaño (`CajaLogo`, en EMU) y lleva un marco gris fino (`D1D5DB`, 0,75 pt, sin relleno) a 3 px de la imagen; el marco depende del logo, así que no va en la huella y lo cubre su propia prueba. Ninguna hoja inmoviliza paneles: Excel dibuja una línea en el corte que no se puede ocultar (al imprimir, la cabecera se sigue repitiendo). Las huellas `activos.json` e `informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.
+- `nota_de_lista`: Decisión del humano 2026-11-24 (opción C): la nota de «Todos los activos» y de cada categoría da las cifras en la primera línea («N activos · n encontrados (pct) por $ … · n no encontrados por $ …», con singular y plural) y, solo si la hoja tiene discrepancias, una segunda con cuántas son: «N discrepancias en amarillo: activos encontrados en una ubicación distinta de la registrada». Discrepancia = ubicación esperada y «Encontrado en» llenas y distintas, la misma regla que pinta la fila de ámbar. Se quita la frase de la tabla dinámica.
 - `resumen_opcion_c`: Decisión del humano 2026-11-24 (opción C): el Resumen deja la plantilla. Título junto al logo, sin combinar. Tarjetas 2 × 2 con fondo `F3F4F6` en A:B y C:D (filas 7–12, 24 pt): Encontrado, No encontrado, Total registrado y % encontrado, con rótulo, cifra (número COP o %) y unidades; bajo el %, una barra de datos clásica de 0 a 1 en C12 (solo la barra, azul claro de los desgloses; la de Excel 2010 escribe fórmulas `xm:f`). Bordes blancos gruesos separan las tarjetas. Panel «Sesión» en F7:J12 con borde fino: Nombre, Cerró, Cerrada, Moneda y Estado. La nota y los avisos van a todo el ancho desde la fila 14, en un recuadro gris. Anchos propios del Resumen para que las cifras quepan (A 24, B 26, C:D 25, E 3, F 22, G 18, H:I 12, J 14).
