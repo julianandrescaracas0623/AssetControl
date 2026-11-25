@@ -23,6 +23,7 @@ rechaza. Texto: siempre ``write_string`` (nunca fórmula).
 
 from __future__ import annotations
 
+import functools
 import io
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -43,7 +44,8 @@ GRIS_ACTIVOS = "#4B5563"  # activos: fecha, «Correo», contacto, dirección (R7
 FONDO_CABECERA = "#1F2937"
 BLANCO = "#FFFFFF"
 DIVISOR = "#E5E7EB"  # línea fina bajo «Informe · …» (encabezado, 2026-11-24)
-MARCO_LOGO = "#D1D5DB"  # marco fino del logo (2026-11-24)
+MARCO_LOGO = "#9CA3AF"  # borde del logo: gris medio (decisión del humano 2026-11-25)
+LINEA_PANEL = "#D1D5DB"  # borde del panel «Sesión» del Resumen
 LINEA = "#9CA3AF"  # bordes finos de cabecera, datos y total
 FONDO_TARJETA = "#F3F4F6"  # tarjetas y nota del Resumen (opción C, 2026-11-24)
 FONDO_TOTAL = "#DBEAFE"  # Total de «Por ubicación» y «Por categoría»
@@ -68,10 +70,15 @@ TEXTO_ALTERNATIVO_LOGO = "Picture"  # L8
 # el logo no cambia: su tamaño va en EMU (``CajaLogo``) y no depende del alto de las filas.
 ALTOS_BLOQUE = {0: 6, 1: 44.1, 2: 18, 3: 16, 4: 30}
 FILA_LOGO = 1  # el logo se ancla en la fila 2, columna A
-# Marco del logo (decisión del humano 2026-11-24): línea gris fina a 3 px de la imagen. Con
-# 3 px cabe en todas las hojas sin pasar a la columna C (en «Activos» quedan 3 px libres).
+# Borde del logo (decisiones del humano 2026-11-24 y 2026-11-25): gris medio de 1 pt con
+# esquinas redondeadas (radio 30 px), a 3 px de la imagen, que también lleva las esquinas
+# redondeadas. Con 3 px cabe en todas las hojas sin pasar a la columna C (en «Activos»
+# quedan 3 px libres). Se compone en una sola imagen al triple de resolución (nítida).
 MARGEN_MARCO_PX = 3
-ANCHO_LINEA_MARCO = 0.75  # puntos
+ANCHO_LINEA_MARCO = 1.0  # puntos
+RADIO_MARCO_PX = 30
+ESCALA_LOGO = 3
+MAX_PIXELES_LOGO = 40_000_000  # el mismo tope de las fotos (bomba de descompresión)
 
 
 def _arial(tamano: int, color: str, negrita: bool = False) -> dict[str, Any]:
@@ -98,7 +105,7 @@ _DIVISOR = {"bottom": 1, "bottom_color": DIVISOR}
 _AJUSTE = {"text_wrap": True}
 
 # Resumen (opción C, 2026-11-24): bordes del panel de la sesión y de las tarjetas.
-_LINEA_PANEL = MARCO_LOGO
+_LINEA_PANEL = LINEA_PANEL
 _PANEL = {"border": 1, "border_color": _LINEA_PANEL}
 _PANEL_IZQ = {"left": 1, "left_color": _LINEA_PANEL}
 _PANEL_DER = {"right": 1, "right_color": _LINEA_PANEL}
@@ -486,6 +493,10 @@ PLANTILLAS: dict[str, Plantilla] = {
     ),
 }
 
+# Caja de referencia del logo con borde (2026-11-25): se compone una sola vez con ella y
+# cada hoja lo escala a la suya (las cajas difieren menos del 10 %).
+CAJA_REFERENCIA = PLANTILLAS["activos"].caja_logo
+
 
 # --- Formatos ----------------------------------------------------------------------------
 
@@ -728,26 +739,60 @@ def ajustar_logo(
     return AjusteLogo(cx / natural_cx, cy / natural_cy, cx, cy)
 
 
-def dibujar_marco_logo(hoja: Any, caja: CajaLogo, ajuste: AjusteLogo) -> None:
-    """Marco gris del logo: rectángulo sin relleno ni texto, ajustado a la imagen (no a la
-    caja) con ``MARGEN_MARCO_PX`` de margen. Va antes de la imagen, que queda encima; el
-    logo no cambia de tamaño ni de posición."""
-    m = MARGEN_MARCO_PX
-    hoja.insert_textbox(
-        FILA_LOGO,
-        0,
-        "",
-        {
-            "x_offset": max(0, caja.col_off / EMU_POR_PX - m),
-            "y_offset": max(0, caja.fila_off / EMU_POR_PX - m),
-            "width": ajuste.cx / EMU_POR_PX + 2 * m,
-            "height": ajuste.cy / EMU_POR_PX + 2 * m,
-            "object_position": 2,
-            "line": {"color": MARCO_LOGO, "width": ANCHO_LINEA_MARCO},
-            "fill": {"none": True},
-            "decorative": True,
-        },
+def alto_bloque_px() -> float:
+    """Alto, en píxeles, de las filas 2–5 (de la banda a la línea azul del encabezado)."""
+    return sum(ALTOS_BLOQUE[f] for f in range(FILA_LOGO, 5)) * 96 / 72
+
+
+def y_logo_px(ajuste: AjusteLogo) -> float:
+    """Desplazamiento vertical que centra el logo entre la banda y la línea azul de la fila
+    5 (decisión del humano 2026-11-25): la fila 5 creció y el logo quedaba arriba."""
+    return max(MARGEN_MARCO_PX, (alto_bloque_px() - ajuste.cy / EMU_POR_PX) / 2)
+
+
+@functools.lru_cache(maxsize=8)
+def componer_logo(logo: bytes) -> tuple[bytes, int, int] | None:
+    """El logo con su borde, en una sola imagen PNG: esquinas redondeadas y borde gris a
+    ``MARGEN_MARCO_PX`` de la imagen, al triple de resolución. Se compone una vez, con la
+    caja de «Activos» de referencia, y cada hoja la escala a su caja: el libro guarda una
+    sola imagen. Devuelve los bytes y su tamaño en píxeles, o ``None`` si Pillow no puede
+    (o no debe) procesarlo."""
+    from PIL import Image as Pil
+    from PIL import ImageDraw, UnidentifiedImageError
+
+    s, m = ESCALA_LOGO, MARGEN_MARCO_PX
+    try:
+        with Pil.open(io.BytesIO(logo)) as fuente:
+            if fuente.width * fuente.height > MAX_PIXELES_LOGO:
+                return None
+            dpi = fuente.info.get("dpi") or (96, 96)
+            imagen = fuente.convert("RGBA")
+    except (UnidentifiedImageError, OSError, ValueError, Pil.DecompressionBombError):
+        return None
+    try:
+        ajuste = ajustar_logo(
+            imagen.width, imagen.height, float(dpi[0]) or 96, float(dpi[1]) or 96, CAJA_REFERENCIA
+        )
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+    ancho, alto = ajuste.cx / EMU_POR_PX, ajuste.cy / EMU_POR_PX  # tamaño del logo, en px
+    lw, lh = max(1, round(ancho * s)), max(1, round(alto * s))
+    cw, ch = round((ancho + 2 * m) * s), round((alto + 2 * m) * s)
+    imagen = imagen.resize((lw, lh), Pil.Resampling.LANCZOS)
+    # Esquinas de la imagen: el radio del borde menos el margen (curvas concéntricas).
+    mascara = Pil.new("L", (lw, lh), 0)
+    radio_logo = max(0, RADIO_MARCO_PX - m) * s
+    ImageDraw.Draw(mascara).rounded_rectangle((0, 0, lw - 1, lh - 1), radius=radio_logo, fill=255)
+    imagen.putalpha(Pil.composite(imagen.getchannel("A"), mascara, mascara))
+    lienzo = Pil.new("RGBA", (cw, ch), (255, 255, 255, 0))
+    lienzo.alpha_composite(imagen, (round(m * s), round(m * s)))
+    grosor = max(1, round(ANCHO_LINEA_MARCO * 96 / 72 * s))
+    ImageDraw.Draw(lienzo).rounded_rectangle(
+        (0, 0, cw - 1, ch - 1), radius=RADIO_MARCO_PX * s, outline=MARCO_LOGO, width=grosor
     )
+    salida = io.BytesIO()
+    lienzo.save(salida, "PNG", optimize=True)  # sin pHYs, como la plantilla (96 dpi)
+    return salida.getvalue(), cw, ch
 
 
 def insertar_logo(hoja: Any, logo: bytes | None, caja: CajaLogo) -> bool:
@@ -763,19 +808,18 @@ def insertar_logo(hoja: Any, logo: bytes | None, caja: CajaLogo) -> bool:
     if not imagen.width or not imagen.height:
         return False
     ajuste = ajustar_logo(imagen.width, imagen.height, imagen.x_dpi, imagen.y_dpi, caja)
-    dibujar_marco_logo(hoja, caja, ajuste)
-    hoja.insert_image(
-        FILA_LOGO,
-        0,
-        "logo.png",
-        {
-            "image_data": io.BytesIO(logo),
-            "x_offset": caja.col_off / EMU_POR_PX,
-            "y_offset": caja.fila_off / EMU_POR_PX,
-            "x_scale": ajuste.x_scale,
-            "y_scale": ajuste.y_scale,
-            "object_position": 2,
-            "description": TEXTO_ALTERNATIVO_LOGO,
-        },
-    )
+    x_px, y_px = caja.col_off / EMU_POR_PX, y_logo_px(ajuste)
+    opciones: dict[str, Any] = {"object_position": 2, "description": TEXTO_ALTERNATIVO_LOGO}
+    compuesto = componer_logo(logo)
+    if compuesto is None:  # sin borde: el logo tal cual (como antes del 2026-11-24)
+        datos, x, y = logo, x_px, y_px
+        opciones.update(x_scale=ajuste.x_scale, y_scale=ajuste.y_scale)
+    else:  # logo con borde: la imagen crece el margen por cada lado; el logo, igual
+        datos, cw, ch = compuesto
+        m = MARGEN_MARCO_PX
+        x, y = x_px - m, y_px - m
+        ancho, alto = ajuste.cx / EMU_POR_PX + 2 * m, ajuste.cy / EMU_POR_PX + 2 * m
+        opciones.update(x_scale=ancho / cw, y_scale=alto / ch)
+    opciones.update(image_data=io.BytesIO(datos), x_offset=max(0, x), y_offset=max(0, y))
+    hoja.insert_image(FILA_LOGO, 0, "logo.png", opciones)
     return True

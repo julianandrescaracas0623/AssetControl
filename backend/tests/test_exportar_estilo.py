@@ -26,6 +26,7 @@ import pytest
 import utils_xlsx_diseno as u
 import xlsxwriter
 from PIL import Image
+from utils_logo import comprobar_logo_con_borde
 
 from app.conteo import exportar_estilo as est
 
@@ -260,34 +261,57 @@ def test_sin_nombre_de_empresa_la_celda_queda_vacia():
 
 
 @pytest.mark.parametrize("clave", CLAVES)
-@pytest.mark.parametrize(("ancho", "alto", "dpi"), [(600, 240, None), (200, 200, None)])
-def test_logo_en_la_caja_de_la_hoja(clave, ancho, alto, dpi):
-    (esp,) = _esperada(clave)["imagenes"]
-    (img,) = _generar(clave, EmpresaFicticia(logo=_png(ancho, alto, dpi)))["imagenes"]
-    caja = esp["ext"]
-    # Equivalente aprobado (Q13): twoCellAnchor que se mueve pero no cambia de tamaño.
-    assert (img["ancla"], img["edit_as"]) == ("twoCellAnchor", "oneCell")
-    assert u.comparar(esp["desde"], img["desde"], "desde") == []
-    assert (img["xfrm"]["x"], img["xfrm"]["y"]) == (esp["xfrm"]["x"], esp["xfrm"]["y"])
-    cx, cy = img["xfrm"]["cx"], img["xfrm"]["cy"]
-    # Una dimensión llena la caja exacta (EMU) y la otra cabe dentro.
-    assert (cx == caja["cx"] and cy <= caja["cy"]) or (cy == caja["cy"] and cx <= caja["cx"])
-    # Proporción del logo conservada (redondeo de 1 EMU en la dimensión derivada).
-    assert abs(cx * alto - cy * ancho) <= max(ancho, alto)
-    assert img["descr"] == esp["descr"] == est.TEXTO_ALTERNATIVO_LOGO
+@pytest.mark.parametrize(("ancho", "alto"), [(600, 240), (200, 200), (1000, 100)])
+def test_logo_con_borde_en_la_caja_de_la_hoja_y_centrado(clave, ancho, alto):
+    """Decisiones del humano 2026-11-24 y 2026-11-25: el logo conserva el tamaño de su caja
+    (Q10), lleva el borde gris redondeado en la misma imagen y queda centrado en altura;
+    el borde no pasa a la columna C."""
+    logo = _png(ancho, alto)
+    hoja = _generar(clave, EmpresaFicticia(logo=logo))
+    (img,) = hoja["imagenes"]
+    comprobar_logo_con_borde(img, est.PLANTILLAS[clave].caja_logo, logo, ancho, alto)
     for k in ("titulo", "oculta", "decorativa", "estirar", "geometria"):
-        assert img[k] == esp[k], k
-    assert (img["imagen"]["ancho"], img["imagen"]["alto"]) == (ancho, alto)
+        assert img[k] == _esperada(clave)["imagenes"][0][k], k
+    assert hoja["formas"] == []  # el borde va en la imagen, no como forma aparte
 
 
 def test_logo_con_dpi_distinto_de_96_sigue_exacto():
     """xlsxwriter escala por 96/dpi: el ajuste lo tiene en cuenta (sin pHYs = 96)."""
     caja = est.PLANTILLAS["activos"].caja_logo
-    (img,) = _generar("activos", EmpresaFicticia(logo=_png(600, 240, 192)))["imagenes"]
-    assert img["imagen"]["phys"] is not None
+    logo = _png(600, 240, 192)
+    (img,) = _generar("activos", EmpresaFicticia(logo=logo))["imagenes"]
     # 600 × 240 a 192 dpi = 300 × 120 px efectivos: manda el alto (116/120 < 297/300).
-    assert img["xfrm"]["cy"] == caja.cy
-    assert img["xfrm"]["cx"] == round(300 * EMU * caja.cy / (120 * EMU)) == 2762250
+    ajuste = est.ajustar_logo(600, 240, 192, 192, caja)
+    assert ajuste.cy == caja.cy
+    assert ajuste.cx == round(300 * EMU * caja.cy / (120 * EMU)) == 2762250
+    comprobar_logo_con_borde(img, caja, logo, 600, 240, dpi=192)
+
+
+def test_el_libro_guarda_una_sola_imagen_del_logo_aunque_las_cajas_difieran():
+    """Se compone una vez (caja de referencia) y cada hoja la escala: una sola imagen."""
+    logo = _png(600, 240)
+    assert est.componer_logo(logo) is est.componer_logo(logo)  # en caché
+    cajas = {p.caja_logo for p in est.PLANTILLAS.values()}
+    assert len(cajas) > 1
+
+
+def test_el_logo_compuesto_tiene_esquinas_redondeadas_y_borde_gris():
+    from PIL import Image as Pil
+
+    logo = _png(600, 240)
+    datos, ancho, alto = est.componer_logo(logo)
+    img = Pil.open(io.BytesIO(datos)).convert("RGBA")
+    assert img.size == (ancho, alto)
+    assert img.getpixel((0, 0))[3] == 0  # esquina fuera de la curva: transparente
+    assert img.getpixel((ancho - 1, alto - 1))[3] == 0
+    gris = tuple(int(est.MARCO_LOGO[i : i + 2], 16) for i in (1, 3, 5))
+    assert img.getpixel((ancho // 2, 1))[:3] == gris  # borde arriba, al medio
+    assert img.getpixel((ancho // 2, alto // 2))[3] == 255  # el logo, opaco
+
+
+@pytest.mark.parametrize("logo", [b"esto no es una imagen", b"\x89PNG\r\n\x1a\n" + b"0" * 40])
+def test_logo_que_pillow_no_lee_no_se_compone(logo):
+    assert est.componer_logo(logo) is None
 
 
 @pytest.mark.parametrize(
@@ -313,26 +337,6 @@ def test_logo_ausente_o_ilegible_genera_sin_imagen(logo):
     hoja = _generar("todos", EmpresaFicticia(logo=logo))
     assert hoja["imagenes"] == []
     assert hoja["formas"] == []  # sin logo no hay marco
-
-
-@pytest.mark.parametrize("clave", CLAVES)
-@pytest.mark.parametrize(("ancho", "alto"), [(600, 240), (200, 200), (1000, 100)])
-def test_el_logo_lleva_un_marco_gris_ajustado_a_la_imagen(clave, ancho, alto):
-    """Decisión del humano 2026-11-24: marco gris fino a 3 px de la imagen, sin relleno ni
-    texto, debajo del logo; no cambia el tamaño ni la posición del logo y no pasa a C."""
-    hoja = _generar(clave, EmpresaFicticia(logo=_png(ancho, alto)))
-    (img,) = hoja["imagenes"]
-    (marco,) = hoja["formas"]
-    m = est.MARGEN_MARCO_PX * EMU
-    i, f = img["xfrm"], marco["xfrm"]
-    assert abs(f["x"] - (i["x"] - m)) <= 1 and abs(f["y"] - (i["y"] - m)) <= 1
-    assert abs(f["cx"] - (i["cx"] + 2 * m)) <= 1 and abs(f["cy"] - (i["cy"] + 2 * m)) <= 1
-    assert marco["linea"] == {"ancho": round(est.ANCHO_LINEA_MARCO * 12700), "color": "D1D5DB"}
-    assert (marco["geometria"], marco["sin_relleno"], marco["texto"]) == ("rect", True, "")
-    assert marco["decorativa"] is True
-    assert marco["edit_as"] == img["edit_as"] == "oneCell"  # se mueve con el logo
-    hasta = marco["hasta"]
-    assert hasta["col"] < 2 or (hasta["col"], hasta["col_off"]) == (2, 0), hasta
 
 
 # ---------------------------------------------------------------------------

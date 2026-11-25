@@ -51,6 +51,7 @@ from flask import Flask
 from openpyxl import load_workbook
 from PIL import Image
 from sqlalchemy import text
+from utils_logo import comprobar_logo_con_borde
 
 from app.activos import exportar, service
 from app.conteo import exportar_estilo as est
@@ -641,13 +642,11 @@ def comprobar_imagen(imagen: dict[str, Any], ancho: int, alto: int) -> None:
     """El logo, en la caja de la plantilla con su proporción (Q10) y los equivalentes
     aceptados (Q13: ancla; L8: nombre «Picture N» y bloqueo de proporción; cstate)."""
     (esp,) = esperada()["imagenes"]
-    assert (imagen["ancla"], imagen["edit_as"]) == ("twoCellAnchor", "oneCell")  # Q13
-    assert u.comparar(esp["desde"], imagen["desde"], "desde") == []
-    assert (imagen["xfrm"]["x"], imagen["xfrm"]["y"]) == (esp["xfrm"]["x"], esp["xfrm"]["y"])
-    caja = esp["ext"]
-    cx, cy = imagen["xfrm"]["cx"], imagen["xfrm"]["cy"]
-    assert (cx == caja["cx"] and cy <= caja["cy"]) or (cy == caja["cy"] and cx <= caja["cx"])
-    assert abs(cx * alto - cy * ancho) <= max(ancho, alto)  # proporción (1 EMU de redondeo)
+    # Caja de la plantilla (Q10) y proporción del logo; con su borde redondeado en la misma
+    # imagen y centrado en altura (decisiones del humano 2026-11-24 y 2026-11-25).
+    comprobar_logo_con_borde(
+        imagen, est.PLANTILLAS["activos"].caja_logo, _png(ancho, alto), ancho, alto
+    )
     for k in ("descr", "titulo", "oculta", "decorativa", "estirar", "geometria", "linea"):
         assert imagen[k] == esp[k], k
     assert imagen["nombre"] == "Picture 1"  # L8, equivalente aceptado (plantilla: «Image 1»)
@@ -658,7 +657,9 @@ def comprobar_imagen(imagen: dict[str, Any], ancho: int, alto: int) -> None:
     assert {k: v for k, v in imagen["imagen"].items() if k not in ("ancho", "alto")} == {
         k: v for k, v in esp["imagen"].items() if k not in ("ancho", "alto")
     }  # PNG sin pHYs, como la plantilla
-    assert (imagen["imagen"]["ancho"], imagen["imagen"]["alto"]) == (ancho, alto)
+    # La imagen guardada es la compuesta (logo y borde), no el logo tal cual.
+    compuesto = est.componer_logo(_png(ancho, alto))
+    assert (imagen["imagen"]["ancho"], imagen["imagen"]["alto"]) == compuesto[1:]
 
 
 LIBRO_IGUAL = (
@@ -1132,14 +1133,16 @@ def test_la_empresa_y_el_logo_de_otro_tenant_no_aparecen(client):
     for dato in TEXTOS_AJENOS:
         assert dato not in xml, dato
     (imagen,) = hoja_de(response)["imagenes"]
-    assert (imagen["imagen"]["ancho"], imagen["imagen"]["alto"]) == (600, 240)
+    tamano = (imagen["imagen"]["ancho"], imagen["imagen"]["alto"])
+    assert tamano == est.componer_logo(_png(600, 240))[1:]  # su logo, con su borde
 
     # Y el otro tenant ve lo suyo, sin lo de A.
     otro = exportar_(client, ADMIN_OTRO)
     hoja_otro = hoja_de(otro)
     assert empresa_en_linea(hoja_otro) == EMPRESA_AJENA["nombre"]
     (imagen_otro,) = hoja_otro["imagenes"]
-    assert (imagen_otro["imagen"]["ancho"], imagen_otro["imagen"]["alto"]) == (120, 100)
+    tamano_otro = (imagen_otro["imagen"]["ancho"], imagen_otro["imagen"]["alto"])
+    assert tamano_otro == est.componer_logo(_png(120, 100))[1:] != tamano
     xml_otro = _todo_el_xml(otro.data)
     for dato in [*EMPRESA.values(), NIT_NORMALIZADO, propio["codigo"]]:
         assert dato not in xml_otro, dato

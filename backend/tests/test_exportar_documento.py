@@ -21,6 +21,7 @@ import utils_xlsx_diseno as u_diseno
 from openpyxl import load_workbook
 from PIL import Image
 from pypdf import PdfReader
+from utils_logo import comprobar_logo_con_borde
 
 from app.conteo import exportar
 from app.conteo import exportar_estilo as est
@@ -619,11 +620,10 @@ def comprobar_imagen_de_hoja(hoja: dict, esp: dict) -> None:
     dentro de la caja de la plantilla."""
     (img_esp,) = esp["imagenes"]
     (img,) = hoja["imagenes"]
-    assert (img["ancla"], img["edit_as"]) == ("twoCellAnchor", "oneCell")
-    assert u_diseno.comparar(img_esp["desde"], img["desde"], "desde") == []
-    assert (img["xfrm"]["x"], img["xfrm"]["y"]) == (img_esp["xfrm"]["x"], img_esp["xfrm"]["y"])
-    caja, cx, cy = img_esp["ext"], img["xfrm"]["cx"], img["xfrm"]["cy"]
-    assert (cx == caja["cx"] and cy <= caja["cy"]) or (cy == caja["cy"] and cx <= caja["cx"])
+    # La caja de la plantilla (Q10); el logo, con su borde y centrado (2026-11-24/25).
+    desde, ext = img_esp["desde"], img_esp["ext"]
+    caja = est.CajaLogo(desde["col_off"], desde["fila_off"], ext["cx"], ext["cy"])
+    comprobar_logo_con_borde(img, caja, _png_logo(), 600, 240)
     for k in ("descr", "titulo", "oculta", "decorativa", "estirar", "geometria"):
         assert img[k] == img_esp[k], k
 
