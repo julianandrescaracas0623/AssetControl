@@ -35,6 +35,15 @@ PERMITIDOS_BLOQUE = {
     "Dirección",
     "{empresa.nombre}\nNIT {empresa.nit}",
     "{empresa.correo}\nTel. {empresa.telefono}",
+    # Panel «Sesión» del Resumen (opción C, 2026-11-24); sus valores van como {texto}.
+    "Sesión",
+    "Nombre",
+    "Cerró",
+    "Cerrada",
+    "Moneda",
+    "COP",
+    "Estado",
+    "Informe congelado",
 }
 
 

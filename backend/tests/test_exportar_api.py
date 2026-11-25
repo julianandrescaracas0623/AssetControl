@@ -182,19 +182,18 @@ def esperado_desglose(informe: dict, dimension: str) -> list[list]:
 
 
 def tarjetas(hoja) -> dict[str, tuple]:
-    """Tarjetas del tablero del Resumen: rótulo → (celda del valor, texto de debajo)."""
+    """Tarjetas del Resumen (opción C, 2 × 2): rótulo → (celda del valor, lo de debajo).
+    Debajo del % va la barra (el mismo número, que solo se ve como barra)."""
     rotulos = ("Encontrado", "No encontrado", "Total registrado", "% encontrado")
-    for fila in hoja.iter_rows():
-        valores = [c.value for c in fila]
-        if all(r in valores for r in rotulos):
-            resultado = {}
-            for celda in fila:
-                if celda.value in rotulos:
-                    valor = hoja.cell(row=celda.row + 1, column=celda.column)
-                    debajo = hoja.cell(row=celda.row + 2, column=celda.column).value
-                    resultado[celda.value] = (valor, debajo)
-            return resultado
-    raise AssertionError("el Resumen no tiene las cuatro tarjetas")
+    resultado = {}
+    for fila in hoja.iter_rows(max_row=13):
+        for celda in fila:
+            if celda.value in rotulos:
+                valor = hoja.cell(row=celda.row + 1, column=celda.column)
+                debajo = hoja.cell(row=celda.row + 2, column=celda.column).value
+                resultado[celda.value] = (valor, debajo)
+    assert sorted(resultado) == sorted(rotulos), "el Resumen no tiene las cuatro tarjetas"
+    return resultado
 
 
 def excel(client, sesion, headers=ADMIN):
@@ -281,7 +280,7 @@ def test_excel_has_a_summary_one_sheet_per_category_and_the_missing(client):
     pct, debajo = cartas["% encontrado"]
     assert isinstance(pct.value, (int, float)) and Decimal(str(pct.value)) == Decimal("0.5")
     assert pct.number_format == est.FORMATO_PORCENTAJE
-    assert debajo == "de las unidades registradas"
+    assert debajo == pct.value  # la barra del % (opción C, 2026-11-24)
     # Criterio 8: las dos hojas de desglose dicen exactamente lo de ``cierre.informe``.
     por_categoria, por_ubicacion = wb["Por categoría"], wb["Por ubicación"]
     assert filas_desglose(por_categoria, "Por categoría") == esperado_desglose(
@@ -318,21 +317,26 @@ def test_summary_has_the_template_cards_and_the_closing_context(client):
     resumen = libro(excel(client, sesion))["Resumen"]
     assert resumen["C2"].value == "Informe de activos"
     assert resumen["C3"].value.endswith("· corte 30/11/2026")
-    contexto = exportar.FILA_CONTEXTO_RESUMEN + 1
-    filas = [
+    # Panel «Sesión» (F7:J12, opción C) y, debajo, la nota a todo el ancho (A14).
+    panel = [
         [c for c in fila if c is not None]
-        for fila in resumen.iter_rows(min_row=contexto, values_only=True)
+        for fila in resumen.iter_rows(min_row=7, max_row=12, min_col=6, values_only=True)
     ]
     cerrada_en = datetime.fromisoformat(informe["sesion"]["cerrada_en"])
     hora = cerrada_en.astimezone(timezone(timedelta(hours=-5)))
     cuando = exportar._fecha_hora(informe["sesion"]["cerrada_en"])
     assert cuando.startswith(f"{hora:%d/%m/%Y}, ")
-    assert filas == [
-        ["Sesión", "Conteo nov 2026"],
-        ["Cerró", ADMIN_A.nombre, "Cerrada", cuando],
+    assert panel == [
+        ["Sesión"],
+        ["Nombre", "Conteo nov 2026"],
+        ["Cerró", ADMIN_A.nombre],
+        ["Cerrada", cuando],
         ["Moneda", "COP"],
         ["Estado", "Informe congelado"],
-        [exportar.NOTA],
+    ]
+    nota = exportar.FILA_NOTA_RESUMEN + 1
+    assert [c for fila in resumen.iter_rows(min_row=nota, values_only=True) for c in fila if c] == [
+        exportar.NOTA
     ]
     assert resumen.page_setup.orientation == "landscape"
     assert resumen.sheet_properties.pageSetUpPr.fitToPage

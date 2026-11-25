@@ -358,13 +358,14 @@ EMPRESA_VIGENTE = (
     "Datos de la empresa vigentes: la sesión se cerró antes de guardarlos con el informe."
 )
 LEYENDA = "En cursiva y fondo ámbar: se encontró en otra ubicación."
-# Resumen (spec 019, Q7): las filas de contexto empiezan en la fila 10 (índice 9), bajo las
-# tarjetas (filas 6–8); la fila 9 queda vacía, como el espacio de la plantilla.
-FILA_CONTEXTO_RESUMEN = 9
-FILA_TARJETAS = 5  # rótulos (fila 6); valores (7) y subtexto (8) debajo
-# Tarjetas en A, C, E y G; las celdas entre ellas y H–J llevan el estilo por defecto
-# centrado de la plantilla (B6, D6, F6, H6–J6 …).
-COLUMNAS_TARJETAS = 10
+# Resumen, opción C (decisión del humano 2026-11-24), en índices de xlsxwriter (0 = fila 1):
+# tarjetas 2 × 2 en A:B y C:D y el panel de la sesión en F:J (filas 7–12); la nota y los
+# avisos, a todo el ancho desde la fila 14.
+FILA_TARJETAS = 6
+FILA_NOTA_RESUMEN = 13
+COLUMNA_PANEL = 5  # F
+ULTIMA_COLUMNA_RESUMEN = 9  # J
+CARACTERES_POR_LINEA_NOTA = 230  # Arial 9 en A:J (≈ 1 250 px)
 
 
 def nombres_de_hoja(categorias: Sequence[str]) -> list[str]:
@@ -668,64 +669,106 @@ def _hoja_de_desglose(
     return hoja
 
 
-def _contexto_resumen(doc: Documento) -> list[tuple[str | None, ...]]:
-    """Filas finales del Resumen (spec 019, Q7): sesión, quién cerró y cuándo, moneda,
-    estado, la nota de cifras congeladas y los avisos que apliquen."""
-    filas: list[tuple[str | None, ...]] = [
-        ("Sesión", doc.sesion or None),
-        ("Cerró", doc.cerrada_por or None, "Cerrada", doc.cerrada_en or None),
+def _datos_sesion(doc: Documento) -> list[tuple[str, str | None]]:
+    """Panel «Sesión» del Resumen: rótulo y valor (vacío si falta)."""
+    return [
+        ("Nombre", doc.sesion or None),
+        ("Cerró", doc.cerrada_por or None),
+        ("Cerrada", doc.cerrada_en or None),
         ("Moneda", "COP"),
         ("Estado", "Informe congelado"),
-        (NOTA,),
     ]
+
+
+def _notas_resumen(doc: Documento) -> list[str]:
+    """La nota de cifras congeladas y los avisos que apliquen, a todo el ancho."""
+    notas = [NOTA]
     if not doc.detalle_disponible:
-        filas.append((SIN_DETALLE,))
+        notas.append(SIN_DETALLE)
     if doc.empresa.vigente:
-        filas.append((EMPRESA_VIGENTE,))
-    return filas
+        notas.append(EMPRESA_VIGENTE)
+    return notas
+
+
+def _alto_nota(texto: str) -> float:
+    """Alto de una nota combinada en A:J: 12 pt por línea estimada más aire."""
+    lineas = max(1, -(-len(texto) // CARACTERES_POR_LINEA_NOTA))
+    return 12.0 * lineas + 10
 
 
 def _hoja_resumen(libro: Any, estilos: Any, doc: Documento) -> Any:
-    """Resumen de la plantilla B (spec 019, T5): bloque (filas 1–5, título combinado C2:D2),
-    las cuatro tarjetas (rótulo en la fila 6, valor en la 7 y subtexto en la 8; columnas A,
-    C, E y G) y, desde la fila 10, las filas de contexto con el estilo de la nota de lista
-    (Q7). La lista «Todos los activos» duplicada de la plantilla no se genera (Q7)."""
+    """Resumen, opción C (decisión del humano 2026-11-24): bloque (filas 1–5), tarjetas
+    2 × 2 con fondo gris a la izquierda (Encontrado, No encontrado, Total registrado y
+    % encontrado con su barra), el panel de la sesión a la derecha y, debajo, la nota de
+    cifras congeladas y los avisos a todo el ancho. Todo texto va como texto; las cifras,
+    como números (COP y porcentaje)."""
     plantilla = est.PLANTILLAS["resumen"]
     hoja = libro.add_worksheet(HOJA_RESUMEN)
-    contexto = _contexto_resumen(doc)
-    est.preparar_hoja(hoja, plantilla, FILA_CONTEXTO_RESUMEN + len(contexto) - 1)
+    notas = _notas_resumen(doc)
+    est.preparar_hoja(hoja, plantilla, FILA_NOTA_RESUMEN + len(notas) - 1)
     est.dibujar_bloque(hoja, estilos, plantilla, doc.empresa, _fecha_de_corte(doc))
     t = doc.totales
-    tarjetas = (
-        ("Encontrado", "tarjeta_rotulo", t.encontrado.valor, "tarjeta_valor_cop"),
-        ("No encontrado", "tarjeta_rotulo", t.no_encontrado.valor, "tarjeta_valor_cop"),
-        ("Total registrado", "tarjeta_rotulo", t.registrado.valor, "tarjeta_valor_cop"),
-        (
-            "% encontrado",
-            "tarjeta_subtexto",  # G6 de la plantilla: sin negrita y en gris
-            fraccion_encontrada(t.encontrado.unidades, t.registrado.unidades),
-            "tarjeta_valor_porcentaje",
-        ),
+    pct = fraccion_encontrada(t.encontrado.unidades, t.registrado.unidades)
+    # (fila, columna, valor, estilo): cada celda combinada en dos columnas.
+    tarjetas: list[tuple[int, int, Any, str]] = [
+        (0, 0, "Encontrado", "tarjeta_rotulo"),
+        (1, 0, t.encontrado.valor, "tarjeta_valor_cop"),
+        (2, 0, _unidades(t.encontrado.unidades), "tarjeta_subtexto"),
+        (0, 2, "No encontrado", "tarjeta_rotulo_izq"),
+        (1, 2, t.no_encontrado.valor, "tarjeta_valor_cop_izq"),
+        (2, 2, _unidades(t.no_encontrado.unidades), "tarjeta_subtexto_izq"),
+        (3, 0, "Total registrado", "tarjeta_rotulo_arriba"),
+        (4, 0, t.registrado.valor, "tarjeta_valor_cop"),
+        (5, 0, _unidades(t.registrado.unidades), "tarjeta_subtexto"),
+        (3, 2, "% encontrado", "tarjeta_rotulo_izq_arriba"),
+        (4, 2, pct, "tarjeta_valor_porcentaje_izq"),
+    ]
+    for fila, col, valor, estilo in tarjetas:
+        formato = estilos(estilo)
+        hoja.merge_range(FILA_TARJETAS + fila, col, FILA_TARJETAS + fila, col + 1, None, formato)
+        est.escribir_celda(hoja, FILA_TARJETAS + fila, col, valor, formato)
+    # Barra del % (C12, sin combinar: mide lo mismo en Excel y en LibreOffice); D12 es fondo.
+    fila_barra = FILA_TARJETAS + 5
+    est.escribir_celda(hoja, fila_barra, 2, pct, estilos("tarjeta_barra_izq"))
+    hoja.write_blank(fila_barra, 3, None, estilos("tarjeta_subtexto"))
+    hoja.conditional_format(
+        fila_barra,
+        2,
+        fila_barra,
+        2,
+        {
+            "type": "data_bar",
+            "bar_color": est.BARRA,  # el azul claro de las barras de los desgloses
+            "bar_only": True,
+            "min_type": "num",
+            "min_value": 0,
+            "max_type": "num",
+            "max_value": 1,
+            # Barra clásica, como la de los desgloses: la de Excel 2010 escribe sus límites
+            # como fórmulas (``xm:f``) y el libro no lleva ninguna.
+            "data_bar_2010": False,
+        },
     )
-    debajo = (
-        _unidades(t.encontrado.unidades),
-        _unidades(t.no_encontrado.unidades),
-        _unidades(t.registrado.unidades),
-        "de las unidades registradas",
-    )
-    for desplazamiento in range(3):
-        celdas: list[tuple[Any, str]] = [(None, "base_centro")] * COLUMNAS_TARJETAS
-        for i, (rotulo, estilo_rotulo, valor, estilo_valor) in enumerate(tarjetas):
-            celdas[2 * i] = (
-                (rotulo, estilo_rotulo),
-                (valor, estilo_valor),
-                (debajo[i], "tarjeta_subtexto"),
-            )[desplazamiento]
-        est.escribir_fila(hoja, estilos, FILA_TARJETAS + desplazamiento, celdas)
-    for i, fila in enumerate(contexto):
-        est.escribir_fila(
-            hoja, estilos, FILA_CONTEXTO_RESUMEN + i, [(valor, "nota") for valor in fila]
-        )
+    # Panel «Sesión» (F:J): título y, en cada fila, rótulo en F y valor en G:J.
+    panel, ultima = COLUMNA_PANEL, ULTIMA_COLUMNA_RESUMEN
+    titulo = estilos("panel_titulo")
+    hoja.merge_range(FILA_TARJETAS, panel, FILA_TARJETAS, ultima, None, titulo)
+    hoja.write_string(FILA_TARJETAS, panel, "Sesión", titulo)
+    datos = _datos_sesion(doc)
+    for i, (rotulo, valor) in enumerate(datos):
+        fila = FILA_TARJETAS + 1 + i
+        fin = "_fin" if i == len(datos) - 1 else ""
+        est.escribir_celda(hoja, fila, panel, rotulo, estilos(f"panel_rotulo{fin}"))
+        formato = estilos(f"panel_valor{fin}")
+        hoja.merge_range(fila, panel + 1, fila, ultima, None, formato)
+        est.escribir_celda(hoja, fila, panel + 1, valor, formato)
+    # Nota y avisos: recuadro gris a todo el ancho (A:J).
+    nota = estilos("nota_resumen")
+    for i, texto in enumerate(notas):
+        fila = FILA_NOTA_RESUMEN + i
+        est.alto_fila(hoja, fila, _alto_nota(texto))
+        hoja.merge_range(fila, 0, fila, ultima, None, nota)
+        hoja.write_string(fila, 0, texto, nota)
     return hoja
 
 

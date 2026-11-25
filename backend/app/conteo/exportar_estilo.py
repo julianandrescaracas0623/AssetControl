@@ -45,6 +45,7 @@ BLANCO = "#FFFFFF"
 DIVISOR = "#E5E7EB"  # línea fina bajo «Informe · …» (encabezado, 2026-11-24)
 MARCO_LOGO = "#D1D5DB"  # marco fino del logo (2026-11-24)
 LINEA = "#9CA3AF"  # bordes finos de cabecera, datos y total
+FONDO_TARJETA = "#F3F4F6"  # tarjetas y nota del Resumen (opción C, 2026-11-24)
 FONDO_TOTAL = "#DBEAFE"  # Total de «Por ubicación» y «Por categoría»
 BARRA = "#BFDBFE"  # barras de datos (T5)
 AMBAR_TEXTO = "#92400E"  # dxf «se encontró en otra ubicación» (T4)
@@ -96,18 +97,60 @@ _LINEA_TITULO = {"bottom": 1, "bottom_color": TINTA}
 _DIVISOR = {"bottom": 1, "bottom_color": DIVISOR}
 _AJUSTE = {"text_wrap": True}
 
+# Resumen (opción C, 2026-11-24): bordes del panel de la sesión y de las tarjetas.
+_LINEA_PANEL = MARCO_LOGO
+_PANEL = {"border": 1, "border_color": _LINEA_PANEL}
+_PANEL_IZQ = {"left": 1, "left_color": _LINEA_PANEL}
+_PANEL_DER = {"right": 1, "right_color": _LINEA_PANEL}
+_PANEL_ABAJO = {"bottom": 1, "bottom_color": _LINEA_PANEL}
+_DIV_ABAJO = {"bottom": 1, "bottom_color": DIVISOR}
+_HUECO_IZQ = {"left": 5, "left_color": BLANCO}  # espacio entre tarjetas de una fila
+_HUECO_ARRIBA = {"top": 5, "top_color": BLANCO}  # espacio entre las dos filas de tarjetas
+
+
+def _estilos_tarjetas() -> dict[str, dict[str, Any]]:
+    """Celdas de las tarjetas: rótulo, valor (COP o %), subtexto y barra, con sus
+    variantes de borde blanco (``_izq``: tarjeta de la derecha; ``_arriba``: segunda fila)."""
+    fondo = {**_solido(FONDO_TARJETA), "align": "left", "indent": 1}
+    base = {
+        "tarjeta_rotulo": {**_arial(9, GRIS), **fondo, "valign": "bottom"},
+        "tarjeta_valor_cop": {**_arial(16, TINTA, True), **fondo, **_VC, "num_format": FORMATO_COP},
+        "tarjeta_valor_porcentaje": {
+            **_arial(16, TINTA, True),
+            **fondo,
+            **_VC,
+            "num_format": FORMATO_PORCENTAJE,
+        },
+        "tarjeta_subtexto": {**_arial(9, GRIS), **fondo, "valign": "top"},
+        "tarjeta_barra": {**_arial(9, GRIS), **fondo, **_VC},
+    }
+    izq, arriba = _HUECO_IZQ, _HUECO_ARRIBA
+    return {
+        # Encontrado (A7:B9) y Total registrado (A10:B12), a la izquierda.
+        "tarjeta_rotulo": base["tarjeta_rotulo"],
+        "tarjeta_rotulo_arriba": {**base["tarjeta_rotulo"], **arriba},
+        "tarjeta_valor_cop": base["tarjeta_valor_cop"],
+        "tarjeta_subtexto": base["tarjeta_subtexto"],
+        # No encontrado (C7:D9) y % encontrado (C10:D12), a la derecha.
+        "tarjeta_rotulo_izq": {**base["tarjeta_rotulo"], **izq},
+        "tarjeta_rotulo_izq_arriba": {**base["tarjeta_rotulo"], **izq, **arriba},
+        "tarjeta_valor_cop_izq": {**base["tarjeta_valor_cop"], **izq},
+        "tarjeta_subtexto_izq": {**base["tarjeta_subtexto"], **izq},
+        "tarjeta_valor_porcentaje_izq": {**base["tarjeta_valor_porcentaje"], **izq},
+        "tarjeta_barra_izq": {**base["tarjeta_barra"], **izq},
+    }
+
+
 # Catálogo: un formato por cada estilo medido en las plantillas (y ninguno más). «base» es
 # el estilo por defecto (Calibri 11, color de tema 1) con la alineación de cada celda.
 ESTILOS: dict[str, dict[str, Any]] = {
     # Celdas sin texto del bloque y de la plantilla (estilo por defecto + alineación).
     "base": {},
     "base_vcentro": _VC,
-    "base_centro": {"align": "center"},
     # Bloque común (filas 1–5).
     "banda": _solido(AZUL),
     "linea_bloque": _LINEA_BLOQUE,
     "titulo": {**_arial(19, TINTA, True), **_VC},
-    "titulo_resumen": {**_arial(19, TINTA, True), **_CC},
     # Encabezado junto al logo (2026-11-24): «Informe · …» con una línea fina debajo, rótulos
     # «Empresa», «Contacto» y «Dirección» y, bajo cada uno, sus datos en dos líneas.
     "subtitulo": {**_arial(10, GRIS_ACTIVOS), **_DIVISOR, **_VC},
@@ -173,15 +216,16 @@ ESTILOS: dict[str, dict[str, Any]] = {
         "num_format": FORMATO_PORCENTAJE,
     },
     "total_fuera": {**_arial(10, TINTA, True), **_IZQ},
-    # Tarjetas del Resumen (T5).
-    "tarjeta_rotulo": {**_arial(9, AZUL, True), **_CC},
-    "tarjeta_subtexto": {**_arial(9, GRIS), **_CC},
-    "tarjeta_valor_cop": {**_arial(18, TINTA, True), **_CC, "num_format": FORMATO_COP},
-    "tarjeta_valor_porcentaje": {
-        **_arial(18, TINTA, True),
-        **_CC,
-        "num_format": FORMATO_PORCENTAJE,
-    },
+    # Resumen, opción C (decisión del humano 2026-11-24): tarjetas 2 × 2 con fondo gris
+    # (los bordes blancos gruesos hacen de espacio entre ellas), panel de la sesión con
+    # borde fino y la nota en un recuadro gris a todo el ancho.
+    **_estilos_tarjetas(),
+    "panel_titulo": {**_arial(10, TINTA, True), **_PANEL, **_DIV_ABAJO, **_IZQ, "indent": 1},
+    "panel_rotulo": {**_arial(9, GRIS), **_PANEL_IZQ, **_DIV_ABAJO, **_IZQ, "indent": 1},
+    "panel_valor": {**_arial(10, TINTA), **_PANEL_DER, **_DIV_ABAJO, **_VC},
+    "panel_rotulo_fin": {**_arial(9, GRIS), **_PANEL_IZQ, **_PANEL_ABAJO, **_IZQ, "indent": 1},
+    "panel_valor_fin": {**_arial(10, TINTA), **_PANEL_DER, **_PANEL_ABAJO, **_VC},
+    "nota_resumen": {**_arial(9, GRIS), **_solido(FONDO_TARJETA), **_IZQ, **_AJUSTE, "indent": 1},
 }
 
 # dxf del formato condicional «se encontró en otra ubicación» (T4): cursiva y fondo ámbar.
@@ -260,7 +304,19 @@ _COLUMNAS_INFORME = (
     Columnas(7, 8, 16),
     Columnas(9, 9, 18),
 )
-_COLUMNAS_RESUMEN = (Columnas(0, 0, 24), *_COLUMNAS_INFORME[1:])
+# Resumen, opción C (2026-11-24): A:B y C:D anchas para las tarjetas (las cifras caben
+# enteras), E angosta entre las tarjetas y el panel de la sesión (F:J). A:B conserva el
+# ancho de antes: ahí va el logo con su caja.
+_COLUMNAS_RESUMEN = (
+    Columnas(0, 0, 24),
+    Columnas(1, 1, 26),
+    Columnas(2, 3, 25),
+    Columnas(4, 4, 3),
+    Columnas(5, 5, 22),
+    Columnas(6, 6, 18),
+    Columnas(7, 8, 12),
+    Columnas(9, 9, 14),
+)
 _COLUMNAS_NO_ENCONTRADOS = (
     *_COLUMNAS_INFORME[:5],
     Columnas(6, 6, 20, True),
@@ -419,14 +475,14 @@ PLANTILLAS: dict[str, Plantilla] = {
     "por_categoria": _desglose(CajaLogo(129540, 57150, 2343150, 1082040)),
     "resumen": Plantilla(
         **_INFORME,
-        estilo_titulo="titulo_resumen",
-        combinar_titulo="C2:D2",
+        estilo_titulo="titulo",  # junto al logo, como las demás hojas (2026-11-24)
         ultima_columna_banda=9,
         ultima_columna_bloque=9,
         caja_logo=CajaLogo(205740, 68580, 2606040, 1074420),
         columnas=_COLUMNAS_RESUMEN,
         ajuste_alto=1,  # hoja corta: 1 × 1 (Q12)
-        altos={5: 15.95, 6: 30, 7: 15.95},  # tarjetas; f9–f13 omitidas (Q7)
+        # Fila 6: aire; 7–12: tarjetas y panel de la sesión (24 pt cada una); 13: aire.
+        altos={5: 12, **{fila: 24 for fila in range(6, 12)}, 12: 12},
     ),
 }
 

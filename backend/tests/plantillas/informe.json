@@ -24134,50 +24134,7 @@
      "oculta": false,
      "nivel": 0,
      "contraida": false,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "general",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
+     "estilo": null
     },
     {
      "min": 2,
@@ -24187,315 +24144,67 @@
      "oculta": false,
      "nivel": 0,
      "contraida": false,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "general",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
+     "estilo": null
     },
     {
      "min": 3,
      "max": 4,
-     "ancho": 18,
+     "ancho": 25,
      "ancho_propio": true,
      "oculta": false,
      "nivel": 0,
      "contraida": false,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "general",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
+     "estilo": null
     },
     {
      "min": 5,
+     "max": 5,
+     "ancho": 3,
+     "ancho_propio": true,
+     "oculta": false,
+     "nivel": 0,
+     "contraida": false,
+     "estilo": null
+    },
+    {
+     "min": 6,
      "max": 6,
      "ancho": 22,
      "ancho_propio": true,
      "oculta": false,
      "nivel": 0,
      "contraida": false,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "general",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
+     "estilo": null
     },
     {
      "min": 7,
      "max": 7,
-     "ancho": 20,
-     "ancho_propio": true,
-     "oculta": false,
-     "nivel": 0,
-     "contraida": false,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "general",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    {
-     "min": 8,
-     "max": 9,
-     "ancho": 16,
-     "ancho_propio": true,
-     "oculta": false,
-     "nivel": 0,
-     "contraida": false,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "general",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    {
-     "min": 10,
-     "max": 10,
      "ancho": 18,
      "ancho_propio": true,
      "oculta": false,
      "nivel": 0,
      "contraida": false,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "general",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
+     "estilo": null
+    },
+    {
+     "min": 8,
+     "max": 9,
+     "ancho": 12,
+     "ancho_propio": true,
+     "oculta": false,
+     "nivel": 0,
+     "contraida": false,
+     "estilo": null
+    },
+    {
+     "min": 10,
+     "max": 10,
+     "ancho": 14,
+     "ancho_propio": true,
+     "oculta": false,
+     "nivel": 0,
+     "contraida": false,
+     "estilo": null
     }
    ],
    "filas": {
@@ -24540,7 +24249,7 @@
      "estilo": null
     },
     "6": {
-     "alto": 15.95,
+     "alto": 12,
      "alto_propio": true,
      "oculta": false,
      "nivel": 0,
@@ -24548,7 +24257,7 @@
      "estilo": null
     },
     "7": {
-     "alto": 30,
+     "alto": 24,
      "alto_propio": true,
      "oculta": false,
      "nivel": 0,
@@ -24556,7 +24265,7 @@
      "estilo": null
     },
     "8": {
-     "alto": 15.95,
+     "alto": 24,
      "alto_propio": true,
      "oculta": false,
      "nivel": 0,
@@ -24564,7 +24273,7 @@
      "estilo": null
     },
     "9": {
-     "alto": 26.1,
+     "alto": 24,
      "alto_propio": true,
      "oculta": false,
      "nivel": 0,
@@ -24572,7 +24281,7 @@
      "estilo": null
     },
     "10": {
-     "alto": 26.1,
+     "alto": 24,
      "alto_propio": true,
      "oculta": false,
      "nivel": 0,
@@ -24580,7 +24289,7 @@
      "estilo": null
     },
     "11": {
-     "alto": 21.95,
+     "alto": 24,
      "alto_propio": true,
      "oculta": false,
      "nivel": 0,
@@ -24588,7 +24297,7 @@
      "estilo": null
     },
     "12": {
-     "alto": 27.95,
+     "alto": 24,
      "alto_propio": true,
      "oculta": false,
      "nivel": 0,
@@ -24596,7 +24305,15 @@
      "estilo": null
     },
     "13": {
-     "alto": 21.95,
+     "alto": 12,
+     "alto_propio": true,
+     "oculta": false,
+     "nivel": 0,
+     "contraida": false,
+     "estilo": null
+    },
+    "14": {
+     "alto": 34,
      "alto_propio": true,
      "oculta": false,
      "nivel": 0,
@@ -25154,7 +24871,7 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
        "vertical": "center",
        "ajuste": false,
        "sangria": 0,
@@ -26475,496 +26192,28 @@
       }
      }
     },
-    "A6": {
+    "A7": {
      "tipo": "s",
      "valor": "Encontrado",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FF1D4ED8"
-       },
        "tamano": 9,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "B6": {
-     "tipo": "vacia",
-     "valor": null,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "C6": {
-     "tipo": "s",
-     "valor": "No encontrado",
-     "estilo": {
-      "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FF1D4ED8"
-       },
-       "tamano": 9,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "D6": {
-     "tipo": "vacia",
-     "valor": null,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "E6": {
-     "tipo": "s",
-     "valor": "Total registrado",
-     "estilo": {
-      "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FF1D4ED8"
-       },
-       "tamano": 9,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "F6": {
-     "tipo": "vacia",
-     "valor": null,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "G6": {
-     "tipo": "s",
-     "valor": "% encontrado",
-     "estilo": {
-      "fuente": {
-       "nombre": "Arial",
        "color": {
         "rgb": "FF6B7280"
        },
-       "tamano": 9,
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "H6": {
-     "tipo": "vacia",
-     "valor": null,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "I6": {
-     "tipo": "vacia",
-     "valor": null,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "J6": {
-     "tipo": "vacia",
-     "valor": null,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "A7": {
-     "tipo": "n",
-     "valor": "{numero}",
-     "estilo": {
-      "fuente": {
        "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FF111827"
-       },
-       "tamano": 18,
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
        "left": null,
@@ -26976,15 +26225,16 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
+       "horizontal": "left",
+       "vertical": "bottom",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
       "formato": {
-       "codigo": "\"$\"\\ #,##0.00"
+       "codigo": "General",
+       "incorporado": 0
       },
       "proteccion": {
        "bloqueada": true,
@@ -26997,21 +26247,23 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 9,
        "color": {
-        "theme": 1
+        "rgb": "FF6B7280"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
        "left": null,
@@ -27023,10 +26275,10 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "bottom",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -27041,73 +26293,35 @@
      }
     },
     "C7": {
-     "tipo": "n",
-     "valor": "{numero}",
+     "tipo": "s",
+     "valor": "No encontrado",
      "estilo": {
       "fuente": {
+       "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
        "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FF111827"
-       },
-       "tamano": 18,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "\"$\"\\ #,##0.00"
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "D7": {
-     "tipo": "vacia",
-     "valor": null,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
        "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": null,
+       "left": {
+        "estilo": "thick",
+        "color": {
+         "rgb": "FFFFFFFF"
+        }
+       },
        "right": null,
        "top": null,
        "bottom": null,
@@ -27116,10 +26330,10 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "bottom",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -27133,27 +26347,36 @@
       }
      }
     },
-    "E7": {
-     "tipo": "n",
-     "valor": "{numero}",
+    "D7": {
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
+       "tamano": 9,
        "color": {
-        "rgb": "FF111827"
+        "rgb": "FF6B7280"
        },
-       "tamano": 18,
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": null,
+       "left": {
+        "estilo": "thick",
+        "color": {
+         "rgb": "FFFFFFFF"
+        }
+       },
        "right": null,
        "top": null,
        "bottom": null,
@@ -27162,15 +26385,16 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
+       "horizontal": "left",
+       "vertical": "bottom",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
       "formato": {
-       "codigo": "\"$\"\\ #,##0.00"
+       "codigo": "General",
+       "incorporado": 0
       },
       "proteccion": {
        "bloqueada": true,
@@ -27179,18 +26403,16 @@
      }
     },
     "F7": {
-     "tipo": "vacia",
-     "valor": null,
+     "tipo": "s",
+     "valor": "Sesión",
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "negrita": true,
+       "tamano": 10,
        "color": {
-        "theme": 1
+        "rgb": "FF111827"
        },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -27200,19 +26422,39 @@
        "bg": null
       },
       "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
+       "left": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "top": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
+       "horizontal": "left",
+       "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -27227,16 +26469,16 @@
      }
     },
     "G7": {
-     "tipo": "n",
-     "valor": "{numero}",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 10,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 18,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -27246,24 +26488,45 @@
        "bg": null
       },
       "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
+       "left": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "top": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
       "formato": {
-       "codigo": "0.0\\ %"
+       "codigo": "General",
+       "incorporado": 0
       },
       "proteccion": {
        "bloqueada": true,
@@ -27276,14 +26539,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "negrita": true,
+       "tamano": 10,
        "color": {
-        "theme": 1
+        "rgb": "FF111827"
        },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -27293,19 +26554,39 @@
        "bg": null
       },
       "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
+       "left": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "top": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
+       "horizontal": "left",
+       "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -27324,14 +26605,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "negrita": true,
+       "tamano": 10,
        "color": {
-        "theme": 1
+        "rgb": "FF111827"
        },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -27341,19 +26620,39 @@
        "bg": null
       },
       "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
+       "left": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "top": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
+       "horizontal": "left",
+       "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -27372,14 +26671,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "negrita": true,
+       "tamano": 10,
        "color": {
-        "theme": 1
+        "rgb": "FF111827"
        },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
@@ -27389,19 +26686,39 @@
        "bg": null
       },
       "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
+       "left": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "top": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
+       "horizontal": "left",
+       "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -27416,23 +26733,27 @@
      }
     },
     "A8": {
-     "tipo": "s",
-     "valor": "{n} unidad",
+     "tipo": "n",
+     "valor": "{numero}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "negrita": true,
+       "tamano": 16,
        "color": {
-        "rgb": "FF6B7280"
+        "rgb": "FF111827"
        },
-       "tamano": 9,
-       "negrita": false,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
        "left": null,
@@ -27444,16 +26765,15 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
       "formato": {
-       "codigo": "General",
-       "incorporado": 0
+       "codigo": "\"$\"\\ #,##0.00"
       },
       "proteccion": {
        "bloqueada": true,
@@ -27466,21 +26786,23 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "negrita": true,
+       "tamano": 16,
        "color": {
-        "theme": 1
+        "rgb": "FF111827"
        },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
        "left": null,
@@ -27492,16 +26814,15 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
+       "horizontal": "left",
+       "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
       "formato": {
-       "codigo": "General",
-       "incorporado": 0
+       "codigo": "\"$\"\\ #,##0.00"
       },
       "proteccion": {
        "bloqueada": true,
@@ -27510,26 +26831,35 @@
      }
     },
     "C8": {
-     "tipo": "s",
-     "valor": "{n} unidades",
+     "tipo": "n",
+     "valor": "{numero}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "negrita": true,
+       "tamano": 16,
        "color": {
-        "rgb": "FF6B7280"
+        "rgb": "FF111827"
        },
-       "tamano": 9,
-       "negrita": false,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": null,
+       "left": {
+        "estilo": "thick",
+        "color": {
+         "rgb": "FFFFFFFF"
+        }
+       },
        "right": null,
        "top": null,
        "bottom": null,
@@ -27538,16 +26868,15 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
       "formato": {
-       "codigo": "General",
-       "incorporado": 0
+       "codigo": "\"$\"\\ #,##0.00"
       },
       "proteccion": {
        "bloqueada": true,
@@ -27560,70 +26889,31 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "negrita": true,
+       "tamano": 16,
        "color": {
-        "theme": 1
+        "rgb": "FF111827"
        },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": null,
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "E8": {
-     "tipo": "s",
-     "valor": "{n} unidad",
-     "estilo": {
-      "fuente": {
        "nombre": "Arial",
-       "color": {
-        "rgb": "FF6B7280"
-       },
-       "tamano": 9,
-       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": null,
+       "left": {
+        "estilo": "thick",
+        "color": {
+         "rgb": "FFFFFFFF"
+        }
+       },
        "right": null,
        "top": null,
        "bottom": null,
@@ -27632,16 +26922,15 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
       "formato": {
-       "codigo": "General",
-       "incorporado": 0
+       "codigo": "\"$\"\\ #,##0.00"
       },
       "proteccion": {
        "bloqueada": true,
@@ -27650,17 +26939,15 @@
      }
     },
     "F8": {
-     "tipo": "vacia",
-     "valor": null,
+     "tipo": "s",
+     "valor": "Nombre",
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 9,
        "color": {
-        "theme": 1
+        "rgb": "FF6B7280"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -27671,19 +26958,29 @@
        "bg": null
       },
       "borde": {
-       "left": null,
+       "left": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
        "right": null,
        "top": null,
-       "bottom": null,
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
+       "horizontal": "left",
+       "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -27699,14 +26996,14 @@
     },
     "G8": {
      "tipo": "s",
-     "valor": "de las unidades registradas",
+     "valor": "{texto}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 10,
        "color": {
-        "rgb": "FF6B7280"
+        "rgb": "FF111827"
        },
-       "tamano": 9,
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -27718,15 +27015,25 @@
       },
       "borde": {
        "left": null,
-       "right": null,
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
        "top": null,
-       "bottom": null,
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
        "vertical": "center",
        "ajuste": false,
        "sangria": 0,
@@ -27748,13 +27055,11 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 10,
        "color": {
-        "theme": 1
+        "rgb": "FF111827"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -27766,16 +27071,26 @@
       },
       "borde": {
        "left": null,
-       "right": null,
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
        "top": null,
-       "bottom": null,
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
+       "horizontal": "general",
+       "vertical": "center",
        "ajuste": false,
        "sangria": 0,
        "rotacion": 0,
@@ -27796,13 +27111,11 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 10,
        "color": {
-        "theme": 1
+        "rgb": "FF111827"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -27814,16 +27127,26 @@
       },
       "borde": {
        "left": null,
-       "right": null,
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
        "top": null,
-       "bottom": null,
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
+       "horizontal": "general",
+       "vertical": "center",
        "ajuste": false,
        "sangria": 0,
        "rotacion": 0,
@@ -27844,13 +27167,11 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 10,
        "color": {
-        "theme": 1
+        "rgb": "FF111827"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -27862,16 +27183,26 @@
       },
       "borde": {
        "left": null,
-       "right": null,
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
        "top": null,
-       "bottom": null,
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "bottom",
+       "horizontal": "general",
+       "vertical": "center",
        "ajuste": false,
        "sangria": 0,
        "rotacion": 0,
@@ -27889,42 +27220,41 @@
     },
     "A9": {
      "tipo": "s",
-     "valor": "Todos los activos",
+     "valor": "{n} unidad",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
+       "tamano": 9,
        "color": {
-        "rgb": "FF111827"
+        "rgb": "FF6B7280"
        },
-       "tamano": 12,
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
        "left": null,
        "right": null,
        "top": null,
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "FF111827"
-        }
-       },
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "general",
-       "vertical": "bottom",
+       "horizontal": "left",
+       "vertical": "top",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -27943,41 +27273,38 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 9,
        "color": {
-        "theme": 1
+        "rgb": "FF6B7280"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
        "left": null,
        "right": null,
        "top": null,
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "FF111827"
-        }
-       },
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "general",
-       "vertical": "bottom",
+       "horizontal": "left",
+       "vertical": "top",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -27992,45 +27319,47 @@
      }
     },
     "C9": {
-     "tipo": "vacia",
-     "valor": null,
+     "tipo": "s",
+     "valor": "{n} unidad",
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 9,
        "color": {
-        "theme": 1
+        "rgb": "FF6B7280"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": {
-        "estilo": "thin",
+       "left": {
+        "estilo": "thick",
         "color": {
-         "rgb": "FF111827"
+         "rgb": "FFFFFFFF"
         }
        },
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "general",
-       "vertical": "bottom",
+       "horizontal": "left",
+       "vertical": "top",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -28049,94 +27378,43 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 9,
        "color": {
-        "theme": 1
+        "rgb": "FF6B7280"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": {
-        "estilo": "thin",
+       "left": {
+        "estilo": "thick",
         "color": {
-         "rgb": "FF111827"
+         "rgb": "FFFFFFFF"
         }
        },
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "general",
-       "vertical": "bottom",
+       "horizontal": "left",
+       "vertical": "top",
        "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "E9": {
-     "tipo": "vacia",
-     "valor": null,
-     "estilo": {
-      "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
-       "color": {
-        "theme": 1
-       },
-       "tamano": 11,
-       "esquema": "minor",
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": null,
-       "right": null,
-       "top": null,
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "FF111827"
-        }
-       },
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "general",
-       "vertical": "bottom",
-       "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -28151,17 +27429,15 @@
      }
     },
     "F9": {
-     "tipo": "vacia",
-     "valor": null,
+     "tipo": "s",
+     "valor": "Cerró",
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 9,
        "color": {
-        "theme": 1
+        "rgb": "FF6B7280"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -28172,13 +27448,18 @@
        "bg": null
       },
       "borde": {
-       "left": null,
+       "left": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
        "right": null,
        "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "FF111827"
+         "rgb": "FFE5E7EB"
         }
        },
        "diagonal": null,
@@ -28186,10 +27467,10 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "general",
-       "vertical": "bottom",
+       "horizontal": "left",
+       "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -28204,17 +27485,15 @@
      }
     },
     "G9": {
-     "tipo": "vacia",
-     "valor": null,
+     "tipo": "s",
+     "valor": "{texto}",
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 10,
        "color": {
-        "theme": 1
+        "rgb": "FF111827"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -28226,12 +27505,17 @@
       },
       "borde": {
        "left": null,
-       "right": null,
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
        "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "FF111827"
+         "rgb": "FFE5E7EB"
         }
        },
        "diagonal": null,
@@ -28240,7 +27524,7 @@
       },
       "alineacion": {
        "horizontal": "general",
-       "vertical": "bottom",
+       "vertical": "center",
        "ajuste": false,
        "sangria": 0,
        "rotacion": 0,
@@ -28261,13 +27545,11 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 10,
        "color": {
-        "theme": 1
+        "rgb": "FF111827"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -28279,12 +27561,17 @@
       },
       "borde": {
        "left": null,
-       "right": null,
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
        "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "FF111827"
+         "rgb": "FFE5E7EB"
         }
        },
        "diagonal": null,
@@ -28293,7 +27580,7 @@
       },
       "alineacion": {
        "horizontal": "general",
-       "vertical": "bottom",
+       "vertical": "center",
        "ajuste": false,
        "sangria": 0,
        "rotacion": 0,
@@ -28314,13 +27601,11 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 10,
        "color": {
-        "theme": 1
+        "rgb": "FF111827"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -28332,12 +27617,17 @@
       },
       "borde": {
        "left": null,
-       "right": null,
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
        "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "FF111827"
+         "rgb": "FFE5E7EB"
         }
        },
        "diagonal": null,
@@ -28346,7 +27636,7 @@
       },
       "alineacion": {
        "horizontal": "general",
-       "vertical": "bottom",
+       "vertical": "center",
        "ajuste": false,
        "sangria": 0,
        "rotacion": 0,
@@ -28367,13 +27657,11 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 10,
        "color": {
-        "theme": 1
+        "rgb": "FF111827"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -28385,12 +27673,17 @@
       },
       "borde": {
        "left": null,
-       "right": null,
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
        "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "FF111827"
+         "rgb": "FFE5E7EB"
         }
        },
        "diagonal": null,
@@ -28399,7 +27692,7 @@
       },
       "alineacion": {
        "horizontal": "general",
-       "vertical": "bottom",
+       "vertical": "center",
        "ajuste": false,
        "sangria": 0,
        "rotacion": 0,
@@ -28417,14 +27710,300 @@
     },
     "A10": {
      "tipo": "s",
-     "valor": "{n} activo · encontrados {n} ({pct}) por {cop} · no encontrados {n} por {cop} · tabla «Activos», lista para filtrar o hacer una tabla dinámica. En cursiva y fondo ámbar: se encontró en otra ubicación.",
+     "valor": "Total registrado",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 9,
        "color": {
         "rgb": "FF6B7280"
        },
+       "nombre": "Arial",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
+      },
+      "borde": {
+       "left": null,
+       "right": null,
+       "top": {
+        "estilo": "thick",
+        "color": {
+         "rgb": "FFFFFFFF"
+        }
+       },
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "left",
+       "vertical": "bottom",
+       "ajuste": false,
+       "sangria": 1,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "B10": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
        "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
+       "nombre": "Arial",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
+      },
+      "borde": {
+       "left": null,
+       "right": null,
+       "top": {
+        "estilo": "thick",
+        "color": {
+         "rgb": "FFFFFFFF"
+        }
+       },
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "left",
+       "vertical": "bottom",
+       "ajuste": false,
+       "sangria": 1,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "C10": {
+     "tipo": "s",
+     "valor": "% encontrado",
+     "estilo": {
+      "fuente": {
+       "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
+       "nombre": "Arial",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
+      },
+      "borde": {
+       "left": {
+        "estilo": "thick",
+        "color": {
+         "rgb": "FFFFFFFF"
+        }
+       },
+       "right": null,
+       "top": {
+        "estilo": "thick",
+        "color": {
+         "rgb": "FFFFFFFF"
+        }
+       },
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "left",
+       "vertical": "bottom",
+       "ajuste": false,
+       "sangria": 1,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "D10": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
+       "nombre": "Arial",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
+      },
+      "borde": {
+       "left": {
+        "estilo": "thick",
+        "color": {
+         "rgb": "FFFFFFFF"
+        }
+       },
+       "right": null,
+       "top": {
+        "estilo": "thick",
+        "color": {
+         "rgb": "FFFFFFFF"
+        }
+       },
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "left",
+       "vertical": "bottom",
+       "ajuste": false,
+       "sangria": 1,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "F10": {
+     "tipo": "s",
+     "valor": "Cerrada",
+     "estilo": {
+      "fuente": {
+       "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
+       "nombre": "Arial",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "none",
+       "fg": null,
+       "bg": null
+      },
+      "borde": {
+       "left": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "right": null,
+       "top": null,
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "left",
+       "vertical": "center",
+       "ajuste": false,
+       "sangria": 1,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "G10": {
+     "tipo": "s",
+     "valor": "{texto}",
+     "estilo": {
+      "fuente": {
+       "tamano": 10,
+       "color": {
+        "rgb": "FF111827"
+       },
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
@@ -28436,9 +28015,19 @@
       },
       "borde": {
        "left": null,
-       "right": null,
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
        "top": null,
-       "bottom": null,
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
@@ -28446,7 +28035,175 @@
       "alineacion": {
        "horizontal": "general",
        "vertical": "center",
-       "ajuste": true,
+       "ajuste": false,
+       "sangria": 0,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "H10": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 10,
+       "color": {
+        "rgb": "FF111827"
+       },
+       "nombre": "Arial",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "none",
+       "fg": null,
+       "bg": null
+      },
+      "borde": {
+       "left": null,
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "top": null,
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "general",
+       "vertical": "center",
+       "ajuste": false,
+       "sangria": 0,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "I10": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 10,
+       "color": {
+        "rgb": "FF111827"
+       },
+       "nombre": "Arial",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "none",
+       "fg": null,
+       "bg": null
+      },
+      "borde": {
+       "left": null,
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "top": null,
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "general",
+       "vertical": "center",
+       "ajuste": false,
+       "sangria": 0,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "J10": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 10,
+       "color": {
+        "rgb": "FF111827"
+       },
+       "nombre": "Arial",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "none",
+       "fg": null,
+       "bg": null
+      },
+      "borde": {
+       "left": null,
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "top": null,
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFE5E7EB"
+        }
+       },
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "general",
+       "vertical": "center",
+       "ajuste": false,
        "sangria": 0,
        "rotacion": 0,
        "reducir": false
@@ -28462,64 +28219,47 @@
      }
     },
     "A11": {
-     "tipo": "s",
-     "valor": "Total",
+     "tipo": "n",
+     "valor": "{numero}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 16,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 10,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
       "formato": {
-       "codigo": "General",
-       "incorporado": 0
+       "codigo": "\"$\"\\ #,##0.00"
       },
       "proteccion": {
        "bloqueada": true,
@@ -28528,64 +28268,47 @@
      }
     },
     "B11": {
-     "tipo": "s",
-     "valor": "Todos los activos",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 16,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 10,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
       "formato": {
-       "codigo": "General",
-       "incorporado": 0
+       "codigo": "\"$\"\\ #,##0.00"
       },
       "proteccion": {
        "bloqueada": true,
@@ -28594,64 +28317,52 @@
      }
     },
     "C11": {
-     "tipo": "vacia",
-     "valor": null,
+     "tipo": "n",
+     "valor": "{numero}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 16,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 10,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
        "left": {
-        "estilo": "thin",
+        "estilo": "thick",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFFFFFFF"
         }
        },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
       "formato": {
-       "codigo": "General",
-       "incorporado": 0
+       "codigo": "0.0\\ %"
       },
       "proteccion": {
        "bloqueada": true,
@@ -28664,126 +28375,48 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
        "negrita": true,
+       "tamano": 16,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 10,
+       "nombre": "Arial",
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
        "left": {
-        "estilo": "thin",
+        "estilo": "thick",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFFFFFFF"
         }
        },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
       "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "E11": {
-     "tipo": "vacia",
-     "valor": null,
-     "estilo": {
-      "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FF111827"
-       },
-       "tamano": 10,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
+       "codigo": "0.0\\ %"
       },
       "proteccion": {
        "bloqueada": true,
@@ -28792,16 +28425,16 @@
      }
     },
     "F11": {
-     "tipo": "vacia",
-     "valor": null,
+     "tipo": "s",
+     "valor": "Moneda",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
+       "tamano": 9,
        "color": {
-        "rgb": "FF111827"
+        "rgb": "FF6B7280"
        },
-       "tamano": 10,
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
@@ -28814,25 +28447,15 @@
        "left": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFD1D5DB"
         }
        },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "right": null,
+       "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFE5E7EB"
         }
        },
        "diagonal": null,
@@ -28840,10 +28463,10 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
        "ajuste": false,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -28858,16 +28481,16 @@
      }
     },
     "G11": {
-     "tipo": "vacia",
-     "valor": null,
+     "tipo": "s",
+     "valor": "COP",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
+       "tamano": 10,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 10,
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
@@ -28877,28 +28500,18 @@
        "bg": null
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
        "right": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFD1D5DB"
         }
        },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFE5E7EB"
         }
        },
        "diagonal": null,
@@ -28906,7 +28519,7 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
        "vertical": "center",
        "ajuste": false,
        "sangria": 0,
@@ -28928,12 +28541,12 @@
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
+       "tamano": 10,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 10,
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
@@ -28943,28 +28556,18 @@
        "bg": null
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
        "right": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFD1D5DB"
         }
        },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFE5E7EB"
         }
        },
        "diagonal": null,
@@ -28972,7 +28575,7 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
        "vertical": "center",
        "ajuste": false,
        "sangria": 0,
@@ -28990,16 +28593,16 @@
      }
     },
     "I11": {
-     "tipo": "s",
-     "valor": "{n} activo",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
+       "tamano": 10,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 10,
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
@@ -29009,28 +28612,18 @@
        "bg": null
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
        "right": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFD1D5DB"
         }
        },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFE5E7EB"
         }
        },
        "diagonal": null,
@@ -29038,7 +28631,7 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
        "vertical": "center",
        "ajuste": false,
        "sangria": 0,
@@ -29056,16 +28649,16 @@
      }
     },
     "J11": {
-     "tipo": "n",
-     "valor": "{numero}",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
+       "tamano": 10,
        "color": {
         "rgb": "FF111827"
        },
-       "tamano": 10,
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
@@ -29075,28 +28668,18 @@
        "bg": null
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
        "right": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFD1D5DB"
         }
        },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFE5E7EB"
         }
        },
        "diagonal": null,
@@ -29104,7 +28687,7 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
        "vertical": "center",
        "ajuste": false,
        "sangria": 0,
@@ -29112,7 +28695,8 @@
        "reducir": false
       },
       "formato": {
-       "codigo": "\"$\"\\ #,##0.00"
+       "codigo": "General",
+       "incorporado": 0
       },
       "proteccion": {
        "bloqueada": true,
@@ -29122,61 +28706,41 @@
     },
     "A12": {
      "tipo": "s",
-     "valor": "Código",
+     "valor": "{n} unidades",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FFFFFFFF"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
        "patron": "solid",
        "fg": {
-        "rgb": "FF1F2937"
+        "rgb": "FFF3F4F6"
        },
        "bg": {
-        "rgb": "FF1F2937"
+        "rgb": "FFF3F4F6"
        }
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": true,
-       "sangria": 0,
+       "horizontal": "left",
+       "vertical": "top",
+       "ajuste": false,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -29191,62 +28755,42 @@
      }
     },
     "B12": {
-     "tipo": "s",
-     "valor": "Activo",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FFFFFFFF"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
        "patron": "solid",
        "fg": {
-        "rgb": "FF1F2937"
+        "rgb": "FFF3F4F6"
        },
        "bg": {
-        "rgb": "FF1F2937"
+        "rgb": "FFF3F4F6"
        }
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": true,
-       "sangria": 0,
+       "horizontal": "left",
+       "vertical": "top",
+       "ajuste": false,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -29261,62 +28805,47 @@
      }
     },
     "C12": {
-     "tipo": "s",
-     "valor": "Categoría",
+     "tipo": "n",
+     "valor": "{numero}",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FFFFFFFF"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
        "patron": "solid",
        "fg": {
-        "rgb": "FF1F2937"
+        "rgb": "FFF3F4F6"
        },
        "bg": {
-        "rgb": "FF1F2937"
+        "rgb": "FFF3F4F6"
        }
       },
       "borde": {
        "left": {
-        "estilo": "thin",
+        "estilo": "thick",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFFFFFFF"
         }
        },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
-       "ajuste": true,
-       "sangria": 0,
+       "ajuste": false,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -29331,132 +28860,42 @@
      }
     },
     "D12": {
-     "tipo": "s",
-     "valor": "Marca",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FFFFFFFF"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
        "patron": "solid",
        "fg": {
-        "rgb": "FF1F2937"
+        "rgb": "FFF3F4F6"
        },
        "bg": {
-        "rgb": "FF1F2937"
+        "rgb": "FFF3F4F6"
        }
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": true,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "E12": {
-     "tipo": "s",
-     "valor": "Serial",
-     "estilo": {
-      "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FFFFFFFF"
-       },
-       "tamano": 9,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "solid",
-       "fg": {
-        "rgb": "FF1F2937"
-       },
-       "bg": {
-        "rgb": "FF1F2937"
-       }
-      },
-      "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": true,
-       "sangria": 0,
+       "horizontal": "left",
+       "vertical": "top",
+       "ajuste": false,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -29472,50 +28911,36 @@
     },
     "F12": {
      "tipo": "s",
-     "valor": "Ubicación esperada",
+     "valor": "Estado",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
-       "color": {
-        "rgb": "FFFFFFFF"
-       },
        "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "solid",
-       "fg": {
-        "rgb": "FF1F2937"
-       },
-       "bg": {
-        "rgb": "FF1F2937"
-       }
+       "patron": "none",
+       "fg": null,
+       "bg": null
       },
       "borde": {
        "left": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFD1D5DB"
         }
        },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "right": null,
+       "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFD1D5DB"
         }
        },
        "diagonal": null,
@@ -29523,10 +28948,10 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
-       "ajuste": true,
-       "sangria": 0,
+       "ajuste": false,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -29542,50 +28967,36 @@
     },
     "G12": {
      "tipo": "s",
-     "valor": "Encontrado en",
+     "valor": "Informe congelado",
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
+       "tamano": 10,
        "color": {
-        "rgb": "FFFFFFFF"
+        "rgb": "FF111827"
        },
-       "tamano": 9,
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "solid",
-       "fg": {
-        "rgb": "FF1F2937"
-       },
-       "bg": {
-        "rgb": "FF1F2937"
-       }
+       "patron": "none",
+       "fg": null,
+       "bg": null
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
        "right": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFD1D5DB"
         }
        },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFD1D5DB"
         }
        },
        "diagonal": null,
@@ -29593,9 +29004,9 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
        "vertical": "center",
-       "ajuste": true,
+       "ajuste": false,
        "sangria": 0,
        "rotacion": 0,
        "reducir": false
@@ -29611,51 +29022,37 @@
      }
     },
     "H12": {
-     "tipo": "s",
-     "valor": "Estado físico",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
+       "tamano": 10,
        "color": {
-        "rgb": "FFFFFFFF"
+        "rgb": "FF111827"
        },
-       "tamano": 9,
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "solid",
-       "fg": {
-        "rgb": "FF1F2937"
-       },
-       "bg": {
-        "rgb": "FF1F2937"
-       }
+       "patron": "none",
+       "fg": null,
+       "bg": null
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
        "right": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFD1D5DB"
         }
        },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFD1D5DB"
         }
        },
        "diagonal": null,
@@ -29663,9 +29060,9 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
        "vertical": "center",
-       "ajuste": true,
+       "ajuste": false,
        "sangria": 0,
        "rotacion": 0,
        "reducir": false
@@ -29681,51 +29078,37 @@
      }
     },
     "I12": {
-     "tipo": "s",
-     "valor": "Resultado",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
+       "tamano": 10,
        "color": {
-        "rgb": "FFFFFFFF"
+        "rgb": "FF111827"
        },
-       "tamano": 9,
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "solid",
-       "fg": {
-        "rgb": "FF1F2937"
-       },
-       "bg": {
-        "rgb": "FF1F2937"
-       }
+       "patron": "none",
+       "fg": null,
+       "bg": null
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
        "right": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFD1D5DB"
         }
        },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "top": null,
        "bottom": {
         "estilo": "thin",
         "color": {
-         "rgb": "009CA3AF"
+         "rgb": "FFD1D5DB"
         }
        },
        "diagonal": null,
@@ -29733,9 +29116,9 @@
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "general",
        "vertical": "center",
-       "ajuste": true,
+       "ajuste": false,
        "sangria": 0,
        "rotacion": 0,
        "reducir": false
@@ -29751,62 +29134,98 @@
      }
     },
     "J12": {
-     "tipo": "s",
-     "valor": "Precio (COP)",
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
-       "negrita": true,
+       "tamano": 10,
        "color": {
-        "rgb": "FFFFFFFF"
+        "rgb": "FF111827"
        },
+       "nombre": "Arial",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "none",
+       "fg": null,
+       "bg": null
+      },
+      "borde": {
+       "left": null,
+       "right": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "top": null,
+       "bottom": {
+        "estilo": "thin",
+        "color": {
+         "rgb": "FFD1D5DB"
+        }
+       },
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "general",
+       "vertical": "center",
+       "ajuste": false,
+       "sangria": 0,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "A14": {
+     "tipo": "s",
+     "valor": "{nota}",
+     "estilo": {
+      "fuente": {
        "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
+       "nombre": "Arial",
+       "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
        "patron": "solid",
        "fg": {
-        "rgb": "FF1F2937"
+        "rgb": "FFF3F4F6"
        },
        "bg": {
-        "rgb": "FF1F2937"
+        "rgb": "FFF3F4F6"
        }
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
        "ajuste": true,
-       "sangria": 0,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -29820,325 +29239,43 @@
       }
      }
     },
-    "A13": {
-     "tipo": "s",
-     "valor": "{texto}",
-     "estilo": {
-      "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF111827"
-       },
-       "tamano": 10,
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "B13": {
-     "tipo": "s",
-     "valor": "{texto}",
-     "estilo": {
-      "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF111827"
-       },
-       "tamano": 10,
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "C13": {
-     "tipo": "s",
-     "valor": "{texto}",
-     "estilo": {
-      "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF111827"
-       },
-       "tamano": 10,
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "D13": {
-     "tipo": "s",
-     "valor": "{texto}",
-     "estilo": {
-      "fuente": {
-       "nombre": "Arial",
-       "color": {
-        "rgb": "FF111827"
-       },
-       "tamano": 10,
-       "negrita": false,
-       "cursiva": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
-      },
-      "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "diagonal": null,
-       "diagonal_arriba": false,
-       "diagonal_abajo": false
-      },
-      "alineacion": {
-       "horizontal": "center",
-       "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
-       "rotacion": 0,
-       "reducir": false
-      },
-      "formato": {
-       "codigo": "General",
-       "incorporado": 0
-      },
-      "proteccion": {
-       "bloqueada": true,
-       "oculta": false
-      }
-     }
-    },
-    "E13": {
+    "B14": {
      "tipo": "vacia",
      "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Calibri",
-       "familia": 2,
+       "tamano": 9,
        "color": {
-        "theme": 1
+        "rgb": "FF6B7280"
        },
-       "tamano": 11,
-       "esquema": "minor",
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
+       "ajuste": true,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -30152,59 +29289,43 @@
       }
      }
     },
-    "F13": {
-     "tipo": "s",
-     "valor": "{texto}",
+    "C14": {
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 9,
        "color": {
-        "rgb": "FF111827"
+        "rgb": "FF6B7280"
        },
-       "tamano": 10,
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
+       "ajuste": true,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -30218,59 +29339,43 @@
       }
      }
     },
-    "G13": {
-     "tipo": "s",
-     "valor": "{texto}",
+    "D14": {
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 9,
        "color": {
-        "rgb": "FF111827"
+        "rgb": "FF6B7280"
        },
-       "tamano": 10,
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
+       "ajuste": true,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -30284,59 +29389,43 @@
       }
      }
     },
-    "H13": {
-     "tipo": "s",
-     "valor": "{texto}",
+    "E14": {
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 9,
        "color": {
-        "rgb": "FF111827"
+        "rgb": "FF6B7280"
        },
-       "tamano": 10,
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
+       "ajuste": true,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -30350,59 +29439,43 @@
       }
      }
     },
-    "I13": {
-     "tipo": "s",
-     "valor": "{texto}",
+    "F14": {
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 9,
        "color": {
-        "rgb": "FF111827"
+        "rgb": "FF6B7280"
        },
-       "tamano": 10,
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
+       "ajuste": true,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
@@ -30416,64 +29489,199 @@
       }
      }
     },
-    "J13": {
-     "tipo": "n",
-     "valor": "{numero}",
+    "G14": {
+     "tipo": "vacia",
+     "valor": null,
      "estilo": {
       "fuente": {
-       "nombre": "Arial",
+       "tamano": 9,
        "color": {
-        "rgb": "FF111827"
+        "rgb": "FF6B7280"
        },
-       "tamano": 10,
+       "nombre": "Arial",
        "negrita": false,
        "cursiva": false,
        "tachado": false
       },
       "relleno": {
-       "patron": "none",
-       "fg": null,
-       "bg": null
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
       },
       "borde": {
-       "left": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "right": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "top": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
-       "bottom": {
-        "estilo": "thin",
-        "color": {
-         "rgb": "009CA3AF"
-        }
-       },
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
        "diagonal": null,
        "diagonal_arriba": false,
        "diagonal_abajo": false
       },
       "alineacion": {
-       "horizontal": "center",
+       "horizontal": "left",
        "vertical": "center",
-       "ajuste": false,
-       "sangria": 0,
+       "ajuste": true,
+       "sangria": 1,
        "rotacion": 0,
        "reducir": false
       },
       "formato": {
-       "codigo": "\"$\"\\ #,##0.00"
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "H14": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
+       "nombre": "Arial",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
+      },
+      "borde": {
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "left",
+       "vertical": "center",
+       "ajuste": true,
+       "sangria": 1,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "I14": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
+       "nombre": "Arial",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
+      },
+      "borde": {
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "left",
+       "vertical": "center",
+       "ajuste": true,
+       "sangria": 1,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
+      },
+      "proteccion": {
+       "bloqueada": true,
+       "oculta": false
+      }
+     }
+    },
+    "J14": {
+     "tipo": "vacia",
+     "valor": null,
+     "estilo": {
+      "fuente": {
+       "tamano": 9,
+       "color": {
+        "rgb": "FF6B7280"
+       },
+       "nombre": "Arial",
+       "negrita": false,
+       "cursiva": false,
+       "tachado": false
+      },
+      "relleno": {
+       "patron": "solid",
+       "fg": {
+        "rgb": "FFF3F4F6"
+       },
+       "bg": {
+        "rgb": "FFF3F4F6"
+       }
+      },
+      "borde": {
+       "left": null,
+       "right": null,
+       "top": null,
+       "bottom": null,
+       "diagonal": null,
+       "diagonal_arriba": false,
+       "diagonal_abajo": false
+      },
+      "alineacion": {
+       "horizontal": "left",
+       "vertical": "center",
+       "ajuste": true,
+       "sangria": 1,
+       "rotacion": 0,
+       "reducir": false
+      },
+      "formato": {
+       "codigo": "General",
+       "incorporado": 0
       },
       "proteccion": {
        "bloqueada": true,
@@ -30483,37 +29691,55 @@
     }
    },
    "combinadas": [
-    "A10:J10",
-    "C2:D2",
+    "A10:B10",
+    "A11:B11",
+    "A12:B12",
+    "A14:J14",
+    "A7:B7",
+    "A8:B8",
+    "A9:B9",
+    "C10:D10",
+    "C11:D11",
     "C5:D5",
+    "C7:D7",
+    "C8:D8",
+    "C9:D9",
     "E5:F5",
-    "G5:J5"
+    "F7:J7",
+    "G10:J10",
+    "G11:J11",
+    "G12:J12",
+    "G5:J5",
+    "G8:J8",
+    "G9:J9"
    ],
    "formato_condicional": [
     {
-     "rango": "A13:J13",
-     "tipo": "expression",
+     "rango": "C12",
+     "tipo": "dataBar",
      "prioridad": 1,
      "detener": false,
      "operador": null,
-     "formulas": [
-      "AND($F13<>\"\",$G13<>\"\",$F13<>$G13)"
-     ],
-     "dxf": {
-      "fuente": {
-       "cursiva": true,
-       "color": {
-        "rgb": "FF92400E"
+     "formulas": [],
+     "dxf": null,
+     "barra": {
+      "cfvo": [
+       {
+        "tipo": "num",
+        "valor": "0"
        },
-       "negrita": false,
-       "tachado": false
-      },
-      "relleno": {
-       "patron": "solid",
-       "color": {
-        "rgb": "FFFDE68A"
+       {
+        "tipo": "num",
+        "valor": "1"
        }
-      }
+      ],
+      "color": {
+       "rgb": "FFBFDBFE"
+      },
+      "mostrar_valor": false,
+      "largo_min": null,
+      "largo_max": null,
+      "ext": []
      }
     }
    ],
@@ -30598,7 +29824,7 @@
    "indice": 5,
    "estado": "visible",
    "impresion": {
-    "area": "'Resumen'!$A$1:$J$13",
+    "area": "Resumen!$A$1:$J$14",
     "titulos": null,
     "filtro": null
    }
@@ -30677,6 +29903,7 @@
    "styleSheet/cellXfs/xf",
    "styleSheet/cellXfs/xf/alignment",
    "styleSheet/cellXfs/xf/alignment@horizontal",
+   "styleSheet/cellXfs/xf/alignment@indent",
    "styleSheet/cellXfs/xf/alignment@vertical",
    "styleSheet/cellXfs/xf/alignment@wrapText",
    "styleSheet/cellXfs/xf@applyAlignment",
@@ -30759,6 +29986,7 @@
    "worksheet/conditionalFormatting/cfRule/dataBar/cfvo@type",
    "worksheet/conditionalFormatting/cfRule/dataBar/color",
    "worksheet/conditionalFormatting/cfRule/dataBar/color@rgb",
+   "worksheet/conditionalFormatting/cfRule/dataBar@showValue",
    "worksheet/conditionalFormatting/cfRule/formula",
    "worksheet/conditionalFormatting/cfRule@dxfId",
    "worksheet/conditionalFormatting/cfRule@priority",

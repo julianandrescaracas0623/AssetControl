@@ -10,7 +10,7 @@ import { type Activo, useBuscarActivos, useExportarActivos } from '@/lib/activos
 import { mensajeDeError } from '@/lib/api/cliente'
 import { rutaDe, useUbicaciones } from '@/lib/catalogo'
 import { formatCOP, formatEntero } from '@/lib/format'
-import { guardarArchivo } from '@/lib/informe'
+import { entregarConAviso } from '@/lib/descarga'
 
 // Activos (docs/08 §4.3, §7.7; spec 004, T9): búsqueda por código, nombre o serial,
 // filtro por estado y paginación en el servidor (25 por página). Spec 005, T8: el menú
@@ -118,10 +118,7 @@ export default function Activos() {
     exportar.mutate(
       { q: q || undefined, estado: pestaña === 'todos' ? undefined : pestaña, ubicacion_id: ubicacion || undefined },
       {
-        onSuccess: (archivo) => {
-          guardarArchivo(archivo)
-          toast.success(`Se descargó «${archivo.nombre}»`)
-        },
+        onSuccess: (archivo) => void entregarConAviso(archivo),
         onError: (error) => toast.error(`No se pudo exportar: ${mensajeDeError(error)}`),
       },
     )

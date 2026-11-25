@@ -355,7 +355,7 @@ def comprobar_libro_seguro(contenido: bytes, empresa: str, sesion: str) -> None:
         assert hoja["C3"].data_type == "s", hoja.title
     resumen = wb.worksheets[-1]
     assert resumen.title == "Resumen"
-    sesion_ref = f"B{FILA_CONTEXTO + 1}"
+    sesion_ref = "G8"  # panel «Sesión» del Resumen (opción C, 2026-11-24)
     assert resumen[sesion_ref].value == sesion and resumen[sesion_ref].data_type == "s"
     with zipfile.ZipFile(io.BytesIO(contenido)) as z:
         xml = "".join(z.read(n).decode() for n in z.namelist() if n.endswith((".xml", ".rels")))
@@ -484,7 +484,7 @@ HOJA_HUELLA = {
     "Por categoría": "Por categoría",
     "Resumen": "Resumen",
 }
-FILA_CONTEXTO = exportar.FILA_CONTEXTO_RESUMEN  # índice de xlsxwriter (0 = fila 1)
+FILA_NOTA = exportar.FILA_NOTA_RESUMEN  # índice de xlsxwriter (0 = fila 1)
 EMPRESA_DISENO = {
     "nombre": "Clínica Ficticia de Prueba S.A.S.",
     "direccion": "Calle Falsa 00 # 00-00, Ciudad Ficticia",
@@ -978,6 +978,19 @@ BLOQUE_COMBINADAS = {
     "Por categoría": ["C5:D5", "E5:F5", "G5:H5"],
     "Resumen": ["C5:D5", "E5:F5", "G5:J5"],
 }
+# Resumen, opción C (2026-11-24): tarjetas 2 × 2 (A:B y C:D, filas 7–12), panel de la
+# sesión (título F7:J7 y valores G8:J12) y la nota (y los avisos) en A:J desde la fila 14.
+RESUMEN_COMBINADAS = [
+    *[
+        f"{c}{f}:{d}{f}"
+        for f in range(7, 13)
+        for c, d in (("A", "B"), ("C", "D"))
+        if (c, f) != ("C", 12)
+    ],
+    # C12 (la barra del %) va sin combinar: la barra mide lo mismo en Excel y LibreOffice.
+    "F7:J7",
+    *[f"G{f}:J{f}" for f in range(8, 13)],
+]
 
 
 def comprobar_hoja_corta(hoja: dict, esp: dict, nombre: str, combinadas: list[str]) -> None:
@@ -1153,98 +1166,105 @@ def test_un_decimal_de_mas_de_16_cifras_se_rechaza_en_vez_de_redondearse():
     assert _valor_numerico(celda) == Decimal("12345678901234.56")
 
 
-def _textos_contexto(doc_informe: dict, detalle: bool = True, vigente: bool = False) -> list:
-    doc = exportar.documento(doc_informe)
-    filas = [
-        ["Sesión", doc.sesion],
-        ["Cerró", doc.cerrada_por, "Cerrada", doc.cerrada_en],
-        ["Moneda", "COP"],
-        ["Estado", "Informe congelado"],
-        [exportar.NOTA],
-    ]
+def _notas(doc_informe: dict, detalle: bool = True, vigente: bool = False) -> list[str]:
+    """La nota de cifras congeladas y los avisos que apliquen, en orden (Resumen)."""
+    del doc_informe
+    notas = [exportar.NOTA]
     if not detalle:
-        filas.append([exportar.SIN_DETALLE])
+        notas.append(exportar.SIN_DETALLE)
     if vigente:
-        filas.append([exportar.EMPRESA_VIGENTE])
-    return filas
+        notas.append(exportar.EMPRESA_VIGENTE)
+    return notas
 
 
-def comprobar_resumen(gen: dict, informe: dict, contexto: list[list]) -> None:
-    """El Resumen contra la huella: filas 1–8 (bloque y tarjetas) iguales a la plantilla con
-    las cifras de ``totales``; nada en la fila 9; desde la 10, las filas de contexto (Q7) con
-    el estilo de la nota de lista; sin la lista duplicada ni su regla (Q7)."""
+def comprobar_resumen(gen: dict, informe: dict, notas: list[str]) -> None:
+    """El Resumen, opción C (decisión del humano 2026-11-24), contra la huella regenerada:
+    mismas celdas, estilos, alturas y combinadas; tarjetas 2 × 2 con las cifras exactas de
+    ``totales`` como números (COP y %), la barra del % en C12, el panel de la sesión en
+    F7:J12 y la nota y los avisos ``notas`` en A:J desde la fila 14; ningún texto es fórmula."""
     hoja, esp = gen["hojas"]["Resumen"], _esperada_informe("Resumen")
-    # Q7: A10:J10 es de la lista omitida; quedan el título combinado C2:D2 y los datos de
-    # Empresa, Contacto y Dirección de la fila 5 (encabezado, 2026-11-24).
-    assert esp["combinadas"] == ["A10:J10", "C2:D2", *BLOQUE_COMBINADAS["Resumen"]]
-    comprobar_hoja_corta(hoja, esp, "Resumen", ["C2:D2", *BLOQUE_COMBINADAS["Resumen"]])
-    ultima = FILA_CONTEXTO + len(contexto)  # 1-based
-    area = esp["impresion"]["area"].split("!")[1]
-    assert hoja["impresion"]["area"].split("!")[1] == re.sub(r"\d+$", str(ultima), area)
-    # Q7: sin la regla de la lista duplicada (A13:J13).
-    assert [r["rango"] for r in esp["formato_condicional"]] == ["A13:J13"]
-    assert hoja["formato_condicional"] == []
-
-    # Alturas: filas 1–8 de la plantilla; las de contexto, la altura por defecto (plan 11b).
-    filas_esp = {k: f for k, f in esp["filas"].items() if int(k) <= 8}
-    defecto = {"alto": None, "alto_propio": False, "oculta": False, "nivel": 0}
-    filas_esp.update(
-        {
-            str(k): {**defecto, "contraida": False, "estilo": None}
-            for k in range(FILA_CONTEXTO + 1, ultima + 1)
-        }
+    combinadas = sorted(
+        [*BLOQUE_COMBINADAS["Resumen"], *RESUMEN_COMBINADAS]
+        + [f"A{FILA_NOTA + 1 + i}:J{FILA_NOTA + 1 + i}" for i in range(len(notas))]
     )
-    assert u_diseno.comparar(filas_esp, hoja["filas"], "Resumen.filas") == []
+    comprobar_hoja_corta(hoja, esp, "Resumen", combinadas)
+    ultima = FILA_NOTA + len(notas)  # 1-based
+    assert hoja["impresion"]["area"].split("!")[1] == f"$A$1:$J${ultima}"
+
+    # Alturas: las de la huella hasta la nota; cada nota, la suya (según su largo).
+    filas_esp = {k: f for k, f in esp["filas"].items() if int(k) <= FILA_NOTA}
+    filas_gen = {k: f for k, f in hoja["filas"].items() if int(k) <= FILA_NOTA}
+    assert u_diseno.comparar(filas_esp, filas_gen, "Resumen.filas") == []
+    for i, texto in enumerate(notas):
+        assert hoja["filas"][str(FILA_NOTA + 1 + i)]["alto"] == exportar._alto_nota(texto)
+
+    # Barra del % (C12): de 0 a 1, solo la barra, azul claro de los desgloses.
+    (regla,) = hoja["formato_condicional"]
+    assert regla["rango"] == "C12"
+    assert [c["valor"] for c in regla["barra"]["cfvo"]] == ["0", "1"]
 
     t = informe["totales"]
-    tarjetas = {
-        "A7": Decimal(t["encontrado"]),
-        "C7": Decimal(t["no_encontrado"]),
-        "E7": Decimal(t["registrado"]),
-        "G7": exportar.fraccion_encontrada(t["unidades_encontrado"], t["unidades_registrado"]),
+    pct = exportar.fraccion_encontrada(t["unidades_encontrado"], t["unidades_registrado"])
+    numeros = {
+        "A8": Decimal(t["encontrado"]),
+        "C8": Decimal(t["no_encontrado"]),
+        "A11": Decimal(t["registrado"]),
+        "C11": pct,
+        "C12": pct,
     }
+    doc = exportar.documento(informe)
     textos = {
         **_textos_del_bloque(),
-        "A8": exportar._unidades(t["unidades_encontrado"]),
-        "C8": exportar._unidades(t["unidades_no_encontrado"]),
-        "E8": exportar._unidades(t["unidades_registrado"]),
+        "A7": "Encontrado",
+        "C7": "No encontrado",
+        "A10": "Total registrado",
+        "C10": "% encontrado",
+        "A9": exportar._unidades(t["unidades_encontrado"]),
+        "C9": exportar._unidades(t["unidades_no_encontrado"]),
+        "A12": exportar._unidades(t["unidades_registrado"]),
+        "F7": "Sesión",
+        "F8": "Nombre",
+        "G8": doc.sesion or None,
+        "F9": "Cerró",
+        "G9": doc.cerrada_por or None,
+        "F10": "Cerrada",
+        "G10": doc.cerrada_en or None,
+        "F11": "Moneda",
+        "G11": "COP",
+        "F12": "Estado",
+        "G12": "Informe congelado",
     }
-    esp_fijas = {r: c for r, c in esp["celdas"].items() if _num_fila(r) <= 8}
-    gen_fijas = {r: c for r, c in hoja["celdas"].items() if _num_fila(r) <= 8}
-    assert sorted(gen_fijas) == sorted(esp_fijas)
-    for ref, celda in esp_fijas.items():
-        g = gen_fijas[ref]
+    textos.update({f"A{FILA_NOTA + 1 + i}": texto for i, texto in enumerate(notas)})
+    esp_celdas = {r: c for r, c in esp["celdas"].items() if _num_fila(r) <= FILA_NOTA + 1}
+    gen_celdas = {r: c for r, c in hoja["celdas"].items() if _num_fila(r) <= FILA_NOTA + 1}
+    assert sorted(gen_celdas) == sorted(esp_celdas)
+    for ref, celda in esp_celdas.items():
+        g = gen_celdas[ref]
         assert u_diseno.comparar(celda["estilo"], g["estilo"], f"Resumen!{ref}") == []
-        if ref in tarjetas:
-            assert _valor_numerico(g) == tarjetas[ref], ref
+        if ref in numeros:
+            assert _valor_numerico(g) == numeros[ref], ref
             continue
         valor = textos.get(ref, textos.get(celda["valor"], celda["valor"]))
         if valor is None:
             assert g["tipo"] == "vacia", (ref, g["valor"])
         else:
             assert (g["tipo"], g["valor"]) == ("s", valor), ref
-
-    # Filas de contexto (Q7): texto siempre como texto, con el estilo de la nota de lista.
-    nota = _esperada_informe("Todos los activos")["celdas"]["A7"]["estilo"]
-    resto = {r: c for r, c in hoja["celdas"].items() if _num_fila(r) > 8}
-    esperadas = {
-        f"{u_diseno.col_letra(c + 1)}{FILA_CONTEXTO + 1 + i}": v
-        for i, fila in enumerate(contexto)
-        for c, v in enumerate(fila)
-    }
-    assert sorted(resto) == sorted(esperadas)
-    for ref, valor in esperadas.items():
-        assert (resto[ref]["tipo"], resto[ref]["valor"]) == ("s", valor), ref
-        assert u_diseno.comparar(nota, resto[ref]["estilo"], ref) == []
+    # Avisos (después de la nota): mismo estilo que la nota, uno por fila.
+    nota_estilo = esp["celdas"][f"A{FILA_NOTA + 1}"]["estilo"]
+    for i, texto in enumerate(notas[1:], start=1):
+        celda = hoja["celdas"][f"A{FILA_NOTA + 1 + i}"]
+        assert (celda["tipo"], celda["valor"]) == ("s", texto)
+        assert u_diseno.comparar(nota_estilo, celda["estilo"], texto[:20]) == []
+    assert not any(_num_fila(r) > ultima for r in hoja["celdas"])
     comprobar_imagen_de_hoja(hoja, esp)
 
 
 def test_resumen_replica_la_huella_con_tarjetas_y_filas_de_contexto():
     informe = _informe_diseno()
     gen = _generar_informe(informe)
-    comprobar_resumen(gen, informe, _textos_contexto(informe))
+    comprobar_resumen(gen, informe, _notas(informe))
     # «Cerrada» es la hora del cierre en Colombia, como en el PDF (no «hoy»).
-    assert gen["hojas"]["Resumen"]["celdas"]["D11"]["valor"] == "14/11/2026, 5:58 p. m."
+    assert gen["hojas"]["Resumen"]["celdas"]["G10"]["valor"] == "14/11/2026, 5:58 p. m."
 
 
 def test_resumen_de_sesion_antigua_avisa_sin_detalle_y_empresa_vigente():
@@ -1256,7 +1276,7 @@ def test_resumen_de_sesion_antigua_avisa_sin_detalle_y_empresa_vigente():
     informe["empresa"]["vigente"] = True
     gen = _generar_informe(informe, detalle=[])
     assert gen["libro"]["hojas"] == ["Por ubicación", "No encontrados", "Por categoría", "Resumen"]
-    comprobar_resumen(gen, informe, _textos_contexto(informe, detalle=False, vigente=True))
+    comprobar_resumen(gen, informe, _notas(informe, detalle=False, vigente=True))
     for nombre, dimension in (("Por ubicación", "ubicaciones"), ("Por categoría", "categorias")):
         filas, total = _desglose_esperado(informe, dimension)
         comprobar_desglose(gen, nombre, filas, total)

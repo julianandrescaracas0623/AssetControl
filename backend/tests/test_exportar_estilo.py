@@ -459,8 +459,6 @@ def _estilos_medidos() -> dict[str, str]:
     for huella, h in HUELLAS.items():
         for nombre, hoja in h["hojas"].items():
             for ref, c in hoja["celdas"].items():
-                if nombre == "Resumen" and _fila(ref) >= 9:
-                    continue  # Q7: lista duplicada del Resumen, no se reproduce
                 medidos.setdefault(_clave_estilo(c["estilo"]), f"{huella}/{nombre}!{ref}")
             for n, f in hoja["filas"].items():
                 if f["estilo"]:

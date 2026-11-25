@@ -1543,6 +1543,16 @@ DECISIONES_ENCABEZADO = {
     "inmoviliza paneles: Excel dibuja una línea en el corte que no se puede ocultar (al "
     "imprimir, la cabecera se sigue repitiendo). Las huellas "
     "`activos.json` e `informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.",
+    "resumen_opcion_c": "Decisión del humano 2026-11-24 (opción C): el Resumen deja la "
+    "plantilla. Título junto al logo, sin combinar. Tarjetas 2 × 2 con fondo `F3F4F6` en "
+    "A:B y C:D (filas 7–12, 24 pt): Encontrado, No encontrado, Total registrado y % "
+    "encontrado, con rótulo, cifra (número COP o %) y unidades; bajo el %, una barra de "
+    "datos clásica de 0 a 1 en C12 (solo la barra, azul claro de los desgloses; la de Excel "
+    "2010 escribe fórmulas `xm:f`). Bordes blancos gruesos separan las tarjetas. Panel "
+    "«Sesión» en F7:J12 con borde fino: Nombre, Cerró, Cerrada, Moneda y Estado. La nota y "
+    "los avisos van a todo el ancho desde la fila 14, en un recuadro gris. Anchos propios "
+    "del Resumen para que las cifras quepan (A 24, B 26, C:D 25, E 3, F 22, G 18, H:I 12, "
+    "J 14).",
 }
 
 

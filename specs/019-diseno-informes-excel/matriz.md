@@ -1004,20 +1004,21 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 - Pestaña `FF1D4ED8`; cuadrícula en pantalla oculta; zoom 100; congelado `None`
 - Selección `[{'panel': None, 'celda_activa': 'B17', 'rango': 'B17'}]`, tabSelected False, topLeftCell `A7` (Q11: no se reproduce)
 - Formato de hoja `{'alto_fila_defecto': 15, 'ancho_col_defecto': 9.140625, 'ancho_base': 10, 'filas_ocultas_defecto': False, 'alto_propio_defecto': False}`
-- Combinadas: ['A10:J10', 'C2:D2', 'C5:D5', 'E5:F5', 'G5:J5'] (A10:J10 es de la lista omitida por Q7)
+- Combinadas: ['A10:B10', 'A11:B11', 'A12:B12', 'A14:J14', 'A7:B7', 'A8:B8', 'A9:B9', 'C10:D10', 'C11:D11', 'C5:D5', 'C7:D7', 'C8:D8', 'C9:D9', 'E5:F5', 'F7:J7', 'G10:J10', 'G11:J11', 'G12:J12', 'G5:J5', 'G8:J8', 'G9:J9'] (A10:J10 es de la lista omitida por Q7)
 - Autofiltro `None`; tablas `[]`; validaciones ninguna; hipervínculos ninguno; protección None
-- Impresión `{'area': "'Resumen'!$A$1:$J$13", 'titulos': None, 'filtro': None}`
+- Impresión `{'area': 'Resumen!$A$1:$J$14', 'titulos': None, 'filtro': None}`
 - Página `{'margenes': {'left': 0.4, 'right': 0.4, 'top': 0.6, 'bottom': 0.6, 'header': 0.3, 'footer': 0.3}, 'orientacion': 'landscape', 'papel': None, 'escala': None, 'ajustar_a_pagina': True, 'ajuste_ancho': 1, 'ajuste_alto': 1, 'primera_pagina': None, 'orden': None, 'blanco_y_negro': False, 'cuadricula_impresa': False, 'encabezados_impresos': False, 'centrado_horizontal': False, 'centrado_vertical': False, 'encabezado_pie': {'oddFooter': '&L&8 Generado con AssetControl&R&8 Página &P de &N'}, 'encabezado_pie_distinto_primera': False, 'encabezado_pie_pares_impares': False, 'saltos_fila': 0, 'saltos_columna': 0}`
 
 | Columnas | Ancho guardado | Oculta | Estilo de columna |
 |---|---|---|---|
-| A | 24 | False | Calibri 11 tema 1; alin general/bottom |
-| B | 26 | False | Calibri 11 tema 1; alin general/bottom |
-| C–D | 18 | False | Calibri 11 tema 1; alin general/bottom |
-| E–F | 22 | False | Calibri 11 tema 1; alin general/bottom |
-| G | 20 | False | Calibri 11 tema 1; alin general/bottom |
-| H–I | 16 | False | Calibri 11 tema 1; alin general/bottom |
-| J | 18 | False | Calibri 11 tema 1; alin general/bottom |
+| A | 24 | False | - |
+| B | 26 | False | - |
+| C–D | 25 | False | - |
+| E | 3 | False | - |
+| F | 22 | False | - |
+| G | 18 | False | - |
+| H–I | 12 | False | - |
+| J | 14 | False | - |
 
 | Fila | Alto (pt) | Propio | Estilo de fila |
 |---|---|---|---|
@@ -1026,14 +1027,15 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 | 3 | 18 | True | - |
 | 4 | 16 | True | - |
 | 5 | 30 | True | - |
-| 6 | 15.95 | True | - |
-| 7 | 30 | True | - |
-| 8 | 15.95 | True | - |
-| 9 | 26.1 | True | - |
-| 10 | 26.1 | True | - |
-| 11 | 21.95 | True | - |
-| 12 | 27.95 | True | - |
-| 13 | 21.95 | True | - |
+| 6 | 12 | True | - |
+| 7 | 24 | True | - |
+| 8 | 24 | True | - |
+| 9 | 24 | True | - |
+| 10 | 24 | True | - |
+| 11 | 24 | True | - |
+| 12 | 24 | True | - |
+| 13 | 12 | True | - |
+| 14 | 34 | True | - |
 
 | Celda | Valor | Estilo resuelto | Fila de matriz / decisión |
 |---|---|---|---|
@@ -1047,7 +1049,7 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 | H1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | I1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
 | J1 |  | Calibri 11 tema 1; relleno solid FF1D4ED8; alin general/bottom | 5–9, 25 |
-| C2 | Informe de activos | Arial 19 N FF111827; alin center/center | 5–9, 25 |
+| C2 | Informe de activos | Arial 19 N FF111827; alin general/center | 5–9, 25 |
 | C3 | Informe · {empresa.nombre} · corte {fecha} | Arial 10 FF4B5563; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
 | D3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
 | E3 |  | Calibri 11 tema 1; borde B:thin FFE5E7EB; alin general/center | 5–9, 25 |
@@ -1076,81 +1078,74 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 | H5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
 | I5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
 | J5 |  | Arial 9 FF111827; borde B:medium FF1D4ED8; alin general/top ajuste | 5–9, 25 |
-| A6 | Encontrado | Arial 9 N FF1D4ED8; alin center/center | 5–9, 25 |
-| B6 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| C6 | No encontrado | Arial 9 N FF1D4ED8; alin center/center | 5–9, 25 |
-| D6 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| E6 | Total registrado | Arial 9 N FF1D4ED8; alin center/center | 5–9, 25 |
-| F6 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| G6 | % encontrado | Arial 9 FF6B7280; alin center/center | 5–9, 25 |
-| H6 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| I6 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| J6 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| A7 | {numero} | Arial 18 N FF111827; alin center/center; formato `"$"\ #,##0.00` | 5–9, 25 |
-| B7 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| C7 | {numero} | Arial 18 N FF111827; alin center/center; formato `"$"\ #,##0.00` | 5–9, 25 |
-| D7 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| E7 | {numero} | Arial 18 N FF111827; alin center/center; formato `"$"\ #,##0.00` | 5–9, 25 |
-| F7 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| G7 | {numero} | Arial 18 N FF111827; alin center/center; formato `0.0\ %` | 5–9, 25 |
-| H7 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| I7 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| J7 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| A8 | {n} unidad | Arial 9 FF6B7280; alin center/center | 5–9, 25 |
-| B8 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| C8 | {n} unidades | Arial 9 FF6B7280; alin center/center | 5–9, 25 |
-| D8 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| E8 | {n} unidad | Arial 9 FF6B7280; alin center/center | 5–9, 25 |
-| F8 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| G8 | de las unidades registradas | Arial 9 FF6B7280; alin center/center | 5–9, 25 |
-| H8 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| I8 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| J8 |  | Calibri 11 tema 1; alin center/bottom | 5–9, 25 |
-| A9 | Todos los activos | Arial 12 N FF111827; borde B:thin FF111827; alin general/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| B9 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| C9 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| D9 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| E9 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| F9 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| G9 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| H9 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| I9 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| J9 |  | Calibri 11 tema 1; borde B:thin FF111827; alin general/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| A10 | {n} activo · encontrados {n} ({pct}) por {cop} · no encontrados {n} por {cop} · tabla «Activos», lista para filtrar o hacer una tabla dinámica. En cursiva y fondo ámbar: se encontró en otra ubicación. | Arial 9 FF6B7280; alin general/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| A11 | Total | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| B11 | Todos los activos | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| C11 |  | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| D11 |  | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| E11 |  | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| F11 |  | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| G11 |  | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| H11 |  | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| I11 | {n} activo | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| J11 | {numero} | Arial 10 N FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center; formato `"$"\ #,##0.00` | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| A12 | Código | Arial 9 N FFFFFFFF; relleno solid FF1F2937; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| B12 | Activo | Arial 9 N FFFFFFFF; relleno solid FF1F2937; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| C12 | Categoría | Arial 9 N FFFFFFFF; relleno solid FF1F2937; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| D12 | Marca | Arial 9 N FFFFFFFF; relleno solid FF1F2937; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| E12 | Serial | Arial 9 N FFFFFFFF; relleno solid FF1F2937; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| F12 | Ubicación esperada | Arial 9 N FFFFFFFF; relleno solid FF1F2937; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| G12 | Encontrado en | Arial 9 N FFFFFFFF; relleno solid FF1F2937; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| H12 | Estado físico | Arial 9 N FFFFFFFF; relleno solid FF1F2937; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| I12 | Resultado | Arial 9 N FFFFFFFF; relleno solid FF1F2937; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| J12 | Precio (COP) | Arial 9 N FFFFFFFF; relleno solid FF1F2937; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| A13 | {texto} | Arial 10 FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| B13 | {texto} | Arial 10 FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| C13 | {texto} | Arial 10 FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| D13 | {texto} | Arial 10 FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| E13 |  | Calibri 11 tema 1; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| F13 | {texto} | Arial 10 FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| G13 | {texto} | Arial 10 FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| H13 | {texto} | Arial 10 FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| I13 | {texto} | Arial 10 FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
-| J13 | {numero} | Arial 10 FF111827; borde L:thin 009CA3AF, R:thin 009CA3AF, T:thin 009CA3AF, B:thin 009CA3AF; alin center/center; formato `"$"\ #,##0.00` | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| A7 | Encontrado | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/bottom | 5–9, 25 |
+| B7 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/bottom | 5–9, 25 |
+| C7 | No encontrado | Arial 9 FF6B7280; relleno solid FFF3F4F6; borde L:thick FFFFFFFF; alin left/bottom | 5–9, 25 |
+| D7 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; borde L:thick FFFFFFFF; alin left/bottom | 5–9, 25 |
+| F7 | Sesión | Arial 10 N FF111827; borde L:thin FFD1D5DB, R:thin FFD1D5DB, T:thin FFD1D5DB, B:thin FFE5E7EB; alin left/center | 5–9, 25 |
+| G7 |  | Arial 10 N FF111827; borde L:thin FFD1D5DB, R:thin FFD1D5DB, T:thin FFD1D5DB, B:thin FFE5E7EB; alin left/center | 5–9, 25 |
+| H7 |  | Arial 10 N FF111827; borde L:thin FFD1D5DB, R:thin FFD1D5DB, T:thin FFD1D5DB, B:thin FFE5E7EB; alin left/center | 5–9, 25 |
+| I7 |  | Arial 10 N FF111827; borde L:thin FFD1D5DB, R:thin FFD1D5DB, T:thin FFD1D5DB, B:thin FFE5E7EB; alin left/center | 5–9, 25 |
+| J7 |  | Arial 10 N FF111827; borde L:thin FFD1D5DB, R:thin FFD1D5DB, T:thin FFD1D5DB, B:thin FFE5E7EB; alin left/center | 5–9, 25 |
+| A8 | {numero} | Arial 16 N FF111827; relleno solid FFF3F4F6; alin left/center; formato `"$"\ #,##0.00` | 5–9, 25 |
+| B8 |  | Arial 16 N FF111827; relleno solid FFF3F4F6; alin left/center; formato `"$"\ #,##0.00` | 5–9, 25 |
+| C8 | {numero} | Arial 16 N FF111827; relleno solid FFF3F4F6; borde L:thick FFFFFFFF; alin left/center; formato `"$"\ #,##0.00` | 5–9, 25 |
+| D8 |  | Arial 16 N FF111827; relleno solid FFF3F4F6; borde L:thick FFFFFFFF; alin left/center; formato `"$"\ #,##0.00` | 5–9, 25 |
+| F8 | Nombre | Arial 9 FF6B7280; borde L:thin FFD1D5DB, B:thin FFE5E7EB; alin left/center | 5–9, 25 |
+| G8 | {texto} | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| H8 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| I8 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| J8 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | 5–9, 25 |
+| A9 | {n} unidad | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/top | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| B9 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/top | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| C9 | {n} unidad | Arial 9 FF6B7280; relleno solid FFF3F4F6; borde L:thick FFFFFFFF; alin left/top | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| D9 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; borde L:thick FFFFFFFF; alin left/top | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| F9 | Cerró | Arial 9 FF6B7280; borde L:thin FFD1D5DB, B:thin FFE5E7EB; alin left/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| G9 | {texto} | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| H9 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| I9 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| J9 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| A10 | Total registrado | Arial 9 FF6B7280; relleno solid FFF3F4F6; borde T:thick FFFFFFFF; alin left/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| B10 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; borde T:thick FFFFFFFF; alin left/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| C10 | % encontrado | Arial 9 FF6B7280; relleno solid FFF3F4F6; borde L:thick FFFFFFFF, T:thick FFFFFFFF; alin left/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| D10 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; borde L:thick FFFFFFFF, T:thick FFFFFFFF; alin left/bottom | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| F10 | Cerrada | Arial 9 FF6B7280; borde L:thin FFD1D5DB, B:thin FFE5E7EB; alin left/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| G10 | {texto} | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| H10 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| I10 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| J10 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| A11 | {numero} | Arial 16 N FF111827; relleno solid FFF3F4F6; alin left/center; formato `"$"\ #,##0.00` | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| B11 |  | Arial 16 N FF111827; relleno solid FFF3F4F6; alin left/center; formato `"$"\ #,##0.00` | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| C11 | {numero} | Arial 16 N FF111827; relleno solid FFF3F4F6; borde L:thick FFFFFFFF; alin left/center; formato `0.0\ %` | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| D11 |  | Arial 16 N FF111827; relleno solid FFF3F4F6; borde L:thick FFFFFFFF; alin left/center; formato `0.0\ %` | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| F11 | Moneda | Arial 9 FF6B7280; borde L:thin FFD1D5DB, B:thin FFE5E7EB; alin left/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| G11 | COP | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| H11 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| I11 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| J11 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFE5E7EB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| A12 | {n} unidades | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/top | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| B12 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/top | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| C12 | {numero} | Arial 9 FF6B7280; relleno solid FFF3F4F6; borde L:thick FFFFFFFF; alin left/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| D12 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/top | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| F12 | Estado | Arial 9 FF6B7280; borde L:thin FFD1D5DB, B:thin FFD1D5DB; alin left/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| G12 | Informe congelado | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFD1D5DB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| H12 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFD1D5DB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| I12 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFD1D5DB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| J12 |  | Arial 10 FF111827; borde R:thin FFD1D5DB, B:thin FFD1D5DB; alin general/center | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| A14 | {nota} | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| B14 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| C14 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| D14 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| E14 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| F14 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| G14 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| H14 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| I14 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
+| J14 |  | Arial 9 FF6B7280; relleno solid FFF3F4F6; alin left/center ajuste | NO REPRODUCIDO (Q7: lista duplicada del Resumen) |
 
 | Formato condicional | Detalle |
 |---|---|
-| A13:J13 (Q7: no se reproduce) | `{'rango': 'A13:J13', 'tipo': 'expression', 'prioridad': 1, 'detener': False, 'operador': None, 'formulas': ['AND($F13<>"",$G13<>"",$F13<>$G13)'], 'dxf': {'fuente': {'cursiva': True, 'color': {'rgb': 'FF92400E'}, 'negrita': False, 'tachado': False}, 'relleno': {'patron': 'solid', 'color': {'rgb': 'FFFDE68A'}}}}` |
+| C12 (Q7: no se reproduce) | `{'rango': 'C12', 'tipo': 'dataBar', 'prioridad': 1, 'detener': False, 'operador': None, 'formulas': [], 'dxf': None, 'barra': {'cfvo': [{'tipo': 'num', 'valor': '0'}, {'tipo': 'num', 'valor': '1'}], 'color': {'rgb': 'FFBFDBFE'}, 'mostrar_valor': False, 'largo_min': None, 'largo_max': None, 'ext': []}}` |
 
 | Imagen | Detalle |
 |---|---|
@@ -1228,6 +1223,7 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 | `styles:styleSheet/cellXfs/xf` | 5-9 estilo de celda (resuelto) |
 | `styles:styleSheet/cellXfs/xf/alignment` | 8 alineación |
 | `styles:styleSheet/cellXfs/xf/alignment@horizontal` | 8 alineación |
+| `styles:styleSheet/cellXfs/xf/alignment@indent` | 8 alineación |
 | `styles:styleSheet/cellXfs/xf/alignment@vertical` | 8 alineación |
 | `styles:styleSheet/cellXfs/xf/alignment@wrapText` | 8 alineación |
 | `styles:styleSheet/cellXfs/xf@applyAlignment` | EQ L10: banderas apply*/pivotButton/quotePrefix por defecto; el estilo se compara resuelto (Q13) |
@@ -1308,6 +1304,7 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 | `sheet:worksheet/conditionalFormatting/cfRule/dataBar/cfvo@type` | 23 formato condicional |
 | `sheet:worksheet/conditionalFormatting/cfRule/dataBar/color` | 23 formato condicional |
 | `sheet:worksheet/conditionalFormatting/cfRule/dataBar/color@rgb` | 23 formato condicional |
+| `sheet:worksheet/conditionalFormatting/cfRule/dataBar@showValue` | 23 formato condicional |
 | `sheet:worksheet/conditionalFormatting/cfRule/formula` | 23 formato condicional |
 | `sheet:worksheet/conditionalFormatting/cfRule@dxfId` | 23 formato condicional |
 | `sheet:worksheet/conditionalFormatting/cfRule@priority` | 23 formato condicional |
@@ -1478,3 +1475,4 @@ Tel. {empresa.telefono} | Arial 9 FF111827; borde B:medium FF1D4ED8; alin genera
 ## Encabezado junto al logo (decisión del humano 2026-11-24)
 
 - `encabezado_junto_al_logo`: Decisión del humano 2026-11-24: el bloque de las dos exportaciones (activos e informe) pone el título junto al logo y debajo la línea «Informe · empresa · exportado|corte fecha» (C3) con una línea fina gris. En la fila 4, los rótulos «Empresa», «Contacto» y «Dirección»; en la fila 5, bajo cada uno, sus datos (nombre y NIT; correo y teléfono; dirección) en celdas combinadas con ajuste de texto, hasta el fin de la banda. Un dato ausente se omite y un grupo sin datos va sin rótulo. Se quitan los rótulos «Exportado» y «Correo» de la plantilla. Alturas: fila 4 = 16 y fila 5 = 30. El logo conserva su caja y su tamaño (`CajaLogo`, en EMU) y lleva un marco gris fino (`D1D5DB`, 0,75 pt, sin relleno) a 3 px de la imagen; el marco depende del logo, así que no va en la huella y lo cubre su propia prueba. Ninguna hoja inmoviliza paneles: Excel dibuja una línea en el corte que no se puede ocultar (al imprimir, la cabecera se sigue repitiendo). Las huellas `activos.json` e `informe.json` llevan las filas 1–5 de este diseño, con sus marcadores.
+- `resumen_opcion_c`: Decisión del humano 2026-11-24 (opción C): el Resumen deja la plantilla. Título junto al logo, sin combinar. Tarjetas 2 × 2 con fondo `F3F4F6` en A:B y C:D (filas 7–12, 24 pt): Encontrado, No encontrado, Total registrado y % encontrado, con rótulo, cifra (número COP o %) y unidades; bajo el %, una barra de datos clásica de 0 a 1 en C12 (solo la barra, azul claro de los desgloses; la de Excel 2010 escribe fórmulas `xm:f`). Bordes blancos gruesos separan las tarjetas. Panel «Sesión» en F7:J12 con borde fino: Nombre, Cerró, Cerrada, Moneda y Estado. La nota y los avisos van a todo el ancho desde la fila 14, en un recuadro gris. Anchos propios del Resumen para que las cifras quepan (A 24, B 26, C:D 25, E 3, F 22, G 18, H:I 12, J 14).

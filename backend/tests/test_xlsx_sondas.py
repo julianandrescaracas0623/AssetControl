@@ -242,14 +242,19 @@ def test_l5_barras_de_datos(clave, nombre, hoja):
 
     def construir(wb, ws):
         for r in reglas:
-            ws.conditional_format(
-                r["rango"],
-                {
-                    "type": "data_bar",
-                    "bar_color": "#" + r["barra"]["color"]["rgb"][-6:],
-                    "data_bar_2010": False,
-                },
-            )
+            opciones = {
+                "type": "data_bar",
+                "bar_color": "#" + r["barra"]["color"]["rgb"][-6:],
+                "data_bar_2010": False,
+            }
+            # La barra del % del Resumen (opción C, 2026-11-24): de 0 a 1, solo la barra.
+            minimo, maximo = r["barra"]["cfvo"]
+            if minimo["tipo"] == "num":
+                opciones.update(min_type="num", min_value=int(minimo["valor"]))
+                opciones.update(max_type="num", max_value=int(maximo["valor"]))
+            if r["barra"]["mostrar_valor"] is False:
+                opciones["bar_only"] = True
+            ws.conditional_format(r["rango"], opciones)
 
     gen = _libro(construir)["huella"]["hojas"][HOJA]
     assert all(r["barra"]["ext"] == [] for r in gen["formato_condicional"])
@@ -262,9 +267,10 @@ def test_l5_barras_de_datos(clave, nombre, hoja):
         )
         == []
     )
-    # Diferencia fijada (no oculta): xlsxwriter escribe val="0" en min/max.
-    assert [c["valor"] for c in gen["formato_condicional"][0]["barra"]["cfvo"]] == ["0", "0"]
-    assert [c["valor"] for c in reglas[0]["barra"]["cfvo"]] == [None, None]
+    # Diferencia fijada (no oculta): con min/max automáticos, xlsxwriter escribe val="0".
+    if reglas[0]["barra"]["cfvo"][0]["tipo"] != "num":
+        assert [c["valor"] for c in gen["formato_condicional"][0]["barra"]["cfvo"]] == ["0", "0"]
+        assert [c["valor"] for c in reglas[0]["barra"]["cfvo"]] == [None, None]
 
 
 # ---------------------------------------------------------------------------
