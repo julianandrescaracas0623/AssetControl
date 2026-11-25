@@ -14,7 +14,7 @@ import { type EstadoRed, NetworkStatus } from '@/components/app/NetworkStatus'
 import { Aviso, Boton, Campo, Estado, Insignia, ListaDatos, MarcoCampo, Panel, Pestanas, Progreso } from '@/components/kit'
 import { useDensidad } from '@/hooks/use-densidad'
 import { useEsEscritorio } from '@/hooks/use-escritorio'
-import { type Activo, aTarjeta, normalizarCodigo, useActivoPorCodigo, useBuscarActivos } from '@/lib/activos'
+import { type Activo, aTarjeta, normalizarCodigo, useActivo, useActivoPorCodigo, useBuscarActivos } from '@/lib/activos'
 import { api, mensajeDeError } from '@/lib/api/cliente'
 import { normalizarBusqueda, rutaDe } from '@/lib/catalogo'
 import { useConfirmarVerificacion, useSalaDeTrabajo } from '@/lib/conteo'
@@ -731,6 +731,11 @@ function UltimaVerificada({ verificacion, sesionId, compacta }: { verificacion: 
   const pendiente = useFotoPendiente()
   const entrada = useRef<HTMLInputElement>(null)
   const a = verificacion.activo
+  // La verificación solo trae id, código y nombre: la foto principal sale de la ficha del activo.
+  // Mientras carga no se ofrece el botón, para no mostrar «Agregar foto» a un activo que ya tiene foto.
+  const ficha = useActivo(a.id)
+  const conFotoPrincipal = Boolean(ficha.data?.foto)
+  const fichaLista = ficha.isSuccess || ficha.isError
   const cuando = hora.format(new Date(verificacion.recibido_en))
   if (compacta) {
     return (
@@ -757,12 +762,17 @@ function UltimaVerificada({ verificacion, sesionId, compacta }: { verificacion: 
             {fila.ubicacion.ruta}: {formatEntero(fila.verificados)} de {formatEntero(fila.total)}
           </span>
         )}
-        {(pendiente.estado === 'sin_foto' || pendiente.estado === 'error') && (
+        {(pendiente.estado === 'sin_foto' || pendiente.estado === 'error') && fichaLista && (
           <Boton variante="secundario" icono={<Camera />} onClick={() => entrada.current?.click()}>
-            {pendiente.estado === 'error' ? 'Elegir otra foto' : 'Agregar foto'}
+            {pendiente.estado === 'error' ? 'Elegir otra foto' : conFotoPrincipal ? 'Tomar foto nueva de este conteo' : 'Agregar foto'}
           </Boton>
         )}
       </div>
+      {pendiente.estado === 'sin_foto' && conFotoPrincipal && (
+        <p className="text-etiqueta font-normal text-muted-foreground">
+          El activo ya tiene su foto principal. Una foto nueva solo queda como evidencia de este conteo.
+        </p>
+      )}
       <input
         ref={entrada}
         type="file"

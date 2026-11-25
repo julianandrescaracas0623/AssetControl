@@ -80,12 +80,13 @@ export function AvisoYaVerificado({ verificacion }: { verificacion: Verificacion
   )
 }
 
-function Guardado({ verificacion, sesion }: { verificacion: Verificacion; sesion: SesionConteo }) {
+function Guardado({ verificacion, sesion, conFotoPrincipal }: { verificacion: Verificacion; sesion: SesionConteo; conFotoPrincipal: boolean }) {
   const detalle = useDetalleSesion(sesion.id)
   const fila = detalle.data?.avance.por_ubicacion.find((f) => f.ubicacion.id === verificacion.ubicacion_encontrada.id)
   const navegar = useNavigate()
   // Spec 012 (R6): una foto opcional de esta verificación. Tocar el botón detiene la
-  // vuelta automática a la cámara hasta que la persona termine.
+  // vuelta automática a la cámara hasta que la persona termine. Si el activo ya tiene foto
+  // principal, esta foto es solo evidencia de este conteo: nada se sube sin tocar el botón.
   const [quedarse, setQuedarse] = useState(false)
   const pendiente = useFotoPendiente()
   const entrada = useRef<HTMLInputElement>(null)
@@ -147,6 +148,11 @@ function Guardado({ verificacion, sesion }: { verificacion: Verificacion; sesion
           void pendiente.enviar(subir, listo)
         }}
       />
+      {pendiente.estado === 'sin_foto' && conFotoPrincipal ? (
+        <p className="text-center text-etiqueta font-normal text-muted-foreground">
+          El activo ya tiene su foto principal. Una foto nueva solo queda como evidencia de este conteo.
+        </p>
+      ) : null}
       {pendiente.estado === 'sin_foto' || pendiente.estado === 'error' ? (
         <Boton
           variante="secundario"
@@ -156,7 +162,7 @@ function Guardado({ verificacion, sesion }: { verificacion: Verificacion; sesion
             entrada.current?.click()
           }}
         >
-          {pendiente.estado === 'error' ? 'Tomar otra foto' : 'Agregar foto (opcional)'}
+          {pendiente.estado === 'error' ? 'Tomar otra foto' : conFotoPrincipal ? 'Tomar foto nueva de este conteo' : 'Agregar foto (opcional)'}
         </Boton>
       ) : null}
       <EstadoFoto estado={pendiente.estado} error={pendiente.error} onReintentar={() => void pendiente.enviar(subir)} />
@@ -205,7 +211,7 @@ function Verificando({ activo, sesion }: { activo: Activo; sesion: SesionConteo 
           </Boton>
         }
       >
-        <Guardado verificacion={resultado.verificacion} sesion={sesion} />
+        <Guardado verificacion={resultado.verificacion} sesion={sesion} conFotoPrincipal={Boolean(activo.foto)} />
       </CountShell>
     )
   }
