@@ -119,19 +119,35 @@ class Estaticos:
         return respuesta
 
 
+# SEC-05: en estas rutas el enlace de un solo uso (restablecer, invitar) o la consola viajan
+# en la URL; ninguna petición de salida debe llevarla como referrer.
+RUTAS_SIN_REFERRER: tuple[str, ...] = ("/restablecer", "/invitacion", "/plataforma")
+
+
+def _ruta_sin_referrer(ruta: str) -> bool:
+    return any(ruta == base or ruta.startswith(base + "/") for base in RUTAS_SIN_REFERRER)
+
+
 class ConCabeceras:
     """Agrega las cabeceras de seguridad (R4) a toda respuesta; HSTS solo en producción."""
 
     def __init__(self, app: WsgiApp, *, produccion: bool) -> None:
         self.app = app
         self.cabeceras = (*CABECERAS, HSTS) if produccion else CABECERAS
+        self.cabeceras_sin_referrer = tuple(
+            ("Referrer-Policy", "no-referrer") if nombre == "Referrer-Policy" else (nombre, valor)
+            for nombre, valor in self.cabeceras
+        )
 
     def __call__(
         self, environ: dict[str, Any], start_response: Callable[..., Any]
     ) -> Iterable[bytes]:
+        ruta = environ.get("PATH_INFO", "")
+        cabeceras = self.cabeceras_sin_referrer if _ruta_sin_referrer(ruta) else self.cabeceras
+
         def con_cabeceras(status: str, headers: list[tuple[str, str]], exc_info: Any = None) -> Any:
             presentes = {nombre.lower() for nombre, _ in headers}
-            extra = [(n, v) for n, v in self.cabeceras if n.lower() not in presentes]
+            extra = [(n, v) for n, v in cabeceras if n.lower() not in presentes]
             return start_response(status, [*headers, *extra], exc_info)
 
         return self.app(environ, con_cabeceras)

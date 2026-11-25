@@ -31,6 +31,8 @@ jobs:
       DATABASE_URL: postgresql+psycopg://assetcontrol_app:ci-app-efimera@localhost:5432/assetcontrol
       MIGRATION_DATABASE_URL: postgresql+psycopg://assetcontrol_admin:ci-migrador-efimera@localhost:5432/assetcontrol?sslmode=require
       ENVIRONMENT: production
+      # SEC-01: en producción es obligatoria. Esta prueba llega directo al contenedor, sin proxy.
+      TRUSTED_PROXY_HOPS: "0"
     steps:
       - uses: actions/checkout@v7
         with:

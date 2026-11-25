@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { RouteObject } from 'react-router'
 
 import type { Rol } from '@/lib/api/cliente'
 import { simularSesion } from '@/test/sesion'
@@ -50,5 +51,30 @@ describe('rutas', () => {
     renderAt('/contar/pendientes', 'contador')
     await screen.findByRole('heading', { level: 1, name: 'Pendientes' })
     expect(screen.queryByText(/Datos ficticios/)).toBeNull()
+  })
+})
+
+// SEC-07: /dev/componentes solo existe en desarrollo (mismo criterio que el módulo de prueba).
+function rutasDe(lista: RouteObject[]): string[] {
+  return lista.flatMap((ruta) => [ruta.path ?? '', ...rutasDe(ruta.children ?? [])])
+}
+
+describe('/dev/componentes solo en desarrollo', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  it('existe en desarrollo', async () => {
+    const { routes: rutasDev } = await import('./router')
+    expect(rutasDe(rutasDev)).toContain('/dev/componentes')
+  })
+
+  it('no existe cuando el build no es de desarrollo', async () => {
+    vi.stubEnv('DEV', false)
+    vi.resetModules()
+    const { routes: rutasProduccion } = await import('./router')
+    expect(rutasDe(rutasProduccion)).not.toContain('/dev/componentes')
+    expect(rutasDe(rutasProduccion)).toContain('/login')
   })
 })

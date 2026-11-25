@@ -41,6 +41,7 @@ class MissingConfigError(RuntimeError):
 SECRET_KEY_MIN_BYTES = 32
 TEST_ENVIRONMENT = "test"
 DEVELOPMENT_ENVIRONMENT = "development"
+PRODUCTION_ENVIRONMENT = "production"
 # Lista cerrada (M1 de T4): cualquier otro valor falla al arrancar.
 ALLOWED_ENVIRONMENTS: frozenset[str] = frozenset(
     {DEVELOPMENT_ENVIRONMENT, TEST_ENVIRONMENT, "production", "staging"}
@@ -83,6 +84,16 @@ class WeakSecretKeyError(RuntimeError):
         super().__init__(
             f"SECRET_KEY debe tener al menos {SECRET_KEY_MIN_BYTES} bytes; genera una con "
             '`python -c "import secrets; print(secrets.token_urlsafe(48))"`.'
+        )
+
+
+class PlataformaSinRedesError(RuntimeError):
+    """Consola de plataforma activa en producción sin lista de redes (SEC-03). No repite valores."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "PLATAFORMA_HABILITADA=true en production exige PLATAFORMA_REDES_PERMITIDAS: "
+            "la consola no puede quedar accesible desde cualquier red (docs/09-despliegue.md, 5.2)."
         )
 
 
@@ -190,6 +201,12 @@ class Config:
         if self.environment not in ALLOWED_ENVIRONMENTS:
             raise InvalidEnvironmentError()
         validar_entorno(self.correo, self.environment)
+        if (
+            self.environment == PRODUCTION_ENVIRONMENT
+            and self.plataforma.habilitada
+            and not self.plataforma.redes_permitidas
+        ):
+            raise PlataformaSinRedesError()
         if (
             self.almacen is not None
             and self.almacen.tipo == "carpeta"
@@ -338,6 +355,13 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
     missing = [name for name in REQUIRED_VARS if not (source.get(name) or "").strip()]
     if missing:
         raise MissingConfigError(missing)
+    # SEC-01: en producción TRUSTED_PROXY_HOPS debe fijarse de forma explícita (0 o 1..5).
+    # Sin ella, detrás de un proxy todos los clientes compartirían un mismo contador.
+    if (
+        source["ENVIRONMENT"].strip() == PRODUCTION_ENVIRONMENT
+        and not (source.get(TRUSTED_PROXY_HOPS_VAR) or "").strip()
+    ):
+        raise MissingConfigError([TRUSTED_PROXY_HOPS_VAR])
     defaults = RateLimits()
     rate_limits = RateLimits(
         **{

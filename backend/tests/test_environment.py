@@ -142,7 +142,7 @@ def test_a_real_process_with_a_valid_environment_starts():
     result = _run_real_process(
         "import sys; from app import create_app; app = create_app(); "
         "print(app.testing, 'pytest' in sys.modules)",
-        {**ENV, "SECRET_KEY": LONG_SECRET, "ENVIRONMENT": "production"},
+        {**ENV, "SECRET_KEY": LONG_SECRET, "ENVIRONMENT": "production", "TRUSTED_PROXY_HOPS": "1"},
     )
 
     assert result.returncode == 0, result.stderr
@@ -233,3 +233,31 @@ def test_deployment_check_detects_environment_test(line):
 @pytest.mark.parametrize("line", ["ENVIRONMENT: development", "UV_PROJECT_ENVIRONMENT=/opt/venv"])
 def test_deployment_check_ignores_other_values(line):
     assert not _FIXES_TEST.search(line)
+
+
+def test_a_real_production_process_without_trusted_proxy_hops_fails_at_startup():
+    # SEC-01: producción sin TRUSTED_PROXY_HOPS explícito no arranca y nombra la variable.
+    result = _run_real_process(
+        "from app import create_app; create_app()",
+        {**ENV, "SECRET_KEY": LONG_SECRET, "ENVIRONMENT": "production"},
+    )
+    assert result.returncode != 0
+    assert "TRUSTED_PROXY_HOPS" in result.stderr
+    _no_secrets(result.stdout + result.stderr)
+
+
+def test_a_real_production_process_with_console_and_no_network_list_fails_at_startup():
+    # SEC-03: consola activa en producción sin PLATAFORMA_REDES_PERMITIDAS no arranca.
+    result = _run_real_process(
+        "from app import create_app; create_app()",
+        {
+            **ENV,
+            "SECRET_KEY": LONG_SECRET,
+            "ENVIRONMENT": "production",
+            "TRUSTED_PROXY_HOPS": "1",
+            "PLATAFORMA_HABILITADA": "true",
+        },
+    )
+    assert result.returncode != 0
+    assert "PLATAFORMA_REDES_PERMITIDAS" in result.stderr
+    _no_secrets(result.stdout + result.stderr)

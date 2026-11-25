@@ -24,7 +24,6 @@ import Historial from './routes/contar/Historial'
 import ContarInicio from './routes/contar/Inicio'
 import Pendientes from './routes/contar/Pendientes'
 import Verificar from './routes/contar/Verificar'
-import Componentes from './routes/dev/Componentes'
 import InicioPorRol from './routes/InicioPorRol'
 import Invitacion from './routes/Invitacion'
 import Login from './routes/Login'
@@ -75,7 +74,16 @@ export const routes: RouteObject[] = [
       { path: '/invitacion', element: <Invitacion /> },
       { path: '/recuperar', element: <RecuperarContrasena /> },
       { path: '/restablecer', element: <NuevaContrasena /> },
-      { path: '/dev/componentes', element: <Componentes /> },
+      // SEC-07: la página de componentes (datos de ejemplo) solo existe en desarrollo; la
+      // condición es la misma que la del módulo de prueba de la consola (modulos.ts).
+      ...(import.meta.env.DEV
+        ? [
+            {
+              path: '/dev/componentes',
+              lazy: async () => ({ Component: (await import('./routes/dev/Componentes')).default }),
+            },
+          ]
+        : []),
       {
         element: <RequiereSesion />,
         children: [

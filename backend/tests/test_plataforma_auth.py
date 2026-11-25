@@ -59,7 +59,7 @@ from plataforma_db import (
 
 from app import create_app
 from app.auth.credentials import JWT_KEY_CONTEXT, Passwords, derive_key, token_storage_hash
-from app.config import Config, RateLimits, load_config
+from app.config import Config, PlataformaSinRedesError, RateLimits, load_config
 from app.db import PlataformaLoginRow
 from app.plataforma import modulos
 from app.plataforma.config import PlataformaConfig, RedesNoValidasError
@@ -168,9 +168,11 @@ def test_production_with_networks_and_no_proxy_hops_warns_without_the_networks(c
     assert not _platform_network_warnings(
         caplog, environment="production", plataforma=redes, trusted_proxy_hops=1
     )
-    assert not _platform_network_warnings(
-        caplog, environment="production", plataforma=PlataformaConfig.desde_texto("true", "")
-    )
+    # SEC-03: consola activa en producción sin redes ya no arranca (no es un aviso).
+    with pytest.raises(PlataformaSinRedesError):
+        _platform_network_warnings(
+            caplog, environment="production", plataforma=PlataformaConfig.desde_texto("true", "")
+        )
     assert not _platform_network_warnings(caplog, environment="test", plataforma=redes)
 
 

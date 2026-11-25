@@ -431,3 +431,16 @@ def app(db_connection) -> Iterator[Flask]:
 def client(app) -> FlaskClient:
     """Cliente HTTP de la app de ``app``."""
     return app.test_client()
+
+
+@pytest.fixture(autouse=True)
+def _cupo_de_subidas_limpio():
+    """Contador de subidas por usuario (SEC-02): cada prueba empieza con el suyo."""
+    from app.fotos import cupo
+
+    original = cupo.SUBIDAS
+    cupo.SUBIDAS = cupo.VentanaDeSubidas(cupo.MAX_SUBIDAS, cupo.VENTANA_SEGUNDOS)
+    try:
+        yield
+    finally:
+        cupo.SUBIDAS = original

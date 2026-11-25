@@ -16,7 +16,7 @@ from flask.typing import ResponseReturnValue
 from app.activos.service import ErrorActivo
 from app.auth.decorators import current_session, current_user, require_auth
 from app.errors import error_response
-from app.fotos import imagen, service
+from app.fotos import cupo, imagen, service
 from app.fotos.almacen import EXTENSION_KEY, Almacen
 
 bp = Blueprint("fotos", __name__)
@@ -50,13 +50,24 @@ def _respuesta(subida: service.Subida) -> ResponseReturnValue:
     return jsonify(foto=service.vista(subida.foto)), 201 if subida.creada else 200
 
 
+def _sin_cupo(usuario_id: uuid.UUID) -> ResponseReturnValue | None:
+    """SEC-02: ``429`` si el usuario agotó sus subidas de la ventana; antes de leer el archivo."""
+    try:
+        cupo.registrar_subida(usuario_id)
+    except cupo.SubidasExcedidas as exc:
+        return _error(exc)
+    return None
+
+
 @bp.put("/activos/<uuid:id>/foto")
 @require_auth
 def subir_principal(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nombre del contrato
+    usuario = current_user()
+    if (rechazo := _sin_cupo(usuario.usuario_id)) is not None:
+        return rechazo
     datos = _subida()
     if datos is None:
         return error_response(*INVALIDA)
-    usuario = current_user()
     try:
         subida = service.subir_principal(
             current_session(),
@@ -92,10 +103,12 @@ def quitar_principal(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002 - nomb
 @bp.put("/sesiones/<uuid:sid>/verificaciones/<uuid:vid>/foto")
 @require_auth
 def subir_de_verificacion(sid: uuid.UUID, vid: uuid.UUID) -> ResponseReturnValue:
+    usuario = current_user()
+    if (rechazo := _sin_cupo(usuario.usuario_id)) is not None:
+        return rechazo
     datos = _subida()
     if datos is None:
         return error_response(*INVALIDA)
-    usuario = current_user()
     try:
         subida = service.subir_de_verificacion(
             current_session(),
