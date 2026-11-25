@@ -101,7 +101,7 @@ export default function Login() {
         <Link
           to="/recuperar"
           onClick={alOlvidar}
-          className="-my-2 inline-flex min-h-11 items-center self-end rounded-sm px-1 text-etiqueta font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="-my-2 inline-flex min-h-11 items-center self-center rounded-sm px-1 text-etiqueta font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           ¿Olvidaste tu contraseña?
         </Link>
