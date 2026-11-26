@@ -83,7 +83,7 @@ describe('/admin/sesiones', () => {
     })
     abrir('/admin/sesiones/00000000-0000-4000-8000-0000000000e1', catalogo)
     const aviso = await screen.findByRole('link', { name: /1 activo se vio en otra ubicación/ })
-    expect(aviso.getAttribute('href')).toBe('/admin/discrepancias?sesion=00000000-0000-4000-8000-0000000000e1')
+    expect(aviso.getAttribute('href')).toBe('/app/discrepancias?sesion=00000000-0000-4000-8000-0000000000e1')
     const pendientes = (await screen.findByRole('heading', { level: 2, name: 'Pendientes por verificar' })).parentElement!
     expect(within(pendientes).getByText('Silla ergonómica')).toBeTruthy()
     expect(within(pendientes).queryByText('Impresora multifuncional')).toBeNull()
@@ -133,7 +133,7 @@ describe('Cerrar una sesión (spec 008, T4)', () => {
     expect(await within(dialogo).findByText(/discrepancia sigue por resolver/)).toBeTruthy()
     expect(within(dialogo).getByText(/No se puede reabrir/)).toBeTruthy()
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Cerrar y ver informe' }))
-    await waitFor(() => expect(router.state.location.pathname).toBe(`/admin/sesiones/${SESION}/informe`))
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/app/sesiones/${SESION}/informe`))
     expect(await screen.findByRole('heading', { level: 1, name: 'Informe · Conteo nov 2026' })).toBeTruthy()
     expect(llamadasCerrar(f)).toBe(1)
     // El informe llega con la respuesta del cierre: no se vuelve a pedir.
@@ -167,7 +167,7 @@ describe('Cerrar una sesión (spec 008, T4)', () => {
     const dialogo = await screen.findByRole('dialog')
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Cerrar y ver informe' }))
     expect(await within(dialogo).findByText('El servicio no está disponible.')).toBeTruthy()
-    expect(router.state.location.pathname).toBe(`/admin/sesiones/${SESION}`)
+    expect(router.state.location.pathname).toBe(`/app/sesiones/${SESION}`)
   })
 
   it('una sesión cerrada muestra «Ver informe» en vez del avance y no se puede volver a cerrar', async () => {
@@ -176,7 +176,7 @@ describe('Cerrar una sesión (spec 008, T4)', () => {
     abrir(`/admin/sesiones/${SESION}`, catalogo)
     const cerrada = await screen.findByRole('region', { name: 'Sesión cerrada' })
     expect(within(cerrada).getByText(/por Ana Torres/)).toBeTruthy()
-    expect(within(cerrada).getByRole('link', { name: 'Ver informe' }).getAttribute('href')).toBe(`/admin/sesiones/${SESION}/informe`)
+    expect(within(cerrada).getByRole('link', { name: 'Ver informe' }).getAttribute('href')).toBe(`/app/sesiones/${SESION}/informe`)
     expect(screen.queryByRole('button', { name: 'Cerrar sesión' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Avance' })).toBeNull()
     // Las discrepancias se pueden resolver después del cierre (Q1 de la 007).
@@ -187,9 +187,9 @@ describe('Cerrar una sesión (spec 008, T4)', () => {
     const catalogo = catalogoDemo('admin', { sesiones: [sesionDe({ estado: 'cerrada', cerrada_en: '2026-11-14T16:00:00+00:00' })] })
     abrir('/admin/sesiones', catalogo)
     const cerradas = await screen.findByRole('region', { name: 'Cerradas' })
-    expect(within(cerradas).getByRole('link', { name: 'Conteo nov 2026' }).getAttribute('href')).toBe(`/admin/sesiones/${SESION}/informe`)
+    expect(within(cerradas).getByRole('link', { name: 'Conteo nov 2026' }).getAttribute('href')).toBe(`/app/sesiones/${SESION}/informe`)
     expect(within(cerradas).getByRole('link', { name: 'Ver informe de Conteo nov 2026' }).getAttribute('href')).toBe(
-      `/admin/sesiones/${SESION}/informe`,
+      `/app/sesiones/${SESION}/informe`,
     )
   })
 })
@@ -210,7 +210,7 @@ describe('Contar dentro de la sesión (spec 015, T9)', () => {
   it('la tarjeta «En curso» trae «Ver avance» y «Contar» (escritorio) y deja de ser un enlace entero', async () => {
     abrirEn('/admin/sesiones', 'escritorio')
     const enCurso = await screen.findByRole('region', { name: 'En curso' })
-    expect(within(enCurso).getByRole('link', { name: 'Ver avance' }).getAttribute('href')).toBe(`/admin/sesiones/${SESION}`)
+    expect(within(enCurso).getByRole('link', { name: 'Ver avance' }).getAttribute('href')).toBe(`/app/sesiones/${SESION}`)
     expect(within(enCurso).getByRole('link', { name: 'Contar' }).getAttribute('href')).toBe('/contar/escanear')
     expect(within(enCurso).getAllByRole('link')).toHaveLength(2)
   })
@@ -229,11 +229,11 @@ describe('Contar dentro de la sesión (spec 015, T9)', () => {
     fireEvent.click(contar)
     await waitFor(() => expect(router.state.location.pathname).toBe('/contar/escanear'))
     const volver = await screen.findByRole('link', { name: 'Volver a la sesión' })
-    expect(volver.getAttribute('href')).toBe(`/admin/sesiones/${SESION}`)
+    expect(volver.getAttribute('href')).toBe(`/app/sesiones/${SESION}`)
     expect(screen.queryByRole('link', { name: 'Inicio del conteo' })).toBeNull()
     fireEvent.click(volver)
     expect(await screen.findByRole('heading', { level: 1, name: 'Conteo nov 2026' })).toBeTruthy()
-    expect(router.state.location.pathname).toBe(`/admin/sesiones/${SESION}`)
+    expect(router.state.location.pathname).toBe(`/app/sesiones/${SESION}`)
   })
 
   it('en teléfono «Contar esta sesión» también está y lleva al inicio del conteo', async () => {

@@ -21,6 +21,7 @@ import { mensajeDeError } from '@/lib/api/cliente'
 import { type Discrepancia, type ResultadoDiscrepancia, TEXTO_RESULTADO, useDiscrepancias, useResolverDiscrepancias } from '@/lib/discrepancias'
 import { formatEntero } from '@/lib/format'
 import { useSesiones } from '@/lib/sesiones'
+import { rutaActivo, rutaApp } from '@/lib/rutas'
 
 // Discrepancias de una sesión (spec 007, T5; CU-DIS-01, 02; Q1–Q4): activos vistos en
 // otra ubicación según su verificación vigente. Aplicar mueve el activo a donde se vio;
@@ -150,7 +151,7 @@ function Lista({ sesionId }: { sesionId: string }) {
       clase: 'min-w-44 whitespace-normal',
       celda: (d) => (
         <>
-          <Link to={`/admin/activos/${encodeURIComponent(d.activo.codigo)}`} className={ENLACE}>
+          <Link to={rutaActivo(d.activo.codigo)} className={ENLACE}>
             {d.activo.nombre}
           </Link>
           <span className="block font-mono text-etiqueta font-normal text-muted-foreground">{d.activo.codigo}</span>
@@ -178,7 +179,7 @@ function Lista({ sesionId }: { sesionId: string }) {
       {porResolver && <div className="-my-1 -ml-2 shrink-0">{casilla(d)}</div>}
       <div className="flex min-w-0 flex-1 flex-col gap-2 text-cuerpo">
         <span className="flex flex-wrap items-center justify-between gap-2">
-          <Link to={`/admin/activos/${encodeURIComponent(d.activo.codigo)}`} className={ENLACE}>
+          <Link to={rutaActivo(d.activo.codigo)} className={ENLACE}>
             {d.activo.nombre}
           </Link>
           <EstadoInsignia d={d} />
@@ -321,7 +322,7 @@ export default function Discrepancias() {
           descripcion="Las discrepancias aparecen cuando se verifica un activo en otra ubicación."
           accion={
             <Boton asChild>
-              <Link to="/admin/sesiones">Ir a Sesiones</Link>
+              <Link to={rutaApp('sesiones')}>Ir a Sesiones</Link>
             </Boton>
           }
         />

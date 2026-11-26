@@ -1,7 +1,7 @@
 import { Construction } from 'lucide-react'
 import { useLocation } from 'react-router'
 
-import { buscarEnNav } from '@/components/app/admin-nav'
+import { buscarEnNav } from '@/components/app/app-nav'
 import { EncabezadoPagina, Estado } from '@/components/kit'
 
 // Pantalla de administración que aún no se construye: dice qué la trae.

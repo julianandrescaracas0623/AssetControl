@@ -24,6 +24,7 @@ import { type Subir, useFotoPendiente } from '@/lib/fotos'
 import { useRol } from '@/lib/sesion'
 import { fechaCorte, porcentaje, type SesionConteo, useDetalleSesion, useSesionAbierta, useUltimaVerificacion, type Verificacion } from '@/lib/sesiones'
 import { cn } from '@/lib/utils'
+import { rutaSesion } from '@/lib/rutas'
 
 import { AvisoYaVerificado, EstadoFisico, Mensaje, OtraUbicacion, Tecla } from './Verificar'
 
@@ -338,14 +339,14 @@ export function CabeceraEscritorio({ sesion, cargando, red }: { sesion: SesionCo
   const pct = avance ? porcentaje(avance.verificados, avance.total) : 0
   // Spec 015, T9 (R10; Q8 = A; maqueta t9-conteo-admin-escritorio): el admin entra desde la
   // sesión abierta y vuelve a ella. La sesión es la abierta del tenant (la del servidor),
-  // no un parámetro de la URL. El contador no entra a /admin: conserva el inicio del conteo.
+  // no un parámetro de la URL. El contador vuelve al inicio del conteo (en el computador, /contar lleva a /app).
   const admin = useRol() === 'admin'
   return (
     <header className="sticky top-0 z-20 border-b bg-card">
       <div className="mx-auto flex h-18 w-full max-w-[1320px] items-center gap-4 px-6">
         {admin && sesion ? (
           <Boton asChild variante="secundario" className="shrink-0">
-            <Link to={`/admin/sesiones/${encodeURIComponent(sesion.id)}`}>
+            <Link to={rutaSesion(sesion.id)}>
               <ArrowLeft />
               Volver a la sesión
             </Link>
@@ -493,13 +494,14 @@ function Captura({
 
   return (
     <Panel role="region" aria-label="Capturar un activo">
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
         <Campo
           ref={campo}
           id="captura"
           etiqueta="Escanea el sticker o busca por código o nombre"
           tipo="codigo"
-          grande
+          captura
+          placeholder="Código, nombre o serial"
           sufijo={<Tecla className="mr-3">Enter</Tecla>}
           role="combobox"
           aria-expanded={resultados.length > 0}
@@ -535,22 +537,38 @@ function Captura({
             }
           }}
         />
-        {error ? (
-          <p id="captura-error" role="alert" className="flex items-start gap-1.5 text-etiqueta font-normal text-destructive">
-            <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            {error}
-          </p>
-        ) : avisoVarios ? (
-          <p id="captura-aviso" role="status" className="flex items-start gap-1.5 text-etiqueta font-normal text-warning">
-            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            {resultados.length} activos coinciden: elige uno con las flechas o con un clic, o pulsa Enter otra vez para abrir el marcado
-          </p>
-        ) : (
-          <p id="captura-ayuda" className="flex items-start gap-1.5 text-etiqueta font-normal text-muted-foreground">
-            <Usb className="mt-0.5 size-3.5 shrink-0 text-success" aria-hidden="true" />
-            El campo está siempre listo: el lector USB escribe el código y lo abre con Enter.
-          </p>
-        )}
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+          {error ? (
+            <p id="captura-error" role="alert" className="flex min-w-0 flex-1 items-start gap-1.5 text-etiqueta font-normal text-destructive">
+              <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              {error}
+            </p>
+          ) : avisoVarios ? (
+            <p id="captura-aviso" role="status" className="flex min-w-0 flex-1 items-start gap-1.5 text-etiqueta font-normal text-warning">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              {resultados.length} activos coinciden: elige uno con las flechas o con un clic, o pulsa Enter otra vez para abrir el marcado
+            </p>
+          ) : (
+            <p id="captura-ayuda" className="flex min-w-0 flex-1 items-center gap-1.5 text-etiqueta font-normal text-muted-foreground">
+              <Usb className="size-3.5 shrink-0 text-success" aria-hidden="true" />
+              <span className="truncate">Lector USB listo</span>
+              <span className="hidden items-center gap-1 sm:inline-flex">
+                <Tecla>/</Tecla>
+                <Tecla>Esc</Tecla>
+              </span>
+            </p>
+          )}
+          <Boton
+            variante="secundario"
+            icono={<Camera />}
+            className="shrink-0"
+            aria-expanded={camara}
+            aria-label={camara ? 'Ocultar la cámara' : 'Usar la cámara de este equipo'}
+            onClick={() => onCamara(!camara)}
+          >
+            {camara ? 'Ocultar' : 'Cámara'}
+          </Boton>
+        </div>
         {resultados.length > 0 && (
         <div id="captura-resultados" role="listbox" aria-label="Resultados" className="flex flex-col overflow-hidden rounded-lg border">
           <p className="border-b bg-muted/40 px-3 py-2 text-etiqueta font-normal text-muted-foreground">
@@ -584,14 +602,6 @@ function Captura({
           ))}
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t pt-3">
-        <Boton variante="fantasma" icono={<Camera />} className="-ml-2 px-2 text-brand-strong" aria-expanded={camara} onClick={() => onCamara(!camara)}>
-          {camara ? 'Ocultar la cámara' : 'Usar la cámara de este equipo'}
-        </Boton>
-        <span className="flex items-center gap-1 text-etiqueta font-normal text-muted-foreground">
-          <Tecla>/</Tecla> buscar <Tecla className="ml-2">Esc</Tecla> limpiar
-        </span>
-      </div>
       {camara && (
         <div className="flex flex-col gap-2">
           <Escaner onLectura={alLeerCamara} className="aspect-[4/3]" />
@@ -876,7 +886,7 @@ function PanelActivo({
 // historial como una fila a lo ancho de la columna (antes, un enlace suelto bajo la tarjeta).
 function EnlaceHistorial({ codigo }: { codigo: string }) {
   return (
-    <Boton asChild variante="secundario" anchoCompleto className="justify-start text-brand-strong">
+    <Boton asChild variante="fantasma" anchoCompleto className="h-auto justify-start px-0 py-1 text-brand-strong">
       <Link to={`/contar/activo/${encodeURIComponent(codigo)}/historial`}>
         <History />
         Ver historial del activo
@@ -1063,7 +1073,7 @@ function VerificandoEscritorio({
 
   return (
     <div className="flex flex-col">
-      <div className={cn('grid gap-6 p-5 xl:grid-cols-[minmax(0,1fr)_240px]', FILAS_CENTRADAS)}>
+      <div className={cn('grid grid-cols-[minmax(0,1fr)_13.5rem] items-start gap-5 p-5', FILAS_CENTRADAS)}>
         <div className="flex min-w-0 flex-col gap-5">
           <AssetCard activo={aTarjeta(activo)} rol={rol} titulo="h1" />
           {deBaja ? (
@@ -1080,27 +1090,25 @@ function VerificandoEscritorio({
               {ultima.data && <AvisoYaVerificado verificacion={ultima.data} />}
               {sala ? (
                 <div className="flex flex-col gap-1">
-                  <Panel relleno={false} className="px-4">
-                    <ListaDatos
-                      datos={[
-                        {
-                          rotulo: 'Encontrada en',
-                          valor: (
-                            // Ícono en línea dentro del texto: la fila toma la línea base del
-                            // texto (con un contenedor flex la tomaba del ícono y se desalineaba).
-                            <span data-verificacion="encontrada" className={cn('block truncate font-medium', otra ? 'text-warning' : 'text-success')}>
-                              {otra ? (
-                                <ArrowLeftRight className="mr-1.5 inline size-4 align-[-0.1875rem]" aria-hidden="true" />
-                              ) : (
-                                <Check className="mr-1.5 inline size-4 align-[-0.1875rem]" aria-hidden="true" />
-                              )}
-                              {rutaDe(lista, encontrada!)}
-                            </span>
-                          ),
-                        },
-                      ]}
-                    />
-                  </Panel>
+                  <ListaDatos
+                    datos={[
+                      {
+                        rotulo: 'Encontrada en',
+                        valor: (
+                          // Ícono en línea dentro del texto: la fila toma la línea base del
+                          // texto (con un contenedor flex la tomaba del ícono y se desalineaba).
+                          <span data-verificacion="encontrada" className={cn('block truncate font-medium', otra ? 'text-warning' : 'text-success')}>
+                            {otra ? (
+                              <ArrowLeftRight className="mr-1.5 inline size-4 align-[-0.1875rem]" aria-hidden="true" />
+                            ) : (
+                              <Check className="mr-1.5 inline size-4 align-[-0.1875rem]" aria-hidden="true" />
+                            )}
+                            {rutaDe(lista, encontrada!)}
+                          </span>
+                        ),
+                      },
+                    ]}
+                  />
                   {otra && (
                     <Boton variante="fantasma" icono={<MapPin />} className="self-start px-2 text-brand-strong" onClick={() => setOtra(undefined)}>
                       Usar {rutaDe(lista, sala)}

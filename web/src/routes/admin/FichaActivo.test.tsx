@@ -338,7 +338,7 @@ describe('disposición de la ficha (015-T7, R13)', () => {
     expect(within(menu).getByRole('menuitem', { name: 'Dar de baja…' }).getAttribute('data-variant')).toBe('destructive')
   })
 
-  it('datos en tarjetas Identificación, Ubicación y Compra; foto antes de los datos y el historial al final', async () => {
+  it('datos de Identificación y Compra; foto, identificación, compra, historial y ubicación, en ese orden', async () => {
     abrir()
     const identificacion = await screen.findByRole('region', { name: 'Identificación' })
     const dato = (region: HTMLElement, etiqueta: string) =>
@@ -358,9 +358,17 @@ describe('disposición de la ficha (015-T7, R13)', () => {
     const foto = screen.getByRole('region', { name: 'Foto del activo' })
     const antes = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
     expect(antes(foto, identificacion)).toBe(true)
-    expect(antes(identificacion, ubicacion)).toBe(true)
-    expect(antes(ubicacion, compra)).toBe(true)
+    expect(antes(identificacion, compra)).toBe(true)
     expect(antes(compra, historial)).toBe(true)
+    expect(antes(historial, ubicacion)).toBe(true)
+    // Un expediente, no cinco tarjetas sueltas: las secciones viven en un solo Panel.
+    const expediente = identificacion.closest('[data-kit=panel]')
+    expect(expediente).toBeTruthy()
+    expect(foto.closest('[data-kit=panel]')).toBe(expediente)
+    expect(compra.closest('[data-kit=panel]')).toBe(expediente)
+    expect(historial.closest('[data-kit=panel]')).toBe(expediente)
+    expect(ubicacion.closest('[data-kit=panel]')).toBe(expediente)
+    expect(screen.queryByText('Una foto principal por activo.')).toBeNull()
   })
 
   it('en reparación, «Volver a activo» queda a la vista y «Más» solo ofrece la baja', async () => {

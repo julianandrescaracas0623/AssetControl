@@ -24,6 +24,7 @@ import type { Activo } from '@/lib/activos'
 import { claseControlAlta, teclasDelAlta, useAltaActivo } from '@/lib/altaActivo'
 import { useCategorias, useUbicaciones } from '@/lib/catalogo'
 import { cn } from '@/lib/utils'
+import { rutaActivo, rutaApp } from '@/lib/rutas'
 
 // Registrar activo desde administración (decisión del humano 2026-11-13; D3; spec 004,
 // T6). R8: sin código de sticker no hay alta. Obligatorios: código, nombre, precio,
@@ -38,7 +39,6 @@ import { cn } from '@/lib/utils'
 // teléfono; sin el fondo de la barra lateral, Deuda T1 e), avisos y campos del kit, y la
 // columna derecha con paneles. Mismos pasos, mismos campos, mismas llamadas e idempotencia.
 
-const rutaActivo = (codigo: string) => `/admin/activos/${encodeURIComponent(codigo)}`
 const FORMULARIO = 'registrar-activo'
 
 function Paso({ n, titulo, nota, children }: { n: number; titulo: string; nota?: string; children: ReactNode }) {
@@ -169,7 +169,7 @@ export default function RegistrarActivo() {
               pie={
                 <>
                   <Boton asChild variante="fantasma" className="max-md:hidden">
-                    <Link to="/admin/activos">Cancelar</Link>
+                    <Link to={rutaApp('activos')}>Cancelar</Link>
                   </Boton>
                   <div className="flex w-full flex-col-reverse gap-separacion sm:ml-auto sm:w-auto sm:flex-row">
                     <Boton variante="secundario" disabled={alta.guardando} onClick={() => guardar(true)}>

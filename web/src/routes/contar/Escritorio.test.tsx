@@ -209,24 +209,18 @@ describe('columna de la foto en el panel de verificación (R8)', () => {
   /** Contenedor que ordena los botones de la foto. */
   const acciones = (boton: HTMLElement) => boton.closest('[data-foto=acciones]') as HTMLElement
 
-  it('sin foto: el cuadro va a lo ancho y «Agregar foto» debajo, a lo ancho, sin desbordar', async () => {
+  it('sin foto: el cuadro va a lo ancho 4:3 y «Agregar foto» vive dentro del marco', async () => {
     abrir()
     await abrirActivo()
     const region = screen.getByRole('region', { name: 'Foto del activo' })
     expect(region.getAttribute('data-disposicion')).toBe('lateral')
     const caja = within(region).getByText('Sin foto').closest('[data-foto=imagen]') as HTMLElement
-    expect(caja.className).toMatch(/xl:w-full/)
-    expect(caja.className).toMatch(/xl:aspect-\[4\/3\]/)
+    expect(caja.className).toMatch(/w-full/)
+    expect(caja.className).toMatch(/aspect-\[4\/3\]/)
     const boton = within(region).getByRole('button', { name: 'Agregar foto' })
-    // Desde xl: una columna, el botón estirado al ancho de la tarjeta y nunca más ancho.
-    expect(acciones(boton).className).toMatch(/xl:flex-col/)
-    expect(acciones(boton).className).toMatch(/xl:items-stretch/)
+    expect(caja.contains(boton)).toBe(true)
     expect(boton.className).toMatch(/max-w-full/)
-    // El bloque de acciones no se encoge junto al cuadro: pasa debajo (antes, min-w-0 + flex-1 lo cortaba).
-    const bloque = boton.closest('[data-foto=bloque-acciones]') as HTMLElement
-    expect(bloque.className).not.toMatch(/(^|\s)min-w-0(\s|$)/)
-    expect(bloque.className).toMatch(/xl:w-full/)
-    expect((region.querySelector('[data-foto=contenido]') as HTMLElement).className).toMatch(/xl:flex-col/)
+    expect((region.querySelector('[data-foto=contenido]') as HTMLElement).className).toMatch(/flex-col/)
   })
 
   it('con foto: la imagen va a lo ancho y «Cambiar foto» y «Quitar foto» se apilan', async () => {
@@ -234,12 +228,12 @@ describe('columna de la foto en el panel de verificación (R8)', () => {
     await abrirActivo()
     const region = screen.getByRole('region', { name: 'Foto del activo' })
     const imagen = await within(region).findByRole('button', { name: 'Ver la foto de Impresora multifuncional' })
-    expect(imagen.className).toMatch(/xl:w-full/)
-    expect(imagen.className).toMatch(/xl:aspect-\[4\/3\]/)
+    expect(imagen.className).toMatch(/w-full/)
+    expect(imagen.className).toMatch(/aspect-\[4\/3\]/)
     const cambiar = within(region).getByRole('button', { name: 'Cambiar foto' })
     const quitar = within(region).getByRole('button', { name: 'Quitar foto' })
     expect(acciones(cambiar)).toBe(acciones(quitar))
-    expect(acciones(cambiar).className).toMatch(/xl:flex-col/)
+    expect(acciones(cambiar).className).toMatch(/flex-col/)
     for (const b of [cambiar, quitar]) expect(b.className).toMatch(/max-w-full/)
   })
 
@@ -896,7 +890,7 @@ describe('cabecera: volver a la sesión (spec 015, T9)', () => {
   it('el admin con sesión abierta ve «Volver a la sesión» hacia su detalle', async () => {
     abrir('/contar/escanear', { rol: 'admin' })
     const volver = await screen.findByRole('link', { name: 'Volver a la sesión' })
-    expect(volver.getAttribute('href')).toBe(`/admin/sesiones/${SESION}`)
+    expect(volver.getAttribute('href')).toBe(`/app/sesiones/${SESION}`)
     expect(screen.queryByRole('link', { name: 'Inicio del conteo' })).toBeNull()
   })
 

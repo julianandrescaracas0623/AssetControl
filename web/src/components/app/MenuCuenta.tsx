@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { RAIZ_APP } from '@/lib/rutas'
 import { etiquetaRol, iniciales, useCerrarSesion, useSesion } from '@/lib/sesion'
 
 // Menú de cuenta del modo conteo (spec 002b, T3): en el encabezado del inicio,
@@ -41,7 +42,7 @@ export function MenuCuenta() {
         <DropdownMenuSeparator />
         {sesion.rol === 'admin' && (
           <DropdownMenuItem asChild className="min-h-control">
-            <Link to="/admin">
+            <Link to={RAIZ_APP}>
               <LayoutDashboard />
               Ir a administración
             </Link>

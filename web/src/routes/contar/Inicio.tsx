@@ -12,6 +12,7 @@ import { useEsEscritorio } from '@/hooks/use-escritorio'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { useSalaDeTrabajo } from '@/lib/conteo'
 import { formatEntero } from '@/lib/format'
+import { rutaApp } from '@/lib/rutas'
 import { useIndicadores } from '@/lib/inicio'
 import { useSesion } from '@/lib/sesion'
 import { fechaCorte, pendientes, porcentaje, type SesionConteo, useDetalleSesion, useSesionAbierta } from '@/lib/sesiones'
@@ -60,7 +61,7 @@ function SalaDeTrabajo({ rol }: { rol: string | undefined }) {
             <>
               Aún no hay salas activas.{' '}
               <Link
-                to="/admin/ubicaciones"
+                to={rutaApp('ubicaciones')}
                 className="rounded-sm font-medium text-brand-strong underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
               >
                 Créalas en Ubicaciones
@@ -208,7 +209,7 @@ function SinSesion({ rol }: { rol: string | undefined }) {
       accion={
         rol === 'admin' && (
           <Boton asChild variante="secundario">
-            <Link to="/admin/sesiones">Ir a Sesiones</Link>
+            <Link to={rutaApp('sesiones')}>Ir a Sesiones</Link>
           </Boton>
         )
       }
@@ -246,8 +247,9 @@ const enlaceHistorial = (a: { codigo: string }) => `/contar/activo/${encodeURICo
  * ancho de la columna y sin barra fija abajo; la columna se queda a la vista al bajar); a
  * la derecha, el estado (pendientes por ubicación, activos hoy y actividad). Mismos datos
  * que en el teléfono: ningún precio.
+ * Spec 020, T3 (R10): también es el Inicio del contador en el marco compartido (/app).
  */
-function InicioEscritorio({ rol }: { rol: string | undefined }) {
+export function InicioEscritorio({ rol }: { rol: string | undefined }) {
   const abierta = useSesionAbierta()
   const sesion = abierta.data
   return (

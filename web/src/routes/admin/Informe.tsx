@@ -11,6 +11,7 @@ import type { FormatoInforme } from '@/lib/api/cliente'
 import { type FilaDesglose, type Informe as InformeSesion, type NoEncontrado, useExportarInforme, useInforme } from '@/lib/informe'
 import { fechaCorte, porcentaje } from '@/lib/sesiones'
 import { useEmpresa } from '@/lib/empresa'
+import { rutaActivo, rutaApp, rutaSesion } from '@/lib/rutas'
 
 // Informe de una sesión cerrada (spec 008, T5; docs/08 §7.5, CU-INF-01; R7 de la spec):
 // tres cifras, desglose y no encontrados congelados al cierre, con los nombres de ese
@@ -75,7 +76,7 @@ function NoEncontrados({ filas, total }: { filas: NoEncontrado[]; total: string 
       tipo: 'codigo',
       celda: (a) => (
         <Link
-          to={`/admin/activos/${encodeURIComponent(a.codigo)}`}
+          to={rutaActivo(a.codigo)}
           className="inline-flex min-h-control items-center rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
         >
           {a.codigo}
@@ -209,7 +210,7 @@ function AvisosEmpresa({ informe }: { informe: InformeSesion }) {
           titulo="Completa los datos de tu empresa"
           accion={
             <Boton asChild variante="secundario">
-              <Link to="/admin/empresa">Ir a Empresa</Link>
+              <Link to={rutaApp('empresa')}>Ir a Empresa</Link>
             </Boton>
           }
         >
@@ -245,7 +246,7 @@ export default function Informe() {
             descripcion="El informe se calcula una sola vez, al cerrar la sesión."
             accion={
               <Boton asChild>
-                <Link to={`/admin/sesiones/${id}`}>Ir a la sesión</Link>
+                <Link to={rutaSesion(id)}>Ir a la sesión</Link>
               </Boton>
             }
           />
@@ -264,7 +265,7 @@ export default function Informe() {
           accion={
             noExiste ? (
               <Boton asChild variante="secundario">
-                <Link to="/admin/sesiones">Ver sesiones</Link>
+                <Link to={rutaApp('sesiones')}>Ver sesiones</Link>
               </Boton>
             ) : undefined
           }
@@ -309,7 +310,7 @@ export default function Informe() {
           <>
             <Boton asChild variante="fantasma">
               {/* Spec 015 (R7): Valor ofrece volver a este informe. */}
-              <Link to={{ pathname: '/admin/valor', search: `?sesion=${encodeURIComponent(id)}` }}>Ver valor actual</Link>
+              <Link to={{ pathname: rutaApp('valor'), search: `?sesion=${encodeURIComponent(id)}` }}>Ver valor actual</Link>
             </Boton>
             <Exportar id={id} />
           </>

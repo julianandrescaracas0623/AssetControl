@@ -63,7 +63,7 @@ describe('alta en administración', () => {
     abrir('/admin/activos/nuevo')
     fireEvent.change(await screen.findByRole('textbox', { name: /Código del sticker/ }), { target: { value: '000123' } })
     expect(await screen.findByText(/Ese código ya existe: Silla ergonómica/)).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Abrir activo' }).getAttribute('href')).toBe('/admin/activos/000123')
+    expect(screen.getByRole('link', { name: 'Abrir activo' }).getAttribute('href')).toBe('/app/activos/000123')
   })
 
   it('copia de un parecido (con precio para el admin) y guarda con el precio canónico', async () => {
@@ -257,7 +257,7 @@ describe('Registrar activo mejorado en administración (015-T10)', () => {
     fireEvent.keyDown(screen.getByRole('textbox', { name: /Serial/ }), { key: 'Enter', ctrlKey: true })
     const aviso = (await screen.findByText(/Ahora escanea el siguiente sticker/)).closest('[role=status]') as HTMLElement
     expect(aviso.textContent).toContain('Silla auxiliar · NUEVO-13')
-    expect(within(aviso).getByRole('link', { name: 'Ver el activo' }).getAttribute('href')).toBe('/admin/activos/NUEVO-13')
+    expect(within(aviso).getByRole('link', { name: 'Ver el activo' }).getAttribute('href')).toBe('/app/activos/NUEVO-13')
     const codigo = screen.getByRole('textbox', { name: /Código del sticker/ })
     await waitFor(() => expect(document.activeElement).toBe(codigo))
     expect((codigo as HTMLInputElement).value).toBe('')

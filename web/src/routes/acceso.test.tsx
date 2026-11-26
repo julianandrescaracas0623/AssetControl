@@ -33,17 +33,19 @@ describe('guardas', () => {
   it('/ lleva al inicio de cada rol', async () => {
     const admin = abrir('/', 'admin')
     await h1('Resumen')
-    expect(admin.router.state.location.pathname).toBe('/admin')
+    expect(admin.router.state.location.pathname).toBe('/app')
     cleanup()
     const contador = abrir('/', 'contador')
     await h1('Conteo')
     expect(contador.router.state.location.pathname).toBe('/contar')
   })
 
-  it('un contador en /admin ve «Sin permiso» con salida a contar', async () => {
-    abrir('/admin/usuarios', 'contador')
+  // Spec 020, T3 (R3; req. 8): «Sin permiso» va dentro del marco, con salida a su Inicio.
+  it('un contador en una pantalla exclusiva del admin ve «Sin permiso» con salida a su inicio', async () => {
+    const { router } = abrir('/admin/usuarios', 'contador')
     await h1('No tienes permiso para ver esto')
-    expect(screen.getByRole('link', { name: 'Ir a contar' }).getAttribute('href')).toBe('/contar')
+    expect(router.state.location.pathname).toBe('/app/usuarios')
+    expect(screen.getAllByRole('link', { name: 'Ir al inicio' }).some((a) => a.getAttribute('data-variante') === 'principal')).toBe(true)
   })
 
   it('un admin puede contar', async () => {
@@ -102,7 +104,7 @@ describe('/login', () => {
   })
 
   it.each([
-    ['admin', '/admin', 'Resumen'],
+    ['admin', '/app', 'Resumen'],
     ['contador', '/contar', 'Conteo'],
   ] as const)('%s entra y llega a %s', async (rol, ruta, titulo) => {
     const { router, f } = abrir('/login', null, loginResponde(() => json(200, sesionDe(rol))))
@@ -121,7 +123,7 @@ describe('/login', () => {
     await h1('Iniciar sesión')
     entrar()
     await h1('Activos')
-    expect(router.state.location.pathname).toBe('/admin/activos')
+    expect(router.state.location.pathname).toBe('/app/activos')
   })
 
   it('credenciales incorrectas muestran el mensaje del servidor', async () => {
@@ -181,6 +183,6 @@ describe('cuenta y cerrar sesión', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: /Menú de usuario/ }), { key: 'Enter' })
     fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Cerrar sesión' }))
     expect(await screen.findByText('No se pudo cerrar la sesión. Intenta de nuevo.')).toBeTruthy()
-    expect(router.state.location.pathname).toBe('/admin')
+    expect(router.state.location.pathname).toBe('/app')
   })
 })

@@ -1,21 +1,21 @@
 import { useMutation } from '@tanstack/react-query'
 import { Copy, MailPlus, Power, PowerOff, ShieldCheck, TriangleAlert, UserPlus, Users } from 'lucide-react'
-import { useId, type FormEvent, useState } from 'react'
+import { type FormEvent, type RefObject, useId, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
-import { Aviso, Boton, Campo, Confirmar, Dialogo, EncabezadoPagina, Insignia, ListaDatos, Panel, TablaDatos, type ColumnaTabla } from '@/components/kit'
+import { Aviso, Boton, Campo, Confirmar, Dialogo, EncabezadoPagina, Insignia, ListaDatos, TablaDatos, type ColumnaTabla } from '@/components/kit'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { api, ErrorApi, type InvitacionCreada, mensajeDeError, type Rol } from '@/lib/api/cliente'
 import { type UsuarioEmpresa, useCambiarUsuario, useUsuarios } from '@/lib/usuarios'
 import { etiquetaRol, useApiAutenticada, useSesion } from '@/lib/sesion'
 import { cn } from '@/lib/utils'
 
-// /admin/usuarios (spec 002b, T5; plan §7): invitar con correo y rol. El enlace sale
-// una sola vez (el servidor no lo vuelve a dar) y se copia para enviarlo por un canal
-// privado. Las personas con acceso salen de GET /usuarios, en tabla; el doble clic abre
-// la ficha (solo lo que ya trajo la lista). El admin cambia el rol y activa o desactiva
-// con PUT /usuarios/{usuario_id} (0033). El servidor decide y avisa: no deja cambiar el
-// propio rol ni desactivarse, ni quitar al último admin activo.
+// /admin/usuarios (spec 002b, T5; plan §7): el módulo es la lista de personas con
+// acceso (GET /usuarios). Invitar es la acción principal: el formulario vive en un
+// diálogo (el enlace sale una sola vez y se copia para un canal privado). El doble clic
+// abre la ficha (solo lo que ya trajo la lista). El admin cambia el rol y activa o
+// desactiva con PUT /usuarios/{usuario_id} (0033). El servidor decide y avisa: no deja
+// cambiar el propio rol ni desactivarse, ni quitar al último admin activo.
 // Spec 016, T9 (R2, R5): presentación con el kit. El rol lo decide el servidor; el enlace
 // no se guarda ni se escribe en ningún registro.
 
@@ -272,7 +272,7 @@ function ListaPersonas() {
             ? { titulo: 'No se pudo cargar la lista', onReintentar: () => void usuarios.refetch(), reintentando: usuarios.isRefetching }
             : null
         }
-        vacio={{ titulo: 'Todavía no hay personas con acceso', descripcion: 'Invita a la primera con el formulario.' }}
+        vacio={{ titulo: 'Todavía no hay personas con acceso', descripcion: 'Invita a la primera con el botón Invitar.' }}
         onAbrirFila={(persona) => setFichaId(persona.id)}
         ayudaAbrirFila="Doble clic para ver"
         accionesFila={esMovil ? undefined : acciones}
@@ -297,10 +297,19 @@ function ListaPersonas() {
   )
 }
 
-export default function Usuarios() {
+function DialogoInvitar({
+  abierto,
+  onAbierto,
+  devolverFocoA,
+}: {
+  abierto: boolean
+  onAbierto: (abierto: boolean) => void
+  devolverFocoA: RefObject<HTMLButtonElement | null>
+}) {
   const conToken = useApiAutenticada()
   const [rol, setRol] = useState<Rol>('contador')
-  const [formulario, setFormulario] = useState(0) // cambiarlo vacía el formulario
+  const [formulario, setFormulario] = useState(0)
+  const idFormulario = useId()
 
   const crear = useMutation({
     mutationFn: (cuerpo: { email: string; rol: Rol }) => conToken((token) => api.crearInvitacion(token, cuerpo)),
@@ -322,57 +331,81 @@ export default function Usuarios() {
     setFormulario((n) => n + 1)
   }
 
-  const tituloLista = useId()
+  function alCambiar(nuevo: boolean) {
+    if (!nuevo) otra()
+    onAbierto(nuevo)
+  }
+
+  return (
+    <Dialogo
+      abierto={abierto}
+      onAbiertoChange={alCambiar}
+      devolverFocoA={devolverFocoA}
+      titulo="Invitar a una persona"
+      descripcion="La persona crea su cuenta con el enlace: solo escribe su nombre y una contraseña. Cada invitación es para un correo y un rol, y vence en 72 horas."
+      ancho="ancho"
+      pie={
+        crear.isSuccess ? (
+          <Boton variante="secundario" onClick={() => alCambiar(false)}>
+            Cerrar
+          </Boton>
+        ) : (
+          <>
+            <Boton variante="secundario" onClick={() => alCambiar(false)}>
+              Cancelar
+            </Boton>
+            <Boton type="submit" form={idFormulario} icono={<MailPlus />} cargando={crear.isPending}>
+              Crear invitación
+            </Boton>
+          </>
+        )
+      }
+    >
+      {crear.isSuccess ? (
+        <Resultado creada={crear.data} onOtra={otra} />
+      ) : (
+        <form id={idFormulario} key={formulario} className="flex flex-col gap-5" onSubmit={alEnviar}>
+          {errorGeneral && <Aviso tono="error" titulo={errorGeneral} />}
+          <Campo
+            id="invitar-email"
+            etiqueta="Correo de la persona"
+            name="email"
+            type="email"
+            inputMode="email"
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+            placeholder="nombre@clinica.com"
+            error={errorCorreo ?? undefined}
+          />
+          <SelectorRol valor={rol} onCambio={setRol} />
+        </form>
+      )}
+    </Dialogo>
+  )
+}
+
+export default function Usuarios() {
+  const [invitar, setInvitar] = useState(false)
+  const invitarRef = useRef<HTMLButtonElement>(null)
 
   return (
     <div className="flex flex-col gap-6">
       <EncabezadoPagina
         titulo="Usuarios"
-        descripcion="Invita a las personas de tu empresa. Cada invitación es para un correo y un rol, y vence en 72 horas."
+        descripcion="Quién tiene acceso a la empresa. Invita, cambia el rol o desactiva a cada persona."
+        claseAcciones="max-sm:w-full max-sm:[&>[data-slot=button]]:flex-1"
+        acciones={
+          <Boton ref={invitarRef} icono={<UserPlus />} onClick={() => setInvitar(true)}>
+            Invitar
+          </Boton>
+        }
       />
-      <Panel
-        titulo="Invitar a una persona"
-        descripcion="La persona crea su cuenta con el enlace: solo escribe su nombre y una contraseña."
-        className="max-w-xl"
-      >
-        {crear.isSuccess ? (
-          <Resultado creada={crear.data} onOtra={otra} />
-        ) : (
-          <form key={formulario} className="flex flex-col gap-5" onSubmit={alEnviar}>
-            {errorGeneral && <Aviso tono="error" titulo={errorGeneral} />}
-            <Campo
-              id="invitar-email"
-              etiqueta="Correo de la persona"
-              name="email"
-              type="email"
-              inputMode="email"
-              autoComplete="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              required
-              placeholder="nombre@clinica.com"
-              error={errorCorreo ?? undefined}
-            />
-            <SelectorRol valor={rol} onCambio={setRol} />
-            <Boton type="submit" icono={<MailPlus />} cargando={crear.isPending} className="self-start max-sm:w-full">
-              Crear invitación
-            </Boton>
-          </form>
-        )}
-      </Panel>
-      <section aria-labelledby={tituloLista} className="flex min-w-0 flex-col gap-3">
-        <div className="flex flex-col gap-0.5">
-          <h2 id={tituloLista} className="inline-flex items-center gap-2 text-titulo-seccion">
-            <Users className="size-4 text-muted-foreground" aria-hidden="true" />
-            Personas con acceso
-          </h2>
-          <p className="text-etiqueta text-muted-foreground">
-            Quién tiene acceso a la empresa, con su rol y su estado. Puedes cambiar el rol o activar y desactivar a cada persona. Doble clic para ver
-            su ficha.
-          </p>
-        </div>
+      <section aria-label="Personas con acceso" className="min-w-0">
         <ListaPersonas />
       </section>
+      <DialogoInvitar abierto={invitar} onAbierto={setInvitar} devolverFocoA={invitarRef} />
     </div>
   )
 }

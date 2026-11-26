@@ -11,6 +11,7 @@ import { mensajeDeError } from '@/lib/api/cliente'
 import { rutaDe, useUbicaciones } from '@/lib/catalogo'
 import { formatCOP, formatEntero } from '@/lib/format'
 import { entregarConAviso } from '@/lib/descarga'
+import { rutaActivo, rutaApp } from '@/lib/rutas'
 
 // Activos (docs/08 §4.3, §7.7; spec 004, T9): búsqueda por código, nombre o serial,
 // filtro por estado y paginación en el servidor (25 por página). Spec 005, T8: el menú
@@ -31,7 +32,7 @@ const PESTANAS: { valor: Pestaña; etiqueta: string }[] = [
   { valor: 'dado_de_baja', etiqueta: 'Dados de baja' },
 ]
 
-const ficha = (a: Activo) => `/admin/activos/${encodeURIComponent(a.codigo)}`
+const ficha = (a: Activo) => rutaActivo(a.codigo)
 
 function opcionesDe(activo: Activo): OpcionMenu[] {
   const ver: OpcionMenu = { etiqueta: 'Ver ficha', icono: <Eye />, href: ficha(activo) }
@@ -207,7 +208,7 @@ export default function Activos() {
               Exportar
             </Boton>
             <Boton asChild>
-              <Link to="/admin/activos/nuevo">
+              <Link to={rutaApp('activos/nuevo')}>
                 <Plus aria-hidden="true" />
                 Registrar activo
               </Link>
@@ -253,7 +254,7 @@ export default function Activos() {
                   accion: (
                     <>
                       <Boton asChild>
-                        <Link to="/admin/activos/nuevo">Registrar activo</Link>
+                        <Link to={rutaApp('activos/nuevo')}>Registrar activo</Link>
                       </Boton>
                       <Boton asChild variante="secundario">
                         <Link to="/contar/escanear">Ir a escanear</Link>

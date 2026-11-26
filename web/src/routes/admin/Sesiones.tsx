@@ -24,6 +24,7 @@ import { type Pendiente, useDiscrepancias, usePendientes } from '@/lib/discrepan
 import { formatEntero } from '@/lib/format'
 import { useCerrarSesion } from '@/lib/informe'
 import { fechaCorte, hoyISO, nombreSugerido, pendientes, porcentaje, type Avance, type SesionConteo, useAbrirSesion, useDetalleSesion, useSesiones } from '@/lib/sesiones'
+import { rutaActivo, rutaApp, rutaInforme, rutaSesion } from '@/lib/rutas'
 
 // Sesiones de conteo (spec 006, T5; CU-SES-01, 02; Q1): el admin abre una sesión (una
 // abierta por clínica) y ve su avance. Spec 008 (T4; R10, Q2): la cierra con un aviso de
@@ -138,7 +139,7 @@ function TarjetaAbierta({ sesion }: { sesion: SesionConteo }) {
           </div>
           <div className="flex shrink-0 gap-separacion">
             <Boton asChild variante="secundario" className="max-md:flex-1">
-              <Link to={`/admin/sesiones/${sesion.id}`}>
+              <Link to={rutaSesion(sesion.id)}>
                 Ver avance
                 <ChevronRight aria-hidden="true" />
               </Link>
@@ -206,7 +207,7 @@ const COLUMNAS_CERRADAS: ColumnaTabla<SesionConteo>[] = [
     principal: true,
     clase: 'whitespace-normal',
     celda: (s) => (
-      <Link to={`/admin/sesiones/${s.id}/informe`} className={ENLACE}>
+      <Link to={rutaInforme(s.id)} className={ENLACE}>
         {s.nombre}
       </Link>
     ),
@@ -280,7 +281,7 @@ export default function Sesiones() {
                 vacio={{ titulo: 'Aún no hay sesiones cerradas' }}
                 accionesFila={(s) => (
                   <Boton asChild variante="fantasma">
-                    <Link to={`/admin/sesiones/${s.id}/informe`} aria-label={`Ver informe de ${s.nombre}`}>
+                    <Link to={rutaInforme(s.id)} aria-label={`Ver informe de ${s.nombre}`}>
                       <FileText aria-hidden="true" />
                       Informe
                     </Link>
@@ -302,7 +303,7 @@ function AvisoDiscrepancias({ sesionId }: { sesionId: string }) {
   if (n === 0) return null
   return (
     <Link
-      to={`/admin/discrepancias?sesion=${sesionId}`}
+      to={`${rutaApp('discrepancias')}?sesion=${sesionId}`}
       className="flex min-h-control items-center gap-3 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-cuerpo shadow-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
     >
       <ArrowLeftRight className="size-5 shrink-0 text-warning" aria-hidden="true" />
@@ -324,7 +325,7 @@ const COLUMNAS_PENDIENTES: ColumnaTabla<Pendiente>[] = [
     clase: 'whitespace-normal',
     celda: (a) => (
       <span className="flex flex-wrap items-center gap-2">
-        <Link to={`/admin/activos/${encodeURIComponent(a.codigo)}`} className={`font-medium ${ENLACE}`}>
+        <Link to={rutaActivo(a.codigo)} className={`font-medium ${ENLACE}`}>
           {a.nombre}
         </Link>
         {a.estado === 'en_reparacion' && <Insignia tono="aviso">En reparación</Insignia>}
@@ -370,7 +371,7 @@ function CerrarSesion({ sesion, pendientesN }: { sesion: SesionConteo; pendiente
     cerrar.mutate(undefined, {
       onSuccess: () => {
         toast.success(`«${sesion.nombre}» quedó cerrada: este es su informe`)
-        void navegar(`/admin/sesiones/${sesion.id}/informe`)
+        void navegar(rutaInforme(sesion.id))
       },
     })
   }
@@ -446,7 +447,7 @@ function SesionCerrada({ sesion }: { sesion: SesionConteo }) {
       }
       acciones={
         <Boton asChild className="max-md:w-full">
-          <Link to={`/admin/sesiones/${sesion.id}/informe`}>
+          <Link to={rutaInforme(sesion.id)}>
             <FileText aria-hidden="true" />
             Ver informe
           </Link>
@@ -480,7 +481,7 @@ export function DetalleSesion({ id }: { id: string }) {
         descripcion="Puede que el enlace esté incompleto."
         accion={
           <Boton asChild variante="secundario">
-            <Link to="/admin/sesiones">Ver sesiones</Link>
+            <Link to={rutaApp('sesiones')}>Ver sesiones</Link>
           </Boton>
         }
       />

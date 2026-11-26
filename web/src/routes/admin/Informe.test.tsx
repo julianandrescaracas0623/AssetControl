@@ -87,7 +87,7 @@ describe('Informe de sesión (spec 008, T5)', () => {
     const tabla = await screen.findByRole('table')
     const fila = within(tabla).getByText('Silla ergonómica').closest('tr')!
     expect(within(fila).getByText('En reparación')).toBeTruthy()
-    expect(within(fila).getByRole('link', { name: '000123' }).getAttribute('href')).toBe('/admin/activos/000123')
+    expect(within(fila).getByRole('link', { name: '000123' }).getAttribute('href')).toBe('/app/activos/000123')
     expect(within(tabla).queryByText('Impresora multifuncional')).toBeNull()
     expect(within(tabla).getByText(/1 activo no encontrado/)).toBeTruthy()
   })
@@ -104,13 +104,13 @@ describe('Informe de sesión (spec 008, T5)', () => {
   it('«Ver valor actual» lleva la sesión para poder volver al informe (spec 015, T3)', async () => {
     abrir(INFORME, cerrado())
     const enlace = await screen.findByRole('link', { name: 'Ver valor actual' })
-    expect(enlace.getAttribute('href')).toBe(`/admin/valor?sesion=${SESION}`)
+    expect(enlace.getAttribute('href')).toBe(`/app/valor?sesion=${SESION}`)
   })
 
   it('una sesión abierta aún no tiene informe y lleva a la sesión', async () => {
     abrir(INFORME, catalogoDemo('admin', { sesiones: [sesionDe()] }))
     expect(await screen.findByText('Esta sesión sigue abierta')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Ir a la sesión' }).getAttribute('href')).toBe(`/admin/sesiones/${SESION}`)
+    expect(screen.getByRole('link', { name: 'Ir a la sesión' }).getAttribute('href')).toBe(`/app/sesiones/${SESION}`)
   })
 
   it('una sesión inexistente lo dice', async () => {
@@ -245,7 +245,7 @@ describe('Informe con la empresa (spec 013, T7)', () => {
   it('nombra la empresa congelada y avisa si la empresa no está completa', async () => {
     abrirCon(conEmpresa(cerrado(), { ...EMPRESA, completa: false }))
     expect(await screen.findByText('Completa los datos de tu empresa')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Ir a Empresa' }).getAttribute('href')).toBe('/admin/empresa')
+    expect(screen.getByRole('link', { name: 'Ir a Empresa' }).getAttribute('href')).toBe('/app/empresa')
     expect(screen.getByText('Clínica de prueba', { selector: 'b' })).toBeTruthy()
     expect(screen.queryByText(/Sesión cerrada antes de guardar/)).toBeNull()
   })

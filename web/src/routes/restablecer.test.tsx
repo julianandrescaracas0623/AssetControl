@@ -262,7 +262,7 @@ describe('/restablecer: enviar', () => {
     render(<RouterProvider router={router} />)
     await waitFor(() => expect(llamadas(f, '/api/auth/refresh')).toHaveLength(1))
     await screen.findAllByText(/Ana Torres/, undefined, { timeout: 3000 })
-    expect(router.state.location.pathname).toBe('/admin')
+    expect(router.state.location.pathname).toBe('/app')
 
     window.history.replaceState(null, '', `/restablecer#${TOKEN}`)
     await act(async () => {

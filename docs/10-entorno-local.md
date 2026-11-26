@@ -128,6 +128,16 @@ uv run --env-file ../.env flask --app app create-tenant "Clínica de prueba" "tu
 
 Copia la línea que empieza por `/invitacion#…`. La usarás en el paso 8 (vence en 24 h; si vence, repite este paso).
 
+## 7b. Sembrar activos de prueba (opcional, solo development)
+
+Cuando la base está vacía o la reseteaste, siembra 12 activos sintéticos (`DEMO-001` … `DEMO-012`), categorías sugeridas y ubicaciones de prueba en la clínica de ese admin. Es idempotente: puedes repetirlo. No usa el Excel de la clínica.
+
+```powershell
+uv run --env-file ../.env flask --app app sembrar-demo tu-correo@ejemplo.com
+```
+
+Fuera de `development` y pruebas el comando se niega. En producción no existe este atajo.
+
 ## 8. Encender la app
 
 **Con un solo comando** (recomendado). Abre Docker Desktop, espera a que diga *Engine running* y en PowerShell:

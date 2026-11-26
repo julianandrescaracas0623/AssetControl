@@ -40,7 +40,7 @@ test('un conteo completo: invitar, verificar en el teléfono, cerrar, informe, e
 
   let enlace = ''
   await test.step('el admin invita a un contador', async () => {
-    await admin.goto('/admin/usuarios')
+    await admin.goto('/app/usuarios')
     await admin.getByLabel('Correo de la persona').fill('luis@e2e.ejemplo.test')
     await admin.getByRole('button', { name: 'Crear invitación' }).click()
     enlace = await admin.getByLabel('Enlace de invitación').inputValue()
@@ -71,7 +71,7 @@ test('un conteo completo: invitar, verificar en el teléfono, cerrar, informe, e
   })
 
   await test.step('el admin completa los datos y el logo de la empresa (spec 013)', async () => {
-    await admin.goto('/admin/empresa')
+    await admin.goto('/app/empresa')
     await admin.getByRole('textbox', { name: /Nombre o razón social/ }).fill('Clínica E2E S.A.S.')
     await admin.getByRole('textbox', { name: /Dirección/ }).fill('Calle 1 # 2-3, Cartago')
     await admin.getByRole('textbox', { name: /NIT/ }).fill('900123456-8')
@@ -82,7 +82,7 @@ test('un conteo completo: invitar, verificar en el teléfono, cerrar, informe, e
   })
 
   await test.step('el admin cierra con el aviso y llega al informe', async () => {
-    await admin.goto(`/admin/sesiones/${sesion.id}`)
+    await admin.goto(`/app/sesiones/${sesion.id}`)
     await admin.getByRole('button', { name: 'Cerrar sesión' }).click()
     const dialogo = admin.getByRole('dialog', { name: '¿Cerrar «Conteo E2E»?' })
     await expect(dialogo.getByText('2 activos sin verificar quedarán como no encontrados.')).toBeVisible()
@@ -110,7 +110,7 @@ test('un conteo completo: invitar, verificar en el teléfono, cerrar, informe, e
   })
 
   await test.step('el admin exporta la lista filtrada y abre la ficha con doble clic (spec 015, T4)', async () => {
-    await admin.goto('/admin/activos')
+    await admin.goto('/app/activos')
     await admin.getByRole('searchbox', { name: 'Buscar activos' }).fill('autoclave')
     await expect(admin.getByRole('row')).toHaveCount(2)
     const [descarga] = await Promise.all([admin.waitForEvent('download'), admin.getByRole('button', { name: 'Exportar' }).click()])
@@ -123,7 +123,7 @@ test('un conteo completo: invitar, verificar en el teléfono, cerrar, informe, e
   })
 
   await test.step('el Inicio del admin muestra el último informe y el valor actual por separado', async () => {
-    await admin.goto('/admin')
+    await admin.goto('/app')
     await expect(admin.getByRole('link', { name: /Activos hoy/ })).toContainText('3')
     const informe = admin.getByRole('region', { name: /Informe congelado/ })
     await expect(informe).toContainText('3.779.900,50')

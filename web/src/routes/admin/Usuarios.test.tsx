@@ -27,19 +27,28 @@ function abrir(invitar: Manejador = (url) => (url === '/api/invitaciones' ? json
   return f
 }
 
-async function invitar(email = 'nuevo@ejemplo.test') {
+async function abrirInvitacion() {
   await screen.findByRole('heading', { level: 1, name: 'Usuarios' })
-  fireEvent.change(screen.getByLabelText('Correo de la persona'), { target: { value: email } })
-  fireEvent.click(screen.getByRole('button', { name: 'Crear invitación' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Invitar' }))
+  return screen.findByRole('dialog', { name: 'Invitar a una persona' })
+}
+
+async function invitar(email = 'nuevo@ejemplo.test') {
+  const dialogo = await abrirInvitacion()
+  fireEvent.change(within(dialogo).getByLabelText('Correo de la persona'), { target: { value: email } })
+  fireEvent.click(within(dialogo).getByRole('button', { name: 'Crear invitación' }))
 }
 
 describe('/admin/usuarios', () => {
-  it('pide correo y rol (Contador por defecto) y no muestra datos ficticios de usuarios', async () => {
+  it('la página es la lista; invitar abre un diálogo con correo y rol (Contador por defecto)', async () => {
     abrir()
     await screen.findByRole('heading', { level: 1, name: 'Usuarios' })
-    const correo = screen.getByLabelText('Correo de la persona')
+    expect(screen.getByRole('button', { name: 'Invitar' })).toBeTruthy()
+    expect(screen.queryByLabelText('Correo de la persona')).toBeNull()
+    const dialogo = await abrirInvitacion()
+    const correo = within(dialogo).getByLabelText('Correo de la persona')
     expect(correo.getAttribute('type')).toBe('email')
-    const rol = screen.getByRole('group', { name: 'Rol' })
+    const rol = within(dialogo).getByRole('group', { name: 'Rol' })
     expect((within(rol).getByRole('radio', { name: /Contador/ }) as HTMLInputElement).checked).toBe(true)
     expect((within(rol).getByRole('radio', { name: /Admin/ }) as HTMLInputElement).checked).toBe(false)
     expect(screen.queryByText(/llega con una spec posterior/)).toBeNull()
@@ -61,9 +70,10 @@ describe('/admin/usuarios', () => {
 
   it('puede invitar como Admin', async () => {
     const f = abrir()
-    await screen.findByRole('heading', { level: 1, name: 'Usuarios' })
-    fireEvent.click(screen.getByRole('radio', { name: /Admin/ }))
-    await invitar()
+    const dialogo = await abrirInvitacion()
+    fireEvent.click(within(dialogo).getByRole('radio', { name: /Admin/ }))
+    fireEvent.change(within(dialogo).getByLabelText('Correo de la persona'), { target: { value: 'nuevo@ejemplo.test' } })
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Crear invitación' }))
     await screen.findByLabelText('Enlace de invitación')
     expect(JSON.parse(String(llamadas(f, '/api/invitaciones')[0][1]?.body)).rol).toBe('admin')
   })
@@ -172,6 +182,7 @@ describe('/admin/usuarios: personas con acceso', () => {
   it('sin personas muestra el estado vacío', async () => {
     abrirConLista(() => json(200, { usuarios: [] }))
     expect(await screen.findByText('Todavía no hay personas con acceso')).toBeTruthy()
+    expect(screen.getByText(/Invita a la primera con el botón Invitar/)).toBeTruthy()
   })
 
   it('si falla la carga ofrece reintentar', async () => {
