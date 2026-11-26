@@ -24,7 +24,7 @@ import { type Subir, useFotoPendiente } from '@/lib/fotos'
 import { useRol } from '@/lib/sesion'
 import { fechaCorte, porcentaje, type SesionConteo, useDetalleSesion, useSesionAbierta, useUltimaVerificacion, type Verificacion } from '@/lib/sesiones'
 import { cn } from '@/lib/utils'
-import { rutaSesion } from '@/lib/rutas'
+import { rutaApp, rutaSesion } from '@/lib/rutas'
 
 import { AvisoYaVerificado, EstadoFisico, Mensaje, OtraUbicacion, Tecla } from './Verificar'
 
@@ -858,8 +858,10 @@ function PanelActivo({
         <CodigoNoEncontrado icono={<SearchX />}>
           El sticker <span className="font-mono text-foreground">{codigo}</span> no está registrado en esta clínica. Si es un activo nuevo, regístralo.
         </CodigoNoEncontrado>
+        {/* Spec 020, T5 (R6): el alta del computador es la del marco, con el código cargado;
+            el state le dice que ofrezca «Volver al conteo». */}
         <Boton asChild>
-          <Link to={`/contar/nuevo?codigo=${encodeURIComponent(codigo)}`}>
+          <Link to={`${rutaApp('activos/nuevo')}?codigo=${encodeURIComponent(codigo)}`} state={{ desde: 'conteo' }}>
             <Plus />
             Crear activo con este código
           </Link>

@@ -36,16 +36,22 @@ const precio = (v: unknown) => (typeof v === 'string' ? formatCOP(v) : texto(v))
 const ruta = (v: unknown) => (v && typeof v === 'object' ? texto((v as { ruta?: unknown }).ruta) : texto(v))
 const nombreDe = (v: unknown) => (v && typeof v === 'object' ? texto((v as { nombre?: unknown }).nombre) : texto(v))
 
-/** Eventos tal como los ve el rol: sin «Precio cambiado» ni datos de precio salvo para el admin. */
+const sinPrecio = (o: object) => Object.fromEntries(Object.entries(o).filter(([k]) => !k.includes('precio')))
+
+/**
+ * Eventos tal como los ve el rol: sin «Precio cambiado» ni datos de precio salvo para el
+ * admin (también los anidados en `datos.campos` de «Datos editados»).
+ */
 export function paraRol<E extends { tipo: string; datos?: unknown }>(eventos: E[], rol: Rol): E[] {
   if (rol === 'admin') return eventos
   return eventos
     .filter((e) => e.tipo !== 'precio_cambiado')
-    .map((e) =>
-      e.datos && typeof e.datos === 'object'
-        ? { ...e, datos: Object.fromEntries(Object.entries(e.datos).filter(([k]) => !k.includes('precio'))) }
-        : e,
-    )
+    .map((e) => {
+      if (!e.datos || typeof e.datos !== 'object') return e
+      const datos = sinPrecio(e.datos)
+      if (datos.campos && typeof datos.campos === 'object') datos.campos = sinPrecio(datos.campos)
+      return { ...e, datos }
+    })
 }
 
 export function vista(evento: Pick<EventoActivo, 'tipo' | 'datos'>): Vista {

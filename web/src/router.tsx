@@ -15,14 +15,13 @@ import Categorias from './routes/admin/Categorias'
 import Ubicaciones from './routes/admin/Ubicaciones'
 import Usuarios from './routes/admin/Usuarios'
 import Valor from './routes/admin/Valor'
-import Alta from './routes/contar/Alta'
 import Escanear from './routes/contar/Escanear'
 import EspacioConteo from './routes/contar/Escritorio'
 import Escribir from './routes/contar/Escribir'
 import Historial from './routes/contar/Historial'
 import Pendientes from './routes/contar/Pendientes'
 import Verificar from './routes/contar/Verificar'
-import { AliasAdmin, InicioApp, InicioConteo } from './routes/app/rutasApp'
+import { AliasAdmin, AltaConteo, InicioApp, InicioConteo } from './routes/app/rutasApp'
 import InicioPorRol from './routes/InicioPorRol'
 import Invitacion from './routes/Invitacion'
 import Login from './routes/Login'
@@ -44,7 +43,8 @@ import { ErrorModulo, InicioPlataforma, RutaModulo } from './routes/plataforma/R
 // Spec 020, T3 (R1–R3, R11): /app es el marco compartido de los dos roles; solo las
 // pantallas exclusivas del admin van bajo RequiereAdmin. /admin/** es un alias que
 // redirige a /app/** con la misma query. En el computador, /contar lleva a /app; el
-// espacio de conteo (escanear, escribir, activo/:codigo) no redirige.
+// espacio de conteo (escanear, escribir, activo/:codigo) no redirige. T5: en el computador
+// /contar/nuevo lleva al alta del marco (/app/activos/nuevo) con la misma query.
 export const routes: RouteObject[] = [
   // Spec 017, T8: consola de plataforma, fuera de la Raiz de la clínica (cliente de
   // consultas y sesión propios). Las pantallas de cada módulo salen de su registro
@@ -135,7 +135,7 @@ export const routes: RouteObject[] = [
                     ],
                   },
                   { path: 'activo/:codigo/historial', element: <Historial /> },
-                  { path: 'nuevo', element: <Alta /> },
+                  { path: 'nuevo', element: <AltaConteo /> },
                   { path: 'pendientes', element: <Pendientes /> },
                 ],
               },

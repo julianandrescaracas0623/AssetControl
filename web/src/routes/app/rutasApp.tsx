@@ -1,9 +1,10 @@
 import { Navigate, useLocation } from 'react-router'
 
 import { useEsEscritorio } from '@/hooks/use-escritorio'
-import { desdeAliasAdmin, RAIZ_APP } from '@/lib/rutas'
+import { desdeAliasAdmin, RAIZ_APP, rutaApp } from '@/lib/rutas'
 import { useRol } from '@/lib/sesion'
 import AdminInicio from '@/routes/admin/Inicio'
+import Alta from '@/routes/contar/Alta'
 import ContarInicio, { InicioEscritorio } from '@/routes/contar/Inicio'
 
 // Spec 020, T3 (R2, R10, R11; req. 7, 9, 11): entradas del marco compartido /app.
@@ -44,4 +45,17 @@ export function InicioConteo() {
   const escritorio = useEsEscritorio()
   if (escritorio) return <Navigate to={RAIZ_APP} replace />
   return <ContarInicio />
+}
+
+/**
+ * Alta del conteo (/contar/nuevo). Spec 020, T5 (R6, R11): en el computador el alta es la
+ * del marco (/app/activos/nuevo), la misma para los dos roles; se redirige conservando la
+ * query (`?codigo=` del sticker no encontrado) y el hash. En el teléfono, el alta del
+ * conteo de siempre.
+ */
+export function AltaConteo() {
+  const escritorio = useEsEscritorio()
+  const { search, hash } = useLocation()
+  if (escritorio) return <Navigate to={{ pathname: rutaApp('activos/nuevo'), search, hash }} replace />
+  return <Alta />
 }

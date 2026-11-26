@@ -879,7 +879,17 @@ describe('cola de la sala y precios', () => {
     ;(await campo()).focus()
     teclear('ZZ-999')
     expect(await screen.findByRole('heading', { level: 1, name: 'No encontramos ese código' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: /Crear activo con este código/ }).getAttribute('href')).toBe('/contar/nuevo?codigo=ZZ-999')
+    expect(screen.getByRole('link', { name: /Crear activo con este código/ }).getAttribute('href')).toBe('/app/activos/nuevo?codigo=ZZ-999')
+  })
+
+  it('crear el activo desde el conteo lleva el código y ofrece volver al conteo (spec 020, T5)', async () => {
+    const { router } = abrir()
+    ;(await campo()).focus()
+    teclear('ZZ-998')
+    fireEvent.click(await screen.findByRole('link', { name: /Crear activo con este código/ }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/app/activos/nuevo'))
+    expect(router.state.location.state).toEqual({ desde: 'conteo' })
+    expect((await screen.findByRole('link', { name: 'Volver al conteo' })).getAttribute('href')).toBe('/contar/escanear')
   })
 })
 
