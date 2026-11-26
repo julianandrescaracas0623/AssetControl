@@ -435,9 +435,10 @@ PROTECTED_ENDPOINTS = {
     "activos.buscar": frozenset({"admin", "contador"}),
     "activos.sugerencias": frozenset({"admin", "contador"}),
     # Spec 005: el historial lo ven ambos (sin precios para el contador, R8); cambiar un
-    # activo existente es solo del admin (R9).
+    # activo existente es solo del admin (R9). Spec 020 (R7): el contador edita los campos
+    # descriptivos (sin precio; 400 con cualquier otro campo, en test_activos_cambios.py).
     "activos.ver_historial": frozenset({"admin", "contador"}),
-    "activos.editar": frozenset({"admin"}),
+    "activos.editar": frozenset({"admin", "contador"}),
     "activos.mover": frozenset({"admin"}),
     "activos.cambiar_estado": frozenset({"admin"}),
     "activos.dar_de_baja": frozenset({"admin"}),

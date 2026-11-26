@@ -838,7 +838,8 @@ def test_activos_responses(client, contrato_db, monkeypatch):
     ):
         check("get", sugerencias, client.get(sugerencias, query_string=params, headers=headers))
 
-    # Spec 005, T2: editar (solo admin, con If-Match).
+    # Spec 005, T2: editar (con If-Match). Spec 020 (R7): el contador edita solo los campos
+    # descriptivos; con precio recibe 400 (ya no hay 403 de rol en el PATCH).
     ruta = f"/activos/{body['id']}"
 
     def editar(payload, headers=admin, version="1", **kwargs):
@@ -853,7 +854,8 @@ def test_activos_responses(client, contrato_db, monkeypatch):
     assert editar({"nombre": "Viejo"})["error"]["code"] == "version_desactualizada"
     assert editar({"nombre": "X"}, version=None)["error"]["code"] == "falta_version"
     assert editar({"codigo": "OTRO"}, version="2")["error"]["code"] == "codigo_inmutable"
-    editar({"nombre": "X"}, headers=contador, version="2")
+    sin_precio = editar({"precio_compra": "1.00"}, headers=contador, version="2")
+    assert sin_precio["error"]["code"] == "solicitud_invalida"
     editar({"nombre": "X"}, headers={}, version="2")
     check(
         "patch",

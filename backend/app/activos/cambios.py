@@ -14,9 +14,10 @@ Un activo ``dado_de_baja`` es de solo lectura (``409 activo_dado_de_baja``, Q1).
 """
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import date
 from decimal import Decimal
+from types import MappingProxyType
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -40,6 +41,12 @@ from app.nombres import normalize_display_name
 # Campos que el admin edita (R1): los mismos del alta; nunca el código.
 TEXTOS = ("serial", "marca", "modelo", "subtipo")
 EDITABLES = ("nombre", "categoria_id", "precio_compra", *TEXTOS, "fecha_compra")
+# Campos que el contador edita (spec 020, R7): los descriptivos; nunca precio, código,
+# ubicación ni estado.
+EDITABLES_CONTADOR = ("nombre", "categoria_id", *TEXTOS, "fecha_compra")
+EDITABLES_POR_ROL: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {"admin": EDITABLES, "contador": EDITABLES_CONTADOR}
+)
 # Orden de los campos dentro de ``datos_cambiados``.
 DATOS = ("nombre", *TEXTOS, "fecha_compra")
 MAX_VERSION_DIGITOS = 9
@@ -137,11 +144,13 @@ def _registrar(
 # --- Editar (T2; R1, R3, CU-CAT-05) -----------------------------------------------------
 
 
-def edicion(body: dict[str, object]) -> dict[str, object]:
-    """Valida el cuerpo de ``PATCH``: solo campos de R1, ya normalizados como en el alta."""
+def edicion(body: dict[str, object], rol: str) -> dict[str, object]:
+    """Valida el cuerpo de ``PATCH``: solo los campos del rol (R1; spec 020, R7), ya
+    normalizados como en el alta. Un campo fuera de la lista es ``400`` antes de tocar la
+    fila; un rol desconocido no edita nada."""
     if "codigo" in body:
         raise CodigoInmutable()
-    if not set(body) <= set(EDITABLES):
+    if not set(body) <= set(EDITABLES_POR_ROL.get(rol, ())):
         raise ErrorActivo()
     cambios: dict[str, object] = {}
     for campo, valor in body.items():

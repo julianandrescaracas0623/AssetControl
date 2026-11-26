@@ -826,7 +826,13 @@ paths:
     patch:
       tags: [activos]
       operationId: editarActivo
-      summary: Editar un activo (solo admin; cada cambio deja su evento)
+      summary: Editar un activo (admin todo; contador solo campos descriptivos)
+      description: >-
+        El admin edita todos los campos de EditarActivoBody. El contador (spec 020, R7) solo
+        nombre, categoria_id, marca, modelo, subtipo, serial y fecha_compra; cualquier otro
+        campo (precio_compra, codigo, ubicacion*, estado* u otro) es 400 sin cambiar nada.
+        Cada cambio deja su evento en activo_evento con su autor. Al contador nunca se le
+        devuelve precio (ni en 200, ni en 400, ni en 412).
       security:
         - bearerAuth: []
       parameters:
@@ -841,15 +847,15 @@ paths:
         "200":
           $ref: "#/components/responses/ActivoCambiado"
         "400":
-          description: Cuerpo o precio no válidos, o se intentó cambiar el código.
+          description: >-
+            Cuerpo o precio no válidos, se intentó cambiar el código, o el contador envió
+            un campo que no es descriptivo (solicitud_invalida; nunca precio_invalido).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
           x-codigos: [solicitud_invalida, precio_invalido, codigo_inmutable]
         "401":
           $ref: "#/components/responses/NoAutenticado"
-        "403":
-          $ref: "#/components/responses/Prohibido"
         "404":
           $ref: "#/components/responses/NoEncontrado"
         "409":
@@ -2651,7 +2657,9 @@ components:
           schema: { $ref: "#/components/schemas/VersionDesactualizada" }
       x-codigos: [version_desactualizada]
     ActivoCambiado:
-      description: Guardado (o sin cambios); el activo con precio, foto y su versión.
+      description: >-
+        Guardado (o sin cambios); el activo con foto y su versión (con precio solo para el
+        admin).
       headers:
         ETag:
           description: La versión nueva entre comillas, para el próximo If-Match.
@@ -3559,7 +3567,9 @@ components:
       type: object
       required: [error, activo]
       additionalProperties: false
-      description: El activo cambió desde que se leyó; trae el vigente (con precio, solo admin).
+      description: >-
+        El activo cambió desde que se leyó; trae el vigente con su foto (con precio solo para
+        el admin; sin clave de precio para el contador).
       properties:
         error:
           type: object
@@ -3575,7 +3585,8 @@ components:
       additionalProperties: false
       description: >-
         Solo los campos que cambian; null o "" borra un opcional. El código no se puede
-        cambiar (400 codigo_inmutable).
+        cambiar (400 codigo_inmutable). precio_compra es solo del admin: el contador que lo
+        envía recibe 400 solicitud_invalida (spec 020, R7).
       properties:
         nombre: { $ref: "#/components/schemas/NombreVisible" }
         categoria_id: { type: string, format: uuid }

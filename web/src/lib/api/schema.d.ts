@@ -430,7 +430,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Editar un activo (solo admin; cada cambio deja su evento) */
+        /**
+         * Editar un activo (admin todo; contador solo campos descriptivos)
+         * @description El admin edita todos los campos de EditarActivoBody. El contador (spec 020, R7) solo nombre, categoria_id, marca, modelo, subtipo, serial y fecha_compra; cualquier otro campo (precio_compra, codigo, ubicacion*, estado* u otro) es 400 sin cambiar nada. Cada cambio deja su evento en activo_evento con su autor. Al contador nunca se le devuelve precio (ni en 200, ni en 400, ni en 412).
+         */
         patch: operations["editarActivo"];
         trace?: never;
     };
@@ -1691,7 +1694,7 @@ export interface components {
             };
             activo: components["schemas"]["ActivoResumen"];
         };
-        /** @description El activo cambió desde que se leyó; trae el vigente (con precio, solo admin). */
+        /** @description El activo cambió desde que se leyó; trae el vigente con su foto (con precio solo para el admin; sin clave de precio para el contador). */
         VersionDesactualizada: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -1701,7 +1704,7 @@ export interface components {
             };
             activo: components["schemas"]["Activo"];
         };
-        /** @description Solo los campos que cambian; null o "" borra un opcional. El código no se puede cambiar (400 codigo_inmutable). */
+        /** @description Solo los campos que cambian; null o "" borra un opcional. El código no se puede cambiar (400 codigo_inmutable). precio_compra es solo del admin: el contador que lo envía recibe 400 solicitud_invalida (spec 020, R7). */
         EditarActivoBody: {
             nombre?: components["schemas"]["NombreVisible"];
             /** Format: uuid */
@@ -2275,7 +2278,7 @@ export interface components {
                 "application/json": components["schemas"]["VersionDesactualizada"];
             };
         };
-        /** @description Guardado (o sin cambios); el activo con precio, foto y su versión. */
+        /** @description Guardado (o sin cambios); el activo con foto y su versión (con precio solo para el admin). */
         ActivoCambiado: {
             headers: {
                 /** @description La versión nueva entre comillas, para el próximo If-Match. */
@@ -3269,7 +3272,7 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["ActivoCambiado"];
-            /** @description Cuerpo o precio no válidos, o se intentó cambiar el código. */
+            /** @description Cuerpo o precio no válidos, se intentó cambiar el código, o el contador envió un campo que no es descriptivo (solicitud_invalida; nunca precio_invalido). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3279,7 +3282,6 @@ export interface operations {
                 };
             };
             401: components["responses"]["NoAutenticado"];
-            403: components["responses"]["Prohibido"];
             404: components["responses"]["NoEncontrado"];
             409: components["responses"]["ActivoDadoDeBaja"];
             412: components["responses"]["VersionDesactualizada"];
