@@ -84,6 +84,16 @@ describe('Pestanas', () => {
     render(<Pestanas etiqueta="Desglose" pestanas={PESTANAS} />)
     expect(screen.getByRole('tab', { name: 'Por categoría' }).className).toContain('h-control')
   })
+
+  // Spec 020, T7: el carril se desplaza (overflow-x) y recortaba el anillo de foco por
+  // fuera de la pestaña; el foco va por dentro, como contorno, y se ve completo.
+  it('el foco se dibuja por dentro de la pestaña (el carril no lo recorta)', () => {
+    render(<Pestanas etiqueta="Desglose" pestanas={PESTANAS} />)
+    const clase = screen.getByRole('tab', { name: 'Por categoría' }).className
+    expect(clase).toContain('focus-visible:ring-0')
+    expect(clase).toContain('focus-visible:outline-2')
+    expect(clase).toContain('focus-visible:-outline-offset-2')
+  })
 })
 
 // Spec 016, T10 (Deuda T8 c): en el teléfono las pestañas que no caben se desplazan; un

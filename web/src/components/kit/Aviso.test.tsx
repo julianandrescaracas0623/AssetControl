@@ -50,6 +50,25 @@ describe('Aviso', () => {
     expect(aviso.contains(screen.getByRole('button', { name: 'Reintentar' }))).toBe(true)
   })
 
+  // Spec 020, T7: ui/alert subraya todo <a> de la descripción; un Boton que es enlace
+  // («Ver el activo», «Volver al conteo») se veía subrayado como texto, no como botón.
+  it('un botón que es enlace dentro de la acción no se subraya', () => {
+    render(
+      <Aviso
+        tono="exito"
+        titulo="Activo creado"
+        accion={
+          <Boton asChild variante="secundario">
+            <a href="/app/activos/E2E-1">Ver el activo</a>
+          </Boton>
+        }
+      />,
+    )
+    const enlace = screen.getByRole('link', { name: 'Ver el activo' })
+    expect(enlace.getAttribute('data-kit')).toBe('boton')
+    expect(enlace.parentElement?.className).toContain('[&_a[data-kit=boton]]:no-underline')
+  })
+
   it('el texto del error sigue siendo legible (texto oscuro, no rojo sobre rojo)', () => {
     render(<Aviso tono="error" titulo="Error">Descripción</Aviso>)
     const descripcion = screen.getByText('Descripción')

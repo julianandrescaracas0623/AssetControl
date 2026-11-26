@@ -334,13 +334,15 @@ export function Resumen({
 }) {
   const { campos, copiado, duplicando } = alta
   const precio = aPrecioCanonico(campos.precio)
+  const codigo = normalizarCodigo(campos.codigo)
   return (
     <Panel titulo="Resumen">
       <div className="flex flex-col gap-3">
         <ListaDatos
           className="-mt-2 [&>div]:min-h-0 [&>div]:py-2"
           datos={[
-            { rotulo: 'Código', valor: normalizarCodigo(campos.codigo) ?? '—', tipo: 'codigo' },
+            // Spec 020, T7: el «—» sin código va en la fuente normal, como el resto.
+            { rotulo: 'Código', valor: codigo ?? '—', tipo: codigo ? 'codigo' : 'texto' },
             { rotulo: 'Nombre', valor: <span className="block truncate">{(duplicando ? copiado?.nombre : campos.nombre.trim()) || '—'}</span> },
             { rotulo: 'Categoría', valor: (duplicando ? copiado?.categoria.nombre : categorias.find((c) => c.id === campos.categoria)?.nombre) || '—' },
             { rotulo: 'Ubicación', valor: <span className="block truncate">{(campos.ubicacion && rutaDe(ubicaciones, campos.ubicacion)) || '—'}</span> },

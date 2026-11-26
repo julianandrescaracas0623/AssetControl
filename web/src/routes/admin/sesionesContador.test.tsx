@@ -157,7 +157,13 @@ describe('Sesiones del contador (R9)', () => {
     expect(await screen.findByRole('heading', { level: 2, name: `Pendientes por verificar en ${BOX2.ruta}` })).toBeTruthy()
     await waitFor(() => expect(screen.getByRole('link', { name: 'Silla ergonómica' })).toBeTruthy())
     expect(f.mock.calls.some(([u]) => String(u).includes('/pendientes?') && String(u).includes(`ubicacion_id=${BOX2.id}`))).toBe(true)
-    expect(screen.getByRole('link', { name: 'Ver todas las ubicaciones' }).getAttribute('href')).toBe(`/app/sesiones/${SESION}`)
+    const todas = screen.getByRole('link', { name: 'Ver todas las ubicaciones' })
+    expect(todas.getAttribute('href')).toBe(`/app/sesiones/${SESION}`)
+    // Spec 020, T7: se ve como enlace (color y subrayado), no como texto en negrita, y
+    // mide 44 px en el teléfono.
+    expect(todas.className).toContain('text-brand-strong')
+    expect(todas.className).toContain('underline')
+    expect(todas.className).toContain('min-h-11')
   })
 
   it('el detalle de la cerrada no ofrece el informe', async () => {

@@ -366,11 +366,15 @@ function ListaPendientes({ sesionId, ubicacion }: { sesionId: string; ubicacion?
   if (consulta.isPending || (activos.length === 0 && !ubicacion)) return null
   return (
     <section aria-labelledby="titulo-pendientes" className="flex flex-col gap-3">
-      <h2 id="titulo-pendientes" className="text-titulo-seccion">
+      <h2 id="titulo-pendientes" className="text-titulo-seccion text-balance">
         {ubicacion ? `Pendientes por verificar en ${ubicacion.ruta}` : 'Pendientes por verificar'}
       </h2>
+      {/* Spec 020, T7: se ve como enlace (color y subrayado) y mide 44 px en el teléfono. */}
       {ubicacion && (
-        <Link to={rutaSesion(sesionId)} className={`self-start text-cuerpo font-medium ${ENLACE}`}>
+        <Link
+          to={rutaSesion(sesionId)}
+          className="-my-2 inline-flex min-h-11 items-center self-start rounded-sm text-cuerpo font-medium text-brand-strong underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none md:min-h-0 md:my-0"
+        >
           Ver todas las ubicaciones
         </Link>
       )}
