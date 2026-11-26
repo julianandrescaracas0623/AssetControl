@@ -204,7 +204,8 @@ export function crearCatalogo(
       activos_hoy: { unidades: hoy.length, en_reparacion: hoy.filter((a) => a.estado === 'en_reparacion').length },
       sesion_abierta,
     }
-    if (rol !== 'admin') return datos
+    // Spec 020, T6: con `filtraPrecio: false` el doble también le manda el valor al contador.
+    if (!conPrecios) return datos
     const ultima = cerradas()[0] ?? null
     const ref = abierta ?? ultima
     const valor = valorActual()
@@ -471,7 +472,7 @@ export function crearCatalogo(
           por_pagina: 50,
         })
       }
-      if (rol !== 'admin') return errorApi(403, 'prohibido', 'No tienes permiso.')
+      // Spec 020, T2 (R8): la lista es de los dos roles; aplicar y descartar, solo del admin.
       if (dis[2] === 'discrepancias' && metodo === 'GET') {
         const filtro = q.get('estado') ?? 'por_resolver'
         const items = [...vigentes.values()]
@@ -490,11 +491,14 @@ export function crearCatalogo(
               recibido_en: v.recibido_en,
               estado,
               resolucion: r ? { tipo: r.tipo, por: { id: '00000000-0000-4000-8000-00000000000a', nombre: 'Ana Torres' }, en: r.en } : null,
+              // Regresión (spec 020, T6): un servidor que se equivocara y mandara el precio.
+              ...(inicial.filtraPrecio === false ? { precio_al_contar: v.precio_al_contar } : {}),
             }
           })
           .filter((d) => filtro === 'todas' || (filtro === 'resueltas') === (d.estado === 'aplicada' || d.estado === 'descartada'))
         return json(200, { discrepancias: items })
       }
+      if (rol !== 'admin') return errorApi(403, 'prohibido', 'No tienes permiso.')
       if (metodo === 'POST') {
         const b = cuerpo(init)
         const aplicar = dis[2].endsWith('aplicar')
@@ -547,7 +551,9 @@ export function crearCatalogo(
         }))
         const total = por_ubicacion.reduce((n, f) => n + f.total, 0)
         const verificados = por_ubicacion.reduce((n, f) => n + f.verificados, 0)
-        return json(200, { sesion, avance: { total, verificados, pendientes: total - verificados, por_ubicacion } })
+        // Regresión (spec 020, T6): con `filtraPrecio: false`, un valor que el servidor no manda.
+        const valor = inicial.filtraPrecio === false ? { valor_verificado: '1390000.00' } : {}
+        return json(200, { sesion, avance: { total, verificados, pendientes: total - verificados, por_ubicacion, ...valor } })
       }
       if (ses[2] && metodo === 'GET') {
         const ultima = verificaciones.filter((v) => v.sesion_id === sesion.id && v.activo.id === q.get('activo_id')).at(-1)
@@ -729,6 +735,8 @@ export function crearCatalogo(
     principales,
     sesiones,
     verificaciones,
+    /** Resoluciones de discrepancias (verificación → aplicada o descartada). */
+    resoluciones,
     eventos,
     /** Cierra como lo haría otra persona (el informe queda congelado igual que en el servidor). */
     cerrarSesion(id: string) {

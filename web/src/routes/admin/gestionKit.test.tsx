@@ -143,10 +143,11 @@ describe('caracterización de Sesiones (T9): lo que no cambia', () => {
   })
 
   // Spec 020, T3 (R3, R9): Sesiones ya no es exclusiva del admin; el contador la abre en su
-  // marco (la lectura sin cifras de valor es de T6). El servidor sigue siendo la autoridad.
+  // marco (T6: en solo lectura y sin cifras de valor). El servidor sigue siendo la autoridad.
   it('el contador entra en su marco, sin «Sin permiso»', async () => {
     abrir('/admin/sesiones', catalogoDemo('contador').manejador, { rol: 'contador' })
-    expect(await screen.findByRole('navigation', { name: 'Navegación principal' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Sesiones' })).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: 'Navegación principal' })).toBeTruthy()
     expect(screen.queryByRole('heading', { level: 1, name: 'No tienes permiso para ver esto' })).toBeNull()
   })
 })
@@ -281,10 +282,11 @@ describe('caracterización de Discrepancias (T9): lo que no cambia', () => {
     expect(await screen.findByText('Aún no se ha resuelto ninguna')).toBeTruthy()
   })
 
-  // Spec 020, T3 (R3, R8): Discrepancias ya no es exclusiva del admin (solo lectura en T6).
+  // Spec 020, T3 (R3, R8): Discrepancias ya no es exclusiva del admin (T6: solo lectura).
   it('el contador entra en su marco, sin «Sin permiso»', async () => {
     abrir('/admin/discrepancias', catalogoDemo('contador').manejador, { rol: 'contador' })
-    expect(await screen.findByRole('navigation', { name: 'Navegación principal' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Discrepancias' })).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: 'Navegación principal' })).toBeTruthy()
     expect(screen.queryByRole('heading', { level: 1, name: 'No tienes permiso para ver esto' })).toBeNull()
   })
 })

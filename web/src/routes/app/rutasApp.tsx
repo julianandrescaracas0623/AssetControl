@@ -1,11 +1,16 @@
-import { Navigate, useLocation } from 'react-router'
+import { Navigate, useLocation, useParams } from 'react-router'
 
 import { useEsEscritorio } from '@/hooks/use-escritorio'
-import { desdeAliasAdmin, RAIZ_APP, rutaApp } from '@/lib/rutas'
+import { normalizarCodigo } from '@/lib/activos'
+import { desdeAliasAdmin, RAIZ_APP, rutaActivo, rutaApp, rutaSesion } from '@/lib/rutas'
 import { useRol } from '@/lib/sesion'
+import { useSesionAbierta } from '@/lib/sesiones'
 import AdminInicio from '@/routes/admin/Inicio'
 import Alta from '@/routes/contar/Alta'
+import Historial from '@/routes/contar/Historial'
 import ContarInicio, { InicioEscritorio } from '@/routes/contar/Inicio'
+import Pendientes from '@/routes/contar/Pendientes'
+import { PantallaCarga } from '@/routes/PantallaCarga'
 
 // Spec 020, T3 (R2, R10, R11; req. 7, 9, 11): entradas del marco compartido /app.
 
@@ -58,4 +63,37 @@ export function AltaConteo() {
   const { search, hash } = useLocation()
   if (escritorio) return <Navigate to={{ pathname: rutaApp('activos/nuevo'), search, hash }} replace />
   return <Alta />
+}
+
+/**
+ * Pendientes del conteo (/contar/pendientes). Spec 020, T6 (R9, R11): en el computador son
+ * los pendientes por ubicación del detalle de la sesión abierta en el marco
+ * (/app/sesiones/:id), con la misma query (`?ubicacion=`); sin sesión abierta, Sesiones. En
+ * el teléfono, la lista del conteo de siempre.
+ */
+export function PendientesConteo() {
+  const escritorio = useEsEscritorio()
+  if (escritorio) return <PendientesAlMarco />
+  return <Pendientes />
+}
+
+function PendientesAlMarco() {
+  const { search, hash } = useLocation()
+  const abierta = useSesionAbierta()
+  if (abierta.isPending) return <PantallaCarga etiqueta="Cargando pendientes" />
+  // Con error o sin sesión abierta, Sesiones lo explica (y reintenta) en el marco.
+  if (abierta.isError || !abierta.data) return <Navigate to={rutaApp('sesiones')} replace />
+  return <Navigate to={{ pathname: rutaSesion(abierta.data.id), search, hash }} replace />
+}
+
+/**
+ * Historial del activo en el conteo (/contar/activo/:codigo/historial). Spec 020, T6: en el
+ * computador es la ficha del marco (/app/activos/:codigo), que ya trae la línea de tiempo.
+ * En el teléfono, el historial del conteo de siempre.
+ */
+export function HistorialConteo() {
+  const escritorio = useEsEscritorio()
+  const { codigo: crudo = '' } = useParams()
+  if (escritorio) return <Navigate to={rutaActivo(normalizarCodigo(crudo) ?? crudo)} replace />
+  return <Historial />
 }

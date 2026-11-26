@@ -12,7 +12,7 @@ import { useEsEscritorio } from '@/hooks/use-escritorio'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { useSalaDeTrabajo } from '@/lib/conteo'
 import { formatEntero } from '@/lib/format'
-import { rutaApp } from '@/lib/rutas'
+import { rutaActivo, rutaApp, rutaSesion } from '@/lib/rutas'
 import { useIndicadores } from '@/lib/inicio'
 import { useSesion } from '@/lib/sesion'
 import { fechaCorte, pendientes, porcentaje, type SesionConteo, useDetalleSesion, useSesionAbierta } from '@/lib/sesiones'
@@ -127,7 +127,9 @@ function PendientesPorUbicacion({ sesionId, escritorio = false }: { sesionId: st
             pendientes: f.pendientes,
             verificados: f.verificados,
             total: f.total,
-            href: `/contar/pendientes?ubicacion=${f.ubicacion.id}`,
+            // Spec 020, T6: en el computador, los pendientes de la ubicación en el detalle de
+            // la sesión del marco; en el teléfono, la lista del conteo de siempre.
+            href: escritorio ? `${rutaSesion(sesionId)}?ubicacion=${f.ubicacion.id}` : `/contar/pendientes?ubicacion=${f.ubicacion.id}`,
           }))}
         />
       ) : (
@@ -240,6 +242,8 @@ function Escanear({ conSesion }: { conSesion: boolean }) {
 }
 
 const enlaceHistorial = (a: { codigo: string }) => `/contar/activo/${encodeURIComponent(a.codigo)}/historial`
+/** En el computador el historial es la ficha del marco (trae la línea de tiempo; spec 020, T6). */
+const enlaceFicha = (a: { codigo: string }) => rutaActivo(a.codigo)
 
 /**
  * Computador (spec 015, R8: ≥ 1024 px y puntero fino). El encabezado de la sesión a todo
@@ -286,7 +290,7 @@ export function InicioEscritorio({ rol }: { rol: string | undefined }) {
         <div data-inicio="columna-estado" className="flex min-w-0 flex-col gap-4">
           {sesion && <PendientesPorUbicacion sesionId={sesion.id} escritorio />}
           <ActivosHoy />
-          <ActividadReciente enlace={enlaceHistorial} />
+          <ActividadReciente enlace={enlaceFicha} />
         </div>
       </div>
     </>

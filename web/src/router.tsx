@@ -18,10 +18,8 @@ import Valor from './routes/admin/Valor'
 import Escanear from './routes/contar/Escanear'
 import EspacioConteo from './routes/contar/Escritorio'
 import Escribir from './routes/contar/Escribir'
-import Historial from './routes/contar/Historial'
-import Pendientes from './routes/contar/Pendientes'
 import Verificar from './routes/contar/Verificar'
-import { AliasAdmin, AltaConteo, InicioApp, InicioConteo } from './routes/app/rutasApp'
+import { AliasAdmin, AltaConteo, HistorialConteo, InicioApp, InicioConteo, PendientesConteo } from './routes/app/rutasApp'
 import InicioPorRol from './routes/InicioPorRol'
 import Invitacion from './routes/Invitacion'
 import Login from './routes/Login'
@@ -44,7 +42,9 @@ import { ErrorModulo, InicioPlataforma, RutaModulo } from './routes/plataforma/R
 // pantallas exclusivas del admin van bajo RequiereAdmin. /admin/** es un alias que
 // redirige a /app/** con la misma query. En el computador, /contar lleva a /app; el
 // espacio de conteo (escanear, escribir, activo/:codigo) no redirige. T5: en el computador
-// /contar/nuevo lleva al alta del marco (/app/activos/nuevo) con la misma query.
+// /contar/nuevo lleva al alta del marco (/app/activos/nuevo) con la misma query. T6: en el
+// computador /contar/pendientes lleva al detalle de la sesión abierta (con su ?ubicacion=)
+// y el historial del activo, a su ficha del marco.
 export const routes: RouteObject[] = [
   // Spec 017, T8: consola de plataforma, fuera de la Raiz de la clínica (cliente de
   // consultas y sesión propios). Las pantallas de cada módulo salen de su registro
@@ -134,9 +134,9 @@ export const routes: RouteObject[] = [
                       { path: 'activo/:codigo', element: <Verificar /> },
                     ],
                   },
-                  { path: 'activo/:codigo/historial', element: <Historial /> },
+                  { path: 'activo/:codigo/historial', element: <HistorialConteo /> },
                   { path: 'nuevo', element: <AltaConteo /> },
-                  { path: 'pendientes', element: <Pendientes /> },
+                  { path: 'pendientes', element: <PendientesConteo /> },
                 ],
               },
             ],
