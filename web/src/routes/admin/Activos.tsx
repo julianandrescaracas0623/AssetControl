@@ -12,6 +12,7 @@ import { rutaDe, useUbicaciones } from '@/lib/catalogo'
 import { formatCOP, formatEntero } from '@/lib/format'
 import { entregarConAviso } from '@/lib/descarga'
 import { rutaActivo, rutaApp } from '@/lib/rutas'
+import { useRol } from '@/lib/sesion'
 
 // Activos (docs/08 §4.3, §7.7; spec 004, T9): búsqueda por código, nombre o serial,
 // filtro por estado y paginación en el servidor (25 por página). Spec 005, T8: el menú
@@ -22,6 +23,9 @@ import { rutaActivo, rutaApp } from '@/lib/rutas'
 // debajo de md, una tarjeta por activo. El filtro de ubicación sigue siendo el
 // LocationPicker (con buscador): el Filtro del kit no busca y las salas pueden ser muchas
 // (Deuda T3 g). Mismas llamadas, mismos filtros (los aplica el servidor) y mismos textos.
+// Spec 020, T4 (R5): la misma lista para el contador, sin precio (ni columna, ni cifra en
+// la tarjeta), sin «Exportar» y con el menú de la fila limitado a ver y editar. El
+// servidor ya no le envía el precio ni le deja exportar, mover o dar de baja.
 
 type Pestaña = 'todos' | Activo['estado']
 
@@ -34,24 +38,26 @@ const PESTANAS: { valor: Pestaña; etiqueta: string }[] = [
 
 const ficha = (a: Activo) => rutaActivo(a.codigo)
 
-function opcionesDe(activo: Activo): OpcionMenu[] {
+function opcionesDe(activo: Activo, esAdmin: boolean): OpcionMenu[] {
   const ver: OpcionMenu = { etiqueta: 'Ver ficha', icono: <Eye />, href: ficha(activo) }
   if (activo.estado === 'dado_de_baja') {
-    return [ver, { etiqueta: 'Reactivar', icono: <ArchiveRestore />, href: `${ficha(activo)}?accion=reactivar` }]
+    return esAdmin ? [ver, { etiqueta: 'Reactivar', icono: <ArchiveRestore />, href: `${ficha(activo)}?accion=reactivar` }] : [ver]
   }
+  const editar: OpcionMenu = { etiqueta: 'Editar', icono: <Pencil />, href: `${ficha(activo)}?accion=editar` }
+  if (!esAdmin) return [ver, editar]
   return [
     ver,
-    { etiqueta: 'Editar', icono: <Pencil />, href: `${ficha(activo)}?accion=editar` },
+    editar,
     { etiqueta: 'Mover', icono: <MapPin />, href: `${ficha(activo)}?accion=mover` },
     { etiqueta: 'Dar de baja', icono: <Archive />, href: `${ficha(activo)}?accion=baja`, peligro: true, separadorAntes: true },
   ]
 }
 
-function AccionesFila({ activo }: { activo: Activo }) {
+function AccionesFila({ activo, esAdmin }: { activo: Activo; esAdmin: boolean }) {
   return (
     <Menu
       rotulo={activo.codigo}
-      opciones={opcionesDe(activo)}
+      opciones={opcionesDe(activo, esAdmin)}
       disparador={
         <Boton
           variante="fantasma"
@@ -65,8 +71,8 @@ function AccionesFila({ activo }: { activo: Activo }) {
   )
 }
 
-/** Tarjeta del teléfono: nombre (enlace a la ficha), código · categoría · ubicación, estado y precio. */
-function TarjetaActivo({ activo: a }: { activo: Activo }) {
+/** Tarjeta del teléfono: nombre (enlace a la ficha), código · categoría · ubicación, estado y precio (solo admin). */
+function TarjetaActivo({ activo: a, esAdmin }: { activo: Activo; esAdmin: boolean }) {
   return (
     <Link
       to={ficha(a)}
@@ -78,7 +84,7 @@ function TarjetaActivo({ activo: a }: { activo: Activo }) {
       </span>
       <span className="flex flex-wrap items-center gap-2">
         <EstadoActivoBadge estado={a.estado} />
-        {a.precio_compra && <span className="text-cuerpo font-medium tabular-nums">{formatCOP(a.precio_compra)}</span>}
+        {esAdmin && a.precio_compra && <span className="text-cuerpo font-medium tabular-nums">{formatCOP(a.precio_compra)}</span>}
       </span>
     </Link>
   )
@@ -94,6 +100,7 @@ function useRetrasado(valor: string, ms = 300) {
 }
 
 export default function Activos() {
+  const esAdmin = useRol() === 'admin'
   const [params, setParams] = useSearchParams()
   // Spec 010: el Inicio enlaza a «en reparación» con ?estado=.
   const [pestaña, setPestaña] = useState<Pestaña>(() => {
@@ -168,7 +175,10 @@ export default function Activos() {
     { id: 'categoria', encabezado: 'Categoría', celda: (a) => a.categoria.nombre },
     { id: 'ubicacion', encabezado: 'Ubicación', clase: 'min-w-40 whitespace-normal text-muted-foreground', celda: (a) => a.ubicacion.ruta },
     { id: 'estado', encabezado: 'Estado', celda: (a) => <EstadoActivoBadge estado={a.estado} /> },
-    { id: 'precio', encabezado: 'Precio de compra', tipo: 'cifra', celda: (a) => (a.precio_compra ? formatCOP(a.precio_compra) : '—') },
+    // El contador no tiene columna de precio: ni rótulo ni hueco (spec 020, R5).
+    ...(esAdmin
+      ? [{ id: 'precio', encabezado: 'Precio de compra', tipo: 'cifra', celda: (a) => (a.precio_compra ? formatCOP(a.precio_compra) : '—') } satisfies ColumnaTabla<Activo>]
+      : []),
   ]
 
   const filtroUbicacion = ubicacion ? (
@@ -204,9 +214,11 @@ export default function Activos() {
         claseAcciones="max-sm:w-full max-sm:[&>*]:flex-1"
         acciones={
           <>
-            <Boton variante="secundario" icono={<Download />} cargando={exportar.isPending} textoCargando="Exportando…" onClick={exportarLista}>
-              Exportar
-            </Boton>
+            {esAdmin && (
+              <Boton variante="secundario" icono={<Download />} cargando={exportar.isPending} textoCargando="Exportando…" onClick={exportarLista}>
+                Exportar
+              </Boton>
+            )}
             <Boton asChild>
               <Link to={rutaApp('activos/nuevo')}>
                 <Plus aria-hidden="true" />
@@ -264,8 +276,8 @@ export default function Activos() {
                 }
           }
           onAbrirFila={(a) => void navigate(ficha(a))}
-          accionesFila={(a) => <AccionesFila activo={a} />}
-          tarjeta={(a) => <TarjetaActivo activo={a} />}
+          accionesFila={(a) => <AccionesFila activo={a} esAdmin={esAdmin} />}
+          tarjeta={(a) => <TarjetaActivo activo={a} esAdmin={esAdmin} />}
           barra={{
             busqueda: {
               valor: texto,

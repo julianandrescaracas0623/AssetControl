@@ -3,13 +3,15 @@ import { Link } from 'react-router'
 
 import { Boton, Estado, Panel } from '@/components/kit'
 import { mensajeDeError } from '@/lib/api/cliente'
-import { TONOS, vista } from '@/lib/eventos'
+import { paraRol, TONOS, vista } from '@/lib/eventos'
 import { type EventoActividad, useActividad } from '@/lib/inicio'
+import { useRol } from '@/lib/sesion'
 import { cn } from '@/lib/utils'
 
 // Actividad reciente del tenant (spec 010, T7; CU-DSH-02). Ambos roles; al contador el
 // servidor ya le quita los cambios de precio y toda cifra de dinero (P13): aquí no se
-// filtra nada. Cada evento enlaza al activo; orden por `seq`, lo más reciente arriba.
+// filtra nada salvo la defensa en dos capas de `paraRol` (spec 020, T4). Cada evento
+// enlaza al activo; orden por `seq`, lo más reciente arriba.
 // Spec 016, T7: Panel y estados del kit. El enlace del activo cubre toda la fila (su
 // ::after se estira sobre el <li>): el objetivo táctil es la fila entera, no la línea de
 // texto de 24 px; el nombre accesible sigue siendo el del activo y su código.
@@ -18,7 +20,8 @@ const fechaHora = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeSt
 
 export function ActividadReciente({ enlace }: { enlace: (activo: EventoActividad['activo']) => string }) {
   const consulta = useActividad()
-  const eventos = consulta.data?.pages.flatMap((p) => p.eventos) ?? []
+  const rol = useRol()
+  const eventos = paraRol(consulta.data?.pages.flatMap((p) => p.eventos) ?? [], rol)
   return (
     <Panel titulo="Actividad reciente" relleno={false}>
       {consulta.isPending ? (

@@ -14,6 +14,7 @@ import { etiquetaMotivo, useAlternarReparacion, useHistorial } from '@/lib/cambi
 import { formatCOP } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { rutaApp } from '@/lib/rutas'
+import { useRol } from '@/lib/sesion'
 
 // Ficha del activo (spec 004, T9; destino de la lista, del alta y del buscador). Spec
 // 005: editar (T5), mover, reparación, baja y reactivar (T6) e historial (T7). `?accion=editar|mover|baja`
@@ -30,9 +31,13 @@ import { rutaApp } from '@/lib/rutas'
 // Compra debajo, en el mismo bloque. Historial y luego Ubicación en el margen. En el
 // teléfono una columna y el mismo orden de lectura. El margen solo se pega si cabe
 // entero: un sticky del historial solo taparía la ubicación.
+// Spec 020, T4 (R5, R7): el contador ve la misma ficha sin precio y solo con «Editar»
+// (los siete campos descriptivos): sin mover, reparación, baja ni reactivar, y
+// `?accion=` solo abre la edición. El servidor es la barrera (403 y sin precio).
 
 type Accion = 'editar' | 'mover' | 'baja' | 'reactivar'
 const ACCIONES: Accion[] = ['editar', 'mover', 'baja', 'reactivar']
+const ACCIONES_CONTADOR: Accion[] = ['editar']
 
 /** Al cerrar un diálogo, el foco va al primero de los botones que siga en pantalla. */
 function devolverFoco(evento: Event, ...destinos: (HTMLElement | null)[]) {
@@ -42,7 +47,16 @@ function devolverFoco(evento: Event, ...destinos: (HTMLElement | null)[]) {
   destino.focus()
 }
 
-function AvisoDeBaja({ activo, onReactivar, reactivarRef }: { activo: Activo; onReactivar: () => void; reactivarRef: RefObject<HTMLButtonElement | null> }) {
+function AvisoDeBaja({
+  activo,
+  onReactivar,
+  reactivarRef,
+}: {
+  activo: Activo
+  /** Sin él (contador) no se ofrece «Reactivar». */
+  onReactivar?: () => void
+  reactivarRef: RefObject<HTMLButtonElement | null>
+}) {
   const historial = useHistorial(activo.id)
   const baja = historial.data?.pages[0]?.eventos.find((e) => e.tipo === 'dado_de_baja')
   const { motivo, nota } = (baja?.datos ?? {}) as { motivo?: string; nota?: string }
@@ -52,9 +66,11 @@ function AvisoDeBaja({ activo, onReactivar, reactivarRef }: { activo: Activo; on
       icono={<Archive aria-hidden="true" />}
       titulo={`Dado de baja${motivo ? `: ${etiquetaMotivo(motivo).toLowerCase()}` : ''}`}
       accion={
-        <Boton ref={reactivarRef} variante="secundario" icono={<ArchiveRestore />} onClick={onReactivar}>
-          Reactivar
-        </Boton>
+        onReactivar && (
+          <Boton ref={reactivarRef} variante="secundario" icono={<ArchiveRestore />} onClick={onReactivar}>
+            Reactivar
+          </Boton>
+        )
       }
     >
       <div className="flex flex-col gap-1">
@@ -67,12 +83,15 @@ function AvisoDeBaja({ activo, onReactivar, reactivarRef }: { activo: Activo; on
 
 function Acciones({
   activo,
+  esAdmin,
   abrir,
   editarRef,
   moverRef,
   masRef,
 }: {
   activo: Activo
+  /** El contador solo edita (spec 020, R7). */
+  esAdmin: boolean
   abrir: (a: Accion) => void
   editarRef: RefObject<HTMLButtonElement | null>
   moverRef: RefObject<HTMLButtonElement | null>
@@ -91,11 +110,15 @@ function Acciones({
     enfocarAlTerminar.current = false
     ;(enReparacion ? volverRef.current : masRef.current)?.focus()
   }, [reparacion.guardando, enReparacion, masRef])
+  const editar = (
+    <Boton ref={editarRef} icono={<Pencil />} onClick={() => abrir('editar')}>
+      Editar
+    </Boton>
+  )
+  if (!esAdmin) return editar
   return (
     <>
-      <Boton ref={editarRef} icono={<Pencil />} onClick={() => abrir('editar')}>
-        Editar
-      </Boton>
+      {editar}
       <Boton ref={moverRef} variante="secundario" icono={<MapPin />} onClick={() => abrir('mover')}>
         Mover
       </Boton>
@@ -210,11 +233,14 @@ function Seccion({
 }
 
 export default function FichaActivo() {
+  const esAdmin = useRol() === 'admin'
   const { codigo: crudo = '' } = useParams()
   const codigo = normalizarCodigo(crudo) ?? crudo
   const consulta = useActivoPorCodigo(codigo)
   const [params, setParams] = useSearchParams()
-  const [accion, setAccion] = useState<Accion | null>(() => ACCIONES.find((a) => a === params.get('accion')) ?? null)
+  const [accion, setAccion] = useState<Accion | null>(
+    () => (esAdmin ? ACCIONES : ACCIONES_CONTADOR).find((a) => a === params.get('accion')) ?? null,
+  )
   const editarRef = useRef<HTMLButtonElement>(null)
   const moverRef = useRef<HTMLButtonElement>(null)
   const masRef = useRef<HTMLButtonElement>(null)
@@ -282,10 +308,10 @@ export default function FichaActivo() {
             </span>
           }
           claseAcciones="max-sm:w-full max-sm:[&>[data-slot=button]]:flex-1"
-          acciones={!deBaja && <Acciones activo={activo} abrir={abrir} editarRef={editarRef} moverRef={moverRef} masRef={masRef} />}
+          acciones={!deBaja && <Acciones activo={activo} esAdmin={esAdmin} abrir={abrir} editarRef={editarRef} moverRef={moverRef} masRef={masRef} />}
         />
       </header>
-      {deBaja && <AvisoDeBaja activo={activo} onReactivar={() => abrir('reactivar')} reactivarRef={reactivarRef} />}
+      {deBaja && <AvisoDeBaja activo={activo} onReactivar={esAdmin ? () => abrir('reactivar') : undefined} reactivarRef={reactivarRef} />}
       <Panel relleno={false} className="overflow-visible">
         <div className="grid xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
           <div className="grid min-w-0 items-start gap-x-6 gap-y-5 p-4 md:grid-cols-[16rem_minmax(0,1fr)] md:p-5">
@@ -310,6 +336,7 @@ export default function FichaActivo() {
               icono={ReceiptText}
               className="border-t pt-5"
               pie={
+                esAdmin &&
                 activo.precio_compra !== undefined && (
                   <p className="mt-3 flex items-center gap-1.5 text-etiqueta font-normal text-muted-foreground">
                     <Lock className="size-3.5 shrink-0" aria-hidden="true" />
@@ -322,7 +349,9 @@ export default function FichaActivo() {
                 className="-my-2"
                 datos={[
                   // El precio solo llega para el admin (lo decide el servidor): sin él no hay rótulo ni hueco (P13).
-                  activo.precio_compra !== undefined && {
+                  // Spec 020: tampoco se pinta para el contador aunque llegara.
+                  esAdmin &&
+                    activo.precio_compra !== undefined && {
                     rotulo: 'Precio de compra',
                     valor: activo.precio_compra ? formatCOP(activo.precio_compra) : '',
                     tipo: 'cifra',
@@ -353,25 +382,36 @@ export default function FichaActivo() {
           </aside>
         </div>
       </Panel>
-      <EditarActivo activo={activo} abierto={accion === 'editar' && !deBaja} onAbierto={(v) => abrir(v ? 'editar' : null)} devolverFocoA={editarRef} />
-      <MoverActivo
+      <EditarActivo
         activo={activo}
-        abierto={accion === 'mover' && !deBaja}
-        onAbierto={(v) => abrir(v ? 'mover' : null)}
-        onCloseAutoFocus={(evento) => devolverFoco(evento, moverRef.current, reactivarRef.current)}
+        rol={esAdmin ? 'admin' : 'contador'}
+        abierto={accion === 'editar' && !deBaja}
+        onAbierto={(v) => abrir(v ? 'editar' : null)}
+        devolverFocoA={editarRef}
       />
-      <DarDeBaja
-        activo={activo}
-        abierto={accion === 'baja' && !deBaja}
-        onAbierto={(v) => abrir(v ? 'baja' : null)}
-        onCloseAutoFocus={(evento) => devolverFoco(evento, reactivarRef.current, masRef.current)}
-      />
-      <Reactivar
-        activo={activo}
-        abierto={accion === 'reactivar' && deBaja}
-        onAbierto={(v) => abrir(v ? 'reactivar' : null)}
-        onCloseAutoFocus={(evento) => devolverFoco(evento, editarRef.current, reactivarRef.current)}
-      />
+      {/* Mover, dar de baja y reactivar: solo del admin (el servidor responde 403 al contador). */}
+      {esAdmin && (
+        <>
+          <MoverActivo
+            activo={activo}
+            abierto={accion === 'mover' && !deBaja}
+            onAbierto={(v) => abrir(v ? 'mover' : null)}
+            onCloseAutoFocus={(evento) => devolverFoco(evento, moverRef.current, reactivarRef.current)}
+          />
+          <DarDeBaja
+            activo={activo}
+            abierto={accion === 'baja' && !deBaja}
+            onAbierto={(v) => abrir(v ? 'baja' : null)}
+            onCloseAutoFocus={(evento) => devolverFoco(evento, reactivarRef.current, masRef.current)}
+          />
+          <Reactivar
+            activo={activo}
+            abierto={accion === 'reactivar' && deBaja}
+            onAbierto={(v) => abrir(v ? 'reactivar' : null)}
+            onCloseAutoFocus={(evento) => devolverFoco(evento, editarRef.current, reactivarRef.current)}
+          />
+        </>
+      )}
     </div>
   )
 }

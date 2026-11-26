@@ -1,11 +1,14 @@
 import { Archive, ArchiveRestore, ArrowLeftRight, Camera, Check, CircleDollarSign, FileInput, MapPin, Pencil, Plus, Tag, Wrench, X } from 'lucide-react'
 import type { ComponentType } from 'react'
 
+import type { Rol } from '@/lib/api/cliente'
 import { type EventoActivo, etiquetaMotivo } from '@/lib/cambiosActivo'
 import { formatCOP } from '@/lib/format'
 
 // Cómo se lee cada evento de un activo (spec 005; compartido con la actividad del Inicio,
 // spec 010). Muestra lo que manda el servidor: al contador ya le llega sin precios (P13).
+// Spec 020, T4: defensa en dos capas; `paraRol` quita los precios a quien no es admin
+// aunque el servidor los mandara (el servidor sigue siendo la barrera).
 
 const NOMBRES_CAMPO: Record<string, string> = {
   nombre: 'Nombre',
@@ -32,6 +35,18 @@ const texto = (v: unknown) => (v === null || v === undefined || v === '' ? 'vac�
 const precio = (v: unknown) => (typeof v === 'string' ? formatCOP(v) : texto(v))
 const ruta = (v: unknown) => (v && typeof v === 'object' ? texto((v as { ruta?: unknown }).ruta) : texto(v))
 const nombreDe = (v: unknown) => (v && typeof v === 'object' ? texto((v as { nombre?: unknown }).nombre) : texto(v))
+
+/** Eventos tal como los ve el rol: sin «Precio cambiado» ni datos de precio salvo para el admin. */
+export function paraRol<E extends { tipo: string; datos?: unknown }>(eventos: E[], rol: Rol): E[] {
+  if (rol === 'admin') return eventos
+  return eventos
+    .filter((e) => e.tipo !== 'precio_cambiado')
+    .map((e) =>
+      e.datos && typeof e.datos === 'object'
+        ? { ...e, datos: Object.fromEntries(Object.entries(e.datos).filter(([k]) => !k.includes('precio'))) }
+        : e,
+    )
+}
 
 export function vista(evento: Pick<EventoActivo, 'tipo' | 'datos'>): Vista {
   const d = evento.datos as Record<string, unknown>
