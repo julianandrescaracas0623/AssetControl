@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { routes } from '@/router'
+import { simularAncho } from '@/test/matchMedia'
 import { errorApi, json, llamadas, type Manejador, sesionDe, simularSesion } from '@/test/sesion'
 
 // Spec 002b, T5 (R2; plan §7): invitar a una persona con correo y rol, y copiar el
@@ -147,12 +148,12 @@ function abrirConLista(respuesta: () => Response) {
 describe('/admin/usuarios: personas con acceso', () => {
   it('lista a cada persona con su rol, su estado y si debe cambiar la contraseña', async () => {
     abrirConLista(() => json(200, PERSONAS))
-    const lista = await screen.findByRole('list', { name: 'Personas con acceso' })
-    const filas = within(lista).getAllByRole('listitem')
+    const filas = await filasDeLaLista()
     expect(filas).toHaveLength(2)
     expect(within(filas[0]).getByText('Ana Admin')).toBeTruthy()
     expect(within(filas[0]).getByText('ana@ejemplo.test')).toBeTruthy()
     expect(within(filas[0]).getByText('Admin')).toBeTruthy()
+    expect(within(filas[0]).getByText('Activa')).toBeTruthy()
     expect(within(filas[1]).getByText('Contador')).toBeTruthy()
     expect(within(filas[1]).getByText('Desactivada')).toBeTruthy()
     expect(within(filas[1]).getByText('Debe cambiar su contraseña')).toBeTruthy()
@@ -161,7 +162,7 @@ describe('/admin/usuarios: personas con acceso', () => {
 
   it('pide la lista con el token de la sesión y por GET', async () => {
     const f = abrirConLista(() => json(200, PERSONAS))
-    await screen.findByRole('list', { name: 'Personas con acceso' })
+    await screen.findByRole('table', { name: 'Personas con acceso' })
     const [url, init] = llamadas(f, '/api/usuarios')[0]
     expect(url).toBe('/api/usuarios')
     expect(init?.method ?? 'GET').toBe('GET')
@@ -202,8 +203,14 @@ function abrirConGestion(lista: unknown = PERSONAS, alCambiar: (url: string, ini
 }
 
 async function filasDeLaLista() {
-  const lista = await screen.findByRole('list', { name: 'Personas con acceso' })
-  return within(lista).getAllByRole('listitem')
+  const tabla = await screen.findByRole('table', { name: 'Personas con acceso' })
+  return within(tabla).getAllByRole('row').slice(1)
+}
+
+function cerrarFicha(dialogo: HTMLElement) {
+  const pie = dialogo.querySelector('[data-dialogo=pie]')
+  if (!pie) throw new Error('la ficha no tiene pie')
+  fireEvent.click(within(pie as HTMLElement).getByRole('button', { name: 'Cerrar' }))
 }
 
 describe('/admin/usuarios: cambiar rol y estado', () => {
@@ -268,5 +275,59 @@ describe('/admin/usuarios: cambiar rol y estado', () => {
     fireEvent.click(within(ana).getByRole('button', { name: 'Pasar a contador' }))
     expect(await screen.findByText('Debe quedar al menos un administrador activo en la empresa.')).toBeTruthy()
     expect(within(ana).getByText('Admin')).toBeTruthy()
+  })
+})
+
+describe('/admin/usuarios: ficha', () => {
+  it('el doble clic abre la ficha y Cerrar la quita', async () => {
+    abrirConLista(() => json(200, PERSONAS))
+    const [ana] = await filasDeLaLista()
+    expect(ana.getAttribute('title')).toBe('Doble clic para ver')
+    fireEvent.doubleClick(within(ana).getByText('ana@ejemplo.test'))
+    const dialogo = await screen.findByRole('dialog', { name: 'Ana Admin' })
+    expect(within(dialogo).getByText('ana@ejemplo.test')).toBeTruthy()
+    expect(within(dialogo).getByText('Admin')).toBeTruthy()
+    expect(within(dialogo).getByText('Activa')).toBeTruthy()
+    expect(dialogo.getAttribute('data-kit')).toBe('dialogo')
+    expect(dialogo.getAttribute('data-forma')).toBe('centrado')
+    cerrarFicha(dialogo)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('la ficha de quien está desactivado muestra ese estado y la contraseña pendiente', async () => {
+    abrirConLista(() => json(200, PERSONAS))
+    const [, carlos] = await filasDeLaLista()
+    fireEvent.doubleClick(within(carlos).getByText('Carlos Contador'))
+    const dialogo = await screen.findByRole('dialog', { name: 'Carlos Contador' })
+    expect(within(dialogo).getByText('Desactivada')).toBeTruthy()
+    expect(within(dialogo).getByText('Debe cambiar su contraseña')).toBeTruthy()
+    expect(within(dialogo).queryByText('Tú')).toBeNull()
+  })
+
+  it('Enter sobre la fila propia abre la ficha con «Tú»', async () => {
+    abrirConGestion({ usuarios: [YO, ...PERSONAS.usuarios] })
+    const [yo] = await filasDeLaLista()
+    yo.focus()
+    fireEvent.keyDown(yo, { key: 'Enter' })
+    const dialogo = await screen.findByRole('dialog', { name: 'Ana Torres' })
+    expect(within(dialogo).getByText('Tú')).toBeTruthy()
+  })
+
+  it('pulsar Desactivar no abre la ficha', async () => {
+    abrirConGestion()
+    const [ana] = await filasDeLaLista()
+    fireEvent.click(within(ana).getByRole('button', { name: 'Desactivar' }))
+    expect(await screen.findByRole('alertdialog', { name: '¿Desactivar a Ana Admin?' })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'Ana Admin' })).toBeNull()
+  })
+
+  it('en el teléfono «Ver» abre la misma ficha como hoja inferior', async () => {
+    simularAncho({ movil: true })
+    abrirConLista(() => json(200, PERSONAS))
+    const lista = await screen.findByRole('list', { name: 'Personas con acceso' })
+    fireEvent.click(within(lista).getByRole('button', { name: 'Ver a Ana Admin' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Ana Admin' })
+    expect(dialogo.getAttribute('data-forma')).toBe('inferior')
+    expect(within(dialogo).getByText('ana@ejemplo.test')).toBeTruthy()
   })
 })

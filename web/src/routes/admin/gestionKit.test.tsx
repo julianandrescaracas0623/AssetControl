@@ -507,7 +507,8 @@ describe('diseño de Usuarios (T9): kit', () => {
     expect(panel.getAttribute('data-kit')).toBe('panel')
     expect(within(panel).getByLabelText('Correo de la persona').closest('[data-kit=campo]')).toBeTruthy()
     expect(within(panel).getByRole('button', { name: 'Crear invitación' }).getAttribute('data-variante')).toBe('principal')
-    expect(screen.getByRole('region', { name: 'Personas con acceso' }).getAttribute('data-kit')).toBe('panel')
+    const personas = screen.getByRole('region', { name: 'Personas con acceso' })
+    expect(personas.querySelector('[data-kit=tabla-datos]')).toBeTruthy()
   })
 
   it('la invitación creada es un aviso de éxito y el enlace un Campo del kit en mono', async () => {
