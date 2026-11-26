@@ -451,8 +451,9 @@ PROTECTED_ENDPOINTS = {
     "sesiones.detalle": frozenset({"admin", "contador"}),
     "sesiones.verificar": frozenset({"admin", "contador"}),
     "sesiones.ultima_verificacion": frozenset({"admin", "contador"}),
-    # Spec 007: discrepancias solo admin (Q4); pendientes ambos (sin precios).
-    "sesiones.listar_discrepancias": frozenset({"admin"}),
+    # Spec 007: resolver discrepancias solo admin (Q4); pendientes ambos (sin precios).
+    # Spec 020 (R8): el contador lee la lista en solo lectura (sin precios ni valores).
+    "sesiones.listar_discrepancias": frozenset({"admin", "contador"}),
     "sesiones.aplicar_discrepancias": frozenset({"admin"}),
     "sesiones.descartar_discrepancias": frozenset({"admin"}),
     "sesiones.listar_pendientes": frozenset({"admin", "contador"}),

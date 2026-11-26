@@ -643,7 +643,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Activos vistos en otra ubicación según su verificación vigente (solo admin) */
+        /**
+         * Activos vistos en otra ubicación según su verificación vigente (ambos roles)
+         * @description Solo lectura para el admin y el contador (spec 020, R8), en sesiones abiertas y cerradas. La vista no trae precios ni valores y es la misma para los dos roles; aplicar y descartar siguen siendo solo del admin.
+         */
         get: operations["listarDiscrepancias"];
         put?: never;
         post?: never;
@@ -3791,7 +3794,6 @@ export interface operations {
             };
             400: components["responses"]["SolicitudInvalida"];
             401: components["responses"]["NoAutenticado"];
-            403: components["responses"]["Prohibido"];
             404: components["responses"]["NoEncontrado"];
         };
     };

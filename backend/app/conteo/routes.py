@@ -106,11 +106,13 @@ def ultima_verificacion(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002
     return jsonify(verificacion=vista)
 
 
-# --- Spec 007: discrepancias (solo admin) y pendientes (ambos) ----------------------------
+# --- Spec 007: discrepancias (resolver, solo admin) y pendientes (ambos) -----------------
+# Spec 020 (R8): la lista es de ambos roles en solo lectura; su vista no trae precios ni
+# valores (activo, ubicaciones, autor y fechas), así que es la misma para los dos.
 
 
 @bp.get("/<uuid:id>/discrepancias")
-@require_role("admin")
+@require_role("admin", "contador")
 def listar_discrepancias(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002
     try:
         items = discrepancias.listar(current_session(), id, request.args.get("estado"))

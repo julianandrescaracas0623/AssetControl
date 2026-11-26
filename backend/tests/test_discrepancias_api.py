@@ -1,8 +1,9 @@
 """Discrepancias y pendientes (spec 007, T2–T4; R1–R9, Q1–Q4; plan.md §3).
 
 - Lista: verificación vigente (R3) con encontrada ≠ esperada y su estado derivado
-  (pendiente, desfasada, aplicada, descartada); solo admin.
-- Aplicar y descartar en lote: resultado por elemento; desfase sin confirmar no aplica;
+  (pendiente, desfasada, aplicada, descartada); ambos roles leen, sin precios ni valores
+  (spec 020, R8).
+- Aplicar y descartar en lote (solo admin): resultado por elemento; desfase sin confirmar no aplica;
   una sola resolución por verificación (también en carrera); sesión cerrada sí (Q1).
 - Pendientes: activos ``activo``/``en_reparacion`` sin verificación; ambos roles, sin
   precio.
@@ -16,6 +17,7 @@ from acceso_db import (
     ADMIN_A,
     ADMIN_B,
     CONTADOR_A,
+    CONTADOR_B,
     TENANT_A,
     TENANT_B,
     AccesoDb,
@@ -30,6 +32,7 @@ from sqlalchemy import text
 ADMIN = bearer(ADMIN_A, TENANT_A)
 CONTADOR = bearer(CONTADOR_A, TENANT_A, rol="contador")
 ADMIN_OTRO = bearer(ADMIN_B, TENANT_B)
+CONTADOR_OTRO = bearer(CONTADOR_B, TENANT_B, rol="contador")
 
 
 @pytest.fixture(scope="module")
@@ -208,12 +211,78 @@ def test_states_desfasada_aplicada_and_descartada(client, cat, sesion):
     assert {d["verificacion_id"] for d in todas} == {va, vb, vc}
 
 
-def test_list_is_admin_only_and_tenant_scoped(client, sesion):
-    assert lista(client, sesion, headers=CONTADOR).status_code == 403
+def test_list_is_for_both_roles_and_tenant_scoped(client, sesion):
+    # Spec 020 (R8): el contador también lee la lista; un usuario de otro tenant, 404.
+    assert lista(client, sesion, headers=CONTADOR).status_code == 200
     assert lista(client, sesion, headers=ADMIN_OTRO).status_code == 404
+    assert lista(client, sesion, headers=CONTADOR_OTRO).status_code == 404
+    assert lista(client, sesion, "otra", headers=CONTADOR).status_code == 400
     assert lista(client, str(uuid.uuid4())).status_code == 404
+    assert lista(client, str(uuid.uuid4()), headers=CONTADOR).status_code == 404
+    assert lista(client, "no-es-uuid", headers=CONTADOR).status_code == 404
     assert lista(client, sesion, "otra").status_code == 400
     assert lista(client, sesion, headers={}).status_code == 401
+
+
+def claves_de_dinero(valor) -> list[str]:
+    """Recorre el JSON y devuelve toda clave que hable de precio o valor (spec 020, R8)."""
+    if isinstance(valor, dict):
+        propias = [k for k in valor if "precio" in k.lower() or "valor" in k.lower()]
+        return propias + [c for v in valor.values() for c in claves_de_dinero(v)]
+    if isinstance(valor, list):
+        return [c for v in valor for c in claves_de_dinero(v)]
+    return []
+
+
+def test_claves_de_dinero_finds_nested_keys():
+    assert claves_de_dinero([{"a": {"b": [{"precio_al_contar": 1}]}, "Valor_total": 2}]) == [
+        "Valor_total",
+        "precio_al_contar",
+    ]
+    assert claves_de_dinero({"activo": {"nombre": "x"}, "estado": "pendiente"}) == []
+
+
+def test_contador_reads_every_filter_without_prices_open_and_closed(client, cat, sesion, dis_db):
+    # Spec 020 (R8; req. 5): solo lectura, con los tres filtros, en sesión abierta y cerrada.
+    pendiente, aplicada, descartada = nuevo(client, cat), nuevo(client, cat), nuevo(client, cat)
+    v_pendiente = verificar(client, sesion, pendiente, cat["bodega"])
+    v_aplicada = verificar(client, sesion, aplicada, cat["bodega"])
+    v_descartada = verificar(client, sesion, descartada, cat["adm"])
+    assert resultados(accion(client, sesion, "aplicar", [v_aplicada])) == {v_aplicada: "aplicada"}
+    assert resultados(accion(client, sesion, "descartar", [v_descartada])) == {
+        v_descartada: "descartada"
+    }
+    esperado = {
+        None: {v_pendiente},
+        "por_resolver": {v_pendiente},
+        "resueltas": {v_aplicada, v_descartada},
+        "todas": {v_pendiente, v_aplicada, v_descartada},
+    }
+
+    def leer_como_contador() -> None:
+        for estado, ids in esperado.items():
+            response = lista(client, sesion, estado, headers=CONTADOR)
+            assert response.status_code == 200, response.get_json()
+            cuerpo = response.get_json()
+            assert {d["verificacion_id"] for d in cuerpo["discrepancias"]} == ids
+            assert claves_de_dinero(cuerpo) == []
+            texto = response.get_data(as_text=True)
+            assert "precio" not in texto.lower()
+            # El importe sembrado no aparece bajo ninguna otra clave.
+            assert "14200000" not in texto
+            # La misma vista que el admin: no hay una forma aparte para el contador.
+            assert cuerpo == lista(client, sesion, estado).get_json()
+
+    leer_como_contador()
+    cerrar(dis_db, sesion)
+    leer_como_contador()
+    for nombre in ("aplicar", "descartar"):
+        response = accion(client, sesion, nombre, [v_pendiente], headers=CONTADOR)
+        assert response.status_code == 403
+        assert code(response) == "prohibido"
+    assert lista(client, sesion, headers=CONTADOR).get_json()["discrepancias"][0]["estado"] == (
+        "pendiente"
+    )
 
 
 # --- T3: aplicar y descartar -------------------------------------------------------------

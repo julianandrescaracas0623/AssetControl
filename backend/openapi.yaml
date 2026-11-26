@@ -1321,7 +1321,11 @@ paths:
     get:
       tags: [conteo]
       operationId: listarDiscrepancias
-      summary: Activos vistos en otra ubicación según su verificación vigente (solo admin)
+      summary: Activos vistos en otra ubicación según su verificación vigente (ambos roles)
+      description: >-
+        Solo lectura para el admin y el contador (spec 020, R8), en sesiones abiertas y
+        cerradas. La vista no trae precios ni valores y es la misma para los dos roles;
+        aplicar y descartar siguen siendo solo del admin.
       security:
         - bearerAuth: []
       parameters:
@@ -1341,8 +1345,6 @@ paths:
           $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
-        "403":
-          $ref: "#/components/responses/Prohibido"
         "404":
           $ref: "#/components/responses/NoEncontrado"
 
