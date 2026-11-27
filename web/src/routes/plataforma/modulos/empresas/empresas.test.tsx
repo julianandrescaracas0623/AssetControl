@@ -37,7 +37,7 @@ function empresa(n: number, extra: Partial<Empresa> = {}): Empresa {
 }
 
 const LISTA = [
-  empresa(1, { nombre: 'Biotecnología Dental', tiene_logo: true }),
+  empresa(1, { nombre: 'Odontología Sonrisa', tiene_logo: true }),
   empresa(2, { nombre: 'Sonrisas del Valle', activa: false }),
   empresa(3, { nombre: 'Odonto Norte', n_admins_activos: 0, n_membresias_activas: 1 }),
 ]
@@ -97,7 +97,7 @@ describe('lista de empresas (CU-05; R21)', () => {
     const tabla = await screen.findByRole('table', { name: 'Empresas' })
     const filas = within(tabla).getAllByRole('row').slice(1)
     expect(filas).toHaveLength(3)
-    expect(within(filas[0]).getByText('Biotecnología Dental')).toBeTruthy()
+    expect(within(filas[0]).getByText('Odontología Sonrisa')).toBeTruthy()
     expect(within(filas[0]).getByText('Activa')).toBeTruthy()
     expect(within(filas[0]).getByText('Sí')).toBeTruthy()
     expect(within(filas[1]).getByText('Desactivada')).toBeTruthy()
@@ -119,7 +119,7 @@ describe('lista de empresas (CU-05; R21)', () => {
   it('filtra por nombre al escribir, sin pedir al servidor', async () => {
     const { f } = abrir('/plataforma/empresas')
     await screen.findByRole('table', { name: 'Empresas' })
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar empresa por nombre' }), { target: { value: 'sonri' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar empresa por nombre' }), { target: { value: 'valle' } })
     const filas = within(screen.getByRole('table', { name: 'Empresas' })).getAllByRole('row').slice(1)
     expect(filas).toHaveLength(1)
     expect(within(filas[0]).getByText('Sonrisas del Valle')).toBeTruthy()
@@ -170,7 +170,7 @@ describe('lista de empresas (CU-05; R21)', () => {
     abrir('/plataforma/empresas', { modulos: [EMPRESAS_MOD] })
     await screen.findByRole('table', { name: 'Empresas' })
     // Sin el módulo Usuarios en el servidor no hay enlace muerto.
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Acciones de Biotecnología Dental' }), { button: 0, ctrlKey: false })
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Acciones de Odontología Sonrisa' }), { button: 0, ctrlKey: false })
     const menu = await screen.findByRole('menu')
     expect(within(menu).queryByRole('menuitem', { name: 'Ver usuarios' })).toBeNull()
     expect(within(menu).getByRole('menuitem', { name: 'Desactivar' })).toBeTruthy()
@@ -183,7 +183,7 @@ describe('lista de empresas (CU-05; R21)', () => {
       extra: (url) => (url === `/api/plataforma/empresas/${id}/usuarios` ? json(200, { usuarios: [] }) : undefined),
     })
     await screen.findByRole('table', { name: 'Empresas' })
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Acciones de Biotecnología Dental' }), { button: 0, ctrlKey: false })
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Acciones de Odontología Sonrisa' }), { button: 0, ctrlKey: false })
     const enlace = within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Ver usuarios' })
     expect(enlace.getAttribute('href')).toBe(`/plataforma/usuarios?empresa=${id}`)
     fireEvent.click(enlace)
@@ -204,9 +204,9 @@ describe('desactivar y reactivar (CU-06; R22, R40)', () => {
 
   it('desactivar pide confirmación con el nombre y el efecto, y no envía si se cancela', async () => {
     const { f } = abrir('/plataforma/empresas')
-    const dialogo = await elegir('Biotecnología Dental', 'Desactivar')
-    expect(within(dialogo).getByRole('heading', { name: '¿Desactivar Biotecnología Dental?' })).toBeTruthy()
-    expect(dialogo.textContent).toContain('Los usuarios de Biotecnología Dental no podrán entrar. No se borra nada.')
+    const dialogo = await elegir('Odontología Sonrisa', 'Desactivar')
+    expect(within(dialogo).getByRole('heading', { name: '¿Desactivar Odontología Sonrisa?' })).toBeTruthy()
+    expect(dialogo.textContent).toContain('Los usuarios de Odontología Sonrisa no podrán entrar. No se borra nada.')
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Cancelar' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
     expect(f.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH')).toBe(false)
@@ -228,13 +228,13 @@ describe('desactivar y reactivar (CU-06; R22, R40)', () => {
         return undefined
       },
     })
-    const dialogo = await elegir('Biotecnología Dental', 'Desactivar')
+    const dialogo = await elegir('Odontología Sonrisa', 'Desactivar')
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Sí, desactivar' }))
     await waitFor(() => expect(llamadas(f, `/api/plataforma/empresas/${id}`, 'PATCH')).toHaveLength(1))
     const [, init] = llamadas(f, `/api/plataforma/empresas/${id}`, 'PATCH')[0]
     expect(cuerpo(init)).toEqual({ activa: false })
     expect(new Headers((init as RequestInit).headers).get('Authorization')).toBe('Bearer jwt.plataforma')
-    const fila = (await screen.findByText('Biotecnología Dental')).closest('tr')!
+    const fila = (await screen.findByText('Odontología Sonrisa')).closest('tr')!
     await waitFor(() => expect(within(fila).getByText('Desactivada')).toBeTruthy())
   })
 
@@ -256,10 +256,10 @@ describe('desactivar y reactivar (CU-06; R22, R40)', () => {
       extra: (url, init) =>
         url === `/api/plataforma/empresas/${id}` && init.method === 'PATCH' ? errorApi(404, 'no_encontrado', 'La empresa no existe.') : undefined,
     })
-    const dialogo = await elegir('Biotecnología Dental', 'Desactivar')
+    const dialogo = await elegir('Odontología Sonrisa', 'Desactivar')
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Sí, desactivar' }))
     expect(await screen.findByText('La empresa no existe.')).toBeTruthy()
-    const fila = screen.getByText('Biotecnología Dental').closest('tr')!
+    const fila = screen.getByText('Odontología Sonrisa').closest('tr')!
     expect(within(fila).getByText('Activa')).toBeTruthy()
   })
 })
@@ -378,7 +378,7 @@ describe('nueva empresa: un solo formulario (CU-03, CU-04; R16–R20, R39, R46)'
     abrir('/plataforma/empresas/nueva')
     await h1('Nueva empresa')
     await waitFor(() => expect(screen.queryByText(/Ya existe una empresa con ese nombre/)).toBeNull())
-    fireEvent.change(campo(/^Nombre o razón social/), { target: { value: '  biotecnología dental ' } })
+    fireEvent.change(campo(/^Nombre o razón social/), { target: { value: '  odontología sonrisa ' } })
     expect(await screen.findByText(/Ya existe una empresa con ese nombre/)).toBeTruthy()
   })
 
@@ -750,7 +750,7 @@ describe('editar empresa (CU-12; R41–R44)', () => {
   const EMPRESA = LISTA[0]
   const URL_FICHA = `/api/plataforma/empresas/${EMPRESA.id}/ficha`
   const URL_LOGO = `/api/plataforma/empresas/${EMPRESA.id}/logo`
-  const VIGENTE = { nombre: 'Biotecnología Dental', direccion: 'Cra 4 # 12-30, Cartago', nit: '900.123.456-8', telefono: '606 211 0000', correo: 'hola@bio.test', tiene_logo: true }
+  const VIGENTE = { nombre: 'Odontología Sonrisa', direccion: 'Cra 4 # 12-30, Cartago', nit: '900.123.456-8', telefono: '606 211 0000', correo: 'hola@bio.test', tiene_logo: true }
 
   async function abrirEditar({ ficha = VIGENTE as unknown, extra }: { ficha?: unknown; extra?: Manejador } = {}) {
     const ctx = abrir('/plataforma/empresas', {
@@ -822,7 +822,7 @@ describe('editar empresa (CU-12; R41–R44)', () => {
   it('carga la ficha vigente con el token y deja «Guardar cambios» deshabilitado sin cambios (R41)', async () => {
     const { f, dialogo } = await abrirEditar()
     expect(within(dialogo).getByRole('heading', { name: 'Editar empresa' })).toBeTruthy()
-    expect(await within(dialogo).findByDisplayValue('Biotecnología Dental')).toBeTruthy()
+    expect(await within(dialogo).findByDisplayValue('Odontología Sonrisa')).toBeTruthy()
     expect(enDialogo(dialogo, /^Dirección/).value).toBe(VIGENTE.direccion)
     expect(enDialogo(dialogo, /^NIT/).value).toBe(VIGENTE.nit)
     expect(enDialogo(dialogo, /^Teléfono/).value).toBe(VIGENTE.telefono)
@@ -854,7 +854,7 @@ describe('editar empresa (CU-12; R41–R44)', () => {
     expect(within(dialogo).getByRole('status', { name: 'Cargando los datos de la empresa' })).toBeTruthy()
     expect(await within(dialogo).findByText('No se pudieron cargar los datos de la empresa')).toBeTruthy()
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Reintentar' }))
-    expect(await within(dialogo).findByDisplayValue('Biotecnología Dental')).toBeTruthy()
+    expect(await within(dialogo).findByDisplayValue('Odontología Sonrisa')).toBeTruthy()
   })
 
   it('409 empresa_sin_datos: explica que los completa su admin y no muestra el formulario', async () => {
@@ -864,33 +864,33 @@ describe('editar empresa (CU-12; R41–R44)', () => {
   })
 
   it('guarda con PUT de las cinco claves (vacío quita el opcional) y refresca la lista (R42, Q-E1)', async () => {
-    const nueva = { ...VIGENTE, nombre: 'Biotecnología Dental S.A.S.', telefono: null }
+    const nueva = { ...VIGENTE, nombre: 'Odontología Sonrisa S.A.S.', telefono: null }
     const { f, dialogo } = await abrirEditar({
       extra: (url, init) => (url === URL_FICHA && init.method === 'PUT' ? json(200, nueva) : undefined),
     })
-    await within(dialogo).findByDisplayValue('Biotecnología Dental')
+    await within(dialogo).findByDisplayValue('Odontología Sonrisa')
     const listasAntes = llamadas(f, '/api/plataforma/empresas?estado=todas').length
-    fireEvent.change(enDialogo(dialogo, /^Nombre o razón social/), { target: { value: 'Biotecnología Dental S.A.S.' } })
+    fireEvent.change(enDialogo(dialogo, /^Nombre o razón social/), { target: { value: 'Odontología Sonrisa S.A.S.' } })
     fireEvent.change(enDialogo(dialogo, /^Teléfono/), { target: { value: '' } })
     expect(guardar(dialogo).disabled).toBe(false)
     fireEvent.click(guardar(dialogo))
     await waitFor(() => expect(llamadas(f, URL_FICHA, 'PUT')).toHaveLength(1))
     const [, init] = llamadas(f, URL_FICHA, 'PUT')[0]
     expect(cuerpo(init)).toEqual({
-      nombre: 'Biotecnología Dental S.A.S.',
+      nombre: 'Odontología Sonrisa S.A.S.',
       direccion: VIGENTE.direccion,
       nit: VIGENTE.nit,
       telefono: null,
       correo: VIGENTE.correo,
     })
-    expect(await screen.findByText('Cambios guardados en Biotecnología Dental S.A.S.')).toBeTruthy()
+    expect(await screen.findByText('Cambios guardados en Odontología Sonrisa S.A.S.')).toBeTruthy()
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     await waitFor(() => expect(llamadas(f, '/api/plataforma/empresas?estado=todas').length).toBeGreaterThan(listasAntes))
   })
 
   it('valida en el campo antes de enviar y lleva el foco al que falla', async () => {
     const { f, dialogo } = await abrirEditar()
-    await within(dialogo).findByDisplayValue('Biotecnología Dental')
+    await within(dialogo).findByDisplayValue('Odontología Sonrisa')
     fireEvent.change(enDialogo(dialogo, /^NIT/), { target: { value: '900123456-1' } })
     fireEvent.click(guardar(dialogo))
     expect(await within(dialogo).findByText('El NIT no es válido: revisa los números y el dígito de verificación.')).toBeTruthy()
@@ -905,7 +905,7 @@ describe('editar empresa (CU-12; R41–R44)', () => {
           ? json(422, { error: { code: 'campo_invalido', message: 'El correo del servidor no es válido.', request_id: 'x', campo: 'correo' } })
           : undefined,
     })
-    await within(dialogo).findByDisplayValue('Biotecnología Dental')
+    await within(dialogo).findByDisplayValue('Odontología Sonrisa')
     fireEvent.change(enDialogo(dialogo, /^Correo de la empresa/), { target: { value: 'otro@bio.test' } })
     fireEvent.click(guardar(dialogo))
     expect(await within(dialogo).findByText('El correo del servidor no es válido.')).toBeTruthy()
@@ -917,7 +917,7 @@ describe('editar empresa (CU-12; R41–R44)', () => {
     const { dialogo } = await abrirEditar({
       extra: (url, init) => (url === URL_FICHA && init.method === 'PUT' ? errorApi(503, 'servicio_no_disponible') : undefined),
     })
-    await within(dialogo).findByDisplayValue('Biotecnología Dental')
+    await within(dialogo).findByDisplayValue('Odontología Sonrisa')
     fireEvent.change(enDialogo(dialogo, /^Dirección/), { target: { value: 'Calle 1, Cartago' } })
     fireEvent.click(guardar(dialogo))
     expect(await within(dialogo).findByText(/El servicio no está disponible/)).toBeTruthy()
@@ -928,11 +928,11 @@ describe('editar empresa (CU-12; R41–R44)', () => {
     const { f, dialogo } = await abrirEditar({
       extra: (url, init) => (url === URL_LOGO && init.method === 'POST' ? json(201, { logo: { id: 'x' } }) : undefined),
     })
-    await within(dialogo).findByDisplayValue('Biotecnología Dental')
+    await within(dialogo).findByDisplayValue('Odontología Sonrisa')
     elegirLogoEditar(png('nuevo.png'))
     expect(within(dialogo).getByRole('img', { name: 'Vista previa del logo' })).toBeTruthy()
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Reemplazar logo' }))
-    expect(await screen.findByText('Logo de Biotecnología Dental reemplazado')).toBeTruthy()
+    expect(await screen.findByText('Logo de Odontología Sonrisa reemplazado')).toBeTruthy()
     const [, init] = llamadas(f, URL_LOGO, 'POST')[0]
     const form = formLogo(init)
     expect([...form.keys()].sort()).toEqual(['archivo', 'logo_id'])
@@ -950,7 +950,7 @@ describe('editar empresa (CU-12; R41–R44)', () => {
     const { dialogo } = await abrirEditar({
       extra: (url, init) => (url === URL_LOGO && init.method === 'POST' ? errorApi(status, code) : undefined),
     })
-    await within(dialogo).findByDisplayValue('Biotecnología Dental')
+    await within(dialogo).findByDisplayValue('Odontología Sonrisa')
     elegirLogoEditar(png())
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Reemplazar logo' }))
     const aviso = await within(dialogo).findByRole('alert')
@@ -968,11 +968,11 @@ describe('editar empresa (CU-12; R41–R44)', () => {
         return intentos === 1 ? errorApi(503, 'servicio_no_disponible') : json(201, { logo: { id: 'x' } })
       },
     })
-    await within(dialogo).findByDisplayValue('Biotecnología Dental')
+    await within(dialogo).findByDisplayValue('Odontología Sonrisa')
     elegirLogoEditar(png())
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Reemplazar logo' }))
     fireEvent.click(await within(dialogo).findByRole('button', { name: 'Reintentar' }))
-    expect(await screen.findByText('Logo de Biotecnología Dental reemplazado')).toBeTruthy()
+    expect(await screen.findByText('Logo de Odontología Sonrisa reemplazado')).toBeTruthy()
     const ids = llamadas(f, URL_LOGO, 'POST').map(([, i]) => formLogo(i).get('logo_id'))
     expect(ids).toHaveLength(2)
     expect(ids[0]).toBe(ids[1])
@@ -981,7 +981,7 @@ describe('editar empresa (CU-12; R41–R44)', () => {
 
 describe('reglas del módulo (api.ts)', () => {
   it('filtrarEmpresas y nombreRepetido ignoran mayúsculas y espacios', () => {
-    expect(filtrarEmpresas(LISTA, '  ODONTO ', 'todas').map((e) => e.nombre)).toEqual(['Odonto Norte'])
+    expect(filtrarEmpresas(LISTA, '  NORTE ', 'todas').map((e) => e.nombre)).toEqual(['Odonto Norte'])
     expect(filtrarEmpresas(LISTA, '', 'activas')).toHaveLength(2)
     expect(nombreRepetido(LISTA, 'sonrisas del valle')).toBe(true)
     expect(nombreRepetido(LISTA, 'Sonrisas')).toBe(false)
