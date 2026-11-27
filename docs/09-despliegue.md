@@ -135,7 +135,10 @@ Los dos usan `ENVIRONMENT=production`, `ALMACEN=s3`, `TRUSTED_PROXY_HOPS=1` y la
 
 **Registro (auditoría).** El registro de la app debe quedar en nivel **INFO** en producción (gunicorn ya usa `loglevel = "info"`): ahí quedan `Contraseña restablecida por enlace de recuperación (request_id=…, usuario_id=…)` y `Correo de recuperación entregado (request_id=…)`. Nunca se registran correo, token, enlace, host ni contraseña; los rechazos y fallos solo llevan `request_id` y el tipo de error. En la base, `log_statement` debe quedar en `none` en producción (compruébalo con `SHOW log_statement;` como `postgres` y no lo subas para depurar); es el criterio único de este documento (ver también «Registro de sentencias de PostgreSQL» en la consola de plataforma). Con `all`, PostgreSQL escribiría en su registro la clave canjeable del enlace que viaja como parámetro de `acceso.*`. `mod` hoy no registraría esas llamadas (son `SELECT acceso.fn(...)`, no sentencias que modifiquen datos), pero también se prohíbe: la regla segura es `none`, sin excepciones que dependan de cómo se escribe cada llamada.
 
-**Apagado.** Un correo en curso se pierde si el proceso se apaga (riesgo aceptado: la persona pide otro). **Pendiente (spec 018, T2):** un `worker_exit` en `backend/gunicorn.conf.py` que llame a `Correo.esperar(timeout)` (con un plazo menor que `graceful_timeout = 20`) para dejar terminar los envíos en curso.
+**Apagado.** Un correo en curso se pierde si el proceso se apaga (riesgo aceptado: la persona pide otro). **Aplicado (spec 018, T2):** `worker_exit` en `backend/gunicorn.conf.py` espera los envíos en curso con `Correo.esperar` hasta `PLAZO_CORREO_AL_APAGAR = 15 s` (menor que `graceful_timeout = 20`); si vence, registra en nivel WARNING `Apagado: venció el plazo de 15.0 s y se perdieron correos en curso.` (texto exacto del código, útil para poner una alerta).
+
+- **Requisito del entorno:** el plazo de parada del contenedor en Coolify (*stop grace period*) debe ser de **25 s o más** en pruebas y en producción. Con el valor por defecto de Docker (10 s), el SIGKILL llega antes y corta la espera. Comprobación: `docker inspect` del contenedor de la API muestra `StopTimeout` ≥ 25.
+- **Límites aceptados:** primero se terminan las peticiones en curso y después corre `worker_exit`, dentro de la misma ventana de `graceful_timeout`. Una entrega SMTP puede tardar hasta 45 s (`SMTP_PLAZO_TOTAL_SEGUNDOS`), así que la espera no la cubre del todo. Un correo perdido deja un token sin usar que vence solo (sin fuga). El aviso de contraseña temporal (spec 017) también puede perderse en esa ventana. El reciclado de procesos por `max_requests` no pasa por Docker, y ahí la espera sí se cumple.
 
 **Prueba manual antes del piloto** (con el proveedor real y un correo de prueba, nunca uno de la clínica):
 
@@ -209,9 +212,10 @@ Navegador ──HTTPS──▶ <IP-del-VPS>:443  Traefik de Coolify (TLS y enrut
 1. DNS: registros `A` de `pruebas.<dominio>`, `app.<dominio>` y `<panel>.<dominio>` hacia `<IP-del-VPS>`.
 2. Prepara y migra su proyecto Supabase desde la PC (sección 4) **antes** del primer despliegue.
 3. Nueva aplicación desde el repositorio, *build pack* Dockerfile con `Dockerfile.prod`, rama `develop` (pruebas) o `main` (producción), dominio `https://pruebas.<dominio>` o `https://app.<dominio>`, puerto `8000` y healthcheck `/api/ready`.
-4. Variables de la sección 5, con los secretos marcados como secretos en Coolify. Nunca `MIGRATION_DATABASE_URL`.
-5. «Pruebas» se despliega desde `develop` (automático si se activó; P10 pendiente); en «producción» el despliegue automático queda desactivado (se despliega a mano, sección 7).
-6. Comprobar: `https://pruebas.<dominio>/api/ready` o `https://app.<dominio>/api/ready` responde `{"status":"ok"}`, `http://` redirige a `https://`, el registro de arranque no avisa `TRUSTED_PROXY_HOPS=0` y la otra app del VPS sigue respondiendo.
+4. Plazo de parada (*stop grace period*) de **25 s o más** (sección 5.1, «Apagado»); comprobar con `docker inspect` que `StopTimeout` ≥ 25.
+5. Variables de la sección 5, con los secretos marcados como secretos en Coolify. Nunca `MIGRATION_DATABASE_URL`.
+6. «Pruebas» se despliega desde `develop` (automático si se activó; P10 pendiente); en «producción» el despliegue automático queda desactivado (se despliega a mano, sección 7).
+7. Comprobar: `https://pruebas.<dominio>/api/ready` o `https://app.<dominio>/api/ready` responde `{"status":"ok"}`, `http://` redirige a `https://`, el registro de arranque no avisa `TRUSTED_PROXY_HOPS=0` y la otra app del VPS sigue respondiendo.
 
 **Recursos:** el VPS comparte memoria entre los dos entornos, la otra app y Coolify; gunicorn usa 2 procesos × 4 hilos y Argon2 (19 MiB) por hilo. Si la memoria aprieta, el humano decide con la medida si baja `workers` en «pruebas».
 

@@ -18,7 +18,7 @@ Diez tareas, cada una ≤ 1 día. «Humano» = cuentas, DNS, secretos, SSH o pan
 - **Verificación:** `cd backend && uv run pytest tests/test_gunicorn_conf.py -q && uv run ruff check .`
 - **Dependencia:** ninguna (en paralelo con T1 solo si el implementer lo decide; una tarea a la vez).
 - **Cubre:** R4, A2.
-- **Estado:** PENDIENTE.
+- **Estado:** HECHA (2026-11-27), con revisión del reviewer y del security-reviewer; falta (humano) el plazo de parada ≥ 25 s en Coolify en los dos entornos y una prueba de apagado real con un correo en curso contra un SMTP de pruebas.
 
 ## T3 — Cuentas y proyectos Supabase, y DNS (humano)
 
@@ -100,3 +100,4 @@ Diez tareas, cada una ≤ 1 día. «Humano» = cuentas, DNS, secretos, SSH o pan
 - Registrar la decisión de T10 en `docs/05` y, si quiere, un ADR de plataforma (P8).
 - TOTP para `/plataforma` antes de habilitarla en producción (P4) y proveedor SMTP con dominio verificado (P3): specs aparte.
 - Contraseñas largas y únicas para el panel de Coolify y las cuentas de desarrollador.
+- Plazo de parada del contenedor ≥ 25 s en Coolify (pruebas y producción); comprobar con `docker inspect` (StopTimeout).

@@ -13,13 +13,16 @@ import mimetypes
 import os
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from flask import Flask
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.security import safe_join
 from werkzeug.utils import send_file
 from werkzeug.wrappers import Request, Response
+
+if TYPE_CHECKING:
+    from app.correo import Correo
 
 WEB_DIST_VAR = "WEB_DIST_DIR"
 INMUTABLE = "public, max-age=31536000, immutable"
@@ -180,10 +183,27 @@ def crear_wsgi(api: Flask, dist: Path, *, produccion: bool) -> WsgiApp:
     return ConCabeceras(DispatcherMiddleware(Estaticos(dist), {"/api": api}), produccion=produccion)
 
 
+# Spec 018 (R4): la API Flask creada en ESTE proceso (``preload_app = False``: cada proceso
+# de gunicorn crea la suya). Solo la lee ``worker_exit`` para esperar los correos en curso.
+_api: Flask | None = None
+
+
+def correo_del_proceso() -> "Correo | None":
+    """El ``Correo`` de la app creada en este proceso, o ``None`` si aún no se creó."""
+    api = _api
+    if api is None:
+        return None
+    from app.correo import EXTENSION_KEY
+
+    return api.extensions.get(EXTENSION_KEY)
+
+
 def _desde_entorno() -> WsgiApp:  # pragma: no cover - lo carga gunicorn en el contenedor
+    global _api
     from app import create_app
 
     api = create_app()
+    _api = api
     config = api.extensions["assetcontrol.config"]
     dist = Path(os.environ.get(WEB_DIST_VAR, Path(__file__).resolve().parents[2] / "web" / "dist"))
     return crear_wsgi(api, dist, produccion=config.environment == "production")
