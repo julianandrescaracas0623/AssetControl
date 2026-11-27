@@ -1,6 +1,6 @@
 # Spec 018 — Despliegue en VPS con Coolify (pruebas y producción)
 
-> Estado: borrador del planner (2026-11-21). Cierra la parte de plataforma de T10 de `docs/05` y los pendientes del riesgo R1 de la spec 017 y de la spec 014. Decisiones del humano de hoy: ver «Alcance».
+> Estado: en ejecución. El humano ejecutó T3–T8 (confirmado el 2026-11-27); aprobación formal de G1–G3 sin registrar; el despliegue en VPS con Coolify está activo en pruebas y producción. Pendientes: T1 (parcial) y T2 (código), y la parte del humano de T9 (respaldo). Redactada por el planner el 2026-11-21. Cierra la parte de plataforma de T10 de `docs/05` y los pendientes del riesgo R1 de la spec 017 y de la spec 014. Decisiones del humano de hoy: ver «Alcance».
 
 ## Problema
 
