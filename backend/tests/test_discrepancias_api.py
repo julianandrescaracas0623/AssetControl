@@ -516,3 +516,64 @@ def test_pending_pages_and_validation(client, cat, sesion):
     )
     assert client.get(f"/sesiones/{uuid.uuid4()}/pendientes", headers=ADMIN).status_code == 404
     assert client.get(f"/sesiones/{sesion}/pendientes", headers={}).status_code == 401
+
+
+def test_pending_is_tenant_scoped(client, cat, sesion, dis_db):
+    # Deuda de T7 (spec 020): pendientes, igual que discrepancias, no cruza empresas.
+    falta = nuevo(client, cat, "bodega", "Pendiente de A")
+    propia = client.get(
+        f"/sesiones/{sesion}/pendientes",
+        query_string={"ubicacion_id": cat["bodega"]},
+        headers=CONTADOR,
+    )
+    assert propia.status_code == 200
+    assert falta["codigo"] in {a["codigo"] for a in propia.get_json()["activos"]}
+
+    # 1. Otro tenant (ambos roles) no ve la sesión de A: 404 sin datos de A.
+    for headers in (ADMIN_OTRO, CONTADOR_OTRO):
+        ajena = client.get(
+            f"/sesiones/{sesion}/pendientes",
+            query_string={"ubicacion_id": cat["bodega"]},
+            headers=headers,
+        )
+        assert ajena.status_code == 404
+        assert code(ajena) == "no_encontrado"
+        assert falta["codigo"] not in ajena.get_data(as_text=True)
+        assert "Bodega" not in ajena.get_data(as_text=True)
+
+    # 2. Sesión propia de B con una ubicación de A: lista vacía, nada de A.
+    creada = client.post(
+        "/sesiones",
+        json={"nombre": "Conteo B", "fecha_corte": "2026-11-30"},
+        headers=ADMIN_OTRO,
+    )
+    assert creada.status_code == 201, creada.get_json()
+    sesion_b = creada.get_json()["sesion"]["id"]
+    try:
+        cruzada = client.get(
+            f"/sesiones/{sesion_b}/pendientes",
+            query_string={"ubicacion_id": cat["bodega"]},
+            headers=CONTADOR_OTRO,
+        )
+        assert cruzada.status_code == 200
+        cuerpo = cruzada.get_json()
+        assert cuerpo["activos"] == [] and cuerpo["total"] == 0
+        assert falta["codigo"] not in cruzada.get_data(as_text=True)
+        assert "Bodega" not in cruzada.get_data(as_text=True)
+        # Igual que con una ubicación inventada: no revela que la de A existe.
+        inventada = client.get(
+            f"/sesiones/{sesion_b}/pendientes",
+            query_string={"ubicacion_id": str(uuid.uuid4())},
+            headers=CONTADOR_OTRO,
+        )
+        assert inventada.status_code == 200
+        assert inventada.get_json() == cuerpo
+    finally:
+        cerrar(dis_db, sesion_b)
+
+    # 3. El contador de A con una ubicación que no es UUID: 400.
+    invalida = client.get(
+        f"/sesiones/{sesion}/pendientes", query_string={"ubicacion_id": "x"}, headers=CONTADOR
+    )
+    assert invalida.status_code == 400
+    assert code(invalida) == "solicitud_invalida"

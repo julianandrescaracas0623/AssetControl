@@ -41,9 +41,12 @@ test('un conteo completo: invitar, verificar en el teléfono, cerrar, informe, e
   let enlace = ''
   await test.step('el admin invita a un contador', async () => {
     await admin.goto('/app/usuarios')
-    await admin.getByLabel('Correo de la persona').fill('luis@e2e.ejemplo.test')
-    await admin.getByRole('button', { name: 'Crear invitación' }).click()
-    enlace = await admin.getByLabel('Enlace de invitación').inputValue()
+    // La invitación vive en un diálogo (spec 016, T9): se abre con «Invitar».
+    await admin.getByRole('button', { name: 'Invitar', exact: true }).click()
+    const dialogo = admin.getByRole('dialog', { name: 'Invitar a una persona' })
+    await dialogo.getByLabel('Correo de la persona').fill('luis@e2e.ejemplo.test')
+    await dialogo.getByRole('button', { name: 'Crear invitación' }).click()
+    enlace = await dialogo.getByLabel('Enlace de invitación').inputValue()
     expect(enlace).toContain('/invitacion#')
   })
 
