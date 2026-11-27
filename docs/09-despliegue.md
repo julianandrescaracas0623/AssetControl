@@ -88,7 +88,7 @@ Hay **dos entornos** en el mismo VPS (spec 018), cada uno como una aplicación a
 
 | Entorno | Rama | Dominio | Despliegue | Datos |
 |---|---|---|---|---|
-| pruebas | `develop` | `pruebas.<dominio>` | desde `develop` (automático si se activó; P10 pendiente) | solo ficticios |
+| pruebas | `develop` | `pruebas.<dominio>` | desde `develop`, automático en cada push a `develop` (P10, decidido el 2026-11-27) | solo ficticios |
 | producción | `main` | `app.<dominio>` | **manual**, después de migrar (sección 7) | los de la clínica (desde el piloto) |
 
 Los dos usan `ENVIRONMENT=production`, `ALMACEN=s3`, `TRUSTED_PROXY_HOPS=1` y la `DATABASE_URL` de su propio proyecto Supabase.
@@ -195,7 +195,7 @@ Navegador ──HTTPS──▶ <IP-del-VPS>:443  Traefik de Coolify (TLS y enrut
 - **Puerto y salud:** `PORT=8000`; healthcheck en `/api/ready`.
 - **Proxy de confianza:** `TRUSTED_PROXY_HOPS=1` (solo Traefik delante); la app toma la IP real del cliente para los límites de tasa (comprobado en «pruebas», T7).
 - **Entorno:** `ENVIRONMENT=production` en los dos entornos (TLS a la base, cookies `Secure`, HSTS).
-- **Dos entornos** (tabla de la sección 5): «pruebas» desde `develop` (despliegue automático si se activó; P10 pendiente) y solo datos ficticios; «producción» desde `main` con despliegue **manual**. Cada uno con su proyecto Supabase y sus secretos.
+- **Dos entornos** (tabla de la sección 5): «pruebas» desde `develop` (despliegue automático en cada push a `develop`; P10, decidido el 2026-11-27) y solo datos ficticios; «producción» desde `main` con despliegue **manual**. Cada uno con su proyecto Supabase y sus secretos.
 - `/plataforma` apagada en producción (`PLATAFORMA_HABILITADA` sin definir; sección 5.2).
 
 **Endurecimiento del VPS (una vez, lo hace el humano):**
@@ -214,7 +214,7 @@ Navegador ──HTTPS──▶ <IP-del-VPS>:443  Traefik de Coolify (TLS y enrut
 3. Nueva aplicación desde el repositorio, *build pack* Dockerfile con `Dockerfile.prod`, rama `develop` (pruebas) o `main` (producción), dominio `https://pruebas.<dominio>` o `https://app.<dominio>`, puerto `8000` y healthcheck `/api/ready`.
 4. Plazo de parada (*stop grace period*) de **25 s o más** (sección 5.1, «Apagado»); comprobar con `docker inspect` que `StopTimeout` ≥ 25.
 5. Variables de la sección 5, con los secretos marcados como secretos en Coolify. Nunca `MIGRATION_DATABASE_URL`.
-6. «Pruebas» se despliega desde `develop` (automático si se activó; P10 pendiente); en «producción» el despliegue automático queda desactivado (se despliega a mano, sección 7).
+6. «Pruebas» se despliega automáticamente en cada push a `develop` (P10, decidido el 2026-11-27); en «producción» el despliegue automático queda desactivado (se despliega a mano, sección 7).
 7. Comprobar: `https://pruebas.<dominio>/api/ready` o `https://app.<dominio>/api/ready` responde `{"status":"ok"}`, `http://` redirige a `https://`, el registro de arranque no avisa `TRUSTED_PROXY_HOPS=0` y la otra app del VPS sigue respondiendo.
 
 **Recursos:** el VPS comparte memoria entre los dos entornos, la otra app y Coolify; gunicorn usa 2 procesos × 4 hilos y Argon2 (19 MiB) por hilo. Si la memoria aprieta, el humano decide con la medida si baja `workers` en «pruebas».
@@ -223,7 +223,7 @@ Navegador ──HTTPS──▶ <IP-del-VPS>:443  Traefik de Coolify (TLS y enrut
 
 ### 7.1 Antes de subir a `develop` un cambio con migración
 
-Migra primero el proyecto de «pruebas» desde la PC: en una ventana nueva de PowerShell, con la `MIGRATION_DATABASE_URL` del proyecto de pruebas solo en esa ventana, `uv run alembic upgrade head` y `uv run alembic current` (sección 4); cierra la ventana al terminar. Así la base de «pruebas» ya tiene el esquema nuevo cuando se despliega el código de `develop` (spec 018, R10 y R12).
+Como «pruebas» se despliega automáticamente en cada push a `develop` (P10, decidido el 2026-11-27), una migración nueva se aplica en el proyecto de «pruebas» desde la PC **antes** de subir a `develop` el cambio que la necesita; si no, el código nuevo arranca contra un esquema viejo. Migra primero el proyecto de «pruebas» desde la PC: en una ventana nueva de PowerShell, con la `MIGRATION_DATABASE_URL` del proyecto de pruebas solo en esa ventana, `uv run alembic upgrade head` y `uv run alembic current` (sección 4); cierra la ventana al terminar. Así la base de «pruebas» ya tiene el esquema nuevo cuando se despliega el código de `develop` (spec 018, R10 y R12).
 
 ### 7.2 Cada vez que algo llega a `main`
 

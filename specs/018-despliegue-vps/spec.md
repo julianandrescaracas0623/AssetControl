@@ -1,6 +1,6 @@
 # Spec 018 — Despliegue en VPS con Coolify (pruebas y producción)
 
-> Estado: en ejecución. El humano ejecutó T3–T8 (confirmado el 2026-11-27); aprobación formal de G1–G3 sin registrar; el despliegue en VPS con Coolify está activo en pruebas y producción. Pendientes: T10 (código), el plazo de parada ≥ 25 s en Coolify, la repetición de A3 en los entornos reales y la parte del humano de T9 (respaldo). Redactada por el planner el 2026-11-21. Cierra la parte de plataforma de T10 de `docs/05` y los pendientes del riesgo R1 de la spec 017 y de la spec 014. Decisiones del humano de hoy: ver «Alcance».
+> Estado: en ejecución. El humano ejecutó T3–T8 (confirmado el 2026-11-27); G1–G3 aprobadas por el humano el 2026-11-27; el despliegue en VPS con Coolify está activo en pruebas y producción. Pendientes: T10 (código), el plazo de parada ≥ 25 s en Coolify, la repetición de A3 en los entornos reales y la parte del humano de T9 (respaldo). Redactada por el planner el 2026-11-21. Cierra la parte de plataforma de T10 de `docs/05` y los pendientes del riesgo R1 de la spec 017 y de la spec 014. Decisiones del humano de hoy: ver «Alcance».
 
 ## Problema
 
@@ -109,11 +109,11 @@ AssetControl no tiene dónde ejecutarse fuera de la PC de desarrollo. `docs/09-d
 - **[PENDIENTE] P7. Ensayo de restauración** de un respaldo en un proyecto aparte (pendiente desde la 010b). ¿Se hace dentro de esta spec usando el proyecto de «pruebas», o queda fuera? Propuesta: dentro, con datos ficticios.
 - **[PENDIENTE] P8. Registro de la decisión de T10** en `docs/05` y, si el humano lo desea, un ADR de plataforma (`docs/adr/` es del humano; el planner no los edita).
 - **[PENDIENTE] P9. Acceso al panel de Coolify:** ¿restringido por IP o solo por contraseña + dominio HTTPS? La decisión es del humano.
-- **[PENDIENTE] P10. ¿Se activan en Coolify los despliegues automáticos de «pruebas» al empujar a `develop`** (webhook de GitHub) o también manuales? Propuesta: automáticos solo en pruebas.
+- **P10. ¿Se activan en Coolify los despliegues automáticos de «pruebas» al empujar a `develop`** (webhook de GitHub) o también manuales? Respondida por el humano el 2026-11-27: automático en cada push a `develop`; producción manual.
 
 ## Cumplimiento de la regla de autonomía (para el coordinator)
 
 - (a) Se deriva de `docs/09`, `docs/01–03` y de las specs 014 y 017: sí. La elección de plataforma es decisión del humano de hoy, aún no escrita en `docs/05` (P8).
 - (b) No contradice ADR ni constitución: sí (ADR-001/002: monolito, un contenedor, sin colas).
-- (c) Sin preguntas abiertas de producto, dominio o precios: **no cumple** mientras P1–P10 estén abiertas. Las que bloquean G1–G3 son **P2, P3, P4 y P9** (producto/seguridad) y **P6** (costo). No se aprueba por autonomía: el coordinator debe preguntar al humano.
+- (c) Sin preguntas abiertas de producto, dominio o precios: El coordinator no podía aprobarla (P1–P10 abiertas; bloqueaban P2, P3, P4, P6 y P9); la aprobó el humano el 2026-11-27. Siguen abiertas P1–P9.
 - Los pasos con cuentas, DNS, secretos, SSH y panel de Coolify son siempre del humano.
