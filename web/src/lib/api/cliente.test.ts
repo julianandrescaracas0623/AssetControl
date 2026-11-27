@@ -362,3 +362,102 @@ describe('sin redirecciones solo al restablecer desde la consola (spec 017, C1b/
     expect(f).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('referrerPolicy strict-origin en todos los fetch (spec 018 T10, riesgo R12)', () => {
+  // Con `Referrer-Policy: no-referrer` en el documento, un POST del mismo origen manda
+  // `Origin: null` y el servidor lo rechaza si falta `Sec-Fetch-Site`. Cada fetch del
+  // cliente fija su propia política para que el `Origin` sea el real.
+  const LOGO = { logo: { id: 'l1' } }
+  const politicas = (f: ReturnType<typeof responder>) =>
+    (f.mock.calls as unknown as [string, RequestInit][]).map(([url, init]) => [url, init.referrerPolicy, init.credentials])
+
+  it('pedir (JSON): login, refresh, logout, recuperar y restablecer de la app', async () => {
+    const f = responder(200, SESION)
+    await api.login({ email: 'ana@ejemplo.test', password: 'secreto-sintetico' })
+    await api.refresh()
+    await api.logout()
+    await api.solicitarRecuperacion({ email: 'ana@ejemplo.test' } as never)
+    await api.restablecerContrasena({ token: 't', password: 'x', password_confirmacion: 'x' } as never)
+    await api.me('jwt.sintetico')
+    expect(politicas(f)).toEqual([
+      ['/api/auth/login', 'strict-origin', 'same-origin'],
+      ['/api/auth/refresh', 'strict-origin', 'same-origin'],
+      ['/api/auth/logout', 'strict-origin', 'same-origin'],
+      ['/api/auth/recuperar', 'strict-origin', 'same-origin'],
+      ['/api/auth/restablecer', 'strict-origin', 'same-origin'],
+      ['/api/auth/me', 'strict-origin', 'same-origin'],
+    ])
+  })
+
+  it('pedir (JSON): refresh y logout de la consola', async () => {
+    const f = responder(200, SESION)
+    await apiPlataforma.refresh()
+    await apiPlataforma.logout()
+    expect(politicas(f)).toEqual([
+      ['/api/plataforma/auth/refresh', 'strict-origin', 'same-origin'],
+      ['/api/plataforma/auth/logout', 'strict-origin', 'same-origin'],
+    ])
+  })
+
+  it('pedir con redirect: error conserva la política', async () => {
+    const f = responder(204)
+    await apiPlataforma.restablecerContrasenaUsuario('jwt.sintetico', 'e1', 'u1', { password: 'Sintetica-Prueba-1', password_confirmacion: 'Sintetica-Prueba-1' })
+    const { init } = peticion(f)
+    expect(init.redirect).toBe('error')
+    expect(init.referrerPolicy).toBe('strict-origin')
+    expect(init.credentials).toBe('same-origin')
+  })
+
+  it('descargar (binario)', async () => {
+    const f = responder(200, 'xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    await api.exportarActivos('jwt.sintetico', {})
+    expect(peticion(f).init.referrerPolicy).toBe('strict-origin')
+    expect(peticion(f).init.credentials).toBe('same-origin')
+  })
+
+  it('enviarMultipart: PUT y DELETE de la app y POST de la consola', async () => {
+    let f = responder(200, LOGO)
+    await api.subirLogo('jwt.sintetico', { id: 'l1', archivo: new Blob(['x'], { type: 'image/png' }) })
+    expect(peticion(f).init.referrerPolicy).toBe('strict-origin')
+    expect(peticion(f).init.credentials).toBe('same-origin')
+
+    f = responder(204)
+    await api.quitarLogo('jwt.sintetico')
+    expect(peticion(f).init.referrerPolicy).toBe('strict-origin')
+    expect(peticion(f).init.credentials).toBe('same-origin')
+
+    f = responder(201, LOGO)
+    await apiPlataforma.subirLogoEmpresa('jwt.sintetico', 'e1', { id: 'l1', archivo: new Blob(['x'], { type: 'image/png' }) })
+    expect(peticion(f).init.referrerPolicy).toBe('strict-origin')
+    expect(peticion(f).init.credentials).toBe('same-origin')
+  })
+})
+
+describe('guarda: ningún fetch fuera del cliente de la API (spec 018 T10, riesgo R12)', () => {
+  // El documento lleva `Referrer-Policy: no-referrer`; un fetch que no use OPCIONES_FETCH
+  // (`referrerPolicy: 'strict-origin'`) manda `Origin: null` en un POST y el servidor lo rechaza.
+  // Solo cliente.ts (con OPCIONES_FETCH) y health.ts (GET, no la necesita) pueden llamar a fetch.
+  const PERMITIDOS = new Set(['/src/lib/api/cliente.ts', '/src/lib/health.ts'])
+  const FUENTES = import.meta.glob<string>('/src/**/*.{ts,tsx}', { query: '?raw', import: 'default', eager: true })
+  // Cuenta `fetch(`, `window.fetch(`, `globalThis.fetch(` y `self.fetch(`; por el límite de
+  // palabra, `refetch(`, `prefetch(` o `q.fetch(` (método de otro objeto) no cuentan.
+  const LLAMADA_FETCH = /(?<![\w.])(?:(?:window|globalThis|self)\.)?fetch\(/
+
+  it('solo cliente.ts y health.ts llaman a fetch', () => {
+    const archivos = Object.keys(FUENTES)
+    expect(archivos).toContain('/src/lib/api/cliente.ts')
+    const infractores = archivos.filter(
+      (ruta) =>
+        !/\.test\.(ts|tsx)$/.test(ruta) &&
+        !ruta.startsWith('/src/mocks/') &&
+        !ruta.startsWith('/src/test/') &&
+        !PERMITIDOS.has(ruta) &&
+        LLAMADA_FETCH.test(FUENTES[ruta]),
+    )
+    expect(
+      infractores,
+      'Riesgo R12 (spec 018): un fetch nuevo debe ir por src/lib/api/cliente.ts y extender OPCIONES_FETCH ' +
+        "(referrerPolicy 'strict-origin'); si no, con Referrer-Policy: no-referrer manda Origin: null y el servidor lo rechaza.",
+    ).toEqual([])
+  })
+})

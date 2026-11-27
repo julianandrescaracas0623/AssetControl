@@ -9,7 +9,7 @@ Diez tareas, cada una ≤ 1 día. «Humano» = cuentas, DNS, secretos, SSH o pan
 - **Verificación:** `cd backend && uv run pytest tests/test_wsgi_cabeceras.py -q && uv run pytest -q && uv run ruff check .`
 - **Dependencia:** ninguna.
 - **Cubre:** R1–R3, A1.
-- **Estado:** HECHA (2026-11-27), con revisión del reviewer y del security-reviewer; falta repetir A3 en los entornos reales (humano). Riesgo conocido: riesgo R12 de la spec (`Origin: null`), seguimiento en T10.
+- **Estado:** HECHA (2026-11-27), con revisión del reviewer y del security-reviewer; falta repetir A3 en los entornos reales (humano). Riesgo conocido: riesgo R12 de la spec (`Origin: null`), seguimiento en T10 (hecho en T10, 2026-11-27).
 
 ## T2 — `worker_exit` con `Correo.esperar` (implementer)
 
@@ -93,7 +93,7 @@ Diez tareas, cada una ≤ 1 día. «Humano» = cuentas, DNS, secretos, SSH o pan
 - **Revisiones:** `reviewer` y `security-reviewer`.
 - **Dependencia:** T1.
 - **Cubre:** riesgo R12 de la sección «Riesgos» de la spec (no el requisito R12).
-- **Estado:** PENDIENTE.
+- **Estado:** HECHA (2026-11-27), con revisión del reviewer y del security-reviewer; falta (humano) comprobar en un navegador real, en pruebas, con DevTools, que el POST a `/api/auth/refresh` desde `/restablecer#…` y desde `/app/…` lleva `Origin` real y `Referer` solo con el origen, y que el logout devuelve 204.
 
 ## Pendiente del humano (fuera de las tareas)
 
