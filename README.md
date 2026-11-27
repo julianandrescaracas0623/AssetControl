@@ -1,24 +1,73 @@
 # AssetControl
 
-Sistema para que las empresas de cualquier sector lleven el inventario de sus activos fijos (equipos, computadores, mobiliario, maquinaria y similares) con conteos periódicos desde el celular o el computador, historial por activo y un informe de valor total.
+**Inventario de activos fijos desde el celular: escanea el sticker, registra el activo y conoce cuánto valen los bienes de tu empresa.**
 
-Es multi-tenant desde el inicio: los datos de cada empresa están aislados de las demás.
+AssetControl es una aplicación web multiempresa (multi-tenant) para que empresas y emprendedores de cualquier sector registren sus activos fijos (equipos, computadores, mobiliario, maquinaria), los cuenten periódicamente y sepan en todo momento dónde están, en qué estado se encuentran y cuánto valen.
+
+## Por qué existe
+
+La idea surgió hace años, viendo de cerca el trabajo de una clínica odontológica en Cartago, Colombia. Cada fin de año la clínica cuenta y registra todos sus activos fijos, viejos y nuevos, y entrega un informe detallado con el estado, la ubicación y el precio de cada uno. Todo se hacía a mano en Excel: digitar los activos uno a uno, ordenarlos por ubicación y dejar el documento presentable. Era un trabajo de días.
+
+Al preparar con la clínica el recorrido anual, se decidió construir la herramienta desde cero en lugar de repetir el proceso. La idea central:
+
+- Cada activo lleva un sticker de seguridad con un código de barras que lo identifica para siempre.
+- Desde el teléfono se escanea el sticker y se registra el activo con su nombre, ubicación, foto, precio y estado.
+- El informe sale solo, con los totales calculados y listo para presentar.
+
+El principio de diseño es **cero digitación innecesaria**: escanear en vez de escribir, elegir en vez de teclear y copiar un activo parecido en vez de empezar de cero.
+
+## Para quién es
+
+Aunque nació en el sector salud, AssetControl está pensado para empresas de cualquier tipo, en especial las que hoy no llevan un registro de sus activos fijos y no saben en cuánto están valorados.
+
+Ya existen productos que ofrecen este servicio, pero muchas empresas de la región no los conocen o no tienen quién las asesore para adoptarlos. AssetControl quiere llegar a ellas con una herramienta sencilla y un acompañamiento cercano. El primer cliente es la clínica donde nació la idea; la meta es crecer por recomendación entre los empresarios de la ciudad.
+
+## Qué hace
+
+- **Alta por escaneo:** la cámara del celular lee el sticker. Si el activo no existe, ofrece crearlo con ese código, con autocompletado, listas para elegir y la opción de duplicar un activo parecido.
+- **Conteos periódicos:** sesiones de conteo por ubicación, con avance, pendientes y discrepancias (un activo encontrado en otro lugar o en otro estado).
+- **Historial por activo:** quién lo verificó y cuándo, y cada cambio de ubicación, precio o estado.
+- **Informe de valor total:** por categoría y por ubicación; se congela al cerrar el conteo y se exporta a PDF y Excel con el logo de la empresa.
+- **Inicio con indicadores:** valor del inventario, avance del conteo y evolución entre conteos.
+- **Fotos** de cada activo.
+- **Dos roles:** administrador (todo, incluidos precios e informes) y contador (cuenta, registra y corrige datos descriptivos, sin ver precios).
+- **Multiempresa:** los datos de cada empresa están aislados de las demás en la propia base de datos, no solo en la pantalla. Cada empresa tiene sus usuarios, ubicaciones y categorías, para adaptarse a distintos modelos de negocio.
+
+## Visión
+
+El MVP es una aplicación web que se usa desde el navegador del celular o del computador, sin instalar nada y con conexión a internet. Después del piloto, el plan es llevarla a una app móvil para ganar portabilidad y evaluar el conteo sin conexión. Por ahora, la app nativa y el modo sin conexión quedan fuera del MVP ([alcance](docs/01-alcance-mvp.md), [ADR-002](docs/adr/ADR-002-solo-online-cliente-web.md)).
 
 ## Estado
 
-Las [specs](specs/) del 001 al 015 y la [017](specs/017-consola-plataforma/spec.md) están implementadas, con los pasos pendientes que cada una indica; la [014](specs/014-recuperar-contrasena/spec.md) está cerrada. Pendientes:
+**MVP funcional y desplegado** (noviembre de 2026) en un servidor privado virtual (VPS) propio, gestionado con Coolify, con dos entornos:
 
-- Rediseño de componentes y de la interfaz de conteo ([016](specs/016-rediseno-ui-componentes/spec.md), propuesta).
-- Despliegue en un servidor propio ([018](specs/018-despliegue-vps/spec.md), borrador).
-- Piloto con una empresa real.
+- **Desarrollo:** sigue la rama `develop`; solo datos de prueba.
+- **Producción:** sigue la rama `main`; lista para el piloto, todavía sin datos.
+
+Ya construido (specs 001 a 020; la 011 está reservada):
+
+- Acceso con invitaciones, dos roles y recuperación de contraseña por correo.
+- Ubicaciones, categorías y activos con alta por escaneo, fotos, historial y baja sin borrado.
+- Sesiones de conteo, discrepancias, cierre con totales congelados e informe en PDF y Excel.
+- Inicio con indicadores y evolución entre conteos; exportación de la lista de activos.
+- Interfaz rediseñada con componentes propios; vista del contador en el computador.
+- Consola interna de plataforma para dar de alta y administrar empresas.
+- Despliegue en VPS con Coolify ([018](specs/018-despliegue-vps/spec.md)).
+
+Siguientes pasos:
+
+- Segundo factor de autenticación en la consola de plataforma.
+- Seguir las pruebas con teléfonos, lectores y stickers reales (en curso) y definir el formato de los stickers.
+- Piloto con la clínica y, después, las primeras empresas por recomendación.
 
 ## Estructura
 
-- `backend/` — API Flask.
-- `web/` — cliente React responsive (conteo en celular y administración en escritorio).
-- `docs/` — alcance, arquitectura, modelo de datos y decisiones de arquitectura (ADR).
-- `specs/` — una especificación por entrega.
-- `scripts/`, `docker/`, `.github/` — herramientas de desarrollo, base local y CI.
+- `backend/`: API Flask, migraciones Alembic y pruebas.
+- `web/`: cliente React responsive: conteo en el celular (`/contar`), trabajo en el computador (`/app`) y consola de plataforma (`/plataforma`).
+- `docs/`: alcance, arquitectura, modelo de datos, diseño visual, despliegue y decisiones de arquitectura (ADR).
+- `specs/`: una especificación por entrega.
+- `Orquestacion/`: método de trabajo.
+- `scripts/`, `docker/`, `.github/`: herramientas de desarrollo, base local y CI.
 
 ## Documentos
 
@@ -37,7 +86,7 @@ Las [specs](specs/) del 001 al 015 y la [017](specs/017-consola-plataforma/spec.
 | [docs/10-entorno-local.md](docs/10-entorno-local.md) | **Empieza aquí:** entorno local paso a paso, conexiones, pruebas y e2e |
 | [docs/adr/](docs/adr/) | Decisiones de arquitectura registradas |
 | [Orquestacion/](Orquestacion/README.md) | Método de trabajo: roles, agentes, compuertas, plan y arneses de Claude Code y Cursor |
-| [specs/](specs/) | Especificaciones de cada entrega (de la 001 a la 018) |
+| [specs/](specs/) | Especificaciones de cada entrega (de la 001 a la 020) |
 
 ## Stack
 
@@ -205,7 +254,7 @@ Las credenciales del CI son valores efímeros de un PostgreSQL desechable; no ha
 
 ## Producción (antes del piloto)
 
-El despliegue está en definición: la base sería Supabase y la plataforma donde corre la API queda por decidir en la [spec 018](specs/018-despliegue-vps/spec.md). Lo que sigue describe el objetivo, no un entorno existente.
+La aplicación corre en un VPS propio gestionado con Coolify, con la base de datos en Supabase ([spec 018](specs/018-despliegue-vps/spec.md), [docs/09](docs/09-despliegue.md)). Lo que sigue documenta la configuración de la base y del servidor de la API.
 
 ### Rol de la aplicación en Supabase
 
