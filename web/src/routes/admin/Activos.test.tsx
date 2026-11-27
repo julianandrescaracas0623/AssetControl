@@ -85,7 +85,7 @@ describe('/admin/activos', () => {
     expect(within(menu).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Ver ficha', 'Editar', 'Mover', 'Dar de baja'])
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'Mover' }))
     expect(await screen.findByRole('dialog', { name: 'Mover activo' })).toBeTruthy()
-    expect(router.state.location.pathname).toBe('/admin/activos/000123')
+    expect(router.state.location.pathname).toBe('/app/activos/000123')
   })
 
   it('un dado de baja solo ofrece ver y reactivar', async () => {
@@ -228,7 +228,7 @@ describe('Abrir la ficha desde la fila (spec 015, T4; R2)', () => {
     const { router } = abrir('/admin/activos')
     await waitFor(() => expect(filas()).toHaveLength(2))
     fireEvent.doubleClick(within(fila('000123')).getByText('Consultorio 1 › Box 2'))
-    await waitFor(() => expect(router.state.location.pathname).toBe('/admin/activos/000123'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/app/activos/000123'))
   })
 
   it('Enter con la fila enfocada abre la ficha; otras teclas no', async () => {
@@ -238,9 +238,9 @@ describe('Abrir la ficha desde la fila (spec 015, T4; R2)', () => {
     expect(silla.tabIndex).toBe(0)
     silla.focus()
     fireEvent.keyDown(silla, { key: ' ' })
-    expect(router.state.location.pathname).toBe('/admin/activos')
+    expect(router.state.location.pathname).toBe('/app/activos')
     fireEvent.keyDown(silla, { key: 'Enter' })
-    await waitFor(() => expect(router.state.location.pathname).toBe('/admin/activos/000123'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/app/activos/000123'))
   })
 
   it('doble clic o Enter en el menú de acciones no navega desde la fila', async () => {
@@ -250,20 +250,20 @@ describe('Abrir la ficha desde la fila (spec 015, T4; R2)', () => {
     fireEvent.doubleClick(menu)
     fireEvent.keyDown(menu, { key: 'Enter' })
     expect(await screen.findByRole('menu')).toBeTruthy()
-    expect(router.state.location.pathname).toBe('/admin/activos')
+    expect(router.state.location.pathname).toBe('/app/activos')
   })
 
   it('el enlace del nombre sigue abriendo la ficha y su doble clic no navega dos veces', async () => {
     const { router } = abrir('/admin/activos')
     await waitFor(() => expect(filas()).toHaveLength(2))
     const enlace = within(fila('000123')).getByRole('link', { name: 'Silla ergonómica' })
-    expect(enlace.getAttribute('href')).toBe('/admin/activos/000123')
+    expect(enlace.getAttribute('href')).toBe('/app/activos/000123')
     const antes = router.state.historyAction
     fireEvent.doubleClick(enlace)
-    expect(router.state.location.pathname).toBe('/admin/activos')
+    expect(router.state.location.pathname).toBe('/app/activos')
     expect(router.state.historyAction).toBe(antes)
     fireEvent.click(enlace)
-    await waitFor(() => expect(router.state.location.pathname).toBe('/admin/activos/000123'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/app/activos/000123'))
   })
 })
 

@@ -1,18 +1,23 @@
 import { useMutation } from '@tanstack/react-query'
-import { Copy, MailPlus, ShieldCheck, TriangleAlert, UserPlus, Users } from 'lucide-react'
-import { type FormEvent, useState } from 'react'
+import { Copy, MailPlus, Power, PowerOff, ShieldCheck, TriangleAlert, UserPlus, Users } from 'lucide-react'
+import { type FormEvent, type RefObject, useId, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
-import { Aviso, Boton, Campo, EncabezadoPagina, Panel } from '@/components/kit'
+import { Aviso, Boton, Campo, Confirmar, Dialogo, EncabezadoPagina, Insignia, ListaDatos, TablaDatos, type ColumnaTabla } from '@/components/kit'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { api, ErrorApi, type InvitacionCreada, mensajeDeError, type Rol } from '@/lib/api/cliente'
-import { etiquetaRol, useApiAutenticada } from '@/lib/sesion'
+import { type UsuarioEmpresa, useCambiarUsuario, useUsuarios } from '@/lib/usuarios'
+import { etiquetaRol, useApiAutenticada, useSesion } from '@/lib/sesion'
 import { cn } from '@/lib/utils'
 
-// /admin/usuarios (spec 002b, T5; plan §7): invitar con correo y rol. El enlace sale
-// una sola vez (el servidor no lo vuelve a dar) y se copia para enviarlo por un canal
-// privado. La lista de usuarios llega con una spec posterior: aquí no se inventa.
-// Spec 016, T9 (R2, R5): presentación con el kit (Panel, Campo, Aviso, Boton). El rol lo
-// decide el servidor; el enlace no se guarda ni se escribe en ningún registro.
+// /admin/usuarios (spec 002b, T5; plan §7): el módulo es la lista de personas con
+// acceso (GET /usuarios). Invitar es la acción principal: el formulario vive en un
+// diálogo (el enlace sale una sola vez y se copia para un canal privado). El doble clic
+// abre la ficha (solo lo que ya trajo la lista). El admin cambia el rol y activa o
+// desactiva con PUT /usuarios/{usuario_id} (0033). El servidor decide y avisa: no deja
+// cambiar el propio rol ni desactivarse, ni quitar al último admin activo.
+// Spec 016, T9 (R2, R5): presentación con el kit. El rol lo decide el servidor; el enlace
+// no se guarda ni se escribe en ningún registro.
 
 const ROLES: { valor: Rol; descripcion: string; icono: typeof Users }[] = [
   { valor: 'contador', descripcion: 'Cuenta y verifica activos. No ve precios.', icono: Users },
@@ -109,10 +114,202 @@ function Resultado({ creada, onOtra }: { creada: InvitacionCreada; onOtra: () =>
   )
 }
 
-export default function Usuarios() {
+/** Lo que pasó, en una frase, tras un cambio que el servidor aceptó. */
+function mensajeDeCambio(persona: UsuarioEmpresa, despues: { rol: Rol; activa: boolean }): string {
+  if (!despues.activa) return `${persona.nombre} quedó desactivada`
+  if (!persona.activa) return `${persona.nombre} vuelve a tener acceso`
+  return `${persona.nombre} ahora es ${etiquetaRol(despues.rol)}`
+}
+
+function RolPersona({ persona }: { persona: UsuarioEmpresa }) {
+  return <Insignia tono={persona.rol === 'admin' ? 'fuerte' : 'neutro'}>{etiquetaRol(persona.rol)}</Insignia>
+}
+
+function EstadoPersona({ persona }: { persona: UsuarioEmpresa }) {
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      {persona.activa ? <span className="text-etiqueta text-muted-foreground">Activa</span> : <Insignia tono="error">Desactivada</Insignia>}
+      {persona.debe_cambiar_password && <Insignia tono="aviso">Debe cambiar su contraseña</Insignia>}
+    </span>
+  )
+}
+
+function columnas(miId: string | undefined): ColumnaTabla<UsuarioEmpresa>[] {
+  return [
+    {
+      id: 'persona',
+      encabezado: 'Persona',
+      principal: true,
+      celda: (persona) => (
+        <span className="inline-flex min-w-0 flex-wrap items-center gap-1.5">
+          <span className="break-words">{persona.nombre}</span>
+          {persona.id === miId && <Insignia tono="info">Tú</Insignia>}
+        </span>
+      ),
+    },
+    {
+      id: 'correo',
+      encabezado: 'Correo',
+      clase: '[overflow-wrap:anywhere]',
+      celda: (persona) => <span className="text-muted-foreground">{persona.email}</span>,
+    },
+    { id: 'rol', encabezado: 'Rol', celda: (persona) => <RolPersona persona={persona} /> },
+    { id: 'estado', encabezado: 'Estado', celda: (persona) => <EstadoPersona persona={persona} /> },
+  ]
+}
+
+function FichaPersona({ persona, esYo, onCerrar }: { persona: UsuarioEmpresa; esYo: boolean; onCerrar: () => void }) {
+  return (
+    <Dialogo
+      abierto
+      onAbiertoChange={(abierto) => {
+        if (!abierto) onCerrar()
+      }}
+      titulo={<span className="break-words">{persona.nombre}</span>}
+      descripcion={<span className="break-all">{persona.email}</span>}
+      pie={
+        <Boton variante="secundario" onClick={onCerrar}>
+          Cerrar
+        </Boton>
+      }
+    >
+      <ListaDatos
+        datos={[
+          { rotulo: 'Rol', valor: <RolPersona persona={persona} /> },
+          { rotulo: 'Estado', valor: persona.activa ? 'Activa' : <Insignia tono="error">Desactivada</Insignia> },
+          { rotulo: 'Contraseña', valor: persona.debe_cambiar_password ? <Insignia tono="aviso">Debe cambiar su contraseña</Insignia> : false },
+          { rotulo: 'Cuenta', valor: esYo ? <Insignia tono="info">Tú</Insignia> : false },
+        ]}
+      />
+    </Dialogo>
+  )
+}
+
+function ListaPersonas() {
+  const usuarios = useUsuarios()
+  const cambiar = useCambiarUsuario()
+  const { sesion } = useSesion()
+  const esMovil = useIsMobile()
+  const [aDesactivar, setADesactivar] = useState<UsuarioEmpresa | null>(null)
+  const [fichaId, setFichaId] = useState<string | null>(null)
+
+  const miId = sesion?.usuario.id
+  const lista = usuarios.data
+  const ficha = lista?.find((persona) => persona.id === fichaId) ?? null
+
+  function cambio(persona: UsuarioEmpresa, valores: { rol?: Rol; activa?: boolean }) {
+    const despues = { rol: valores.rol ?? persona.rol, activa: valores.activa ?? persona.activa }
+    cambiar.mutate(
+      { id: persona.id, ...despues },
+      {
+        onSuccess: () => toast.success(mensajeDeCambio(persona, despues)),
+        // El texto llega del servidor en español (p. ej. «no puedes cambiar tu propio rol»).
+        onError: (error) => toast.error(mensajeDeError(error)),
+      },
+    )
+  }
+
+  function acciones(persona: UsuarioEmpresa) {
+    if (persona.id === miId) return null
+    const otroRol: Rol = persona.rol === 'admin' ? 'contador' : 'admin'
+    return (
+      <div className="flex flex-wrap justify-end gap-2">
+        <Boton
+          variante="secundario"
+          icono={persona.rol === 'admin' ? <Users /> : <ShieldCheck />}
+          disabled={cambiar.isPending}
+          onClick={() => cambio(persona, { rol: otroRol })}
+        >
+          {persona.rol === 'admin' ? 'Pasar a contador' : 'Hacer administrador'}
+        </Boton>
+        {persona.activa ? (
+          <Boton variante="secundario" icono={<PowerOff />} disabled={cambiar.isPending} onClick={() => setADesactivar(persona)}>
+            Desactivar
+          </Boton>
+        ) : (
+          <Boton variante="secundario" icono={<Power />} disabled={cambiar.isPending} onClick={() => cambio(persona, { activa: true })}>
+            Reactivar
+          </Boton>
+        )}
+      </div>
+    )
+  }
+
+  function tarjeta(persona: UsuarioEmpresa) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="inline-flex flex-wrap items-center gap-1.5 text-cuerpo font-medium">
+            {persona.nombre}
+            {persona.id === miId && <Insignia tono="info">Tú</Insignia>}
+          </span>
+          <span className="text-etiqueta text-muted-foreground [overflow-wrap:anywhere]">{persona.email}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <RolPersona persona={persona} />
+          <EstadoPersona persona={persona} />
+        </div>
+        <Boton variante="secundario" className="self-start" aria-label={`Ver a ${persona.nombre}`} onClick={() => setFichaId(persona.id)}>
+          Ver
+        </Boton>
+        {acciones(persona)}
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <TablaDatos
+        etiqueta="Personas con acceso"
+        columnas={columnas(miId)}
+        filas={lista}
+        claveFila={(persona) => persona.id}
+        nombrarFilas
+        cargando={usuarios.isPending}
+        etiquetaCargando="Cargando personas con acceso"
+        error={
+          usuarios.isError
+            ? { titulo: 'No se pudo cargar la lista', onReintentar: () => void usuarios.refetch(), reintentando: usuarios.isRefetching }
+            : null
+        }
+        vacio={{ titulo: 'Todavía no hay personas con acceso', descripcion: 'Invita a la primera con el botón Invitar.' }}
+        onAbrirFila={(persona) => setFichaId(persona.id)}
+        ayudaAbrirFila="Doble clic para ver"
+        accionesFila={esMovil ? undefined : acciones}
+        tarjeta={esMovil ? tarjeta : undefined}
+      />
+      {ficha && <FichaPersona persona={ficha} esYo={ficha.id === miId} onCerrar={() => setFichaId(null)} />}
+      <Confirmar
+        abierto={aDesactivar !== null}
+        onAbiertoChange={(abierto) => {
+          if (!abierto) setADesactivar(null)
+        }}
+        titulo={`¿Desactivar a ${aDesactivar?.nombre ?? 'esta persona'}?`}
+        descripcion="Deja de tener acceso a la empresa desde su siguiente petición y no puede renovar su sesión. Puedes reactivarla después."
+        textoConfirmar="Sí, desactivar"
+        peligro
+        onConfirmar={() => {
+          if (aDesactivar) cambio(aDesactivar, { activa: false })
+          setADesactivar(null)
+        }}
+      />
+    </>
+  )
+}
+
+function DialogoInvitar({
+  abierto,
+  onAbierto,
+  devolverFocoA,
+}: {
+  abierto: boolean
+  onAbierto: (abierto: boolean) => void
+  devolverFocoA: RefObject<HTMLButtonElement | null>
+}) {
   const conToken = useApiAutenticada()
   const [rol, setRol] = useState<Rol>('contador')
-  const [formulario, setFormulario] = useState(0) // cambiarlo vacía el formulario
+  const [formulario, setFormulario] = useState(0)
+  const idFormulario = useId()
 
   const crear = useMutation({
     mutationFn: (cuerpo: { email: string; rol: Rol }) => conToken((token) => api.crearInvitacion(token, cuerpo)),
@@ -134,53 +331,81 @@ export default function Usuarios() {
     setFormulario((n) => n + 1)
   }
 
+  function alCambiar(nuevo: boolean) {
+    if (!nuevo) otra()
+    onAbierto(nuevo)
+  }
+
+  return (
+    <Dialogo
+      abierto={abierto}
+      onAbiertoChange={alCambiar}
+      devolverFocoA={devolverFocoA}
+      titulo="Invitar a una persona"
+      descripcion="La persona crea su cuenta con el enlace: solo escribe su nombre y una contraseña. Cada invitación es para un correo y un rol, y vence en 72 horas."
+      ancho="ancho"
+      pie={
+        crear.isSuccess ? (
+          <Boton variante="secundario" onClick={() => alCambiar(false)}>
+            Cerrar
+          </Boton>
+        ) : (
+          <>
+            <Boton variante="secundario" onClick={() => alCambiar(false)}>
+              Cancelar
+            </Boton>
+            <Boton type="submit" form={idFormulario} icono={<MailPlus />} cargando={crear.isPending}>
+              Crear invitación
+            </Boton>
+          </>
+        )
+      }
+    >
+      {crear.isSuccess ? (
+        <Resultado creada={crear.data} onOtra={otra} />
+      ) : (
+        <form id={idFormulario} key={formulario} className="flex flex-col gap-5" onSubmit={alEnviar}>
+          {errorGeneral && <Aviso tono="error" titulo={errorGeneral} />}
+          <Campo
+            id="invitar-email"
+            etiqueta="Correo de la persona"
+            name="email"
+            type="email"
+            inputMode="email"
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+            placeholder="nombre@clinica.com"
+            error={errorCorreo ?? undefined}
+          />
+          <SelectorRol valor={rol} onCambio={setRol} />
+        </form>
+      )}
+    </Dialogo>
+  )
+}
+
+export default function Usuarios() {
+  const [invitar, setInvitar] = useState(false)
+  const invitarRef = useRef<HTMLButtonElement>(null)
+
   return (
     <div className="flex flex-col gap-6">
       <EncabezadoPagina
         titulo="Usuarios"
-        descripcion="Invita a las personas de tu clínica. Cada invitación es para un correo y un rol, y vence en 72 horas."
+        descripcion="Quién tiene acceso a la empresa. Invita, cambia el rol o desactiva a cada persona."
+        claseAcciones="max-sm:w-full max-sm:[&>[data-slot=button]]:flex-1"
+        acciones={
+          <Boton ref={invitarRef} icono={<UserPlus />} onClick={() => setInvitar(true)}>
+            Invitar
+          </Boton>
+        }
       />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,40rem)_minmax(0,1fr)] lg:items-start">
-        <Panel titulo="Invitar a una persona" descripcion="La persona crea su cuenta con el enlace: solo escribe su nombre y una contraseña.">
-          {crear.isSuccess ? (
-            <Resultado creada={crear.data} onOtra={otra} />
-          ) : (
-            <form key={formulario} className="flex flex-col gap-5" onSubmit={alEnviar}>
-              {errorGeneral && <Aviso tono="error" titulo={errorGeneral} />}
-              <Campo
-                id="invitar-email"
-                etiqueta="Correo de la persona"
-                name="email"
-                type="email"
-                inputMode="email"
-                autoComplete="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                required
-                placeholder="nombre@clinica.com"
-                error={errorCorreo ?? undefined}
-              />
-              <SelectorRol valor={rol} onCambio={setRol} />
-              <Boton type="submit" icono={<MailPlus />} cargando={crear.isPending} className="self-start max-sm:w-full">
-                Crear invitación
-              </Boton>
-            </form>
-          )}
-        </Panel>
-        <Panel
-          titulo={
-            <span className="inline-flex items-center gap-2">
-              <Users className="size-4 text-muted-foreground" aria-hidden="true" />
-              Personas con acceso
-            </span>
-          }
-          className="border-dashed shadow-none"
-        >
-          <p className="text-cuerpo text-muted-foreground">
-            La lista de personas con acceso llega con una spec posterior, junto con cambiar el rol y dar de baja.
-          </p>
-        </Panel>
-      </div>
+      <section aria-label="Personas con acceso" className="min-w-0">
+        <ListaPersonas />
+      </section>
+      <DialogoInvitar abierto={invitar} onAbierto={setInvitar} devolverFocoA={invitarRef} />
     </div>
   )
 }

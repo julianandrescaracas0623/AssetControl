@@ -54,7 +54,7 @@ describe('caracterización del conteo (T5): lo que no cambia', () => {
   it('Inicio: el admin sin sesión abierta tiene el atajo a Sesiones', async () => {
     abrir('/contar', { rol: 'admin', conSesion: false })
     expect(await screen.findByText('No hay una sesión abierta')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Ir a Sesiones' }).getAttribute('href')).toBe('/admin/sesiones')
+    expect(screen.getByRole('link', { name: 'Ir a Sesiones' }).getAttribute('href')).toBe('/app/sesiones')
   })
 
   it('Verificar: un error al buscar ofrece reintentar y escribir el código', async () => {

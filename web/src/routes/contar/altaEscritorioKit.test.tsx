@@ -319,8 +319,9 @@ describe('diseño del alta con el kit (T6)', () => {
     expect(screen.getByRole('link', { name: 'Escanear otro' }).getAttribute('data-variante')).toBe('principal')
   })
 
+  // Spec 020, T5: en el computador /contar/nuevo es el alta del marco (/app/activos/nuevo).
   it('escritorio: resumen, copiar y foto son paneles; la tecla del botón principal se lee sobre cobalto', async () => {
-    abrirEscritorio('/contar/nuevo?codigo=nuevo-54')
+    const { router } = abrirEscritorio('/contar/nuevo?codigo=nuevo-54')
     const resumen = await screen.findByRole('region', { name: 'Resumen' })
     expect(resumen.getAttribute('data-kit')).toBe('panel')
     expect(screen.getByRole('combobox', { name: /Copiar de un parecido/ }).closest('[data-kit=panel]')).toBeTruthy()
@@ -330,7 +331,8 @@ describe('diseño del alta con el kit (T6)', () => {
     const tecla = guardar.querySelector('kbd')!
     expect(tecla.className).not.toContain('bg-primary-foreground/10')
     expect(tecla.getAttribute('data-kit')).toBe('tecla')
-    expect(screen.getByRole('link', { name: 'Volver al conteo' }).getAttribute('data-kit')).toBe('boton')
+    expect(screen.getByRole('link', { name: 'Cancelar' }).getAttribute('data-kit')).toBe('boton')
+    expect(router.state.location.pathname + router.state.location.search).toBe('/app/activos/nuevo?codigo=nuevo-54')
   })
 })
 

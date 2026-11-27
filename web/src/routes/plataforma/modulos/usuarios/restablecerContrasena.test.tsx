@@ -35,7 +35,7 @@ const INACTIVA = '00000000-0000-4000-8000-000000000102'
 function empresa(id: string, nombre: string, activa = true): Empresa {
   return { id, nombre, activa, creado_en: '2026-11-10T15:00:00+00:00', tiene_logo: false, n_membresias_activas: 2, n_admins_activos: 1 }
 }
-const EMPRESAS = [empresa(ACTIVA, 'Biotecnología Dental'), empresa(INACTIVA, 'Sonrisas del Valle', false)]
+const EMPRESAS = [empresa(ACTIVA, 'Odontología Sonrisa'), empresa(INACTIVA, 'Sonrisas del Valle', false)]
 
 const ANA: Usuario = { id: '00000000-0000-4000-8000-000000000a01', nombre: 'Ana Torres', email: 'ana@clinica.test', rol: 'admin', activa: true, debe_cambiar_password: false }
 const LUIS: Usuario = { id: '00000000-0000-4000-8000-000000000c01', nombre: 'Luis Pérez', email: 'luis@clinica.test', rol: 'contador', activa: true, debe_cambiar_password: false }
@@ -134,7 +134,7 @@ afterEach(() => {
 describe('acción por fila (R60; CU-14)', () => {
   it('cada fila tiene «Restablecer contraseña» junto a Editar y Desactivar/Reactivar', async () => {
     abrir(`/plataforma/usuarios?empresa=${ACTIVA}`)
-    const tabla = await screen.findByRole('table', { name: 'Usuarios de Biotecnología Dental' })
+    const tabla = await screen.findByRole('table', { name: 'Usuarios de Odontología Sonrisa' })
     for (const u of USUARIOS) {
       const fila = within(tabla).getByText(u.nombre).closest('tr')!
       expect(within(fila).getByRole('button', { name: `Editar a ${u.nombre}` })).toBeTruthy()
@@ -174,7 +174,7 @@ describe('el diálogo (R58, R60, R39)', () => {
   it('nombra a la persona y la empresa, pide las dos contraseñas con la política y el efecto', async () => {
     abrir(`/plataforma/usuarios?empresa=${ACTIVA}`)
     const d = await abrirDialogo('Luis Pérez')
-    expect(d.textContent).toContain('Luis Pérez · Biotecnología Dental')
+    expect(d.textContent).toContain('Luis Pérez · Odontología Sonrisa')
     for (const campo of [campoClave(d), campoConfirmar(d)]) {
       expect(campo.type).toBe('password')
       expect(campo.getAttribute('autocomplete')).toBe('new-password')
@@ -202,7 +202,7 @@ describe('el diálogo (R58, R60, R39)', () => {
   it('una membresía desactivada lo dice (Q-P3: se permite)', async () => {
     abrir(`/plataforma/usuarios?empresa=${ACTIVA}`)
     const d = await abrirDialogo('Eva Gil')
-    expect(d.textContent).toContain('El acceso de Eva Gil a Biotecnología Dental está desactivado')
+    expect(d.textContent).toContain('El acceso de Eva Gil a Odontología Sonrisa está desactivado')
     expect(definir(d).disabled).toBe(false)
   })
 
@@ -215,7 +215,7 @@ describe('el diálogo (R58, R60, R39)', () => {
     expect(within(confirmar).getByRole('heading', { name: '¿Definir una contraseña temporal para Luis Pérez?' })).toBeTruthy()
     const texto = confirmar.textContent!
     expect(texto).toContain('Luis Pérez')
-    expect(texto).toContain('Biotecnología Dental')
+    expect(texto).toContain('Odontología Sonrisa')
     expect(texto).toContain('Se cerrarán todas sus sesiones abiertas, también en otras empresas')
     expect(texto).toContain('deberá cambiar esta contraseña al entrar')
     expect(texto).toContain('No se vuelve a mostrar')
@@ -349,7 +349,7 @@ describe('rechazos del servidor (R55, R60): textos propios y campos vacíos', ()
     const d = await abrirDialogo('Luis Pérez')
     await definirYConfirmar(d)
     expect(await within(d).findByText('Esta empresa está desactivada')).toBeTruthy()
-    expect(d.textContent).toContain('Reactiva Biotecnología Dental en Empresas')
+    expect(d.textContent).toContain('Reactiva Odontología Sonrisa en Empresas')
     expect(d.textContent).toContain('No se cambió la contraseña')
     expect(definir(d).disabled).toBe(true)
     await waitFor(() => expect(llamadas(f, '/api/plataforma/empresas?estado=todas').length).toBeGreaterThan(1))
@@ -430,7 +430,7 @@ describe('la contraseña no queda en la caché ni en los registros (R58; securit
     render(
       <QueryClientProvider client={cliente}>
         <MemoryRouter>
-          <RestablecerContrasena empresa={{ id: ACTIVA, nombre: 'Biotecnología Dental' }} usuario={LUIS} onCerrar={onCerrar} />
+          <RestablecerContrasena empresa={{ id: ACTIVA, nombre: 'Odontología Sonrisa' }} usuario={LUIS} onCerrar={onCerrar} />
         </MemoryRouter>
       </QueryClientProvider>,
     )
@@ -490,7 +490,7 @@ describe('sesión que no se recupera (401; spec 017, C1b/T16; security-reviewer)
     render(
       <QueryClientProvider client={cliente}>
         <MemoryRouter>
-          <RestablecerContrasena empresa={{ id: ACTIVA, nombre: 'Biotecnología Dental' }} usuario={LUIS} onCerrar={vi.fn()} />
+          <RestablecerContrasena empresa={{ id: ACTIVA, nombre: 'Odontología Sonrisa' }} usuario={LUIS} onCerrar={vi.fn()} />
         </MemoryRouter>
       </QueryClientProvider>,
     )

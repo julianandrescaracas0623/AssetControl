@@ -92,7 +92,9 @@ export function Pestanas({
                 className={cn(
                   'h-control flex-none rounded-none rounded-t-lg border-0 border-b-2 border-transparent px-3 font-medium text-muted-foreground',
                   'hover:bg-muted hover:text-foreground data-active:border-primary data-active:text-foreground',
-                  'after:hidden focus-visible:ring-offset-0',
+                  // Spec 020, T7: el carril (overflow-x) recortaba el anillo por fuera; el foco
+                  // va por dentro, como contorno, y se ve completo.
+                  'after:hidden focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
                 )}
               >
                 {p.etiqueta}

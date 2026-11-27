@@ -10,13 +10,16 @@ import { cn } from '@/lib/utils'
 
 // Foto principal de un activo con cambiar y quitar (spec 012, T7; R4, R7; Q1 B: los dos
 // roles). Quitar o cambiar borra la imagen anterior (Q2 B): se confirma antes de quitar.
-// `grande` (spec 015, T7, R13): la ficha de administración muestra la foto con las
-// acciones al lado; el conteo conserva la miniatura (96 px).
-// Spec 016, T8 (D13, R11): en la ficha, la foto va en una caja de tamaño prudente
-// (MarcoImagen `foto`: 320 × 240 px desde md; todo el ancho y 200 px de alto en el
-// teléfono; object-cover) y al tocarla se amplía en un Dialogo del kit. Botones del kit
-// (48 px en el teléfono y en el conteo; antes «Agregar foto» medía 28 px) y Confirmar del
-// kit para quitarla. Mismas llamadas y mismos textos.
+// `grande` (spec 015, T7, R13; ficha admin): caja D13 de 256 × 256 px desde md (200 px
+// de alto en el teléfono). En la ficha vive a la izquierda de los datos, no encima; el
+// CTA «Agregar foto» va dentro del marco vacío. El conteo conserva la miniatura (96 px).
+// Spec 016, T8 (D13, R11): al tocarla se amplía en un Dialogo del kit. Botones del kit
+// y Confirmar del kit para quitarla. Mismas llamadas y mismos textos.
+// `lateral` (spec 015, R8): la columna derecha del conteo en escritorio (240 px desde xl).
+// Desde xl la imagen (o «Sin foto») va a lo ancho en 4:3 y los botones debajo, a lo ancho
+// de la tarjeta: nunca se cortan. Por debajo de xl la columna ocupa todo el panel y se
+// conserva la miniatura con los botones al lado (pasan debajo si no caben). Sin
+// `lateral` (teléfono, Verificar móvil) nada cambia.
 
 const fechaFoto = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' })
 
@@ -28,6 +31,7 @@ function FotoAmpliable({ foto, nombre }: { foto: Foto; nombre: string }) {
     <>
       <MarcoImagen
         variante="foto"
+        className="bg-card"
         src={imagen.url}
         alt=""
         cargando={!imagen.url && !imagen.error}
@@ -55,21 +59,17 @@ function FotoAmpliable({ foto, nombre }: { foto: Foto; nombre: string }) {
   )
 }
 
-const SIN_FOTO = (
-  <span className="flex flex-col items-center gap-2 text-cuerpo text-muted-foreground">
-    <ImageOff className="size-8" aria-hidden="true" />
-    <span>Sin foto</span>
-  </span>
-)
-
 export function FotoActivo({
   activo,
   editable = true,
   grande = false,
+  lateral = false,
 }: {
   activo: { id: string; nombre: string; foto?: Foto | null }
   editable?: boolean
   grande?: boolean
+  /** Columna lateral del conteo en escritorio: imagen a lo ancho y botones apilados desde xl. */
+  lateral?: boolean
 }) {
   const entrada = useRef<HTMLInputElement>(null)
   const pendiente = useFotoPendiente()
@@ -84,60 +84,132 @@ export function FotoActivo({
     await pendiente.elegir(archivo)
   }
 
+  const eligiendo = Boolean(pendiente.archivo && pendiente.estado === 'sin_foto')
+  const agregarEnMarco = (grande || lateral) && editable && !foto && !eligiendo
+  const vacioGrande = (
+    <span className="flex size-full flex-col items-center justify-center gap-3 px-4 py-3">
+      <span className="flex flex-col items-center gap-1.5 text-cuerpo text-muted-foreground">
+        <ImageOff className="size-6" aria-hidden="true" />
+        <span>Sin foto</span>
+      </span>
+      {agregarEnMarco && (
+        <Boton
+          variante="secundario"
+          icono={<Camera />}
+          cargando={pendiente.estado === 'subiendo'}
+          onClick={() => entrada.current?.click()}
+        >
+          Agregar foto
+        </Boton>
+      )}
+    </span>
+  )
+  const vacioLateral = (
+    <span className="flex size-full flex-col items-center justify-center gap-2 px-3 py-3">
+      <span className="flex flex-col items-center gap-1 text-etiqueta font-normal text-muted-foreground">
+        <ImageOff className="size-5" aria-hidden="true" />
+        <span>Sin foto</span>
+      </span>
+      {agregarEnMarco && (
+        <Boton
+          variante="secundario"
+          icono={<Camera />}
+          className="max-w-full"
+          cargando={pendiente.estado === 'subiendo'}
+          onClick={() => entrada.current?.click()}
+        >
+          Agregar foto
+        </Boton>
+      )}
+    </span>
+  )
   const imagen = grande ? (
     foto ? (
       <FotoAmpliable key={foto.id} foto={foto} nombre={activo.nombre} />
     ) : (
-      <MarcoImagen variante="foto" alt="" vacio={SIN_FOTO} />
+      <MarcoImagen variante="foto" className="border-dashed bg-muted/40" alt="" vacio={vacioGrande} />
     )
   ) : foto ? (
-    <FotoGuardada key={foto.id} fotoId={foto.id} descripcion={activo.nombre} />
+    <FotoGuardada
+      key={foto.id}
+      fotoId={foto.id}
+      descripcion={activo.nombre}
+      className={cn(lateral && 'aspect-[4/3] h-auto w-full shrink-0')}
+      imagenClassName={cn(lateral && 'size-full')}
+    />
+  ) : lateral ? (
+    <div
+      data-foto="imagen"
+      className="flex aspect-[4/3] w-full flex-col items-center justify-center rounded-lg border border-dashed bg-muted/40 text-etiqueta font-normal text-muted-foreground"
+    >
+      {vacioLateral}
+    </div>
   ) : (
-    <div className="flex size-24 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-xs text-muted-foreground">
+    <div
+      data-foto="imagen"
+      className="flex size-24 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-xs text-muted-foreground"
+    >
       <ImageOff className="size-5" aria-hidden="true" />
       Sin foto
     </div>
   )
+  // En la columna lateral los botones nunca pasan del ancho de la tarjeta.
+  const ajusteBoton = lateral ? 'max-w-full' : grande ? 'w-full' : undefined
+
+  const entradaArchivo = editable && (
+    <input
+      ref={entrada}
+      type="file"
+      accept="image/*"
+      capture="environment"
+      className="sr-only"
+      tabIndex={-1}
+      aria-hidden="true"
+      data-testid="entrada-foto-activo"
+      onChange={async (evento) => {
+        const archivo = evento.target.files?.[0] ?? null
+        evento.target.value = ''
+        if (!archivo) return
+        await elegir(archivo)
+      }}
+    />
+  )
 
   const acciones = editable && (
     <>
-      <input
-        ref={entrada}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="sr-only"
-        tabIndex={-1}
-        aria-hidden="true"
-        data-testid="entrada-foto-activo"
-        onChange={async (evento) => {
-          const archivo = evento.target.files?.[0] ?? null
-          evento.target.value = ''
-          if (!archivo) return
-          await elegir(archivo)
-        }}
-      />
-      <div className="flex flex-wrap items-center gap-separacion">
-        {pendiente.archivo && pendiente.estado === 'sin_foto' ? (
+      <div
+        data-foto="acciones"
+        className={cn(
+          'flex flex-wrap items-center gap-separacion',
+          (lateral || grande) && 'w-full flex-col items-stretch',
+        )}
+      >
+        {eligiendo ? (
           <>
-            <Boton onClick={() => subir(pendiente.archivo)}>Guardar foto</Boton>
-            <Boton variante="fantasma" onClick={() => pendiente.limpiar()}>
+            <Boton className={ajusteBoton} onClick={() => subir(pendiente.archivo)}>
+              Guardar foto
+            </Boton>
+            <Boton variante="fantasma" className={ajusteBoton} onClick={() => pendiente.limpiar()}>
               Cancelar
             </Boton>
           </>
         ) : (
-          <Boton
-            variante="secundario"
-            icono={<Camera />}
-            cargando={pendiente.estado === 'subiendo'}
-            onClick={() => entrada.current?.click()}
-          >
-            {foto ? 'Cambiar foto' : 'Agregar foto'}
-          </Boton>
+          !((grande || lateral) && !foto) && (
+            <Boton
+              variante="secundario"
+              className={ajusteBoton}
+              icono={<Camera />}
+              cargando={pendiente.estado === 'subiendo'}
+              onClick={() => entrada.current?.click()}
+            >
+              {foto ? 'Cambiar foto' : 'Agregar foto'}
+            </Boton>
+          )
         )}
         {foto && (
           <Boton
             variante="fantasma"
+            className={ajusteBoton}
             icono={<Trash2 />}
             disabled={quitar.isPending || pendiente.estado === 'subiendo'}
             onClick={() => setConfirmando(true)}
@@ -147,44 +219,77 @@ export function FotoActivo({
         )}
       </div>
       <div className="flex flex-col gap-1 text-etiqueta font-normal empty:hidden">
-        {pendiente.archivo && pendiente.estado === 'sin_foto' && (
-          <p className="text-muted-foreground">Foto lista. {foto ? 'Reemplazará la actual.' : ''}</p>
-        )}
+        {eligiendo && <p className="text-muted-foreground">Foto lista. {foto ? 'Reemplazará la actual.' : ''}</p>}
         <EstadoFoto estado={pendiente.estado} error={pendiente.error} onReintentar={() => subir(pendiente.archivo)} />
       </div>
     </>
   )
 
-  return (
-    <Panel role="region" aria-label="Foto del activo">
-      <div className={cn('flex gap-4', grande ? 'flex-col md:flex-row md:items-start' : 'flex-wrap items-start')}>
+  const confirmar = (
+    <Confirmar
+      abierto={confirmando}
+      onAbiertoChange={setConfirmando}
+      peligro
+      titulo={`¿Quitar la foto de ${activo.nombre}?`}
+      descripcion="La imagen se borra y no se puede recuperar. El historial guarda que se quitó."
+      textoConfirmar="Quitar foto"
+      onConfirmar={() =>
+        quitar.mutate(undefined, {
+          onSuccess: () => toast.success('Foto quitada'),
+          onError: (error) => toast.error(mensajeDeError(error)),
+        })
+      }
+    />
+  )
+
+  const contenido = (
+    <>
+      {entradaArchivo}
+      <div
+        data-foto="contenido"
+        className={cn(
+          'flex gap-4',
+          grande || lateral ? 'w-full flex-col gap-2' : 'flex-wrap items-start',
+        )}
+      >
         {imagen}
         {(editable || (grande && foto)) && (
-          <div className="flex min-w-0 flex-1 flex-col items-start gap-3">
-            {grande && (foto || editable) && (
-              <div className="flex flex-col gap-0.5">
-                {foto && <p className="text-cuerpo font-medium">Foto principal · {fechaFoto.format(new Date(foto.creada_en))}</p>}
-                {editable && <p className="text-etiqueta font-normal text-muted-foreground">Una foto principal por activo.</p>}
-              </div>
+          <div
+            data-foto="bloque-acciones"
+            className={cn(
+              'flex flex-col items-start gap-2',
+              // Lateral: con un ancho mínimo, el bloque pasa debajo de la miniatura en vez de
+              // encogerse y cortar el botón; desde xl ocupa todo el ancho y estira los botones.
+              lateral || grande ? 'w-full items-stretch' : 'min-w-0 flex-1',
+            )}
+          >
+            {grande && foto && (
+              <p className="text-etiqueta font-normal text-muted-foreground">{fechaFoto.format(new Date(foto.creada_en))}</p>
             )}
             {acciones}
           </div>
         )}
       </div>
-      <Confirmar
-        abierto={confirmando}
-        onAbiertoChange={setConfirmando}
-        peligro
-        titulo={`¿Quitar la foto de ${activo.nombre}?`}
-        descripcion="La imagen se borra y no se puede recuperar. El historial guarda que se quitó."
-        textoConfirmar="Quitar foto"
-        onConfirmar={() =>
-          quitar.mutate(undefined, {
-            onSuccess: () => toast.success('Foto quitada'),
-            onError: (error) => toast.error(mensajeDeError(error)),
-          })
-        }
-      />
+      {confirmar}
+    </>
+  )
+
+  if (grande || lateral) {
+    return (
+      <section
+        role="region"
+        aria-label="Foto del activo"
+        data-disposicion={lateral ? 'lateral' : undefined}
+        className={cn('flex min-w-0 flex-col', grande ? 'w-full md:w-64' : 'w-full')}
+      >
+        {contenido}
+      </section>
+    )
+  }
+
+  return (
+    <Panel role="region" aria-label="Foto del activo" relleno>
+      {contenido}
     </Panel>
   )
 }

@@ -1,6 +1,6 @@
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
 
 import { EstadoFoto } from '@/components/app/CampoFoto'
 import {
@@ -20,10 +20,13 @@ import { InputSugerido } from '@/components/app/InputSugerido'
 import { LocationPicker } from '@/components/app/LocationPicker'
 import { Aviso, Boton, Campo, EncabezadoPagina, MarcaObligatorio, MarcoCampo, Panel } from '@/components/kit'
 import { useIsMobile } from '@/hooks/use-mobile'
-import type { Activo } from '@/lib/activos'
+import { type Activo, normalizarCodigo } from '@/lib/activos'
 import { claseControlAlta, teclasDelAlta, useAltaActivo } from '@/lib/altaActivo'
 import { useCategorias, useUbicaciones } from '@/lib/catalogo'
+import { useSalaDeTrabajo } from '@/lib/conteo'
 import { cn } from '@/lib/utils'
+import { rutaActivo, rutaApp } from '@/lib/rutas'
+import { useRol } from '@/lib/sesion'
 
 // Registrar activo desde administración (decisión del humano 2026-11-13; D3; spec 004,
 // T6). R8: sin código de sticker no hay alta. Obligatorios: código, nombre, precio,
@@ -37,9 +40,18 @@ import { cn } from '@/lib/utils'
 // conteo (T6): el formulario en un Panel con su pie de acciones (pegado abajo en el
 // teléfono; sin el fondo de la barra lateral, Deuda T1 e), avisos y campos del kit, y la
 // columna derecha con paneles. Mismos pasos, mismos campos, mismas llamadas e idempotencia.
+// Spec 020, T5 (R6; P13): en el computador es el alta de los dos roles (el conteo de
+// escritorio enlaza aquí con `?codigo=` y /contar/nuevo redirige con su query). El código
+// de la URL llega cargado y el cursor empieza en Nombre; la ubicación empieza en la sala
+// donde se está contando, si hay una. El contador escribe el precio y después no lo ve:
+// no está en el resumen ni en «Activo creado»; al copiar de un parecido lo copia el
+// servidor (con nombre y categoría) y aquí solo se elige la ubicación y el serial, como en
+// el alta del conteo. «Varias unidades iguales» deja el precio a la vista: solo el admin.
+// Solo un código válido de la URL entra al campo. Si se llegó desde el conteo (state
+// `{ desde: 'conteo' }`), «Volver al conteo» sustituye a «Cancelar» y sale en «Activo creado».
 
-const rutaActivo = (codigo: string) => `/admin/activos/${encodeURIComponent(codigo)}`
 const FORMULARIO = 'registrar-activo'
+const RUTA_CONTEO = '/contar/escanear'
 
 function Paso({ n, titulo, nota, children }: { n: number; titulo: string; nota?: string; children: ReactNode }) {
   const id = useId()
@@ -62,29 +74,41 @@ function Paso({ n, titulo, nota, children }: { n: number; titulo: string; nota?:
 }
 
 export default function RegistrarActivo() {
-  const alta = useAltaActivo({ rol: 'admin' })
+  const rol = useRol()
+  const [params] = useSearchParams()
+  const codigoInicial = normalizarCodigo(params.get('codigo') ?? '') ?? ''
+  const { state } = useLocation()
+  const desdeConteo = (state as { desde?: unknown } | null)?.desde === 'conteo'
+  const { sala } = useSalaDeTrabajo()
+  const alta = useAltaActivo({ rol, codigoInicial, ubicacionPorDefecto: sala })
   const categorias = useCategorias()
   const ubicaciones = useUbicaciones()
   const movil = useIsMobile()
   const [varias, setVarias] = useState(false)
   const [registrado, setRegistrado] = useState<Activo | null>(null)
   const codigoRef = useRef<HTMLInputElement>(null)
-  const { campos, errores } = alta
+  const { campos, errores, copiado, duplicando } = alta
+  const esAdmin = rol === 'admin'
+  const conVarias = esAdmin && varias
 
   // Foco en el código al abrir (en el teléfono no, para no tapar el formulario con el
-  // teclado) y cada vez que el formulario queda listo para el siguiente sticker.
+  // teclado) y cada vez que el formulario queda listo para el siguiente sticker. Si el
+  // código llegó en la URL, el cursor empieza en Nombre (como tras el Enter del lector).
   const enfocar = !movil || alta.ronda > 0
+  const empiezaEnNombre = Boolean(codigoInicial) && alta.ronda === 0
   useEffect(() => {
-    if (enfocar) codigoRef.current?.focus()
-  }, [enfocar, alta.ronda])
+    if (!enfocar) return
+    if (empiezaEnNombre) document.getElementById('nombre')?.focus()
+    else codigoRef.current?.focus()
+  }, [enfocar, empiezaEnNombre, alta.ronda])
 
   function guardar(otro: boolean) {
     alta.enviar({
       alCrear:
-        otro || varias
+        otro || conVarias
           ? (activo: Activo) => {
               setRegistrado(activo)
-              if (varias) alta.siguienteUnidad()
+              if (conVarias) alta.siguienteUnidad()
               else alta.registrarOtro()
             }
           : undefined,
@@ -119,6 +143,11 @@ export default function RegistrarActivo() {
               <Boton asChild variante="secundario">
                 <Link to={rutaActivo(alta.creado.codigo)}>Ver el activo</Link>
               </Boton>
+              {desdeConteo && (
+                <Boton asChild variante="secundario">
+                  <Link to={RUTA_CONTEO}>Volver al conteo</Link>
+                </Boton>
+              )}
             </>
           }
         >
@@ -169,7 +198,7 @@ export default function RegistrarActivo() {
               pie={
                 <>
                   <Boton asChild variante="fantasma" className="max-md:hidden">
-                    <Link to="/admin/activos">Cancelar</Link>
+                    {desdeConteo ? <Link to={RUTA_CONTEO}>Volver al conteo</Link> : <Link to={rutaApp('activos')}>Cancelar</Link>}
                   </Boton>
                   <div className="flex w-full flex-col-reverse gap-separacion sm:ml-auto sm:w-auto sm:flex-row">
                     <Boton variante="secundario" disabled={alta.guardando} onClick={() => guardar(true)}>
@@ -190,33 +219,55 @@ export default function RegistrarActivo() {
 
               <Paso n={2} titulo="Datos del activo" nota="Solo se teclean nombre y precio; lo demás se elige.">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <MarcoCampo id="nombre" etiqueta="Nombre" obligatorio error={errores.nombre}>
-                    <InputSugerido
-                      campo="nombre"
-                      id="nombre"
-                      value={campos.nombre}
-                      onChange={(e) => alta.cambiar('nombre', e.target.value)}
-                      maxLength={120}
-                      autoComplete="off"
-                      aria-required
-                      aria-invalid={Boolean(errores.nombre)}
-                      aria-describedby={errores.nombre ? 'nombre-error' : undefined}
-                      className={claseControlAlta(alta)}
-                    />
-                  </MarcoCampo>
-                  <Campo
-                    id="precio"
-                    tipo="dinero"
-                    etiqueta="Precio de compra (COP)"
-                    obligatorio
-                    error={errores.precio}
-                    ayuda="Solo lo ven los administradores."
-                    value={campos.precio}
-                    onChange={(e) => alta.cambiar('precio', e.target.value)}
-                    autoComplete="off"
-                  />
-                  <CampoCategoria alta={alta} categorias={categorias.data ?? []} cargando={categorias.isPending} ayuda="Lista cerrada de la clínica." />
-                  <MarcoCampo id="ubicacion" etiqueta={<Etiqueta conserva>Ubicación <MarcaObligatorio /></Etiqueta>} error={errores.ubicacion} ayuda="Una sala o un box activos.">
+                  {duplicando ? (
+                    <Aviso
+                      tono="info"
+                      titulo={`Se copia de ${copiado!.nombre}`}
+                      className="md:col-span-2"
+                      accion={
+                        <Boton variante="fantasma" icono={<X />} className="-ml-2 px-2 text-brand-strong" onClick={alta.quitarCopia}>
+                          Quitar la copia
+                        </Boton>
+                      }
+                    >
+                      Nombre, categoría ({copiado!.categoria.nombre}), marca, modelo y precio se copian del original. El precio solo lo ven los administradores.
+                    </Aviso>
+                  ) : (
+                    <>
+                      <MarcoCampo id="nombre" etiqueta="Nombre" obligatorio error={errores.nombre}>
+                        <InputSugerido
+                          campo="nombre"
+                          id="nombre"
+                          value={campos.nombre}
+                          onChange={(e) => alta.cambiar('nombre', e.target.value)}
+                          maxLength={120}
+                          autoComplete="off"
+                          aria-required
+                          aria-invalid={Boolean(errores.nombre)}
+                          aria-describedby={errores.nombre ? 'nombre-error' : undefined}
+                          className={claseControlAlta(alta)}
+                        />
+                      </MarcoCampo>
+                      <Campo
+                        id="precio"
+                        tipo="dinero"
+                        etiqueta="Precio de compra (COP)"
+                        obligatorio
+                        error={errores.precio}
+                        ayuda={esAdmin ? 'Solo lo ven los administradores.' : 'Después de guardar, solo lo verán los administradores.'}
+                        value={campos.precio}
+                        onChange={(e) => alta.cambiar('precio', e.target.value)}
+                        autoComplete="off"
+                      />
+                      <CampoCategoria alta={alta} categorias={categorias.data ?? []} cargando={categorias.isPending} ayuda="Lista cerrada de la clínica." />
+                    </>
+                  )}
+                  <MarcoCampo
+                    id="ubicacion"
+                    etiqueta={<Etiqueta conserva>Ubicación <MarcaObligatorio /></Etiqueta>}
+                    error={errores.ubicacion}
+                    ayuda={sala && campos.ubicacion === sala ? 'Viene de la sala donde estás contando.' : 'Una sala o un box activos.'}
+                  >
                     <LocationPicker
                       id="ubicacion"
                       ubicaciones={ubicaciones.data ?? []}
@@ -227,19 +278,22 @@ export default function RegistrarActivo() {
                     />
                   </MarcoCampo>
                 </div>
-                <MasDatos alta={alta} />
+                <MasDatos alta={alta} soloSerial={duplicando} />
               </Paso>
             </Panel>
           </form>
         </div>
 
         <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-20">
-          <TarjetaCopiar alta={alta} rol="admin" />
+          <TarjetaCopiar alta={alta} rol={rol} />
           <TarjetaFoto alta={alta} />
-          <Resumen alta={alta} rol="admin" categorias={categorias.data ?? []} ubicaciones={ubicaciones.data ?? []}>
+          <Resumen alta={alta} rol={rol} categorias={categorias.data ?? []} ubicaciones={ubicaciones.data ?? []}>
+            {!esAdmin && (
+              <p className="text-etiqueta font-normal text-muted-foreground">El precio no se muestra aquí; después de guardar, solo lo ven los administradores.</p>
+            )}
             {/* Con varias unidades se conservan nombre y precio: la nota no aplica. */}
-            {!varias && <NotaRegistrarOtro />}
-            <VariasUnidades activo={varias} onCambio={setVarias} />
+            {!conVarias && <NotaRegistrarOtro />}
+            {esAdmin && <VariasUnidades activo={varias} onCambio={setVarias} />}
           </Resumen>
         </aside>
       </div>

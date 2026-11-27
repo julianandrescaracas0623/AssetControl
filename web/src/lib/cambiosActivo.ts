@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { type Activo, aPrecioCanonico, CLAVE_ACTIVOS, precioParaCampo } from '@/lib/activos'
-import { api, ErrorApi, type Esquemas, mensajeDeError } from '@/lib/api/cliente'
+import { api, ErrorApi, type Esquemas, mensajeDeError, type Rol } from '@/lib/api/cliente'
 import { useApiAutenticada } from '@/lib/sesion'
 
 // Cambios sobre un activo existente e historial (spec 005, T5–T7). Toda escritura va
@@ -125,6 +125,15 @@ export const ETIQUETAS: Record<CampoEdicion, string> = {
 }
 const OPCIONALES = ['serial', 'marca', 'modelo', 'subtipo'] as const
 
+/**
+ * Campos que cada rol edita (spec 020, R7). El contador corrige los descriptivos y nunca
+ * ve ni envía el precio: el servidor responde 400 si llega (T1).
+ */
+export const CAMPOS_POR_ROL: Record<Rol, readonly CampoEdicion[]> = {
+  admin: Object.keys(ETIQUETAS) as CampoEdicion[],
+  contador: ['nombre', 'categoria', 'serial', 'marca', 'modelo', 'subtipo', 'fecha'],
+}
+
 export function camposDe(activo: Activo): CamposEdicion {
   return {
     nombre: activo.nombre,
@@ -139,29 +148,32 @@ export function camposDe(activo: Activo): CamposEdicion {
 }
 
 /** Campos cuyo valor guardado difiere entre dos versiones del mismo activo. */
-export function camposCambiados(antes: Activo, despues: Activo): CampoEdicion[] {
+export function camposCambiados(antes: Activo, despues: Activo, rol: Rol): CampoEdicion[] {
   const a = camposDe(antes)
   const d = camposDe(despues)
-  return (Object.keys(ETIQUETAS) as CampoEdicion[]).filter((c) => a[c] !== d[c])
+  return CAMPOS_POR_ROL[rol].filter((c) => a[c] !== d[c])
 }
 
 /** Valida y arma el cuerpo con solo lo que la persona cambió respecto de `base`. */
 export function cuerpoDeEdicion(
   base: Activo,
   campos: CamposEdicion,
+  rol: Rol,
 ): { errores: ErroresEdicion; cuerpo?: Esquemas['EditarActivoBody'] } {
   const e: ErroresEdicion = {}
+  const conPrecio = CAMPOS_POR_ROL[rol].includes('precio')
   const nombre = campos.nombre.trim()
-  const precio = aPrecioCanonico(campos.precio)
+  const precio = conPrecio ? aPrecioCanonico(campos.precio) : null
   if (!nombre) e.nombre = 'Escribe el nombre'
-  if (!campos.precio.trim()) e.precio = 'Escribe el precio'
-  else if (!precio) e.precio = 'Escribe el precio en pesos, por ejemplo 389.900'
+  if (conPrecio && !campos.precio.trim()) e.precio = 'Escribe el precio'
+  else if (conPrecio && !precio) e.precio = 'Escribe el precio en pesos, por ejemplo 389.900'
   if (campos.fecha && campos.fecha > new Date().toISOString().slice(0, 10)) e.fecha = 'La fecha no puede ser futura'
   if (Object.keys(e).length > 0) return { errores: e }
 
   const cuerpo: Esquemas['EditarActivoBody'] = {}
   if (nombre !== base.nombre) cuerpo.nombre = nombre
-  if (precio !== base.precio_compra) cuerpo.precio_compra = precio!
+  // El contador nunca envía el precio (spec 020, R7), aunque el activo lo trajera.
+  if (conPrecio && precio !== base.precio_compra) cuerpo.precio_compra = precio!
   if (campos.categoria !== base.categoria.id) cuerpo.categoria_id = campos.categoria
   for (const campo of OPCIONALES) {
     const valor = campos[campo].trim() || null
@@ -177,7 +189,8 @@ export function cuerpoDeEdicion(
  * persona ve como "antes"); `version` es contra la que se guarda. Ante un 412 se
  * conserva lo escrito, se avisa qué cambió otra persona y se puede reaplicar.
  */
-export function useEdicionActivo(activo: Activo, alGuardar: (activo: Activo, sinCambios: boolean) => void) {
+// `rol` es obligatorio (spec 020, T4): sin defecto no hay forma de caer en el del admin.
+export function useEdicionActivo(activo: Activo, alGuardar: (activo: Activo, sinCambios: boolean) => void, rol: Rol) {
   const editar = useEditarActivo()
   const [base, setBase] = useState(activo)
   const [version, setVersion] = useState(activo.row_version)
@@ -191,7 +204,7 @@ export function useEdicionActivo(activo: Activo, alGuardar: (activo: Activo, sin
   }
 
   function guardar() {
-    const { errores: e, cuerpo } = cuerpoDeEdicion(base, campos)
+    const { errores: e, cuerpo } = cuerpoDeEdicion(base, campos, rol)
     setErrores(e)
     setErrorGeneral(null)
     if (!cuerpo) return
@@ -209,7 +222,7 @@ export function useEdicionActivo(activo: Activo, alGuardar: (activo: Activo, sin
         onError: (error) => {
           const vigente = vigenteDe(error)
           if (vigente) {
-            setConflicto({ vigente, cambiados: camposCambiados(base, vigente) })
+            setConflicto({ vigente, cambiados: camposCambiados(base, vigente, rol) })
             setVersion(vigente.row_version)
             return
           }

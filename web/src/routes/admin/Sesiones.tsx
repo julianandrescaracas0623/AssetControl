@@ -1,6 +1,6 @@
 import { ArrowLeftRight, ChevronRight, ClipboardList, FileText, Lock, Plus, ScanBarcode } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
 import {
@@ -24,6 +24,8 @@ import { type Pendiente, useDiscrepancias, usePendientes } from '@/lib/discrepan
 import { formatEntero } from '@/lib/format'
 import { useCerrarSesion } from '@/lib/informe'
 import { fechaCorte, hoyISO, nombreSugerido, pendientes, porcentaje, type Avance, type SesionConteo, useAbrirSesion, useDetalleSesion, useSesiones } from '@/lib/sesiones'
+import { rutaActivo, rutaApp, rutaInforme, rutaSesion } from '@/lib/rutas'
+import { useRol } from '@/lib/sesion'
 
 // Sesiones de conteo (spec 006, T5; CU-SES-01, 02; Q1): el admin abre una sesión (una
 // abierta por clínica) y ve su avance. Spec 008 (T4; R10, Q2): la cierra con un aviso de
@@ -32,6 +34,9 @@ import { fechaCorte, hoyISO, nombreSugerido, pendientes, porcentaje, type Avance
 // Spec 016, T9 (R2, R3, R5): presentación con el kit. Abrir es un Dialogo con Campo; el
 // cierre, un Dialogo con el efecto explícito y la acción de peligro (solo admin; el
 // servidor decide y congela); avance con Progreso (aria-valuenow) y tablas TablaDatos.
+// Spec 020, T6 (R9): el contador ve lo mismo en solo lectura: sin abrir ni cerrar, sin
+// enlaces al informe (ni Excel ni PDF) y sin cifras de valor (la vista no trae ninguna).
+// El servidor responde 403 a esas acciones; ocultarlas aquí es solo presentación.
 
 const fecha = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' })
 const FORMULARIO_ABRIR = 'abrir-sesion'
@@ -138,7 +143,7 @@ function TarjetaAbierta({ sesion }: { sesion: SesionConteo }) {
           </div>
           <div className="flex shrink-0 gap-separacion">
             <Boton asChild variante="secundario" className="max-md:flex-1">
-              <Link to={`/admin/sesiones/${sesion.id}`}>
+              <Link to={rutaSesion(sesion.id)}>
                 Ver avance
                 <ChevronRight aria-hidden="true" />
               </Link>
@@ -170,19 +175,23 @@ function TarjetaAbierta({ sesion }: { sesion: SesionConteo }) {
 }
 
 // Sin sesión abierta no hay conteo (006): se explica y se ofrece abrirla (maqueta t9-sin-sesion).
-function SinSesionAbierta({ onAbrir }: { onAbrir: () => void }) {
+function SinSesionAbierta({ onAbrir }: { onAbrir?: () => void }) {
   return (
     <Panel
       titulo="No hay una sesión abierta"
       acciones={
-        <Boton variante="secundario" icono={<Plus />} onClick={onAbrir}>
-          Abrir sesión
-        </Boton>
+        onAbrir && (
+          <Boton variante="secundario" icono={<Plus />} onClick={onAbrir}>
+            Abrir sesión
+          </Boton>
+        )
       }
       className="border-dashed shadow-none"
     >
       <p className="text-cuerpo text-muted-foreground">
-        Para contar, abre una sesión: el botón «Contar» aparece aquí y en su detalle. Sin una sesión abierta no se puede contar; solo se pueden consultar y registrar activos.
+        {onAbrir
+          ? 'Para contar, abre una sesión: el botón «Contar» aparece aquí y en su detalle. Sin una sesión abierta no se puede contar; solo se pueden consultar y registrar activos.'
+          : 'Cuando el administrador abra una, el botón «Contar» aparece aquí y en su detalle. Mientras tanto puedes consultar y registrar activos.'}
       </p>
     </Panel>
   )
@@ -199,14 +208,15 @@ function TituloSeccion({ id, children }: { id: string; children: string }) {
 
 const ENLACE = 'rounded-sm hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 
-const COLUMNAS_CERRADAS: ColumnaTabla<SesionConteo>[] = [
+/** El admin abre el informe congelado; el contador, el detalle de la sesión (R9). */
+const columnasCerradas = (esAdmin: boolean): ColumnaTabla<SesionConteo>[] => [
   {
     id: 'nombre',
     encabezado: 'Nombre',
     principal: true,
     clase: 'whitespace-normal',
     celda: (s) => (
-      <Link to={`/admin/sesiones/${s.id}/informe`} className={ENLACE}>
+      <Link to={esAdmin ? rutaInforme(s.id) : rutaSesion(s.id)} className={ENLACE}>
         {s.nombre}
       </Link>
     ),
@@ -217,6 +227,7 @@ const COLUMNAS_CERRADAS: ColumnaTabla<SesionConteo>[] = [
 
 export default function Sesiones() {
   const consulta = useSesiones()
+  const esAdmin = useRol() === 'admin'
   const [abriendo, setAbriendo] = useState(false)
   const sesiones = consulta.data ?? []
   const abierta = sesiones.find((s) => s.estado === 'abierta')
@@ -228,6 +239,7 @@ export default function Sesiones() {
         titulo="Sesiones"
         descripcion="Cada conteo es una sesión. Solo puede haber una abierta a la vez."
         acciones={
+          esAdmin &&
           !abierta &&
           consulta.isSuccess && (
             <Boton icono={<Plus />} onClick={() => setAbriendo(true)}>
@@ -252,11 +264,17 @@ export default function Sesiones() {
         <Estado.Vacio
           icono={<ClipboardList />}
           titulo="Aún no hay conteos"
-          descripcion="Abre la primera sesión para que el personal empiece a verificar activos."
+          descripcion={
+            esAdmin
+              ? 'Abre la primera sesión para que el personal empiece a verificar activos.'
+              : 'Cuando el administrador abra la primera sesión, aparecerá aquí.'
+          }
           accion={
-            <Boton variante="secundario" onClick={() => setAbriendo(true)}>
-              Abrir sesión
-            </Boton>
+            esAdmin && (
+              <Boton variante="secundario" onClick={() => setAbriendo(true)}>
+                Abrir sesión
+              </Boton>
+            )
           }
         />
       ) : (
@@ -267,31 +285,35 @@ export default function Sesiones() {
               <TarjetaAbierta sesion={abierta} />
             </section>
           ) : (
-            <SinSesionAbierta onAbrir={() => setAbriendo(true)} />
+            <SinSesionAbierta onAbrir={esAdmin ? () => setAbriendo(true) : undefined} />
           )}
           {cerradas.length > 0 && (
             <section aria-labelledby="titulo-cerradas" className="flex flex-col gap-2">
               <TituloSeccion id="titulo-cerradas">Cerradas</TituloSeccion>
               <TablaDatos
                 etiqueta="Sesiones cerradas"
-                columnas={COLUMNAS_CERRADAS}
+                columnas={columnasCerradas(esAdmin)}
                 filas={cerradas}
                 claveFila={(s) => s.id}
                 vacio={{ titulo: 'Aún no hay sesiones cerradas' }}
-                accionesFila={(s) => (
-                  <Boton asChild variante="fantasma">
-                    <Link to={`/admin/sesiones/${s.id}/informe`} aria-label={`Ver informe de ${s.nombre}`}>
-                      <FileText aria-hidden="true" />
-                      Informe
-                    </Link>
-                  </Boton>
-                )}
+                accionesFila={
+                  esAdmin
+                    ? (s) => (
+                        <Boton asChild variante="fantasma">
+                          <Link to={rutaInforme(s.id)} aria-label={`Ver informe de ${s.nombre}`}>
+                            <FileText aria-hidden="true" />
+                            Informe
+                          </Link>
+                        </Boton>
+                      )
+                    : undefined
+                }
               />
             </section>
           )}
         </>
       )}
-      <AbrirSesion abierto={abriendo} onAbierto={setAbriendo} />
+      {esAdmin && <AbrirSesion abierto={abriendo} onAbierto={setAbriendo} />}
     </div>
   )
 }
@@ -302,7 +324,7 @@ function AvisoDiscrepancias({ sesionId }: { sesionId: string }) {
   if (n === 0) return null
   return (
     <Link
-      to={`/admin/discrepancias?sesion=${sesionId}`}
+      to={`${rutaApp('discrepancias')}?sesion=${sesionId}`}
       className="flex min-h-control items-center gap-3 rounded-xl border border-warning-border bg-warning-soft px-4 py-3 text-cuerpo shadow-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
     >
       <ArrowLeftRight className="size-5 shrink-0 text-warning" aria-hidden="true" />
@@ -324,7 +346,7 @@ const COLUMNAS_PENDIENTES: ColumnaTabla<Pendiente>[] = [
     clase: 'whitespace-normal',
     celda: (a) => (
       <span className="flex flex-wrap items-center gap-2">
-        <Link to={`/admin/activos/${encodeURIComponent(a.codigo)}`} className={`font-medium ${ENLACE}`}>
+        <Link to={rutaActivo(a.codigo)} className={`font-medium ${ENLACE}`}>
           {a.nombre}
         </Link>
         {a.estado === 'en_reparacion' && <Insignia tono="aviso">En reparación</Insignia>}
@@ -334,21 +356,34 @@ const COLUMNAS_PENDIENTES: ColumnaTabla<Pendiente>[] = [
   { id: 'ubicacion', encabezado: 'Ubicación', clase: 'whitespace-normal text-muted-foreground', celda: (a) => a.ubicacion.ruta },
 ]
 
-function ListaPendientes({ sesionId }: { sesionId: string }) {
-  const consulta = usePendientes(sesionId, undefined)
+/**
+ * Pendientes de la sesión; con `?ubicacion=` (desde el Inicio o desde /contar/pendientes
+ * en el computador, spec 020 T6), solo los de esa ubicación.
+ */
+function ListaPendientes({ sesionId, ubicacion }: { sesionId: string; ubicacion?: { id: string; ruta: string } }) {
+  const consulta = usePendientes(sesionId, ubicacion?.id)
   const activos = consulta.data?.pages.flatMap((p) => p.activos) ?? []
-  if (consulta.isPending || activos.length === 0) return null
+  if (consulta.isPending || (activos.length === 0 && !ubicacion)) return null
   return (
     <section aria-labelledby="titulo-pendientes" className="flex flex-col gap-3">
-      <h2 id="titulo-pendientes" className="text-titulo-seccion">
-        Pendientes por verificar
+      <h2 id="titulo-pendientes" className="text-titulo-seccion text-balance">
+        {ubicacion ? `Pendientes por verificar en ${ubicacion.ruta}` : 'Pendientes por verificar'}
       </h2>
+      {/* Spec 020, T7: se ve como enlace (color y subrayado) y mide 44 px en el teléfono. */}
+      {ubicacion && (
+        <Link
+          to={rutaSesion(sesionId)}
+          className="-my-2 inline-flex min-h-11 items-center self-start rounded-sm text-cuerpo font-medium text-brand-strong underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none md:min-h-0 md:my-0"
+        >
+          Ver todas las ubicaciones
+        </Link>
+      )}
       <TablaDatos
         etiqueta="Pendientes por verificar"
         columnas={COLUMNAS_PENDIENTES}
         filas={activos}
         claveFila={(a) => a.id}
-        vacio={{ titulo: 'No hay pendientes' }}
+        vacio={{ titulo: ubicacion ? `No quedan pendientes en ${ubicacion.ruta}` : 'No hay pendientes' }}
       />
       {consulta.hasNextPage && (
         <Boton variante="secundario" className="self-start max-md:w-full" cargando={consulta.isFetchingNextPage} onClick={() => void consulta.fetchNextPage()}>
@@ -370,7 +405,7 @@ function CerrarSesion({ sesion, pendientesN }: { sesion: SesionConteo; pendiente
     cerrar.mutate(undefined, {
       onSuccess: () => {
         toast.success(`«${sesion.nombre}» quedó cerrada: este es su informe`)
-        void navegar(`/admin/sesiones/${sesion.id}/informe`)
+        void navegar(rutaInforme(sesion.id))
       },
     })
   }
@@ -435,7 +470,7 @@ function CerrarSesion({ sesion, pendientesN }: { sesion: SesionConteo; pendiente
   )
 }
 
-function SesionCerrada({ sesion }: { sesion: SesionConteo }) {
+function SesionCerrada({ sesion, esAdmin }: { sesion: SesionConteo; esAdmin: boolean }) {
   return (
     <Panel
       titulo={
@@ -445,17 +480,20 @@ function SesionCerrada({ sesion }: { sesion: SesionConteo }) {
         </span>
       }
       acciones={
-        <Boton asChild className="max-md:w-full">
-          <Link to={`/admin/sesiones/${sesion.id}/informe`}>
-            <FileText aria-hidden="true" />
-            Ver informe
-          </Link>
-        </Boton>
+        esAdmin && (
+          <Boton asChild className="max-md:w-full">
+            <Link to={rutaInforme(sesion.id)}>
+              <FileText aria-hidden="true" />
+              Ver informe
+            </Link>
+          </Boton>
+        )
       }
     >
       <p className="text-cuerpo text-muted-foreground">
         {sesion.cerrada_en ? `El ${fecha.format(new Date(sesion.cerrada_en))}` : 'Cerrada'}
-        {sesion.cerrada_por ? ` por ${sesion.cerrada_por.nombre}` : ''}. Sus cifras quedaron congeladas en el informe.
+        {sesion.cerrada_por ? ` por ${sesion.cerrada_por.nombre}` : ''}.{' '}
+        {esAdmin ? 'Sus cifras quedaron congeladas en el informe.' : 'Ya no se puede seguir contando en ella.'}
       </p>
     </Panel>
   )
@@ -464,6 +502,7 @@ function SesionCerrada({ sesion }: { sesion: SesionConteo }) {
 export function DetalleSesion({ id }: { id: string }) {
   const consulta = useDetalleSesion(id)
   const contar = rutaParaContar(useEsEscritorio())
+  const esAdmin = useRol() === 'admin'
   if (consulta.isPending) {
     return (
       <Estado.Cargando etiqueta="Cargando la sesión">
@@ -480,7 +519,7 @@ export function DetalleSesion({ id }: { id: string }) {
         descripcion="Puede que el enlace esté incompleto."
         accion={
           <Boton asChild variante="secundario">
-            <Link to="/admin/sesiones">Ver sesiones</Link>
+            <Link to={rutaApp('sesiones')}>Ver sesiones</Link>
           </Boton>
         }
       />
@@ -514,7 +553,7 @@ export function DetalleSesion({ id }: { id: string }) {
         acciones={
           abierta && (
             <>
-              <CerrarSesion sesion={sesion} pendientesN={avance.pendientes} />
+              {esAdmin && <CerrarSesion sesion={sesion} pendientesN={avance.pendientes} />}
               <Boton asChild>
                 <Link to={contar}>
                   <ScanBarcode aria-hidden="true" />
@@ -529,7 +568,7 @@ export function DetalleSesion({ id }: { id: string }) {
         <AvanceEnVivo sesion={sesion} avance={avance} />
       ) : (
         <>
-          <SesionCerrada sesion={sesion} />
+          <SesionCerrada sesion={sesion} esAdmin={esAdmin} />
           <AvisoDiscrepancias sesionId={sesion.id} />
         </>
       )}
@@ -555,6 +594,9 @@ const COLUMNAS_AVANCE: ColumnaTabla<FilaUbicacion>[] = [
 // Avance en vivo de una sesión abierta (información de trabajo, no el informe).
 function AvanceEnVivo({ sesion, avance }: { sesion: SesionConteo; avance: Avance }) {
   const pct = porcentaje(avance.verificados, avance.total)
+  const [params] = useSearchParams()
+  const pedida = params.get('ubicacion')
+  const ubicacion = avance.por_ubicacion.find((f) => f.ubicacion.id === pedida)?.ubicacion
   return (
     <>
       <Panel titulo="Avance">
@@ -579,7 +621,7 @@ function AvanceEnVivo({ sesion, avance }: { sesion: SesionConteo; avance: Avance
       ) : (
         <Estado.Vacio titulo="No hay activos que contar" descripcion="Registra activos para verlos aquí por ubicación." />
       )}
-      <ListaPendientes sesionId={sesion.id} />
+      <ListaPendientes key={ubicacion?.id ?? 'todas'} sesionId={sesion.id} ubicacion={ubicacion} />
     </>
   )
 }

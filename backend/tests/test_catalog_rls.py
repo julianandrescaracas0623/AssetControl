@@ -109,6 +109,9 @@ EXCEPTIONS = frozenset({"alembic_version", "tenant", "usuario", "limite_tasa"}) 
 TENANT_TABLES = frozenset(
     {
         "membresia",
+        # Spec usuarios (0034): registro de cambios de rol y activación; solo SELECT de la
+        # app y solo INSERT del dueño (inmutable).
+        "membresia_auditoria",
         "invitacion",
         "refresh_token",
         "ubicacion",
@@ -127,6 +130,9 @@ TENANT_TABLES = frozenset(
         "recuperacion_contrasena",
     }
 )
+
+# Tablas de empresa de solo lectura para la app (sin política de escritura): 0034.
+SOLO_LECTURA_APP = frozenset({"membresia_auditoria"})
 
 TENANT_EXPR = "(NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid"
 ISOLATION_EXPR = f"(tenant_id = {TENANT_EXPR})"
@@ -155,6 +161,13 @@ EXPECTED_POLICIES = {
         "{app}",
         ISOLATION_EXPR,
         ISOLATION_EXPR,
+    ),
+    ("membresia_auditoria", "tenant_isolation"): (
+        "PERMISSIVE",
+        "SELECT",
+        "{app}",
+        ISOLATION_EXPR,
+        None,
     ),
     ("invitacion", "tenant_isolation"): (
         "PERMISSIVE",
@@ -576,6 +589,7 @@ EXPECTED_APP_TABLE_PRIVILEGES = {
     "tenant": set(),
     "usuario": set(),
     "membresia": {"SELECT"},
+    "membresia_auditoria": {"SELECT"},
     "invitacion": set(),
     "refresh_token": {"SELECT", "INSERT"},
     "limite_tasa": {"SELECT", "INSERT"},
@@ -780,6 +794,53 @@ CAMBIO_OWNER_POLICIES = {
 # Catálogo cerrado C6 (T3): políticas del dueño (0003) con su texto exacto, tal como lo
 # devuelve pg_policies con los espacios normalizados.
 # (tabla, nombre) -> (permissive, cmd, USING, WITH CHECK).
+# Spec usuarios (0033): el admin cambia rol y activación de una persona de su empresa. Las
+# políticas del dueño se acotan por las dos GUC de la función (tenant y usuario objetivo).
+_MEM_TENANT = _uuid_guc("app.auth_membresia_tenant")
+_MEM_USUARIO = _uuid_guc("app.auth_membresia_usuario")
+_REFRESH_DE_LA_MEMBRESIA = (
+    "(EXISTS ( SELECT 1 FROM membresia m "  # noqa: S608
+    "WHERE ((m.id = refresh_token.membresia_id) "
+    "AND (m.tenant_id = refresh_token.tenant_id) "
+    f"AND (m.tenant_id = {_MEM_TENANT}) AND (m.usuario_id = {_MEM_USUARIO}))))"
+)
+MEMBRESIA_OWNER_POLICIES = {
+    ("membresia", "dueno_membresia_cambiar_leer"): (
+        "PERMISSIVE",
+        "SELECT",
+        f"(tenant_id = {_MEM_TENANT})",
+        None,
+    ),
+    ("membresia", "dueno_membresia_cambiar"): (
+        "PERMISSIVE",
+        "UPDATE",
+        f"((tenant_id = {_MEM_TENANT}) AND (usuario_id = {_MEM_USUARIO}))",
+        f"((tenant_id = {_MEM_TENANT}) AND (usuario_id = {_MEM_USUARIO}))",
+    ),
+    ("refresh_token", "dueno_refresh_cambiar_leer"): (
+        "PERMISSIVE",
+        "SELECT",
+        _REFRESH_DE_LA_MEMBRESIA,
+        None,
+    ),
+    ("refresh_token", "dueno_refresh_cambiar_revocar"): (
+        "PERMISSIVE",
+        "UPDATE",
+        f"((revocado_en IS NULL) AND {_REFRESH_DE_LA_MEMBRESIA})",
+        "(revocado_en = now())",
+    ),
+}
+
+# Spec usuarios (0034): el dueño solo inserta en la auditoría, acotado a la GUC de tenant.
+AUDITORIA_OWNER_POLICIES = {
+    ("membresia_auditoria", "dueno_auditoria_insertar"): (
+        "PERMISSIVE",
+        "INSERT",
+        None,
+        f"(tenant_id = {_MEM_TENANT})",
+    ),
+}
+
 EXPECTED_OWNER_POLICIES = {
     ("invitacion", "dueno_invitacion_validar"): (
         "PERMISSIVE",
@@ -881,12 +942,17 @@ EXPECTED_OWNER_POLICIES = {
     ),
     **RECOVERY_OWNER_POLICIES,
     **CAMBIO_OWNER_POLICIES,
+    **MEMBRESIA_OWNER_POLICIES,
+    **AUDITORIA_OWNER_POLICIES,
 }
 
 # Catálogo cerrado C6 (T3): funciones de acceso (0004).
 # nombre -> (argumentos, resultado, GUC que fija, huella sha256 de prosrc, rol con EXECUTE).
 # La huella obliga a que todo cambio del cuerpo se revise también aquí.
 SEARCH_PATH = ["search_path=pg_catalog, pg_temp"]
+# Configuración adicional de funciones concretas: cambiar_membresia (0033) acota su espera
+# de candado con lock_timeout = 5s, como las de 0027.
+EXTRA_CONFIG = {"cambiar_membresia": ["lock_timeout=5s"]}
 EXPECTED_FUNCTIONS = {
     "buscar_login": (
         "p_email text",
@@ -948,6 +1014,14 @@ EXPECTED_FUNCTIONS = {
         "cb733ca49a196da4be0966807af73ad7a5800bbfd135b6d58dd4cabf3a7f097b",
         "app",
     ),
+    # Spec usuarios (0033): cambio de rol y activación de una persona de la empresa (admin).
+    "cambiar_membresia": (
+        "p_tenant uuid, p_actor uuid, p_usuario uuid, p_rol text, p_activa boolean",
+        "TABLE(rol_resultado text, activa_resultado boolean, cambiado boolean)",
+        {"app.auth_membresia_tenant", "app.auth_membresia_usuario"},
+        "7bb249f9903bc9beb7e29d0c58ed8ec140e4ca9a57a63fdbb156d0375fd3f0a8",
+        "app",
+    ),
 }
 FUNCTION_CALLS = {
     "buscar_login": "select * from acceso.buscar_login('x@ejemplo.test')",
@@ -960,6 +1034,10 @@ FUNCTION_CALLS = {
     "restablecer_contrasena": "select acceso.restablecer_contrasena('" + "0" * 64 + "', 'h')",
     "cambiar_password_propio": (
         "select acceso.cambiar_password_propio(gen_random_uuid(), gen_random_uuid(), 'a', 'b')"
+    ),
+    "cambiar_membresia": (
+        "select * from acceso.cambiar_membresia("
+        "gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'contador', true)"
     ),
 }
 # GRANT de auth_owner (0003): tabla -> privilegio -> columnas; nada a nivel de tabla.
@@ -980,9 +1058,23 @@ EXPECTED_OWNER_COLUMNS = {
         "UPDATE": {"password_hash", "debe_cambiar_password", "sesiones_validas_desde"},
     },
     # Sin INSERT de id en membresia ni invitacion (M3): lo pone el DEFAULT.
+    # Spec usuarios (0033): cambiar rol y activa solo desde acceso.cambiar_membresia.
     "membresia": {
         "SELECT": {"id", "tenant_id", "usuario_id", "rol", "activa"},
         "INSERT": {"tenant_id", "usuario_id", "rol"},
+        "UPDATE": {"rol", "activa"},
+    },
+    # Spec usuarios (0034): solo INSERT de las columnas que escribe la función; id y
+    # creado_en los pone el DEFAULT. Sin UPDATE ni DELETE para ningún rol (inmutable).
+    "membresia_auditoria": {
+        "INSERT": {
+            "tenant_id",
+            "actor_usuario_id",
+            "usuario_id",
+            "accion",
+            "rol_anterior",
+            "rol_nuevo",
+        },
     },
     "invitacion": {
         "SELECT": {"tenant_id", "email", "rol", "token_hash", "expira_en", "usada_en"},
@@ -1307,10 +1399,31 @@ def test_every_non_exception_table_is_tenant_isolated(conn, catalog):
         if _rls_flags(conn, table) != (True, True):
             problems.append(f"{table}: RLS no habilitada y forzada")
         policy = policies.get((table, "tenant_isolation"))
-        expected = ("PERMISSIVE", "ALL", f"{{{catalog.app_role}}}", ISOLATION_EXPR, ISOLATION_EXPR)
+        if table in SOLO_LECTURA_APP:
+            # Spec usuarios (0034): la app solo lee; sin política de escritura.
+            expected = ("PERMISSIVE", "SELECT", f"{{{catalog.app_role}}}", ISOLATION_EXPR, None)
+        else:
+            expected = (
+                "PERMISSIVE",
+                "ALL",
+                f"{{{catalog.app_role}}}",
+                ISOLATION_EXPR,
+                ISOLATION_EXPR,
+            )
         if policy != expected:
             problems.append(f"{table}: tenant_isolation distinta: {policy}")
     assert problems == []
+
+
+def test_membresia_auditoria_is_immutable_for_every_role(conn, catalog):
+    # Spec usuarios (0034): nadie hace UPDATE, DELETE ni TRUNCATE; la app no hace INSERT.
+    for role in (catalog.app_role, AUTH_OWNER, *SUPABASE_ROLES):
+        tabla = _acl_table_privileges(conn, role, "membresia_auditoria")
+        columnas = set(_column_privileges(conn, role, "membresia_auditoria"))
+        assert not tabla & {"UPDATE", "DELETE", "TRUNCATE", "INSERT"}, role
+        assert not columnas & {"UPDATE", "DELETE"}, role
+    politicas = [key for key, value in _policies(conn).items() if key[0] == "membresia_auditoria"]
+    assert all(_policies(conn)[key][1] in ("SELECT", "INSERT") for key in politicas)
 
 
 def test_no_role_but_the_owner_can_delete_or_truncate(conn, catalog):
@@ -1660,7 +1773,7 @@ def test_acceso_function_signature_and_attributes(conn, name):
     assert function["lang"] == "plpgsql"
     assert function["volatile"] == "v"
     assert function["owner"] == AUTH_OWNER
-    assert function["config"] == SEARCH_PATH
+    assert sorted(function["config"]) == sorted([*SEARCH_PATH, *EXTRA_CONFIG.get(name, [])])
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED_FUNCTIONS))

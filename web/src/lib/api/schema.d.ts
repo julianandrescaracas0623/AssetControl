@@ -217,6 +217,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/usuarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Usuarios de la empresa con su rol y estado (solo admin)
+         * @description Por membresía de la empresa de la sesión: nombre, correo, rol, si la membresía está activa y si la persona debe cambiar su contraseña. Nunca trae contraseñas ni hashes. Solo ve la empresa de la sesión.
+         */
+        get: operations["listarUsuarios"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/usuarios/{usuario_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Cambiar el rol y activar o desactivar a una persona de la empresa (solo admin)
+         * @description Exactamente rol y activa; cualquier otra clave da 400. No edita nombre, correo ni contraseña. Cambia la membresía de esta empresa, no la de otras. No se cambia el propio rol ni se desactiva uno mismo (409 cambio_propio_no_permitido). Quitar el rol admin o desactivar al último admin activo da 409 ultimo_admin. Si se desactiva o cambia el rol, se revocan las sesiones renovables de esa membresía: desactivada, su siguiente petición recibe 401; con rol nuevo, lo aplica en la siguiente petición. Si nada cambia, responde 200 sin escribir.
+         */
+        put: operations["cambiarUsuario"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ubicaciones": {
         parameters: {
             query?: never;
@@ -390,7 +430,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Editar un activo (solo admin; cada cambio deja su evento) */
+        /**
+         * Editar un activo (admin todo; contador solo campos descriptivos)
+         * @description El admin edita todos los campos de EditarActivoBody. El contador (spec 020, R7) solo nombre, categoria_id, marca, modelo, subtipo, serial y fecha_compra; cualquier otro campo (precio_compra, codigo, ubicacion*, estado* u otro) es 400 sin cambiar nada. Cada cambio deja su evento en activo_evento con su autor. Al contador nunca se le devuelve precio (ni en 200, ni en 400, ni en 412).
+         */
         patch: operations["editarActivo"];
         trace?: never;
     };
@@ -600,7 +643,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Activos vistos en otra ubicación según su verificación vigente (solo admin) */
+        /**
+         * Activos vistos en otra ubicación según su verificación vigente (ambos roles)
+         * @description Solo lectura para el admin y el contador (spec 020, R8), en sesiones abiertas y cerradas. La vista no trae precios ni valores y es la misma para los dos roles; aplicar y descartar siguen siendo solo del admin.
+         */
         get: operations["listarDiscrepancias"];
         put?: never;
         post?: never;
@@ -1145,7 +1191,7 @@ export interface components {
          * @description Código estable del error; el texto para la persona va en message.
          * @enum {string}
          */
-        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "enlace_invalido" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta" | "fotos_no_disponibles" | "sin_foto" | "foto_id_en_uso" | "empresa_sin_datos" | "sin_logo" | "logo_id_en_uso" | "foto_existente" | "imagen_demasiado_grande" | "tipo_no_admitido" | "imagen_invalida" | "exportacion_demasiado_grande" | "campo_invalido" | "contrasenas_distintas" | "empresa_existente" | "email_en_uso" | "cambio_password_requerido" | "contrasena_repetida" | "empresa_inactiva" | "ultimo_admin" | "empresa_sin_admin" | "logos_no_disponibles";
+        ErrorCode: "solicitud_invalida" | "no_autenticado" | "prohibido" | "no_encontrado" | "metodo_no_permitido" | "cuerpo_demasiado_grande" | "tipo_no_soportado" | "error_http" | "error_interno" | "servicio_no_disponible" | "demasiadas_solicitudes" | "credenciales_invalidas" | "invitacion_invalida" | "enlace_invalido" | "contrasena_invalida" | "contrasena_corta" | "contrasena_larga" | "contrasena_comun" | "jerarquia_invalida" | "nombre_duplicado" | "tiene_hijas_activas" | "padre_inactivo" | "tiene_activos" | "codigo_invalido" | "precio_invalido" | "ubicacion_invalida" | "codigo_existente" | "falta_version" | "version_desactualizada" | "codigo_inmutable" | "activo_dado_de_baja" | "motivo_invalido" | "sesion_abierta_existente" | "sesion_cerrada" | "sesion_abierta" | "fotos_no_disponibles" | "sin_foto" | "foto_id_en_uso" | "empresa_sin_datos" | "sin_logo" | "logo_id_en_uso" | "foto_existente" | "imagen_demasiado_grande" | "tipo_no_admitido" | "imagen_invalida" | "exportacion_demasiado_grande" | "campo_invalido" | "contrasenas_distintas" | "empresa_existente" | "email_en_uso" | "cambio_password_requerido" | "contrasena_repetida" | "empresa_inactiva" | "ultimo_admin" | "cambio_propio_no_permitido" | "empresa_sin_admin" | "logos_no_disponibles";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -1165,6 +1211,31 @@ export interface components {
             /** Format: email */
             email: string;
             nombre: string;
+        };
+        UsuarioEmpresa: {
+            /** Format: uuid */
+            id: string;
+            nombre: string;
+            /** Format: email */
+            email: string;
+            rol: components["schemas"]["Rol"];
+            /** @description Si la membresía de la empresa está activa. */
+            activa: boolean;
+            debe_cambiar_password: boolean;
+        };
+        ListaUsuarios: {
+            usuarios: components["schemas"]["UsuarioEmpresa"][];
+        };
+        CambiarUsuarioBody: {
+            rol: components["schemas"]["Rol"];
+            /** @description Si la membresía de la empresa queda activa. */
+            activa: boolean;
+        };
+        UsuarioEmpresaCambiado: {
+            /** Format: uuid */
+            id: string;
+            rol: components["schemas"]["Rol"];
+            activa: boolean;
         };
         Tenant: {
             /** Format: uuid */
@@ -1626,7 +1697,7 @@ export interface components {
             };
             activo: components["schemas"]["ActivoResumen"];
         };
-        /** @description El activo cambió desde que se leyó; trae el vigente (con precio, solo admin). */
+        /** @description El activo cambió desde que se leyó; trae el vigente con su foto (con precio solo para el admin; sin clave de precio para el contador). */
         VersionDesactualizada: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -1636,7 +1707,7 @@ export interface components {
             };
             activo: components["schemas"]["Activo"];
         };
-        /** @description Solo los campos que cambian; null o "" borra un opcional. El código no se puede cambiar (400 codigo_inmutable). */
+        /** @description Solo los campos que cambian; null o "" borra un opcional. El código no se puede cambiar (400 codigo_inmutable). precio_compra es solo del admin: el contador que lo envía recibe 400 solicitud_invalida (spec 020, R7). */
         EditarActivoBody: {
             nombre?: components["schemas"]["NombreVisible"];
             /** Format: uuid */
@@ -2174,6 +2245,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description No se puede cambiar: es tu propia cuenta (no cambias tu rol ni te desactivas) o quitaría el rol admin o desactivaría al último admin activo de la empresa. */
+        UsuarioNoCambiable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description El activo está dado de baja; solo se puede reactivar. */
         ActivoDadoDeBaja: {
             headers: {
@@ -2201,7 +2281,7 @@ export interface components {
                 "application/json": components["schemas"]["VersionDesactualizada"];
             };
         };
-        /** @description Guardado (o sin cambios); el activo con precio, foto y su versión. */
+        /** @description Guardado (o sin cambios); el activo con foto y su versión (con precio solo para el admin). */
         ActivoCambiado: {
             headers: {
                 /** @description La versión nueva entre comillas, para el próximo If-Match. */
@@ -2703,6 +2783,60 @@ export interface operations {
             503: components["responses"]["ServicioNoDisponible"];
         };
     };
+    listarUsuarios: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lista de usuarios de la empresa. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListaUsuarios"];
+                };
+            };
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+        };
+    };
+    cambiarUsuario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuario_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CambiarUsuarioBody"];
+            };
+        };
+        responses: {
+            /** @description El rol y la activación resultantes (los mismos de antes si no cambió nada). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsuarioEmpresaCambiado"];
+                };
+            };
+            400: components["responses"]["SolicitudInvalida"];
+            401: components["responses"]["NoAutenticado"];
+            403: components["responses"]["Prohibido"];
+            404: components["responses"]["NoEncontrado"];
+            409: components["responses"]["UsuarioNoCambiable"];
+            503: components["responses"]["ServicioNoDisponible"];
+        };
+    };
     listarUbicaciones: {
         parameters: {
             query?: never;
@@ -3141,7 +3275,7 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["ActivoCambiado"];
-            /** @description Cuerpo o precio no válidos, o se intentó cambiar el código. */
+            /** @description Cuerpo o precio no válidos, se intentó cambiar el código, o el contador envió un campo que no es descriptivo (solicitud_invalida; nunca precio_invalido). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3151,7 +3285,6 @@ export interface operations {
                 };
             };
             401: components["responses"]["NoAutenticado"];
-            403: components["responses"]["Prohibido"];
             404: components["responses"]["NoEncontrado"];
             409: components["responses"]["ActivoDadoDeBaja"];
             412: components["responses"]["VersionDesactualizada"];
@@ -3661,7 +3794,6 @@ export interface operations {
             };
             400: components["responses"]["SolicitudInvalida"];
             401: components["responses"]["NoAutenticado"];
-            403: components["responses"]["Prohibido"];
             404: components["responses"]["NoEncontrado"];
         };
     };

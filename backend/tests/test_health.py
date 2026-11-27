@@ -148,3 +148,12 @@ def test_health_only_accepts_get():
 
     assert response.status_code == 405
     assert response.get_json()["error"]["code"] == "metodo_no_permitido"
+
+
+def test_health_answers_no_store_both_when_up_and_down(up_app):
+    # SEC-09: ni el 200 ni el 503 de /health los guarda un intermediario.
+    arriba = up_app.test_client().get("/health")
+    assert (arriba.status_code, arriba.headers["Cache-Control"]) == (200, "no-store")
+    abajo = make_app(DOWN_DB).test_client().get("/health")
+    assert (abajo.status_code, abajo.headers["Cache-Control"]) == (503, "no-store")
+    assert set(arriba.get_json()) == {"status", "db", "version"}

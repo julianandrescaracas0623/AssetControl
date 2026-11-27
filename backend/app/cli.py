@@ -26,6 +26,10 @@ migrador no es superusuario (Supabase), con el usuario y la contraseña solo por
 (``APP_DB_USER``, ``APP_DB_PASSWORD``) y la contraseña enviada como verificador SCRAM
 (``app.roles``).
 
+``flask sembrar-demo <email>`` (solo development/test) siembra categorías sugeridas,
+ubicaciones de prueba y activos sintéticos ``DEMO-*`` en la clínica del admin
+indicado. Idempotente. No corre en production/staging ni usa datos de la clínica.
+
 Cuentas de desarrollador de la consola de plataforma (spec 017, T1; R7–R10; plan.md
 §2.4): ``flask crear-desarrollador <email>``, ``flask restablecer-desarrollador <email>`` y
 ``flask desactivar-desarrollador <email> [--reactivar]``.
@@ -49,7 +53,8 @@ import sys
 
 import click
 import psycopg
-from flask import Flask
+from flask import Flask, current_app
+from flask.cli import with_appcontext
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
@@ -58,14 +63,17 @@ from sqlalchemy.pool import NullPool
 from app import conexiones, roles
 from app.auth.credentials import PasswordPolicyError, new_token, token_key
 from app.config import (
+    LOCAL_ENVIRONMENTS,
     InvalidDatabaseUrlError,
     MissingConfigError,
     SameDatabaseRoleError,
+    get_config,
     load_migration_url,
 )
 from app.invitaciones.service import normalize_invitation_email
 from app.nombres import NOMBRE_MAX_LENGTH, normalize_display_name
 from app.plataforma.credenciales import hash_developer_password
+from app.sembrar import SembrarError, sembrar_demo
 
 INVITATION_LINK_PREFIX = "/invitacion#"
 CONNECT_TIMEOUT_SECONDS = 5
@@ -415,6 +423,25 @@ def desactivar_desarrollador_command(email: str, reactivar: bool) -> None:
         click.echo("Desarrollador desactivado; sus sesiones abiertas se cerraron.")
 
 
+@click.command("sembrar-demo")
+@click.argument("email")
+@with_appcontext
+def sembrar_demo_command(email: str) -> None:
+    """Siembra activos sintéticos DEMO-* en la clínica del admin (solo local)."""
+    if get_config(current_app).environment not in LOCAL_ENVIRONMENTS:
+        raise click.ClickException("sembrar-demo solo se admite en development y pruebas locales.")
+    failure: str | None = None
+    try:
+        resultado = sembrar_demo(email)
+    except SembrarError as exc:
+        failure = str(exc)
+    except (SQLAlchemyError, psycopg.Error) as exc:
+        failure = f"error de base ({_database_error_summary(exc)})"
+    if failure is not None:
+        raise click.ClickException(failure)
+    click.echo(f"{resultado.nuevos} activos nuevos, {resultado.existentes} ya estaban.")
+
+
 def register_cli(app: Flask) -> None:
     """Registra los comandos del operador en ``flask``."""
     app.cli.add_command(create_tenant_command)
@@ -424,3 +451,4 @@ def register_cli(app: Flask) -> None:
     app.cli.add_command(crear_desarrollador_command)
     app.cli.add_command(restablecer_desarrollador_command)
     app.cli.add_command(desactivar_desarrollador_command)
+    app.cli.add_command(sembrar_demo_command)

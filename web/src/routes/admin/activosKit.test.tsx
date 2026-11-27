@@ -74,13 +74,13 @@ describe('caracterización de Activos (T8): lo que no cambia', () => {
     abrir('/admin/activos', catalogo)
     expect(await screen.findByText('Aún no hay activos')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Ir a escanear' }).getAttribute('href')).toBe('/contar/escanear')
-    expect(screen.getAllByRole('link', { name: /Registrar activo/ }).every((a) => a.getAttribute('href') === '/admin/activos/nuevo')).toBe(true)
+    expect(screen.getAllByRole('link', { name: /Registrar activo/ }).every((a) => a.getAttribute('href') === '/app/activos/nuevo')).toBe(true)
   })
 
   it('en el teléfono, una tarjeta por activo con enlace a la ficha, estado y precio (admin)', async () => {
     abrir('/admin/activos', catalogoDemo('admin'), { movil: true })
     const enlace = await screen.findByRole('link', { name: /Silla ergonómica/ })
-    expect(enlace.getAttribute('href')).toBe('/admin/activos/000123')
+    expect(enlace.getAttribute('href')).toBe('/app/activos/000123')
     expect(screen.queryByRole('table')).toBeNull()
     const tarjeta = enlace.closest('li')!
     expect(tarjeta.textContent).toContain('000123')
@@ -133,7 +133,7 @@ describe('caracterización de la ficha (T8): lo que no cambia', () => {
     cleanup()
     abrir('/admin/activos/NOEXISTE')
     expect(await screen.findByRole('heading', { level: 1, name: 'No encontramos ese código' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Ver activos' }).getAttribute('href')).toBe('/admin/activos')
+    expect(screen.getByRole('link', { name: 'Ver activos' }).getAttribute('href')).toBe('/app/activos')
   })
 
   it('un error ofrece «Reintentar»', async () => {
@@ -158,23 +158,28 @@ describe('caracterización de la ficha (T8): lo que no cambia', () => {
     expect(compra.textContent).toContain('El precio solo lo ven los administradores.')
   })
 
-  it('sin foto: «Sin foto», «Agregar foto» y la nota de una foto principal', async () => {
+  it('sin foto: «Sin foto» y «Agregar foto»', async () => {
     abrir('/admin/activos/000123')
     expect(await screen.findByText('Sin foto')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Agregar foto' })).toBeTruthy()
-    expect(screen.getByText('Una foto principal por activo.')).toBeTruthy()
+    expect(screen.queryByText('Una foto principal por activo.')).toBeNull()
   })
 })
 
 describe('diseño de la ficha (T8): kit y foto de tamaño prudente (D13)', () => {
-  it('datos en Panel + ListaDatos del kit; historial en un Panel', async () => {
+  it('expediente en un Panel; identificación y compra con ListaDatos', async () => {
     abrir('/admin/activos/000123')
-    for (const nombre of ['Identificación', 'Ubicación', 'Compra', 'Historial']) {
-      const region = await screen.findByRole('region', { name: nombre })
-      expect(region.getAttribute('data-kit')).toBe('panel')
-    }
-    expect(within(screen.getByRole('region', { name: 'Compra' })).getByText('$ 389.900,00').closest('dd')?.className).toContain('tabular-nums')
-    expect(screen.getByRole('region', { name: 'Identificación' }).querySelector('[data-kit=lista-datos]')).toBeTruthy()
+    const identificacion = await screen.findByRole('region', { name: 'Identificación' })
+    const compra = screen.getByRole('region', { name: 'Compra' })
+    const historial = screen.getByRole('region', { name: 'Historial' })
+    const ubicacion = screen.getByRole('region', { name: 'Ubicación' })
+    const expediente = identificacion.closest('[data-kit=panel]')
+    expect(expediente).toBeTruthy()
+    expect(compra.closest('[data-kit=panel]')).toBe(expediente)
+    expect(historial.closest('[data-kit=panel]')).toBe(expediente)
+    expect(ubicacion.closest('[data-kit=panel]')).toBe(expediente)
+    expect(within(compra).getByText('$ 389.900,00').closest('dd')?.className).toContain('tabular-nums')
+    expect(identificacion.querySelector('[data-kit=lista-datos]')).toBeTruthy()
   })
 
   it('sin foto: la caja tiene el tamaño de D13 y «Agregar foto» es un Boton del kit (48 px en teléfono)', async () => {
@@ -182,16 +187,18 @@ describe('diseño de la ficha (T8): kit y foto de tamaño prudente (D13)', () =>
     const vacio = await screen.findByText('Sin foto')
     const caja = vacio.closest('[data-kit=marco-imagen]')
     expect(caja?.getAttribute('data-variante')).toBe('foto')
-    expect(clases(caja)).toEqual(expect.arrayContaining(['w-full', 'h-50', 'md:w-80', 'md:h-60']))
-    expect(screen.getByRole('button', { name: 'Agregar foto' }).getAttribute('data-kit')).toBe('boton')
-    expect(clases(screen.getByRole('button', { name: 'Agregar foto' }))).toContain('h-control')
+    expect(clases(caja)).toEqual(expect.arrayContaining(['w-full', 'h-50', 'md:w-64', 'md:h-64']))
+    const agregar = screen.getByRole('button', { name: 'Agregar foto' })
+    expect(agregar.getAttribute('data-kit')).toBe('boton')
+    expect(clases(agregar)).toContain('h-control')
+    expect(agregar.closest('[data-kit=marco-imagen]')).toBe(caja)
   })
 
-  it('con foto: caja de 320 × 240 (200 px de alto en teléfono), object-cover, y al tocarla se amplía en un Dialogo', async () => {
+  it('con foto: caja de 256 × 256 (200 px de alto en teléfono), object-cover, y al tocarla se amplía en un Dialogo', async () => {
     abrir('/admin/activos/000123')
     const ver = await subirFoto()
     expect(ver.getAttribute('data-kit')).toBe('marco-imagen')
-    expect(clases(ver)).toEqual(expect.arrayContaining(['w-full', 'h-50', 'md:w-80', 'md:h-60', 'max-w-full']))
+    expect(clases(ver)).toEqual(expect.arrayContaining(['w-full', 'h-50', 'md:w-64', 'md:h-64', 'max-w-full']))
     const miniatura = ver.querySelector('img')!
     expect(clases(miniatura)).toEqual(expect.arrayContaining(['size-full', 'object-cover']))
     // La foto ya no ocupa todo el ancho de la columna (antes aspect-[4/3] w-full).

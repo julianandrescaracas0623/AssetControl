@@ -2,12 +2,14 @@ import { FotoGuardada } from '@/components/app/CampoFoto'
 import { Boton, Estado } from '@/components/kit'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { type EventoActivo, useHistorial } from '@/lib/cambiosActivo'
-import { TONOS, vista } from '@/lib/eventos'
+import { paraRol, TONOS, vista } from '@/lib/eventos'
+import { useRol } from '@/lib/sesion'
 import { cn } from '@/lib/utils'
 
 // Línea de tiempo de un activo (spec 005, T7; CU-HIS-01). Muestra lo que el servidor
-// manda: al contador ya le llega sin eventos ni valores de precio (P13), así que este
-// componente no filtra nada. Orden por `seq`, lo más reciente arriba.
+// manda: al contador ya le llega sin eventos ni valores de precio (P13). Spec 020, T4:
+// defensa en dos capas, `HistorialActivo` igual se los quita a quien no es admin
+// (`paraRol`). Orden por `seq`, lo más reciente arriba.
 // Spec 016, T5: estados cargando/error/«Ver más» con el kit (R3).
 
 const fechaHora = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
@@ -46,6 +48,7 @@ export function LineaDeTiempo({ eventos, className }: { eventos: EventoActivo[];
 /** Historial de un activo con sus estados: cargando, error con reintento y "Ver más". */
 export function HistorialActivo({ activoId, className }: { activoId: string; className?: string }) {
   const historial = useHistorial(activoId)
+  const rol = useRol()
   if (historial.isPending) {
     return <Estado.Cargando etiqueta="Cargando el historial" filas={2} className={className} />
   }
@@ -60,7 +63,7 @@ export function HistorialActivo({ activoId, className }: { activoId: string; cla
       />
     )
   }
-  const eventos = historial.data.pages.flatMap((p) => p.eventos)
+  const eventos = paraRol(historial.data.pages.flatMap((p) => p.eventos), rol)
   return (
     <div className={cn('flex flex-col gap-4', className)}>
       {eventos.length === 0 ? (

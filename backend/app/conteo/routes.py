@@ -5,9 +5,11 @@ el admin abre (Q1) y solo él recibe ``precio_al_contar`` (P13). Una sesión de 
 tenant es ``404``. Cuerpos JSON de 4 KB como máximo (``app.auth.http``).
 """
 
+import logging
 import uuid
 from urllib.parse import quote
 
+from botocore.exceptions import BotoCoreError, ClientError
 from flask import Blueprint, Response, current_app, jsonify, request
 from flask.typing import ResponseReturnValue
 
@@ -18,6 +20,7 @@ from app.errors import error_response
 from app.fotos.almacen import EXTENSION_KEY
 
 bp = Blueprint("sesiones", __name__, url_prefix="/sesiones")
+logger = logging.getLogger(__name__)
 
 
 def _error(exc: service.ErrorConteo) -> ResponseReturnValue:
@@ -103,11 +106,13 @@ def ultima_verificacion(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002
     return jsonify(verificacion=vista)
 
 
-# --- Spec 007: discrepancias (solo admin) y pendientes (ambos) ----------------------------
+# --- Spec 007: discrepancias (resolver, solo admin) y pendientes (ambos) -----------------
+# Spec 020 (R8): la lista es de ambos roles en solo lectura; su vista no trae precios ni
+# valores (activo, ubicaciones, autor y fechas), así que es la misma para los dos.
 
 
 @bp.get("/<uuid:id>/discrepancias")
-@require_role("admin")
+@require_role("admin", "contador")
 def listar_discrepancias(id: uuid.UUID) -> ResponseReturnValue:  # noqa: A002
     try:
         items = discrepancias.listar(current_session(), id, request.args.get("estado"))
@@ -202,7 +207,10 @@ def _archivo(contenido: bytes, mimetype: str, nombre: str) -> Response:
 
 
 def _logo(session, empresa: dict) -> bytes | None:
-    """Bytes del logo congelado; si no hay o no se puede leer, el archivo sale sin logo."""
+    """Bytes del logo congelado; si no hay o no se puede leer (no existe, almacén sin
+    configurar, disco o S3 con error), el archivo sale sin logo (spec 019, req. 8): el logo
+    es decorativo y no tumba el informe. Un fallo del almacén deja un WARNING con el tipo
+    del error y, en S3, su código; sin clave, ruta, endpoint, bucket ni datos."""
     logo = empresa.get("logo")
     if not logo:
         return None
@@ -211,6 +219,14 @@ def _logo(session, empresa: dict) -> bytes | None:
             session, current_app.extensions.get(EXTENSION_KEY), uuid.UUID(logo["id"])
         )
     except empresa_service.ErrorEmpresa:
+        return None
+    except (OSError, ClientError, BotoCoreError) as exc:
+        # Solo el tipo y, en S3, el código del error (un enum, sin datos); nunca la
+        # clave, la ruta, el endpoint, el bucket ni datos de la empresa o del informe.
+        detalle = type(exc).__name__
+        if isinstance(exc, ClientError):
+            detalle += f" {exc.response.get('Error', {}).get('Code', '')}".rstrip()
+        logger.warning("Informe sin logo: el almacén falló (%s).", detalle)
         return None
 
 

@@ -13,6 +13,7 @@ import {
   useUbicaciones,
 } from '@/lib/catalogo'
 import { cn } from '@/lib/utils'
+import { rutaApp } from '@/lib/rutas'
 
 // /admin/ubicaciones (spec 003, T5; R2, R4; plan §5): sede > sala > box. El tipo y el
 // padre los fija el botón que se pulsa (el admin no elige jerarquía); renombrar y
@@ -186,7 +187,7 @@ export default function Ubicaciones() {
           // D2 (spec 004) y R10 (spec 005): llevar a los activos que hay que mover.
           error instanceof ErrorApi && error.code === 'tiene_activos'
             ? toast.error(error.message, {
-                action: { label: 'Ver activos', onClick: () => navegar(`/admin/activos?ubicacion=${encodeURIComponent(ubicacion.id)}`) },
+                action: { label: 'Ver activos', onClick: () => navegar(`${rutaApp('activos')}?ubicacion=${encodeURIComponent(ubicacion.id)}`) },
               })
             : toast.error(mensajeDeError(error)),
       },

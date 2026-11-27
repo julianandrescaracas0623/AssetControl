@@ -2,7 +2,7 @@ import { LoaderCircle, Package } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { ADMIN_NAV } from '@/components/app/admin-nav'
+import { navDeRol } from '@/components/app/app-nav'
 import {
   Command,
   CommandDialog,
@@ -14,15 +14,19 @@ import {
   CommandSeparator,
 } from '@/components/ui/command'
 import { useBuscarActivos } from '@/lib/activos'
+import { rutaActivo } from '@/lib/rutas'
+import { useRol } from '@/lib/sesion'
 
 // Buscador global (docs/08 §4.1, spec 001b T5): activos por código, nombre o serial y
 // saltos a pantallas. Desde la spec 004 los activos los busca el servidor (por tenant,
 // 300 ms después de escribir); las pantallas se filtran aquí.
+// Spec 020, T3: solo las pantallas del rol de la sesión (el servidor sigue siendo la barrera).
 
 const sinTildes = (texto: string) => texto.normalize('NFD').replace(/\p{Mn}/gu, '').toLowerCase()
 
 export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const navigate = useNavigate()
+  const rol = useRol()
   const [consulta, setConsulta] = useState('')
   const [q, setQ] = useState('')
   useEffect(() => {
@@ -31,7 +35,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
   }, [consulta])
   const busqueda = useBuscarActivos({ q }, open && q !== '')
   const activos = q ? (busqueda.data?.activos ?? []).slice(0, 8) : []
-  const pantallas = ADMIN_NAV.flatMap((grupo) => grupo.items).filter(
+  const pantallas = navDeRol(rol).flatMap((grupo) => grupo.items).filter(
     (item) => !consulta.trim() || sinTildes(item.titulo).includes(sinTildes(consulta.trim())),
   )
   const buscando = q !== consulta.trim() || (q !== '' && busqueda.isFetching)
@@ -73,7 +77,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
               <CommandItem
                 key={activo.id}
                 value={`activo ${activo.id}`}
-                onSelect={() => ir(`/admin/activos/${encodeURIComponent(activo.codigo)}`)}
+                onSelect={() => ir(rutaActivo(activo.codigo))}
                 className="min-h-control"
               >
                 <Package />

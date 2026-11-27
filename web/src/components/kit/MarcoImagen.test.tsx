@@ -13,12 +13,12 @@ afterEach(cleanup)
 const clases = (el: Element | null) => (el?.getAttribute('class') ?? '').split(/\s+/)
 
 describe('MarcoImagen', () => {
-  it('foto de la ficha: 320 × 240 px desde md; en teléfono ancho completo y 200 px de alto; object-cover', () => {
+  it('foto de la ficha: 256 × 256 px desde md; en teléfono ancho completo y 200 px de alto; object-cover', () => {
     render(<MarcoImagen variante="foto" src="blob:foto" alt="Silla" />)
     const caja = document.querySelector('[data-kit=marco-imagen]')
     expect(caja?.getAttribute('data-variante')).toBe('foto')
-    // h-50 = 200 px y w-full en teléfono; md:h-60 = 240 px y md:w-80 = 320 px.
-    expect(clases(caja)).toEqual(expect.arrayContaining(['w-full', 'h-50', 'md:w-80', 'md:h-60', 'max-w-full', 'overflow-hidden']))
+    // h-50 = 200 px y w-full en teléfono; md:h-64 md:w-64 = 256 px (cabe al lado de los datos).
+    expect(clases(caja)).toEqual(expect.arrayContaining(['w-full', 'h-50', 'md:w-64', 'md:h-64', 'max-w-full', 'overflow-hidden']))
     const img = screen.getByRole('img', { name: 'Silla' })
     // Llena la caja y recorta: nunca se estira ni se sale.
     expect(clases(img)).toEqual(expect.arrayContaining(['size-full', 'object-cover']))
@@ -42,7 +42,7 @@ describe('MarcoImagen', () => {
   })
 
   it('las medidas viven en un solo lugar (MEDIDAS_IMAGEN) para reutilizarlas', () => {
-    expect(MEDIDAS_IMAGEN.foto.caja).toContain('md:w-80')
+    expect(MEDIDAS_IMAGEN.foto.caja).toContain('md:w-64')
     expect(MEDIDAS_IMAGEN.logo.ajuste).toBe('object-contain')
     expect(MEDIDAS_IMAGEN.foto.ajuste).toBe('object-cover')
   })
@@ -81,7 +81,7 @@ describe('MarcoImagen', () => {
     render(<MarcoImagen variante="foto" src="blob:foto" alt="" onAmpliar={ampliar} etiquetaAmpliar="Ver la foto de Silla" />)
     const boton = screen.getByRole('button', { name: 'Ver la foto de Silla' })
     expect(boton.getAttribute('data-kit')).toBe('marco-imagen')
-    expect(clases(boton)).toEqual(expect.arrayContaining(['h-50', 'md:h-60', 'focus-visible:ring-2']))
+    expect(clases(boton)).toEqual(expect.arrayContaining(['h-50', 'md:h-64', 'focus-visible:ring-2']))
     fireEvent.click(boton)
     expect(ampliar).toHaveBeenCalledOnce()
   })

@@ -1,11 +1,11 @@
 import { ArrowLeft, Package, RefreshCw, Wrench } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router'
 
-import { rutaInforme } from '@/components/app/admin-nav'
 import { Boton, type ColumnaTabla, EncabezadoPagina, Esqueleto, Estado, Insignia, Panel, Pestanas, TablaDatos } from '@/components/kit'
 import { mensajeDeError } from '@/lib/api/cliente'
 import { formatCOP, formatEntero, formatUnidades } from '@/lib/format'
 import { type FilaValor, type ValorEnVivo, useInformeDeOrigen, useValorActual } from '@/lib/informe'
+import { rutaApp, rutaInforme } from '@/lib/rutas'
 
 // Valor actual del inventario (spec 008, T6; R8 de la spec, R7 de docs/03; CU-INF-02):
 // suma en vivo de los activos vigentes (activos y en reparación; los dados de baja no).
@@ -96,7 +96,7 @@ function Volver() {
     )
   }
   // En la primera pantalla de la pestaña no hay a dónde regresar: va al Inicio.
-  const volver = () => (key === 'default' ? navigate('/admin') : navigate(-1))
+  const volver = () => (key === 'default' ? navigate(rutaApp()) : navigate(-1))
   return (
     <Boton variante="fantasma" className={clase} icono={<ArrowLeft />} onClick={() => void volver()}>
       Volver
@@ -146,7 +146,7 @@ export default function Valor() {
           descripcion="Cuando registres activos, aquí verás cuánto vale el inventario hoy."
           accion={
             <Boton asChild>
-              <Link to="/admin/activos/nuevo">Registrar activo</Link>
+              <Link to={rutaApp('activos/nuevo')}>Registrar activo</Link>
             </Boton>
           }
         />
@@ -166,7 +166,7 @@ export default function Valor() {
         Cuentan los activos «activo» y «en reparación»; los dados de baja no. Cambia en cuanto se corrige un precio, se mueve o se da de baja un activo.
         Las cifras de un conteo están en el informe de su sesión, congeladas al cierre.{' '}
         <Link
-          to="/admin/sesiones"
+          to={rutaApp('sesiones')}
           className="rounded-sm font-medium text-brand-strong underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
         >
           Ver sesiones

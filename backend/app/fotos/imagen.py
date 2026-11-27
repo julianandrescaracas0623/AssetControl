@@ -8,17 +8,26 @@ codificar en JPEG **sin metadatos** (sin EXIF, GPS ni perfil de color), con lado
 """
 
 import io
+import threading
 import warnings
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 MAX_BYTES = 10 * 1024 * 1024
-MAX_PIXELES = 40_000_000
+# SEC-02: 25 MP (antes 40 MP). Decodificar a RGB cuesta ~3 bytes por píxel; con 40 MP una
+# foto llegaba a ~350 MB por subida. 25 MP cubren cámaras de 20 a 24 MP sin problema.
+MAX_PIXELES = 25_000_000
 LADO_COMPLETA = 1600
 LADO_MINI = 320
 CALIDAD = 82
 FORMATOS = frozenset({"JPEG", "PNG", "WEBP"})
+# SEC-02: decodificaciones simultáneas por proceso y espera máxima antes de responder 503.
+MAX_DECODIFICACIONES = 2
+ESPERA_DECODIFICACION_SEGUNDOS = 5.0
+_CUPO_DECODIFICACION = threading.BoundedSemaphore(MAX_DECODIFICACIONES)
 
 
 class ErrorImagen(ValueError):
@@ -43,6 +52,23 @@ class ImagenInvalida(ErrorImagen):
     pass
 
 
+class ImagenOcupada(ErrorImagen):
+    status = 503
+    code = "procesado_ocupado"
+    message = "Hay varias fotos procesándose. Intenta de nuevo en unos segundos."
+
+
+@contextmanager
+def _cupo_de_decodificacion() -> Iterator[None]:
+    """Limita cuántas imágenes se decodifican a la vez en este proceso (SEC-02)."""
+    if not _CUPO_DECODIFICACION.acquire(timeout=ESPERA_DECODIFICACION_SEGUNDOS):
+        raise ImagenOcupada()
+    try:
+        yield
+    finally:
+        _CUPO_DECODIFICACION.release()
+
+
 @dataclass(frozen=True)
 class Procesada:
     completa: bytes
@@ -51,16 +77,28 @@ class Procesada:
     alto: int
 
 
-def _jpeg(img: Image.Image, lado: int) -> tuple[bytes, Image.Image]:
-    copia = img.copy()
-    copia.thumbnail((lado, lado), Image.Resampling.LANCZOS)
+def _reducir(img: Image.Image, lado: int) -> Image.Image:
+    """Imagen con lado mayor ≤ ``lado``. Si ya cabe, devuelve la misma (sin copiar)."""
+    ancho, alto = img.size
+    mayor = max(ancho, alto)
+    if mayor <= lado:
+        return img
+    escala = lado / mayor
+    nuevo = (max(1, round(ancho * escala)), max(1, round(alto * escala)))
+    # resize crea solo la imagen pequeña: no se copia la decodificada completa.
+    return img.resize(nuevo, Image.Resampling.LANCZOS)
+
+
+def _codificar(img: Image.Image) -> bytes:
     buffer = io.BytesIO()
     # Sin ``exif`` ni ``icc_profile``: Pillow no escribe metadatos que no se le pasen.
-    copia.save(buffer, "JPEG", quality=CALIDAD, optimize=True, progressive=True)
-    return buffer.getvalue(), copia
+    img.save(buffer, "JPEG", quality=CALIDAD, optimize=True, progressive=True)
+    return buffer.getvalue()
 
 
 def _rgb(img: Image.Image) -> Image.Image:
+    if img.mode == "RGB":
+        return img
     if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
         con_alfa = img.convert("RGBA")
         fondo = Image.new("RGB", con_alfa.size, (255, 255, 255))
@@ -83,7 +121,9 @@ def _abrir(datos: bytes, max_bytes: int) -> Image.Image:
             if ancho * alto > MAX_PIXELES:
                 raise ImagenInvalida()
             original.load()
-            return ImageOps.exif_transpose(original)
+            # in_place: sin una copia completa extra solo para girar (SEC-02).
+            ImageOps.exif_transpose(original, in_place=True)
+            return original
     except ErrorImagen:
         raise
     except UnidentifiedImageError:
@@ -93,10 +133,17 @@ def _abrir(datos: bytes, max_bytes: int) -> Image.Image:
 
 
 def procesar(datos: bytes) -> Procesada:
-    img = _rgb(_abrir(datos, MAX_BYTES))
-    completa, reducida = _jpeg(img, LADO_COMPLETA)
-    mini, _ = _jpeg(img, LADO_MINI)
-    return Procesada(completa=completa, mini=mini, ancho=reducida.width, alto=reducida.height)
+    with _cupo_de_decodificacion():
+        img = _rgb(_abrir(datos, MAX_BYTES))
+        completa = _reducir(img, LADO_COMPLETA)
+        # La miniatura sale de la completa (ya pequeña), no de la imagen decodificada.
+        mini = _reducir(completa, LADO_MINI)
+        return Procesada(
+            completa=_codificar(completa),
+            mini=_codificar(mini),
+            ancho=completa.width,
+            alto=completa.height,
+        )
 
 
 # Spec 013 (R2): el logo de la empresa, en PNG con transparencia, ≤ 600 px y sin metadatos.
@@ -116,15 +163,15 @@ class Logo:
 
 
 def procesar_logo(datos: bytes) -> Logo:
-    try:
-        img = _abrir(datos, LOGO_MAX_BYTES)
-    except ImagenDemasiadoGrande:
-        raise LogoDemasiadoGrande() from None
-    img = img.convert("RGBA")
-    img.thumbnail((LADO_LOGO, LADO_LOGO), Image.Resampling.LANCZOS)
-    buffer = io.BytesIO()
-    # Una imagen nueva sin ``info``: PNG no copia textos, EXIF ni perfil de color.
-    limpia = Image.new("RGBA", img.size)
-    limpia.paste(img)
-    limpia.save(buffer, "PNG", optimize=True)
-    return Logo(png=buffer.getvalue(), ancho=limpia.width, alto=limpia.height)
+    with _cupo_de_decodificacion():
+        try:
+            img = _abrir(datos, LOGO_MAX_BYTES)
+        except ImagenDemasiadoGrande:
+            raise LogoDemasiadoGrande() from None
+        img = _reducir(img.convert("RGBA"), LADO_LOGO)
+        buffer = io.BytesIO()
+        # Una imagen nueva sin ``info``: PNG no copia textos, EXIF ni perfil de color.
+        limpia = Image.new("RGBA", img.size)
+        limpia.paste(img)
+        limpia.save(buffer, "PNG", optimize=True)
+        return Logo(png=buffer.getvalue(), ancho=limpia.width, alto=limpia.height)

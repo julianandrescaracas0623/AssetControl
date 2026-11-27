@@ -26,6 +26,7 @@ tags:
   - name: meta
   - name: auth
   - name: invitaciones
+  - name: usuarios
   - name: catalogo
   - name: activos
   - name: empresa
@@ -375,6 +376,72 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
           x-codigos: [error_interno]
+        "503":
+          $ref: "#/components/responses/ServicioNoDisponible"
+
+  /usuarios:
+    get:
+      tags: [usuarios]
+      operationId: listarUsuarios
+      summary: Usuarios de la empresa con su rol y estado (solo admin)
+      description: >-
+        Por membresía de la empresa de la sesión: nombre, correo, rol, si la membresía está
+        activa y si la persona debe cambiar su contraseña. Nunca trae contraseñas ni hashes.
+        Solo ve la empresa de la sesión.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista de usuarios de la empresa.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListaUsuarios" }
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+
+  /usuarios/{usuario_id}:
+    put:
+      tags: [usuarios]
+      operationId: cambiarUsuario
+      summary: Cambiar el rol y activar o desactivar a una persona de la empresa (solo admin)
+      description: >-
+        Exactamente rol y activa; cualquier otra clave da 400. No edita nombre, correo ni
+        contraseña. Cambia la membresía de esta empresa, no la de otras. No se cambia el
+        propio rol ni se desactiva uno mismo (409 cambio_propio_no_permitido). Quitar el rol
+        admin o desactivar al último admin activo da 409 ultimo_admin. Si se desactiva o
+        cambia el rol, se revocan las sesiones renovables de esa membresía: desactivada, su
+        siguiente petición recibe 401; con rol nuevo, lo aplica en la siguiente petición. Si
+        nada cambia, responde 200 sin escribir.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: usuario_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CambiarUsuarioBody" }
+      responses:
+        "200":
+          description: El rol y la activación resultantes (los mismos de antes si no cambió nada).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UsuarioEmpresaCambiado" }
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/Prohibido"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/UsuarioNoCambiable"
         "503":
           $ref: "#/components/responses/ServicioNoDisponible"
 
@@ -759,7 +826,13 @@ paths:
     patch:
       tags: [activos]
       operationId: editarActivo
-      summary: Editar un activo (solo admin; cada cambio deja su evento)
+      summary: Editar un activo (admin todo; contador solo campos descriptivos)
+      description: >-
+        El admin edita todos los campos de EditarActivoBody. El contador (spec 020, R7) solo
+        nombre, categoria_id, marca, modelo, subtipo, serial y fecha_compra; cualquier otro
+        campo (precio_compra, codigo, ubicacion*, estado* u otro) es 400 sin cambiar nada.
+        Cada cambio deja su evento en activo_evento con su autor. Al contador nunca se le
+        devuelve precio (ni en 200, ni en 400, ni en 412).
       security:
         - bearerAuth: []
       parameters:
@@ -774,15 +847,15 @@ paths:
         "200":
           $ref: "#/components/responses/ActivoCambiado"
         "400":
-          description: Cuerpo o precio no válidos, o se intentó cambiar el código.
+          description: >-
+            Cuerpo o precio no válidos, se intentó cambiar el código, o el contador envió
+            un campo que no es descriptivo (solicitud_invalida; nunca precio_invalido).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
           x-codigos: [solicitud_invalida, precio_invalido, codigo_inmutable]
         "401":
           $ref: "#/components/responses/NoAutenticado"
-        "403":
-          $ref: "#/components/responses/Prohibido"
         "404":
           $ref: "#/components/responses/NoEncontrado"
         "409":
@@ -1248,7 +1321,11 @@ paths:
     get:
       tags: [conteo]
       operationId: listarDiscrepancias
-      summary: Activos vistos en otra ubicación según su verificación vigente (solo admin)
+      summary: Activos vistos en otra ubicación según su verificación vigente (ambos roles)
+      description: >-
+        Solo lectura para el admin y el contador (spec 020, R8), en sesiones abiertas y
+        cerradas. La vista no trae precios ni valores y es la misma para los dos roles;
+        aplicar y descartar siguen siendo solo del admin.
       security:
         - bearerAuth: []
       parameters:
@@ -1268,8 +1345,6 @@ paths:
           $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
-        "403":
-          $ref: "#/components/responses/Prohibido"
         "404":
           $ref: "#/components/responses/NoEncontrado"
 
@@ -2557,6 +2632,14 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
       x-codigos: [prohibido]
+    UsuarioNoCambiable:
+      description: >-
+        No se puede cambiar: es tu propia cuenta (no cambias tu rol ni te desactivas) o
+        quitaría el rol admin o desactivaría al último admin activo de la empresa.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+      x-codigos: [cambio_propio_no_permitido, ultimo_admin]
     ActivoDadoDeBaja:
       description: El activo está dado de baja; solo se puede reactivar.
       content:
@@ -2576,7 +2659,9 @@ components:
           schema: { $ref: "#/components/schemas/VersionDesactualizada" }
       x-codigos: [version_desactualizada]
     ActivoCambiado:
-      description: Guardado (o sin cambios); el activo con precio, foto y su versión.
+      description: >-
+        Guardado (o sin cambios); el activo con foto y su versión (con precio solo para el
+        admin).
       headers:
         ETag:
           description: La versión nueva entre comillas, para el próximo If-Match.
@@ -2729,6 +2814,7 @@ components:
         - contrasena_repetida
         - empresa_inactiva
         - ultimo_admin
+        - cambio_propio_no_permitido
         - empresa_sin_admin
         - logos_no_disponibles
     Error:
@@ -2759,6 +2845,40 @@ components:
         id: { type: string, format: uuid }
         email: { type: string, format: email }
         nombre: { type: string }
+    UsuarioEmpresa:
+      type: object
+      required: [id, nombre, email, rol, activa, debe_cambiar_password]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        email: { type: string, format: email }
+        rol: { $ref: "#/components/schemas/Rol" }
+        activa: { type: boolean, description: Si la membresía de la empresa está activa. }
+        debe_cambiar_password: { type: boolean }
+    ListaUsuarios:
+      type: object
+      required: [usuarios]
+      additionalProperties: false
+      properties:
+        usuarios:
+          type: array
+          items: { $ref: "#/components/schemas/UsuarioEmpresa" }
+    CambiarUsuarioBody:
+      type: object
+      required: [rol, activa]
+      additionalProperties: false
+      properties:
+        rol: { $ref: "#/components/schemas/Rol" }
+        activa: { type: boolean, description: Si la membresía de la empresa queda activa. }
+    UsuarioEmpresaCambiado:
+      type: object
+      required: [id, rol, activa]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        rol: { $ref: "#/components/schemas/Rol" }
+        activa: { type: boolean }
     Tenant:
       type: object
       required: [id, nombre]
@@ -3449,7 +3569,9 @@ components:
       type: object
       required: [error, activo]
       additionalProperties: false
-      description: El activo cambió desde que se leyó; trae el vigente (con precio, solo admin).
+      description: >-
+        El activo cambió desde que se leyó; trae el vigente con su foto (con precio solo para
+        el admin; sin clave de precio para el contador).
       properties:
         error:
           type: object
@@ -3465,7 +3587,8 @@ components:
       additionalProperties: false
       description: >-
         Solo los campos que cambian; null o "" borra un opcional. El código no se puede
-        cambiar (400 codigo_inmutable).
+        cambiar (400 codigo_inmutable). precio_compra es solo del admin: el contador que lo
+        envía recibe 400 solicitud_invalida (spec 020, R7).
       properties:
         nombre: { $ref: "#/components/schemas/NombreVisible" }
         categoria_id: { type: string, format: uuid }

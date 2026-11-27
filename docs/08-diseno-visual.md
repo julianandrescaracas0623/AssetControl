@@ -112,7 +112,7 @@ Copiar un componente de shadcn/ui no es "cero dependencias": muchos instalan paq
 
 | Componente | Responsabilidad |
 |---|---|
-| `AdminShell` | Barra lateral + encabezado (migas, buscador, usuario) + área de contenido (ver 4.1) |
+| `AppShell` (antes `AdminShell`, spec 020) | Marco compartido por los dos roles: barra lateral con menú filtrado por rol + encabezado (migas, buscador, usuario) + área de contenido (ver 4.1) |
 | `CountShell` | Encabezado compacto (sesión, sala, estado de red) + contenido + barra de acción fija abajo (ver 5) |
 | `StatCard` | Indicador: rótulo, cifra del servidor, contexto ("de 200", "hace 5 min"), enlace al detalle |
 | `DataTable` | Tabla de datos con búsqueda, filtros, orden, paginación y acciones por fila (ver 4.3) |
@@ -138,16 +138,27 @@ Copiar un componente de shadcn/ui no es "cero dependencias": muchos instalan paq
 | Confirmación destructiva o irreversible (cerrar sesión, dar de baja) | `alert-dialog` en ambos modos, con el efecto explícito |
 | Error que bloquea el flujo (sesión cerrada) | `alert` en pantalla, no toast |
 
-## 4. Layout de administración (`/admin/**`, responsive: celular y computador)
+### 3.4 Ajustes de componentes del kit (spec 020, T7, 2026-11-26)
+
+- **Pestañas** (`Pestanas`, en Activos, Discrepancias e Informe): el foco es un **contorno cobalto de 2 px por dentro** de la pestaña, no un anillo por fuera (el carril desplazable lo recortaba). Excepción a la regla general de foco de la sección 9.
+- **Aviso** (`Aviso`): un botón que es enlace dentro de la acción del aviso («Ver el activo», «Volver al conteo») va **sin subrayado** y se ve como botón secundario.
+- **Enlace dentro del texto** del detalle de sesión («Ver todas las ubicaciones»): se ve como enlace (cobalto oscuro y subrayado), no como texto en negrita; en el teléfono mide 44 px de alto. El título «Pendientes por verificar en …» reparte sus líneas para no dejar una palabra huérfana a 375 px.
+- **Resumen del alta**: si falta el código, el «—» va en la fuente normal, como las demás filas (no en monoespaciada).
+
+## 4. Layout del marco compartido (`/app/**`, antes `/admin/**`; responsive: celular y computador)
+
+Desde la spec 020 (P38, decisión del humano del 2026-11-25) el marco de esta sección es **único para los dos roles** (`AppShell`) y vive en `/app/**`; `/admin/**` queda como alias que redirige a `/app/**` conservando subruta y query. Donde esta sección y la 6.2 dicen «admin» o `/admin`, se lee `/app` con el menú del rol correspondiente.
 
 ### 4.1 App shell
 
-- **Barra lateral** (componente `sidebar`), colapsable a solo íconos (con tooltip) y recordando el estado. Arriba: "AssetControl" en texto (sin logotipo hasta T9). Grupos: **General** (Inicio), **Inventario** (Activos, Registrar activo, Ubicaciones, Categorías), **Conteo** (Sesiones, Discrepancias `[PENDIENTE: entrada propia o solo dentro de la sesión]`), **Finanzas** (Valor actual), **Ajustes** (Usuarios). Abajo: "Ir a contar" (abre `/contar`) y la clínica activa (tenant) como texto.
+- **Barra lateral** (componente `sidebar`), colapsable a solo íconos (con tooltip) y recordando el estado. Arriba: "AssetControl" en texto (sin logotipo hasta T9). Grupos del **admin**: **General** (Inicio), **Inventario** (Activos, Registrar activo, Ubicaciones, Categorías), **Conteo** (Sesiones, Discrepancias, con entrada propia en el menú; spec 020), **Finanzas** (Valor actual), **Ajustes** (Usuarios). Abajo: "Ir a contar" (abre `/contar`) y la clínica activa (tenant) como texto.
+- **Menú del contador** (spec 020, R4): Inicio, Contar (abre `/contar/escanear`), Activos, Registrar activo, Sesiones y Discrepancias. Cada entrada declara sus roles y el menú se filtra con el rol de la sesión.
 - **Encabezado** (altura ~56 px, borde inferior): botón para colapsar la barra, **migas de pan** (`Sesiones / Conteo nov 2026 / Informe`), **buscador global** al centro o a la derecha, y **menú de usuario** (avatar con iniciales, nombre, rol, "Cerrar sesión").
 - **Buscador global**: abre un `command` (también con `Ctrl/⌘ K`) que busca activos por código o nombre y salta a su ficha; alcance más allá de activos `[PENDIENTE]` (recomendación MVP: solo activos y navegación a pantallas). La búsqueda la resuelve el servidor, filtrada por tenant.
 - **Área de contenido**: título de página + descripción corta a la izquierda, acciones de página a la derecha (una principal); debajo, tarjetas y tablas.
 - **Por debajo de `md`**: la barra lateral se convierte en un menú tipo `sheet` que se abre desde el encabezado (componente `sheet` ya previsto en 3.1; sin dependencias nuevas). Reglas completas del modo celular en 4.4.
-- El menú lateral solo se muestra al `admin`; el contador que abre `/admin/**` recibe 403 del servidor (ocultar el menú no es seguridad).
+- El contador ve el marco con su menú en `/app/**` (spec 020, P38). Las pantallas exclusivas del admin (Usuarios, Empresa, Ubicaciones, Categorías, Valor e Informe) no aparecen en su menú; si las abre, la web lo lleva a `/app` o a "Sin permiso" y el servidor responde 403 (ocultar el menú no es seguridad).
+- **En el computador**, `/contar` del contador redirige a `/app`, salvo el espacio de conteo (`/contar/escanear`, `/contar/escribir`, `/contar/activo/:codigo`), que se muestra sin redirigir; `/contar/nuevo` lleva a `/app/activos/nuevo` con su query y `/contar/pendientes` al detalle de la sesión filtrado por la sala (`?ubicacion=`), y el historial del conteo lleva a la ficha del activo. En el teléfono `/contar/**` no cambia.
 
 ### 4.2 Inicio / Resumen (`/admin`)
 
@@ -161,7 +172,7 @@ Copiar un componente de shadcn/ui no es "cero dependencias": muchos instalan paq
 
 ### 4.2.1 Inicio del contador (sin precios)
 
-El contador no entra a `/admin/**` (403); su Inicio vive en el modo conteo (`/contar`, ruta exacta `[PENDIENTE]` P25), a 375 px. Recomendación (P25): tarjeta de **Activos hoy** (total en tiempo real), **Avance del conteo abierto** (% verificado y pendientes por ubicación) y **Actividad reciente** sin precios (sin eventos `precio_cambiado` ni montos). Valor actual, discrepancias, dañados, último informe, gráficas y evolución **no existen** para él: no se ocultan con un hueco ni con "•••", y el servidor no envía esos datos (P13).
+Dónde vive (P25 cambiada por P38, 2026-11-25): **en el computador**, en `/app`, dentro del marco compartido (4.1), en dos columnas (spec 015 R8); **en el teléfono**, en `/contar` a 375 px (boceto de abajo). Mismo contenido en los dos, sin precios (P25, decidida el 2026-11-15): tarjeta de **Activos hoy** (total en tiempo real), **Avance del conteo abierto** (% verificado y pendientes por ubicación) y **Actividad reciente** sin precios (sin eventos `precio_cambiado` ni montos). Valor actual, discrepancias, dañados, último informe, gráficas y evolución **no existen** para él: no se ocultan con un hueco ni con "•••", y el servidor no envía esos datos (P13).
 
 ```
 ┌─────────────────────────┐
@@ -235,7 +246,7 @@ Rutas **propuestas** (`[PENDIENTE]` de fijar en las specs 002–010). "Precios" 
 | Ruta | Pantalla | CU | Precios |
 |---|---|---|---|
 | `/login`, `/invitacion/:token` | Iniciar sesión; aceptar invitación | ACC-01, 03 | — |
-| `/contar` | Inicio del contador (4.2.1): sesión abierta, avance, pendientes por ubicación, actividad reciente, botón "Escanear" | SES-02, DSH-01, 02 | **Sin ningún precio para el contador** |
+| `/contar` | Inicio del contador en el teléfono (4.2.1): sesión abierta, avance, pendientes por ubicación, actividad reciente, botón "Escanear". En el computador redirige a `/app` (P38) | SES-02, DSH-01, 02 | **Sin ningún precio para el contador** |
 | `/contar/escanear` | Escáner + "Escribir código" + cámara denegada | CAT-01, VER-05 | — |
 | `/contar/activo/:codigo` | Ficha / verificar con un toque; ubicación distinta; daño | VER-01..03 | **Admin ve precio de referencia; contador no** |
 | `/contar/nuevo?codigo=` | Alta por escaneo (nombre, precio, categoría, ubicación; copiar de un parecido) | CAT-02, 03 | **El contador escribe el precio y después no lo ve** |
@@ -243,21 +254,25 @@ Rutas **propuestas** (`[PENDIENTE]` de fijar en las specs 002–010). "Precios" 
 | `/contar/activo/:codigo/historial` | Línea de tiempo del activo | HIS-01 | **Contador no ve eventos ni valores de precio** |
 | (estado en todas) | "No se pudo confirmar / Reintentar"; "La sesión se cerró" | VER-06, SES-04 | — |
 
-### 6.2 Administración (`/admin/**`, responsive: celular y computador; solo `admin`)
+**Pantallas de acceso y de sistema** (`MarcoAcceso`: iniciar sesión, invitación, recuperar, nueva y cambiar contraseña, la entrada de Plataforma y los mensajes de sistema): título, descripción e ícono **centrados**, sin excepción (decisión del humano, 2026-11-25). Los campos y botones del formulario conservan su alineación.
 
-| Ruta | Pantalla | CU | Precios |
-|---|---|---|---|
-| `/admin` | Inicio / Resumen (4.2): indicadores, último informe, gráficas, evolución, actividad | DSH-01..04 (reúne SES-02, INF-01, INF-02, DIS-01, HIS-01) | Solo admin |
-| `/admin/activos` | Tabla de datos; ficha con editar, mover, estado, baja | CAT-04..08 | Admin ve todo |
-| `/admin/activos/nuevo` (ruta propuesta) | Registrar activo desde el computador: código del sticker (escanear con la cámara o escribir y confirmar), copiar de un parecido, nombre, precio, categoría y ubicación obligatorios, opcionales colapsados, varias unidades iguales seguidas | CAT-01..03 | Admin escribe y ve el precio |
-| `/admin/ubicaciones` | Árbol sede > sala > box; crear, editar, desactivar | UBI-01..03 | — |
-| `/admin/categorias` | Lista cerrada de categorías | CAT-09 | — |
-| `/admin/sesiones` | Lista; abrir; detalle con avance y cierre | SES-01..03 | — |
-| `/admin/sesiones/:id/discrepancias` | Esperada vs. encontrada; aplicar | DIS-01, 02 | — |
-| `/admin/sesiones/:id/informe` | Tres cifras, por categoría y ubicación, lista de no encontrados con marca "en reparación", exportar PDF/Excel | INF-01, 03 | Solo admin |
-| `/admin/valor` | Valor en tiempo real (separado del informe) | INF-02 | Solo admin |
-| `/admin/usuarios` | Usuarios e invitaciones (enlace de un solo uso, se muestra una vez) | ACC-02, 05 | — |
-| `/admin/activos/:id/historial` | Línea de tiempo completa con antes/después | HIS-01 | Admin ve todo |
+### 6.2 Marco compartido (`/app/**`, antes `/admin/**`; responsive: celular y computador; menú por rol)
+
+Desde la spec 020 (P38) estas rutas viven en `/app/**`; `/admin/**` es alias que redirige conservando la query. La columna "Rol" indica quién la abre; las exclusivas del admin responden 403 al contador en el servidor.
+
+| Ruta | Pantalla | CU | Rol | Precios |
+|---|---|---|---|---|
+| `/app` | Inicio / Resumen (4.2) del admin: indicadores, último informe, gráficas, evolución, actividad. Para el contador, su Inicio (4.2.1) | DSH-01..04 (reúne SES-02, INF-01, INF-02, DIS-01, HIS-01) | Ambos | Contador sin ningún precio |
+| `/app/activos` | Tabla de datos con búsqueda, estado y ubicación; ficha. Admin: editar, mover, estado, baja, exportar. Contador: consulta y corrige los siete datos descriptivos (P36) | CAT-04..08 | Ambos | Admin ve todo; contador sin columna ni campo de precio |
+| `/app/activos/nuevo` | Registrar activo desde el computador, la **misma pantalla para los dos roles** (spec 020, 7.7): código del sticker (escanear con la cámara o escribir y confirmar), copiar de un parecido, nombre, precio, categoría y ubicación obligatorios, opcionales colapsados; "Varias unidades iguales" solo para el admin | CAT-01..03 | Ambos | Admin escribe y ve el precio; el contador lo escribe y después no lo ve |
+| `/app/ubicaciones` | Árbol sede > sala > box; crear, editar, desactivar | UBI-01..03 | Solo admin | — |
+| `/app/categorias` | Lista cerrada de categorías | CAT-09 | Solo admin | — |
+| `/app/sesiones` | Lista; detalle con avance (y `?ubicacion=` para los pendientes de una sala). Admin: abrir y cerrar. Contador: solo lectura, sin enlace al informe (P37) | SES-01..03, HIS-02 | Ambos | Sin cifras de valor para el contador |
+| `/app/sesiones/:id/discrepancias` | Esperada vs. encontrada. Admin: aplicar y descartar. Contador: solo lectura, sin casillas ni acciones (P37) | DIS-01, 02 | Ambos | — |
+| `/app/sesiones/:id/informe` | Tres cifras, por categoría y ubicación, lista de no encontrados con marca "en reparación", exportar PDF/Excel | INF-01, 03 | Solo admin | Solo admin |
+| `/app/valor` | Valor en tiempo real (separado del informe) | INF-02 | Solo admin | Solo admin |
+| `/app/usuarios` | Usuarios e invitaciones (enlace de un solo uso, se muestra una vez) | ACC-02, 05 | Solo admin | — |
+| `/app/activos/:id/historial` | Línea de tiempo completa con antes/después | HIS-01 | Ambos | Admin ve todo; contador sin eventos ni valores de precio |
 
 El admin también puede usar `/contar/**` (con precio de referencia donde corresponda).
 
@@ -342,6 +357,7 @@ Contador (sin precio)             Admin (con precio de referencia)
 - "Copiar de un parecido" rellena categoría, nombre, marca, modelo, subtipo, ubicación y precio. Para el contador el precio se copia en el servidor y el campo **no** aparece relleno (CU-CAT-03; editar al duplicar `[PENDIENTE]`).
 - Código por entrada manual: confirmar el código antes de guardar. Validación junto al campo y en el servidor.
 - Éxito: "Activo creado" + "Verificarlo ahora" (si hay sesión) / "Escanear otro". Meta: < 30 s (C4).
+- **En el computador** (spec 020) esta alta no se usa: `/contar/nuevo` redirige a `/app/activos/nuevo`, la misma pantalla para los dos roles (7.7, "Registrar activo unificado").
 
 ### 7.4 (d) "No se pudo confirmar / Reintentar" (375 px)
 
@@ -447,6 +463,12 @@ Contador (sin precio)             Admin (con precio de referencia)
 
 - `⋯` abre Ver, Editar (sheet lateral), Mover, Historial y Dar de baja (con `alert-dialog`). Precio alineado a la derecha, `tabular-nums`, en COP.
 - **Registrar activo** (decisión del humano, 2026-11-13): entrada propia en la barra lateral y acción principal de la tabla. Sigue R8: no hay alta sin código de sticker (se escanea o se escribe y se confirma, porque es inmutable). Obligatorios: nombre, precio, categoría y ubicación; solo se teclean nombre y precio. El vacío ofrece [Registrar activo] y [Ir a escanear]. Edición concurrente: `412` con aviso (sección 8).
+- **Activos del contador** (spec 020, T4): la misma tabla sin columna de precio, sin "Exportar" ni acciones de mover, estado o baja; la ficha permite corregir los siete datos descriptivos (P36). La lista no tiene filtro por categoría en esta entrega (mejora futura para los dos roles, decisión del humano en T4).
+- **Registrar activo unificado** (spec 020, T5, textos aprobados por el humano el 2026-11-26): en el computador `/app/activos/nuevo` es la misma pantalla para los dos roles, y `/contar/nuevo` redirige ahí con su query (`?codigo=` del sticker no encontrado llega cargado); en el teléfono sigue el alta del conteo (7.3).
+  - **Código**: llega cargado pero es editable, con la confirmación «Revisé que coincide con el sticker: no se puede cambiar después» (en el computador no hay código fijo).
+  - **Ubicación por defecto, ambos roles**: la sala donde se está contando, si se eligió una en esa pestaña, con la ayuda «Viene de la sala donde estás contando.».
+  - **Contador**: la ayuda del precio dice «Después de guardar, solo lo verán los administradores.» (el admin conserva «Solo lo ven los administradores.»); el resumen no tiene fila de precio y lleva la nota «El precio no se muestra aquí; después de guardar, solo lo ven los administradores.»; al copiar de un parecido se muestra el aviso «Se copia de …» del alta del conteo y solo se eligen ubicación y serial; no ve el interruptor «Varias unidades iguales» (dejaría su precio a la vista tras guardar).
+  - **Desde el conteo** («Crear activo con este código»): el pie muestra «Volver al conteo» en lugar de «Cancelar», y «Activo creado» lo ofrece junto a «Registrar otro» y «Ver el activo».
 
 ## 8. Estados y mensajes
 
@@ -461,11 +483,14 @@ Tono: breve, directo, sin tecnicismos ni culpa al usuario. Tuteo.
 | Inicio de conteo | Esqueleto | "No hay una sesión abierta. Pídele al administrador que abra una." | "No se pudo cargar" [Reintentar] | — |
 | Inicio admin | Esqueleto de tarjetas, gráficas y filas | "Aún no hay activos ni sesiones." [Ir a escanear] · Evolución: "Aún no hay conteos cerrados" · Último informe: "Todavía no hay un informe cerrado" | "No se pudo cargar" [Reintentar] (por tarjeta o gráfica, sin tumbar la página) | — |
 | Historial | Esqueleto de línea de tiempo | "Este activo aún no tiene movimientos" | "No se pudo cargar" [Reintentar] | — |
-| Activos (admin) | Esqueleto de filas | "Aún no hay activos. Escanea un sticker para crear el primero." [Ir a escanear] · Con filtros: "Nada coincide." [Limpiar filtros] | "No se pudo cargar" [Reintentar] · `412`: "Alguien cambió este activo. Recargamos; revisa tus cambios" | "Cambios guardados" (toast) |
+| Activos (admin) | Esqueleto de filas | "Aún no hay activos. Escanea un sticker para crear el primero." [Ir a escanear] · Con filtros: "Nada coincide." [Limpiar filtros] | "No se pudo cargar" [Reintentar] · `412`: "Alguien cambió este activo. Recargamos; revisa tus cambios" · `412` del contador causado solo por un dato que no edita (p. ej. el precio): "Cambió un dato que no editas aquí. Tus datos siguen aquí." (sin nombrar el campo; spec 020, T4) | "Cambios guardados" (toast) |
 | Ubicaciones | Esqueleto de árbol | "Crea la primera sede." [Crear ubicación] | "No se pudo guardar" [Reintentar] | "Ubicación creada" |
 | Sesiones | Esqueleto de filas | "No hay sesiones. Abre la primera." [Abrir sesión] | "No se pudo cargar" [Reintentar] | "Sesión abierta" |
+| Sesiones (contador, solo lectura; spec 020, T6) | Esqueleto de filas | Sin sesiones: "Cuando el administrador abra la primera sesión, aparecerá aquí." · Sin sesión abierta: "Cuando el administrador abra una, el botón «Contar» aparece aquí y en su detalle. Mientras tanto puedes consultar y registrar activos." · Sesión cerrada: "El … por …. Ya no se puede seguir contando en ella." (sin "Ver informe"; el nombre de una cerrada abre su detalle, no el informe) | "No se pudo cargar" [Reintentar] | — |
+| Detalle de sesión con `?ubicacion=` (ambos roles; spec 020, T6) | Esqueleto de filas | Título "Pendientes por verificar en {ubicación}" y enlace "Ver todas las ubicaciones" | "No se pudo cargar" [Reintentar] | — |
 | Cerrar sesión | "Cerrando…" | — | "No se pudo cerrar" [Reintentar] | "Sesión cerrada. Informe listo." [Ver informe] |
 | Discrepancias | Esqueleto de filas | "Sin diferencias de ubicación" | "No se pudo aplicar" [Reintentar] · "El activo ya se movió. ¿Aplicar de todos modos?" | "Ubicación actualizada" |
+| Discrepancias (contador, solo lectura; spec 020, T6) | Esqueleto de filas | Descripción "… El administrador decide si se mueven o se quedan donde están." · Pestañas Por resolver, Resueltas y **Todas** (esta última solo del contador; el admin conserva dos pestañas, asimetría consciente) · Vacío en Todas: "No hay diferencias en esta sesión" · Columnas "Está ahora en" y "Resolvió"; sin casillas ni acciones | "No se pudo cargar" [Reintentar] | — |
 | Informe | Esqueleto de tarjetas | "El informe se genera al cerrar la sesión." [Ir a la sesión] | "No se pudo cargar el informe" [Reintentar] | "Archivo descargado" |
 | Valor en tiempo real | Esqueleto | "Sin activos registrados" | "No se pudo cargar" [Reintentar] | "Valor actual al [hora]. No es el informe de una sesión." |
 | Usuarios / invitaciones | Esqueleto | "Aún no has invitado a nadie." [Invitar] | "No se pudo crear la invitación" [Reintentar] | "Enlace creado. Cópialo ahora: no se vuelve a mostrar." |
@@ -475,7 +500,7 @@ Tono: breve, directo, sin tecnicismos ni culpa al usuario. Tuteo.
 
 ## 9. Accesibilidad y móvil
 
-- **Foco**: anillo visible (`--ring`, 2 px) en todo control; orden de tabulación = orden visual; tras confirmar una verificación el foco vuelve al visor o a "Escanear otro". En admin, la barra lateral y el buscador son operables con teclado.
+- **Foco**: anillo visible (`--ring`, 2 px) en todo control; en las pestañas, contorno cobalto de 2 px por dentro para que el carril desplazable no lo recorte (3.4, spec 020); orden de tabulación = orden visual; tras confirmar una verificación el foco vuelve al visor o a "Escanear otro". En admin, la barra lateral y el buscador son operables con teclado.
 - **Toque**: ≥ 44 × 44 px en `/contar/**` y en `/admin/**` por debajo de `md`, ≥ 8 px entre objetivos; acción principal a ancho completo. Sin gestos como única vía.
 - **Una mano**: acciones principales y sheets en el tercio inferior; navegación superior solo de retroceso.
 - **Poca luz**: "Linterna" si el navegador lo permite; "Poca luz" tras ~3 s sin lectura `[PENDIENTE: umbral]`; siempre queda "Escribir código".
@@ -506,13 +531,13 @@ Tono: breve, directo, sin tecnicismos ni culpa al usuario. Tuteo.
 5. Dependencias: `lucide-react` (ya instalada en la fundación), `react-router`, `cmdk`, `sonner` y las fuentes Geist **aprobadas en la spec 001b (D1)**. Siguen pendientes `@tanstack/react-table` (tablas, con la primera pantalla con datos) y `recharts` (gráficos del Inicio, spec 010).
 6. Alcance del buscador global (recomendación: activos y navegación).
 7. Paginación, orden y filtro en cliente o en servidor.
-8. "Actividad reciente": ¿pantalla de actividad global o solo historial por activo? Discrepancias: ¿entrada propia en la barra lateral?
+8. "Actividad reciente": ¿pantalla de actividad global o solo historial por activo? ~~Discrepancias: ¿entrada propia en la barra lateral?~~ Sí, entrada propia para los dos roles (spec 020, 4.1).
 9. ~~Acción principal de la tabla de Activos~~: "Registrar activo" (2026-11-13). Pendiente: ancho máximo del contenido (el lienzo usa ~1320 px).
 10. Admin por debajo de `md` (resuelto el 2026-11-11: responsive, sección 4.4): falta el criterio por pantalla (tarjetas o scroll horizontal con columnas prioritarias) y el patrón de crear o editar.
 11. Vibración y sonido al verificar, y si el usuario puede apagarlos.
 12. Rutas definitivas (sección 6) y `inputmode` del campo de código (P9).
 13. Nombre y logo del producto (T9); hasta entonces, texto "AssetControl". El lienzo trae un logo provisional de barras, no aprobado como marca.
-14. Contador: ¿ve discrepancias de su conteo? (CU-DIS-01), ¿sesiones pasadas? (CU-HIS-02), ¿puede editar el precio al duplicar sin verlo? (CU-CAT-03), ¿qué ve en su Inicio? (P25).
+14. ~~Contador: ¿ve discrepancias de su conteo? (CU-DIS-01), ¿sesiones pasadas? (CU-HIS-02), ¿qué ve en su Inicio? (P25)~~: resuelta (2026-11-25): ve sesiones y discrepancias en solo lectura y sin cifras de valor (P37); su Inicio, en P25 y P38. Sigue abierta: ¿puede editar el precio al duplicar sin verlo? (CU-CAT-03, P13).
 15. Vista previa "no definitiva" del informe con sesión abierta; "buscado y no hallado" frente a "sin verificar" (P16); umbral de "Poca luz".
 16. ~~Nombre y número de la spec de sistema de diseño y app shell~~: `specs/001b-sistema-de-diseno/` (decisión del humano, 2026-11-13), implementada el 2026-11-14.
 17. Inicio de admin: fuente por defecto de las gráficas por categoría y ubicación (P23), cuántos conteos muestra la evolución (P22) y base del % encontrado (P24).

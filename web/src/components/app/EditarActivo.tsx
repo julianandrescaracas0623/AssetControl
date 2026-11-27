@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { InputSugerido } from '@/components/app/InputSugerido'
 import { Aviso, Boton, Campo, Dialogo, MarcoCampo } from '@/components/kit'
 import type { Activo } from '@/lib/activos'
+import type { Rol } from '@/lib/api/cliente'
 import { type CampoEdicion, camposDe, ETIQUETAS, useEdicionActivo } from '@/lib/cambiosActivo'
 import { useCategorias } from '@/lib/catalogo'
 import { formatCOP } from '@/lib/format'
@@ -17,6 +18,8 @@ import { formatCOP } from '@/lib/format'
 // Spec 016, T8: Dialogo, Campo y Aviso del kit. El pie del diálogo envía el formulario con
 // `form=`; el estado de la edición vive en un componente que se monta de nuevo cada vez que
 // se abre (empieza del activo que muestra la ficha, como antes).
+// Spec 020, T4 (R7): con `rol="contador"` el formulario es el mismo sin el precio: solo los
+// siete campos descriptivos; nunca carga ni envía `precio_compra`.
 
 const FORMULARIO = 'editar-activo'
 
@@ -29,10 +32,13 @@ export function EditarActivo({
   onAbierto,
   devolverFocoA,
   onCloseAutoFocus,
+  rol,
 }: {
   activo: Activo
   abierto: boolean
   onAbierto: (v: boolean) => void
+  /** Quién edita: el contador no ve ni envía el precio (spec 020, R7). Obligatorio: sin defecto. */
+  rol: Rol
   /** A dónde vuelve el foco al cerrar (el botón que lo abrió). */
   devolverFocoA?: RefObject<HTMLElement | null>
   onCloseAutoFocus?: (evento: Event) => void
@@ -52,6 +58,7 @@ export function EditarActivo({
       onAbierto={onAbierto}
       devolverFocoA={devolverFocoA}
       onCloseAutoFocus={onCloseAutoFocus}
+      rol={rol}
     />
   )
 }
@@ -68,12 +75,14 @@ function Edicion({
   onAbierto,
   devolverFocoA,
   onCloseAutoFocus,
+  rol,
 }: {
   activo: Activo
   abierto: boolean
   onAbierto: (v: boolean) => void
   devolverFocoA?: RefObject<HTMLElement | null>
   onCloseAutoFocus?: (evento: Event) => void
+  rol: Rol
 }) {
   const cerrar = () => onAbierto(false)
   // Spec 016, T10 (Deuda T8 a): la respuesta de un guardado solo cierra este diálogo si
@@ -86,7 +95,7 @@ function Edicion({
   const edicion = useEdicionActivo(activo, (_guardado, sinCambios) => {
     toast.success(sinCambios ? 'Sin cambios que guardar' : 'Cambios guardados')
     if (sigueAbierto.current) cerrar()
-  })
+  }, rol)
   return (
     <Dialogo
       abierto={abierto}
@@ -114,12 +123,12 @@ function Edicion({
       }
     >
       {/* Las categorías se piden al abrir, como antes (no al cargar la ficha). */}
-      {abierto && <Formulario edicion={edicion} />}
+      {abierto && <Formulario edicion={edicion} conPrecio={rol === 'admin'} />}
     </Dialogo>
   )
 }
 
-function Formulario({ edicion }: { edicion: ReturnType<typeof useEdicionActivo> }) {
+function Formulario({ edicion, conPrecio }: { edicion: ReturnType<typeof useEdicionActivo>; conPrecio: boolean }) {
   const categorias = useCategorias()
   const { campos, errores, conflicto } = edicion
   const otro = (campo: CampoEdicion) =>
@@ -154,7 +163,9 @@ function Formulario({ edicion }: { edicion: ReturnType<typeof useEdicionActivo> 
         >
           {conflicto.cambiados.length > 0
             ? `Cambió: ${conflicto.cambiados.map((c) => ETIQUETAS[c].toLowerCase()).join(', ')}. Tus datos siguen aquí.`
-            : 'Cambió su estado o su ubicación. Tus datos siguen aquí.'}
+            : conPrecio
+              ? 'Cambió su estado o su ubicación. Tus datos siguen aquí.'
+              : 'Cambió un dato que no editas aquí. Tus datos siguen aquí.'}
         </Aviso>
       )}
       {edicion.errorGeneral && (
@@ -187,17 +198,19 @@ function Formulario({ edicion }: { edicion: ReturnType<typeof useEdicionActivo> 
             className={CONTROL}
           />
         </MarcoCampo>
-        <Campo
-          id="precio"
-          tipo="dinero"
-          etiqueta="Precio de compra (COP)"
-          obligatorio
-          error={errores.precio}
-          ayuda={ayuda('precio', 'Cambiarlo deja el antes y el después en el historial.')}
-          value={campos.precio}
-          onChange={(e) => edicion.cambiar('precio', e.target.value)}
-          autoComplete="off"
-        />
+        {conPrecio && (
+          <Campo
+            id="precio"
+            tipo="dinero"
+            etiqueta="Precio de compra (COP)"
+            obligatorio
+            error={errores.precio}
+            ayuda={ayuda('precio', 'Cambiarlo deja el antes y el después en el historial.')}
+            value={campos.precio}
+            onChange={(e) => edicion.cambiar('precio', e.target.value)}
+            autoComplete="off"
+          />
+        )}
         <Campo
           id="categoria"
           tipo="seleccion"

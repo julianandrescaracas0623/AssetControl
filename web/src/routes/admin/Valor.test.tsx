@@ -82,7 +82,7 @@ describe('Valor actual (spec 008, T6)', () => {
 // a ese informe (enlace y miga) solo si el id es un UUID de una sesión cerrada existente.
 describe('Volver al informe desde Valor actual (spec 015, T3)', () => {
   const SESION = '00000000-0000-4000-8000-0000000000e1'
-  const INFORME = `/admin/sesiones/${SESION}/informe`
+  const INFORME = `/app/sesiones/${SESION}/informe`
 
   function cerrada() {
     const catalogo = catalogoDemo('admin', { sesiones: [sesionDe()] })
@@ -109,7 +109,7 @@ describe('Volver al informe desde Valor actual (spec 015, T3)', () => {
     const migas = screen.getByRole('navigation', { name: 'Migas de pan' })
     expect(migas.textContent).toBe('ConteoSesionesInforme de Conteo nov 2026Valor actual')
     expect(within(migas).getByRole('link', { name: 'Informe de Conteo nov 2026' }).getAttribute('href')).toBe(INFORME)
-    expect(within(migas).getByRole('link', { name: 'Sesiones' }).getAttribute('href')).toBe('/admin/sesiones')
+    expect(within(migas).getByRole('link', { name: 'Sesiones' }).getAttribute('href')).toBe('/app/sesiones')
     fireEvent.click(volver)
     await waitFor(() => expect(router.state.location.pathname).toBe(INFORME))
     expect(await screen.findByRole('heading', { level: 1, name: 'Informe · Conteo nov 2026' })).toBeTruthy()
@@ -148,13 +148,14 @@ describe('Volver al informe desde Valor actual (spec 015, T3)', () => {
     await screen.findByRole('region', { name: /Valor actual/ })
     expect(screen.queryByRole('link', { name: /Volver al informe/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Volver' }))
-    await waitFor(() => expect(router.state.location.pathname).toBe('/admin/activos'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/app/activos'))
   })
 
   it('sin pantalla anterior «Volver» lleva al Inicio', async () => {
-    const { router } = abrirEn(['/admin/valor'])
+    // Spec 020, T3: la entrada directa es la de /app (el alias /admin ya es una redirección).
+    const { router } = abrirEn(['/app/valor'])
     await screen.findByRole('region', { name: /Valor actual/ })
     fireEvent.click(screen.getByRole('button', { name: 'Volver' }))
-    await waitFor(() => expect(router.state.location.pathname).toBe('/admin'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/app'))
   })
 })

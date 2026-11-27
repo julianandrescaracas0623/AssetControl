@@ -57,7 +57,10 @@ export function Aviso({ tono, titulo, accion, icono, rol, className, children, .
         <AlertDescription className="min-w-0 text-foreground">
           <div className="text-cuerpo text-foreground">
             {children}
-            {accion && <div className={cn('flex flex-wrap gap-separacion', children ? 'mt-3' : 'mt-2')}>{accion}</div>}
+            {/* Spec 020, T7: ui/alert subraya todo <a>; un Boton que es enlace no se subraya. */}
+            {accion && (
+              <div className={cn('flex flex-wrap gap-separacion [&_a[data-kit=boton]]:no-underline', children ? 'mt-3' : 'mt-2')}>{accion}</div>
+            )}
           </div>
         </AlertDescription>
       )}

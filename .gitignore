@@ -60,3 +60,10 @@ backend/.almacen/
 
 # Spec 014: correos de desarrollo (.eml con enlaces válidos; nunca al repo).
 backend/.buzon/
+
+# Specs: datos reales de la clínica y temporales (nunca se publican)
+specs/019-diseno-informes-excel/medicion-plantillas.md
+specs/017-consola-plataforma/spec-cierre-tmp.txt
+# Specs: capturas y maquetas locales (no se publican)
+specs/*/capturas/
+specs/*/maquetas/

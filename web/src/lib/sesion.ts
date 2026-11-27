@@ -1,9 +1,10 @@
-import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
+import { notifyManager, type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
 import { api, ErrorApi, type Rol, type Sesion } from '@/lib/api/cliente'
+import { bajoRaiz, RAIZ_ADMIN_ANTIGUA, RAIZ_APP } from '@/lib/rutas'
 
 // Sesión de la web (spec 002b, T3; plan §4). La sesión es el dato de la consulta
 // ['sesion'] de TanStack Query: solo memoria, nunca localStorage ni sessionStorage
@@ -14,19 +15,54 @@ export const CLAVE_SESION = ['sesion'] as const
 
 export type EstadoSesion = 'cargando' | 'anonima' | 'activa' | 'error'
 
-/** `null` = sin sesión (401); otros errores suben (API caída, 429, 503). */
-async function renovar(): Promise<Sesion | null> {
+/** Consultas que no son de negocio: la sesión de la clínica y la consola de la plataforma. */
+const FUERA_DE_NEGOCIO = new Set<unknown>([CLAVE_SESION[0], 'plataforma'])
+
+/**
+ * Quita de la caché todas las consultas de negocio (todo salvo la sesión y la consola de
+ * la plataforma). Spec 020, T3: los datos de una persona no pasan a otra en la misma
+ * pestaña (otro usuario u otra clínica, o tras quedar anónima). Cada consulta se reinicia
+ * antes de quitarla: así se cancela su carga en vuelo (no escribe al terminar) y las
+ * pantallas que la observan dejan de mostrar el dato de la persona anterior.
+ */
+function vaciarNegocio(cliente: QueryClient): void {
+  const cache = cliente.getQueryCache()
+  notifyManager.batch(() => {
+    for (const consulta of cache.findAll({ predicate: (c) => !FUERA_DE_NEGOCIO.has(c.queryKey[0]) })) {
+      consulta.reset()
+      cache.remove(consulta)
+    }
+  })
+}
+
+/** ¿Es otra persona u otra clínica? Sin sesión previa no hay nada que comparar. */
+function esOtraPersona(previa: Sesion | null | undefined, nueva: Sesion): boolean {
+  return Boolean(previa) && (previa!.usuario.id !== nueva.usuario.id || previa!.tenant.id !== nueva.tenant.id)
+}
+
+/**
+ * `null` = sin sesión (401); otros errores suben (API caída, 429, 503). Si una sesión pasa
+ * a anónima, o si la renovación trae otra persona u otra clínica (la cookie de refresh es
+ * compartida entre pestañas), los datos de negocio de la caché se quitan antes de devolver.
+ */
+async function renovar(cliente: QueryClient): Promise<Sesion | null> {
   try {
-    return await api.refresh()
+    const nueva = await api.refresh()
+    if (esOtraPersona(cliente.getQueryData<Sesion | null>(CLAVE_SESION), nueva)) vaciarNegocio(cliente)
+    return nueva
   } catch (error) {
-    if (error instanceof ErrorApi && error.status === 401) return null
+    if (error instanceof ErrorApi && error.status === 401) {
+      // Sin sesión previa (arranque, páginas públicas) no hay datos de nadie que quitar.
+      if (cliente.getQueryData<Sesion | null>(CLAVE_SESION)) vaciarNegocio(cliente)
+      return null
+    }
     throw error
   }
 }
 
 /** Una sola renovación en vuelo aunque varias llamadas la pidan (fetchQuery deduplica). */
 function renovarCompartido(cliente: QueryClient): Promise<Sesion | null> {
-  return cliente.fetchQuery({ queryKey: CLAVE_SESION, queryFn: renovar, staleTime: 0 })
+  return cliente.fetchQuery({ queryKey: CLAVE_SESION, queryFn: () => renovar(cliente), staleTime: 0 })
 }
 
 /**
@@ -47,7 +83,7 @@ export function useSesion() {
   const navigate = useNavigate()
   const consulta = useQuery({
     queryKey: CLAVE_SESION,
-    queryFn: renovar,
+    queryFn: () => renovar(cliente),
     retry: false,
     staleTime: Infinity,
     gcTime: Infinity,
@@ -60,8 +96,12 @@ export function useSesion() {
   if (consulta.data === undefined) estado = consulta.isError ? 'error' : 'cargando'
   else estado = consulta.data === null ? 'anonima' : 'activa'
 
+  /** Guarda la sesión nueva; si es de otra persona u otra clínica, vacía antes la caché de negocio. */
   const iniciar = useCallback(
-    (nueva: Sesion) => cliente.setQueryData<Sesion | null>(CLAVE_SESION, nueva),
+    (nueva: Sesion) => {
+      if (esOtraPersona(cliente.getQueryData<Sesion | null>(CLAVE_SESION), nueva)) vaciarNegocio(cliente)
+      return cliente.setQueryData<Sesion | null>(CLAVE_SESION, nueva)
+    },
     [cliente],
   )
 
@@ -131,12 +171,29 @@ export function useApiAutenticada() {
   )
 }
 
-export function inicioDeRol(rol: Rol): string {
-  return rol === 'admin' ? '/admin' : '/contar'
+/**
+ * Inicio de cada rol (spec 020, T3: R10, R11). El admin, en el marco (/app). El contador,
+ * en el computador también en /app; en el teléfono, en el conteo de siempre (/contar).
+ */
+export function inicioDeRol(rol: Rol, escritorio = false): string {
+  return rol === 'admin' || escritorio ? RAIZ_APP : '/contar'
 }
 
-function bajo(ruta: string, raiz: string): boolean {
-  return ruta === raiz || ruta.startsWith(`${raiz}/`)
+// Caracteres de control (C0, DEL y C1), incluidos el salto de línea y el tabulador.
+// eslint-disable-next-line no-control-regex
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/
+
+/**
+ * ¿La ruta es segura como destino interno? Rechaza barras invertidas y caracteres de
+ * control en todo el destino, y segmentos de puntos (`.`, `..`) en la ruta, también
+ * codificados (`%2e`, `%2E`): sin salir de /app o /contar ni saltar a otro origen.
+ */
+function destinoLimpio(desde: string, ruta: string): boolean {
+  if (desde.includes('\\') || CONTROL.test(desde)) return false
+  return ruta
+    .replace(/%2e/gi, '.')
+    .split('/')
+    .every((segmento) => segmento !== '.' && segmento !== '..')
 }
 
 /**
@@ -146,8 +203,9 @@ function bajo(ruta: string, raiz: string): boolean {
 export function destinoTrasLogin(rol: Rol, desde?: unknown): string {
   if (typeof desde === 'string' && desde.startsWith('/') && !desde.startsWith('//')) {
     const ruta = desde.split(/[?#]/, 1)[0]
-    if (bajo(ruta, '/contar')) return desde
-    if (bajo(ruta, '/admin') && rol === 'admin') return desde
+    if (!destinoLimpio(desde, ruta)) return inicioDeRol(rol)
+    if (bajoRaiz(ruta, '/contar') || bajoRaiz(ruta, RAIZ_APP)) return desde
+    if (bajoRaiz(ruta, RAIZ_ADMIN_ANTIGUA) && rol === 'admin') return desde
   }
   return inicioDeRol(rol)
 }

@@ -21,6 +21,7 @@ from acceso_db import (
     ADMIN_A,
     ADMIN_B,
     CONTADOR_A,
+    CONTADOR_B,
     TENANT_A,
     TENANT_B,
     AccesoDb,
@@ -37,6 +38,7 @@ from app.auth.http import AUTH_MAX_BODY_BYTES
 ADMIN = bearer(ADMIN_A, TENANT_A)
 CONTADOR = bearer(CONTADOR_A, TENANT_A, rol="contador")
 ADMIN_OTRO = bearer(ADMIN_B, TENANT_B)
+CONTADOR_OTRO = bearer(CONTADOR_B, TENANT_B, rol="contador")
 
 
 @pytest.fixture(scope="module")
@@ -306,6 +308,28 @@ def test_other_tenant_rows_are_invisible_and_404(client):
         assert code(response) == "no_encontrado"
     assert [u["nombre"] for u in listar(client, ADMIN_OTRO)] == ["Sede B"]
     assert listar(client, ADMIN_OTRO)[0]["activa"] is True
+
+
+def test_contador_reads_only_its_tenant_and_cannot_write_elsewhere(client):
+    # Spec 020 (req. 6): lectura de ambos roles fijada; el contador solo ve las activas de
+    # su tenant y no escribe ni en el suyo ni en otro.
+    sede_a = creada(client, "Sede A", "sede")
+    inactiva = creada(client, "Inactiva A", "sala", sede_a)
+    patch(client, inactiva, {"activa": False})
+    sede_b = creada(client, "Sede B", "sede", headers=ADMIN_OTRO)
+
+    response = client.get("/ubicaciones", headers=CONTADOR)
+    assert response.status_code == 200
+    assert {u["id"] for u in response.get_json()["ubicaciones"]} == {sede_a}
+    assert [u["id"] for u in listar(client, CONTADOR_OTRO)] == [sede_b]
+    for response in (
+        crear(client, "Hija", "sala", sede_a, headers=CONTADOR),
+        patch(client, sede_b, {"nombre": "X"}, headers=CONTADOR),
+        patch(client, inactiva, {"activa": True}, headers=CONTADOR),
+    ):
+        assert response.status_code == 403
+        assert code(response) == "prohibido"
+    assert {u["nombre"] for u in listar(client)} == {"Sede A", "Inactiva A"}
 
 
 def test_unknown_id_is_404(client):

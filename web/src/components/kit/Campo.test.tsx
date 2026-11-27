@@ -218,6 +218,14 @@ describe('MarcoCampo', () => {
     for (const clase of ['h-accion', 'font-mono', 'text-center', 'text-2xl']) expect(clases, clase).toContain(clase)
     expect(clases).not.toMatch(/(^|\s)h-control(\s|$)/)
   })
+
+  it('captura: alto de acción, mono y alineado a la izquierda', () => {
+    render(<Campo id="captura" tipo="codigo" captura etiqueta="Buscar" />)
+    const clases = screen.getByRole('textbox', { name: 'Buscar' }).className
+    for (const clase of ['h-accion', 'font-mono', 'text-left', 'text-base']) expect(clases, clase).toContain(clase)
+    expect(clases).not.toMatch(/text-center/)
+    expect(clases).not.toMatch(/tracking-widest/)
+  })
 })
 
 // Spec 016, T10: ui/label fusiona con el `cn` sin la escala nombrada y borraba text-etiqueta

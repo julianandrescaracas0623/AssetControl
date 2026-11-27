@@ -16,6 +16,7 @@ from acceso_db import (
     ADMIN_A,
     ADMIN_B,
     CONTADOR_A,
+    CONTADOR_B,
     TENANT_A,
     TENANT_B,
     AccesoDb,
@@ -32,6 +33,7 @@ from app.catalogo.service import CATEGORIAS_SUGERIDAS
 ADMIN = bearer(ADMIN_A, TENANT_A)
 CONTADOR = bearer(CONTADOR_A, TENANT_A, rol="contador")
 ADMIN_OTRO = bearer(ADMIN_B, TENANT_B)
+CONTADOR_OTRO = bearer(CONTADOR_B, TENANT_B, rol="contador")
 
 
 @pytest.fixture(scope="module")
@@ -167,6 +169,24 @@ def test_other_tenant_is_invisible_and_404(client):
     assert response.status_code == 404
     assert code(response) == "no_encontrado"
     assert "Solo B" in nombres(client, ADMIN_OTRO)
+
+
+def test_contador_reads_only_its_tenant_and_cannot_write_elsewhere(client):
+    # Spec 020 (req. 6): lectura de ambos roles fijada; escribir sigue siendo del admin.
+    de_a = creada(client, "Solo A")
+    de_b = creada(client, "Solo B", headers=ADMIN_OTRO)
+
+    assert nombres(client, CONTADOR) == ["Solo A"]
+    assert nombres(client, CONTADOR_OTRO) == ["Solo B"]
+    for response in (
+        client.patch(f"/categorias/{de_a}", json={"nombre": "X"}, headers=CONTADOR),
+        client.patch(f"/categorias/{de_b}", json={"nombre": "X"}, headers=CONTADOR),
+        crear(client, "Nueva", headers=CONTADOR_OTRO),
+    ):
+        assert response.status_code == 403
+        assert code(response) == "prohibido"
+    assert nombres(client) == ["Solo A"]
+    assert nombres(client, ADMIN_OTRO) == ["Solo B"]
 
 
 def test_unknown_id_is_404_and_anonymous_is_401(client):
