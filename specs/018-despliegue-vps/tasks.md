@@ -1,6 +1,6 @@
 # Tasks 018 — Despliegue en VPS con Coolify
 
-Nueve tareas, cada una ≤ 1 día. «Humano» = cuentas, DNS, secretos, SSH o panel de Coolify (el implementer no accede). «Implementer» = código y docs con tests primero. Revisiones: `reviewer` y `security-reviewer` en T1 y T2 (cabeceras, apagado); `reviewer` en T9. Las tareas del humano se cierran con evidencia pegada (sin secretos).
+Diez tareas, cada una ≤ 1 día. «Humano» = cuentas, DNS, secretos, SSH o panel de Coolify (el implementer no accede). «Implementer» = código y docs con tests primero. Revisiones: `reviewer` y `security-reviewer` en T1 y T2 (cabeceras, apagado); `reviewer` en T9. Las tareas del humano se cierran con evidencia pegada (sin secretos).
 
 ## T1 — Cabeceras `no-referrer` y `no-store` en páginas sensibles (implementer, ejecutable)
 
@@ -9,7 +9,7 @@ Nueve tareas, cada una ≤ 1 día. «Humano» = cuentas, DNS, secretos, SSH o pa
 - **Verificación:** `cd backend && uv run pytest tests/test_wsgi_cabeceras.py -q && uv run pytest -q && uv run ruff check .`
 - **Dependencia:** ninguna.
 - **Cubre:** R1–R3, A1.
-- **Estado:** PARCIAL. Ya aplicado: `Referrer-Policy: no-referrer` en `/restablecer`, `/invitacion` y `/plataforma/**` (`backend/app/wsgi.py`, SEC-05). Falta: `no-referrer` en `/cambiar-contrasena`; `Cache-Control: no-store` en esas rutas y en el *fallback* de `index.html` (hoy `no-cache`); y `backend/tests/test_wsgi_cabeceras.py`.
+- **Estado:** HECHA (2026-11-27), con revisión del reviewer y del security-reviewer; falta repetir A3 en los entornos reales (humano). Riesgo conocido: riesgo R12 de la spec (`Origin: null`), seguimiento en T10.
 
 ## T2 — `worker_exit` con `Correo.esperar` (implementer)
 
@@ -51,7 +51,7 @@ Nueve tareas, cada una ≤ 1 día. «Humano» = cuentas, DNS, secretos, SSH o pa
 
 - **Resultado:** aplicación `Dockerfile.prod` desde `develop`, dominio `pruebas.<dominio>`, puerto 8000, healthcheck `/api/ready`, variables y secretos del plan; `PLATAFORMA_HABILITADA` según P2 (con restricción por red si se activa); `CORREO_MODO` sin definir mientras P3 esté abierta.
 - **Archivos probables:** ninguno (panel de Coolify).
-- **Verificación:** `curl -s https://pruebas.<dominio>/api/ready` devuelve `{"status":"ok"}`; `http://` redirige a `https://`; `curl -sI https://pruebas.<dominio>/restablecer` (e `/invitacion`, `/cambiar-contrasena`, `/plataforma/entrar`, ruta inexistente) muestra las cabeceras de T1; el registro de arranque no avisa `TRUSTED_PROXY_HOPS=0`.
+- **Verificación:** `curl -s https://pruebas.<dominio>/api/ready` devuelve `{"status":"ok"}`; `http://` redirige a `https://`; `curl -sI https://pruebas.<dominio>/restablecer` (e `/invitacion`, `/cambiar-contrasena`, `/plataforma/entrar`, `/login`, una ruta con mayúsculas como `/RESTABLECER` y una ruta inexistente) muestra las cabeceras de T1; el registro de arranque no avisa `TRUSTED_PROXY_HOPS=0`.
 - **Dependencia:** T1, T2, T4, T5.
 - **Cubre:** R5, R6, R7, A3, A4.
 - **Estado:** HECHA por el humano (confirmado el 2026-11-27); la comprobación de las cabeceras de T1 (A3) se repite al cerrar T1.
@@ -82,6 +82,18 @@ Nueve tareas, cada una ≤ 1 día. «Humano» = cuentas, DNS, secretos, SSH o pa
 - **Dependencia:** T8 (y T7 para las comprobaciones reales).
 - **Cubre:** A10, A11, P7.
 - **Estado:** documentación hecha (2026-11-27); falta del humano: pg_dump de cada proyecto y ensayo de restauración.
+
+## T10 — `referrerPolicy: 'strict-origin'` en el cliente de la API web (implementer)
+
+> No confundir con la pregunta T10 de `docs/05` (elección de plataforma, P8).
+
+- **Resultado:** los `fetch` de `web/src/lib/api/cliente.ts` envían `referrerPolicy: 'strict-origin'`, de modo que los POST del mismo origen llevan un `Origin` real aunque el documento tenga `Referrer-Policy: no-referrer`; refresh, logout, recuperar y restablecer (y los de la consola) dejan de responder 403 en navegadores sin `Sec-Fetch-Site` (riesgo R12). El servidor no cambia ni acepta `Origin: null`. Pruebas escritas primero.
+- **Archivos probables:** `web/src/lib/api/cliente.ts` y su prueba.
+- **Verificación:** `cd web && npm test && npm run lint && npm run typecheck`
+- **Revisiones:** `reviewer` y `security-reviewer`.
+- **Dependencia:** T1.
+- **Cubre:** riesgo R12 de la sección «Riesgos» de la spec (no el requisito R12).
+- **Estado:** PENDIENTE.
 
 ## Pendiente del humano (fuera de las tareas)
 
