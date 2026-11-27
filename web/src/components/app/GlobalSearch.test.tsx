@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { routes } from '@/router'
 import { catalogoDemo } from '@/test/catalogo'
+import { simularEscritorio } from '@/test/matchMedia'
 import { simularSesion } from '@/test/sesion'
 
 // Spec 001b, T5: buscador global (R7, A5) sobre datos ficticios.
@@ -46,7 +47,7 @@ describe('buscador global', () => {
     expect(within(dialogo).queryByRole('option', { name: /Impresora multifuncional/ })).toBeNull()
     fireEvent.keyDown(campo, { key: 'Enter' })
     expect(await screen.findByRole('heading', { level: 1, name: 'Silla ergonómica' })).toBeTruthy()
-    expect(router.state.location.pathname).toBe('/admin/activos/000123')
+    expect(router.state.location.pathname).toBe('/app/activos/000123')
   })
 
   it('filtra por nombre y lleva también a pantallas', async () => {
@@ -68,5 +69,26 @@ describe('buscador global', () => {
   it('un código inexistente en la ficha muestra «No encontramos ese código»', async () => {
     await abrirEn('/admin/activos/999999')
     expect(await screen.findByRole('heading', { level: 1, name: 'No encontramos ese código' })).toBeTruthy()
+  })
+})
+
+describe('buscador global con el contador (spec 020, T3)', () => {
+  it('no muestra precio_compra ni «•••» aunque la respuesta trajera el precio', async () => {
+    simularEscritorio()
+    // Datos del catálogo con precio (los del admin): la pantalla no debe pintarlo nunca.
+    simularSesion('contador', catalogoDemo('admin').manejador)
+    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/app/activos'] })} />)
+    await screen.findByRole('navigation', { name: 'Navegación principal' })
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+    const dialogo = await screen.findByRole('dialog', { name: 'Buscar' })
+    fireEvent.change(within(dialogo).getByRole('combobox'), { target: { value: 'silla' } })
+    expect(await within(dialogo).findByRole('option', { name: /Silla ergonómica/ })).toBeTruthy()
+    const texto = dialogo.textContent ?? ''
+    expect(texto).not.toMatch(/precio|\$|COP|389[.\s]?900/i)
+    expect(texto).not.toContain('•••')
+    // Solo las pantallas del contador: nada de Valor actual ni Usuarios.
+    fireEvent.change(within(dialogo).getByRole('combobox'), { target: { value: '' } })
+    expect(await within(dialogo).findByRole('option', { name: /Contar/ })).toBeTruthy()
+    expect(within(dialogo).queryByRole('option', { name: /Valor actual|Usuarios/ })).toBeNull()
   })
 })

@@ -139,12 +139,16 @@ describe('caracterización de Sesiones (T9): lo que no cambia', () => {
   it('una sesión que no existe enlaza a «Ver sesiones»', async () => {
     abrir('/admin/sesiones/00000000-0000-4000-8000-0000000000ff', catalogoDemo('admin').manejador)
     expect(await screen.findByText('Puede que el enlace esté incompleto.')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Ver sesiones' }).getAttribute('href')).toBe('/admin/sesiones')
+    expect(screen.getByRole('link', { name: 'Ver sesiones' }).getAttribute('href')).toBe('/app/sesiones')
   })
 
-  it('el contador no entra', async () => {
+  // Spec 020, T3 (R3, R9): Sesiones ya no es exclusiva del admin; el contador la abre en su
+  // marco (T6: en solo lectura y sin cifras de valor). El servidor sigue siendo la autoridad.
+  it('el contador entra en su marco, sin «Sin permiso»', async () => {
     abrir('/admin/sesiones', catalogoDemo('contador').manejador, { rol: 'contador' })
-    expect(await screen.findByRole('heading', { level: 1, name: 'No tienes permiso para ver esto' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Sesiones' })).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: 'Navegación principal' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 1, name: 'No tienes permiso para ver esto' })).toBeNull()
   })
 })
 
@@ -183,7 +187,7 @@ describe('diseño de Sesiones (T9): kit', () => {
     abrir('/admin/sesiones', catalogo.manejador, { movil: true })
     const cerradas = await screen.findByRole('region', { name: 'Cerradas' })
     expect(within(cerradas).queryByRole('table')).toBeNull()
-    expect(within(cerradas).getByRole('link', { name: 'Ver informe de Conteo nov 2026' }).getAttribute('href')).toBe(`/admin/sesiones/${SESION}/informe`)
+    expect(within(cerradas).getByRole('link', { name: 'Ver informe de Conteo nov 2026' }).getAttribute('href')).toBe(`/app/sesiones/${SESION}/informe`)
   })
 
   it('abrir sesión es un Dialogo del kit con Campo del kit (sin el selector de compatibilidad)', async () => {
@@ -278,9 +282,12 @@ describe('caracterización de Discrepancias (T9): lo que no cambia', () => {
     expect(await screen.findByText('Aún no se ha resuelto ninguna')).toBeTruthy()
   })
 
-  it('el contador no entra', async () => {
+  // Spec 020, T3 (R3, R8): Discrepancias ya no es exclusiva del admin (T6: solo lectura).
+  it('el contador entra en su marco, sin «Sin permiso»', async () => {
     abrir('/admin/discrepancias', catalogoDemo('contador').manejador, { rol: 'contador' })
-    expect(await screen.findByRole('heading', { level: 1, name: 'No tienes permiso para ver esto' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Discrepancias' })).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: 'Navegación principal' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 1, name: 'No tienes permiso para ver esto' })).toBeNull()
   })
 })
 
@@ -469,8 +476,10 @@ const invitar: Manejador = (url) => (url === '/api/invitaciones' ? json(201, CRE
 
 async function crearInvitacion() {
   await screen.findByRole('heading', { level: 1, name: 'Usuarios' })
-  fireEvent.change(screen.getByLabelText('Correo de la persona'), { target: { value: 'nuevo@ejemplo.test' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Crear invitación' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Invitar' }))
+  const dialogo = await screen.findByRole('dialog', { name: 'Invitar a una persona' })
+  fireEvent.change(within(dialogo).getByLabelText('Correo de la persona'), { target: { value: 'nuevo@ejemplo.test' } })
+  fireEvent.click(within(dialogo).getByRole('button', { name: 'Crear invitación' }))
   return (await screen.findByLabelText('Enlace de invitación')) as HTMLInputElement
 }
 
@@ -501,13 +510,16 @@ describe('caracterización de Usuarios (T9): lo que no cambia', () => {
 })
 
 describe('diseño de Usuarios (T9): kit', () => {
-  it('formulario en un Panel del kit con Campo y la acción principal', async () => {
+  it('la lista es el módulo; invitar abre un Dialogo del kit con Campo y la acción principal', async () => {
     abrir('/admin/usuarios', invitar)
-    const panel = await screen.findByRole('region', { name: 'Invitar a una persona' })
-    expect(panel.getAttribute('data-kit')).toBe('panel')
-    expect(within(panel).getByLabelText('Correo de la persona').closest('[data-kit=campo]')).toBeTruthy()
-    expect(within(panel).getByRole('button', { name: 'Crear invitación' }).getAttribute('data-variante')).toBe('principal')
-    expect(screen.getByRole('region', { name: 'Personas con acceso' }).getAttribute('data-kit')).toBe('panel')
+    const personas = await screen.findByRole('region', { name: 'Personas con acceso' })
+    expect(personas.querySelector('[data-kit=tabla-datos]')).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'Invitar a una persona' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Invitar' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Invitar a una persona' })
+    expect(dialogo.getAttribute('data-kit')).toBe('dialogo')
+    expect(within(dialogo).getByLabelText('Correo de la persona').closest('[data-kit=campo]')).toBeTruthy()
+    expect(within(dialogo).getByRole('button', { name: 'Crear invitación' }).getAttribute('data-variante')).toBe('principal')
   })
 
   it('la invitación creada es un aviso de éxito y el enlace un Campo del kit en mono', async () => {
@@ -647,7 +659,7 @@ describe('diseño de Empresa (T9; D13, R11, A9): kit y caja del logo', () => {
 describe('Pendiente (T9): kit', () => {
   it('título en el encabezado del kit y el aviso como estado vacío del kit', () => {
     render(
-      <MemoryRouter initialEntries={['/admin/usuarios']}>
+      <MemoryRouter initialEntries={['/app/usuarios']}>
         <Pendiente />
       </MemoryRouter>,
     )

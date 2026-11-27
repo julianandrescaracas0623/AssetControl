@@ -15,6 +15,9 @@ import { useDensidad } from '@/hooks/use-densidad'
 // Spec 016, T5 (R4, Deuda T4 g): `principal` y `secundaria` van en la BarraAccion del kit
 // (principal de 56 px abajo, secundaria encima); las pantallas no ponen alturas a mano.
 // Spec 016, T10 (Deuda T6 e): se retiró la barra libre `acciones` (ya sin pantallas).
+// Adaptación responsive (2026-11-25): en teléfono, columna de 480 px. A partir de 768 px
+// (tableta y computador) el contenido se ensancha a 768 px y, desde 1280 px, a 1152 px,
+// para que el conteo en computador no se vea como una pantalla de teléfono.
 
 export function CountShell({
   titulo,
@@ -45,7 +48,7 @@ export function CountShell({
     <div data-densidad="conteo" className="flex min-h-0 flex-1 flex-col">
       <SaltarContenido />
       <header className="sticky top-0 z-10 border-b bg-card">
-        <div className="mx-auto flex min-h-fila w-full max-w-[480px] items-center gap-1 px-1 py-1">
+        <div className="mx-auto flex min-h-fila w-full max-w-[480px] items-center gap-1 px-1 py-1 md:max-w-3xl xl:max-w-6xl">
           {volver ? (
             <>
               <Boton asChild variante="fantasma" className="size-control shrink-0 p-0 [&_svg]:size-5">
@@ -77,7 +80,7 @@ export function CountShell({
           </div>
         </div>
       </header>
-      <main id={ID_CONTENIDO} tabIndex={-1} className="mx-auto flex w-full max-w-[480px] min-w-0 flex-1 flex-col gap-4 p-4 outline-none">
+      <main id={ID_CONTENIDO} tabIndex={-1} className="mx-auto flex w-full max-w-[480px] min-w-0 flex-1 flex-col gap-4 p-4 outline-none md:max-w-3xl md:p-6 xl:max-w-6xl">
         {children}
       </main>
       {principal && <BarraAccion elemento="footer" principal={principal} secundaria={secundaria} />}

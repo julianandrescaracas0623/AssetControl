@@ -78,6 +78,11 @@ const CONTROL = 'h-control bg-card px-3 text-base shadow-xs disabled:bg-muted md
  * las alturas de la densidad, así que no se ponen las dos) y letra de 24 px.
  */
 const GRANDE = 'h-accion bg-card px-3 text-center text-2xl tracking-widest shadow-xs disabled:bg-muted md:text-2xl'
+/**
+ * Captura de escritorio (lector USB + búsqueda): mismo alto de acción, alineado a la
+ * izquierda, sin tracking. El `grande` centrado es el código del sticker en el teléfono.
+ */
+const CAPTURA = 'h-accion bg-card px-3 text-left text-base tracking-normal font-mono shadow-xs disabled:bg-muted md:text-base'
 
 type InputNativo = Omit<ComponentProps<'input'>, 'id' | 'className' | 'children'>
 type TextareaNativo = Omit<ComponentProps<'textarea'>, 'id' | 'className' | 'children'>
@@ -97,6 +102,11 @@ type CampoEntrada = CampoBase &
      * alto de acción (56 px), letra de 24 px, centrado. Solo uno por pantalla.
      */
     grande?: boolean
+    /**
+     * Captura de escritorio: alto de acción, mono, alineado a la izquierda (lector USB y
+     * búsqueda). No usar junto a `grande`.
+     */
+    captura?: boolean
   }
 type CampoArea = CampoBase & TextareaNativo & { tipo: 'area' }
 type CampoSeleccion = CampoBase & {
@@ -184,7 +194,7 @@ export function Campo(props: CampoProps) {
     )
   }
 
-  const { tipo = 'texto', sufijo, grande = false, type, ...nativo } = resto
+  const { tipo = 'texto', sufijo, grande = false, captura = false, type, ...nativo } = resto
   if (type === 'date') {
     return (
       <MarcoCampo {...marco}>
@@ -215,7 +225,7 @@ export function Campo(props: CampoProps) {
       aria-describedby={describedBy}
       aria-invalid={error ? true : nativo['aria-invalid']}
       aria-required={obligatorio || nativo['aria-required']}
-      className={cn(grande ? GRANDE : CONTROL, clase, sufijo !== undefined && 'pr-12')}
+      className={cn(captura ? CAPTURA : grande ? GRANDE : CONTROL, clase, sufijo !== undefined && (captura ? 'pr-14' : 'pr-12'))}
     />
   )
   const conSufijo =

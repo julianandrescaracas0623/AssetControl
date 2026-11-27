@@ -5,7 +5,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate, useNavigationType, typ
 import { DatosFicticios } from '@/components/app/DatosFicticios'
 import { GlobalSearch } from '@/components/app/GlobalSearch'
 import { Logo } from '@/components/app/Logo'
-import { ADMIN_NAV, entradaDeRuta, migasDeRuta } from '@/components/app/admin-nav'
+import { entradaDeRuta, migasDeRuta, navDeRol } from '@/components/app/app-nav'
 import { Boton, ID_CONTENIDO, Notificaciones, SaltarContenido } from '@/components/kit'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -45,9 +45,10 @@ import { useDensidad } from '@/hooks/use-densidad'
 import { useEsEscritorio } from '@/hooks/use-escritorio'
 import { useInformeDeOrigen } from '@/lib/informe'
 import { cn } from '@/lib/utils'
-import { etiquetaRol, iniciales, useCerrarSesion, useSesion } from '@/lib/sesion'
+import { RAIZ_APP, rutaApp } from '@/lib/rutas'
+import { etiquetaRol, iniciales, useCerrarSesion, useRol, useSesion } from '@/lib/sesion'
 
-// App shell de administración (docs/08 §4.1, spec 001b T4): barra lateral
+// Marco compartido (docs/08 §4.1, spec 001b T4; spec 020, T3: admin y contador): barra lateral
 // colapsable a íconos (estado recordado en la cookie de shadcn), menú tipo
 // sheet por debajo de md, migas de pan, buscador y menú de usuario.
 // Pulsar el logo abre y cierra el menú, sin icono. En el encabezado, las
@@ -56,6 +57,8 @@ import { etiquetaRol, iniciales, useCerrarSesion, useSesion } from '@/lib/sesion
 // Spec 016, T4 (D1, D6, D8): barra lateral blanca; el ítem activo se marca con fondo
 // --brand-soft, texto cobalto fuerte, peso y una barra de acento (nunca solo el color:
 // también aria-current). Encabezado blanco con borde sobre la página (--page).
+// Spec 020, T3 (R1, R4): el menú sale de APP_NAV filtrado por el rol de la sesión
+// (useRol). Es presentación: los permisos los verifica el servidor.
 
 /** Receta del ítem de la barra: altura de control y estado activo de D8. */
 const ITEM_NAV = cn(
@@ -99,6 +102,9 @@ function BarraLateral() {
   // Spec 015, T9 (R10; Q8 = A): en escritorio no hay atajo suelto a contar; se entra
   // desde la sesión abierta. En teléfono y tableta táctil se conserva.
   const escritorio = useEsEscritorio()
+  const rol = useRol()
+  // El contador ya tiene «Contar» en el menú: el atajo del pie sería un duplicado.
+  const atajoContar = !escritorio && rol === 'admin'
   const alElegir = () => {
     if (isMobile) setOpenMobile(false)
   }
@@ -108,7 +114,7 @@ function BarraLateral() {
         <div className="flex h-12 items-center gap-2.5 px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <BotonMenu />
           <Link
-            to="/admin"
+            to={RAIZ_APP}
             onClick={alElegir}
             className="min-w-0 truncate rounded-sm text-titulo-seccion tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group-data-[collapsible=icon]:hidden"
           >
@@ -118,7 +124,7 @@ function BarraLateral() {
       </SidebarHeader>
       <SidebarContent>
         <nav aria-label="Navegación principal">
-          {ADMIN_NAV.map((grupo) => (
+          {navDeRol(rol).map((grupo) => (
             <SidebarGroup key={grupo.titulo}>
               <SidebarGroupLabel className="text-etiqueta font-medium text-muted-foreground">{grupo.titulo}</SidebarGroupLabel>
               <SidebarGroupContent>
@@ -147,7 +153,7 @@ function BarraLateral() {
       <SidebarFooter>
         {/* Spec 016, T10 (Deuda T4 f): 8 px entre «Ir a contar» y la tarjeta de la clínica. */}
         <SidebarMenu className="gap-separacion">
-          {!escritorio && (
+          {atajoContar && (
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Ir a contar" variant="outline" className="h-control gap-2.5 bg-card px-2.5">
                 <Link to="/contar" onClick={alElegir}>
@@ -178,7 +184,7 @@ function BarraLateral() {
 function Migas() {
   const { pathname } = useLocation()
   // Spec 015 (R7): en «Valor actual» abierto desde un informe, las migas llevan a él.
-  const origen = useInformeDeOrigen(pathname.replace(/\/+$/, '') === '/admin/valor')
+  const origen = useInformeDeOrigen(pathname.replace(/\/+$/, '') === rutaApp('valor'))
   const migas = migasDeRuta(pathname, origen)
   return (
     <Breadcrumb aria-label="Migas de pan" className="min-w-0">
@@ -234,6 +240,7 @@ function MenuUsuario() {
   const cerrarSesion = useCerrarSesion()
   const escritorio = useEsEscritorio()
   if (!sesion) return null
+  const atajoContar = !escritorio && sesion.rol === 'admin'
   const { nombre, email } = sesion.usuario
   const rol = etiquetaRol(sesion.rol)
   return (
@@ -254,7 +261,7 @@ function MenuUsuario() {
           <span className="mt-1 truncate text-etiqueta text-muted-foreground">{rol}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {!escritorio && (
+        {atajoContar && (
           <>
             <DropdownMenuItem asChild className="min-h-control px-2.5">
               <Link to="/contar">Ir a contar</Link>
@@ -271,9 +278,12 @@ function MenuUsuario() {
 }
 
 // Pantallas que ya muestran datos reales de la API: sin la banda de maqueta.
-const RUTAS_CON_DATOS_REALES = new Set(['/admin/usuarios', '/admin/ubicaciones', '/admin/categorias', '/admin/sesiones', '/admin/discrepancias', '/admin/valor', '/admin/empresa'])
+const RUTAS_CON_DATOS_REALES = new Set(['usuarios', 'ubicaciones', 'categorias', 'sesiones', 'discrepancias', 'valor', 'empresa'].map((r) => rutaApp(r)))
 const conDatosReales = (ruta: string) =>
-  ruta === '/admin' || RUTAS_CON_DATOS_REALES.has(ruta) || ruta.startsWith('/admin/activos') || /^\/admin\/sesiones\/[^/]+(\/informe)?$/.test(ruta)
+  ruta === RAIZ_APP ||
+  RUTAS_CON_DATOS_REALES.has(ruta) ||
+  ruta.startsWith(rutaApp('activos')) ||
+  new RegExp(`^${rutaApp('sesiones')}/[^/]+(/informe)?$`).test(ruta)
 
 type Pila = { claves: string[]; cursor: number }
 
@@ -333,9 +343,9 @@ function Cabecera({ pathname, onBuscar }: { pathname: string; onBuscar: () => vo
       )}
       <FlechasRuta />
       <div className="mr-1 hidden h-5 w-px bg-border md:block" aria-hidden="true" />
-      {pathname !== '/admin' && (
+      {pathname !== RAIZ_APP && (
         <Boton asChild variante="fantasma" className="size-control shrink-0 p-0 md:hidden">
-          <Link to="/admin" aria-label="Ir al inicio">
+          <Link to={RAIZ_APP} aria-label="Ir al inicio">
             <House />
           </Link>
         </Boton>
@@ -348,14 +358,14 @@ function Cabecera({ pathname, onBuscar }: { pathname: string; onBuscar: () => vo
   )
 }
 
-export default function AdminShell() {
+export default function AppShell() {
   const { pathname } = useLocation()
   const [abierta] = useState(barraAbierta)
   const [buscando, setBuscando] = useState(false)
   // Spec 016, T1 (D6): densidad de escritorio desde md, de pulgar por debajo.
   useDensidad('admin')
 
-  // Ctrl+K / ⌘K abre el buscador desde cualquier pantalla de administración.
+  // Ctrl+K / ⌘K abre el buscador desde cualquier pantalla del marco.
   useEffect(() => {
     function alPulsar(evento: KeyboardEvent) {
       if (evento.key.toLowerCase() === 'k' && (evento.ctrlKey || evento.metaKey)) {

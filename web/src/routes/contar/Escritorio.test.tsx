@@ -197,6 +197,81 @@ describe('conteo en escritorio: disposición y cámara (R8, R9)', () => {
   })
 })
 
+// Spec 015, R8: la columna lateral del panel (240 px desde xl) apila la foto y su botón y
+// ordena el enlace al historial. jsdom no mide: se fijan las clases que impiden que el
+// botón se corte (las medidas reales están en las capturas del navegador).
+describe('columna de la foto en el panel de verificación (R8)', () => {
+  const fotoDe = (c: Catalogo) => {
+    const impresora = c.activos.find((a) => a.codigo === '000215')!
+    c.principales.set(impresora.id, { id: '00000000-0000-4000-8000-0000000000f1', creada_en: '2026-11-15T12:00:00+00:00', ancho: 1600, alto: 1200 })
+    c.fotos.set('00000000-0000-4000-8000-0000000000f1', new Uint8Array([0xff, 0xd8, 0xff]))
+  }
+  /** Contenedor que ordena los botones de la foto. */
+  const acciones = (boton: HTMLElement) => boton.closest('[data-foto=acciones]') as HTMLElement
+
+  it('sin foto: el cuadro va a lo ancho 4:3 y «Agregar foto» vive dentro del marco', async () => {
+    abrir()
+    await abrirActivo()
+    const region = screen.getByRole('region', { name: 'Foto del activo' })
+    expect(region.getAttribute('data-disposicion')).toBe('lateral')
+    const caja = within(region).getByText('Sin foto').closest('[data-foto=imagen]') as HTMLElement
+    expect(caja.className).toMatch(/w-full/)
+    expect(caja.className).toMatch(/aspect-\[4\/3\]/)
+    const boton = within(region).getByRole('button', { name: 'Agregar foto' })
+    expect(caja.contains(boton)).toBe(true)
+    expect(boton.className).toMatch(/max-w-full/)
+    expect((region.querySelector('[data-foto=contenido]') as HTMLElement).className).toMatch(/flex-col/)
+  })
+
+  it('con foto: la imagen va a lo ancho y «Cambiar foto» y «Quitar foto» se apilan', async () => {
+    abrir('/contar/escanear', { preparar: fotoDe })
+    await abrirActivo()
+    const region = screen.getByRole('region', { name: 'Foto del activo' })
+    const imagen = await within(region).findByRole('button', { name: 'Ver la foto de Impresora multifuncional' })
+    expect(imagen.className).toMatch(/w-full/)
+    expect(imagen.className).toMatch(/aspect-\[4\/3\]/)
+    const cambiar = within(region).getByRole('button', { name: 'Cambiar foto' })
+    const quitar = within(region).getByRole('button', { name: 'Quitar foto' })
+    expect(acciones(cambiar)).toBe(acciones(quitar))
+    expect(acciones(cambiar).className).toMatch(/flex-col/)
+    for (const b of [cambiar, quitar]) expect(b.className).toMatch(/max-w-full/)
+  })
+
+  it('el historial va en la misma columna, a lo ancho y debajo de la foto', async () => {
+    abrir()
+    await abrirActivo()
+    const columna = document.querySelector('[data-verificacion=lateral]') as HTMLElement
+    const region = within(columna).getByRole('region', { name: 'Foto del activo' })
+    const enlace = within(columna).getByRole('link', { name: 'Ver historial del activo' })
+    expect(enlace.getAttribute('href')).toBe('/contar/activo/000215/historial')
+    expect(enlace.className).toMatch(/w-full/)
+    expect(region.compareDocumentPosition(enlace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('«Encontrada en» alinea el ícono con el texto (sin altura extra) y no muestra precios', async () => {
+    abrir()
+    await abrirActivo()
+    const valor = screen.getByText('Encontrada en').nextElementSibling as HTMLElement
+    const linea = valor.querySelector('[data-verificacion=encontrada]') as HTMLElement
+    expect(linea.className).toMatch(/truncate/)
+    expect(linea.querySelector('svg')).toBeTruthy()
+    expect(document.body.textContent).not.toContain('$')
+  })
+
+  it('en el teléfono la foto conserva su miniatura en fila (sin la disposición lateral)', async () => {
+    simularAncho({ movil: true })
+    guardarSala(ADMINISTRACION)
+    simularSesion('contador', catalogoDemo('contador', { sesiones: [sesionDe()] }).manejador)
+    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/contar/activo/000215'] })} />)
+    const region = await screen.findByRole('region', { name: 'Foto del activo' })
+    expect(region.getAttribute('data-disposicion')).toBeNull()
+    const caja = within(region).getByText('Sin foto').closest('[data-foto=imagen]') as HTMLElement
+    expect(caja.className).toMatch(/size-24/)
+    expect(caja.className).not.toMatch(/xl:/)
+    expect(acciones(within(region).getByRole('button', { name: 'Agregar foto' })).className).not.toMatch(/xl:/)
+  })
+})
+
 describe('lector USB tipo teclado y búsqueda', () => {
   it('una ráfaga con Enter abre el activo a la derecha y deja el campo vacío', async () => {
     const { router } = abrir()
@@ -401,6 +476,24 @@ describe('atajos y confirmar', () => {
     expect(cuerpos).toHaveLength(1)
     expect(cuerpos[0]).toMatchObject({ estado_fisico: 'danado', ubicacion_encontrada_id: ADMINISTRACION })
     expect(catalogo.verificaciones).toHaveLength(1)
+  })
+
+  it('con foto principal, tras verificar la franja ofrece «Tomar foto nueva de este conteo» y no sube ninguna', async () => {
+    const IMPRESORA = '00000000-0000-4000-8000-0000000000d1'
+    const { f } = abrir('/contar/escanear', {
+      preparar: (c) => c.principales.set(IMPRESORA, { id: '00000000-0000-4000-8000-00000000f0d1', creada_en: '2026-11-01T10:00:00Z', ancho: 800, alto: 600 }),
+    })
+    await abrirActivo()
+    await waitFor(() => expect(document.activeElement).toBe(panel()))
+    fireEvent.keyDown(panel(), { key: 'Enter' })
+    fireEvent.keyDown(panel(), { key: 'Enter' })
+
+    await screen.findByText(/^Verificado:/)
+    expect(await screen.findByRole('button', { name: 'Tomar foto nueva de este conteo' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Agregar foto' })).toBeNull()
+    expect(screen.getByText(/ya tiene su foto principal/)).toBeTruthy()
+    const subidas = f.mock.calls.filter(([url, init]) => String(url).includes('/foto') && init?.method === 'POST')
+    expect(subidas).toHaveLength(0)
   })
 
   it('D y Enter de inmediato confirman «Dañado» (sin ventana con el estado viejo)', async () => {
@@ -786,7 +879,17 @@ describe('cola de la sala y precios', () => {
     ;(await campo()).focus()
     teclear('ZZ-999')
     expect(await screen.findByRole('heading', { level: 1, name: 'No encontramos ese código' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: /Crear activo con este código/ }).getAttribute('href')).toBe('/contar/nuevo?codigo=ZZ-999')
+    expect(screen.getByRole('link', { name: /Crear activo con este código/ }).getAttribute('href')).toBe('/app/activos/nuevo?codigo=ZZ-999')
+  })
+
+  it('crear el activo desde el conteo lleva el código y ofrece volver al conteo (spec 020, T5)', async () => {
+    const { router } = abrir()
+    ;(await campo()).focus()
+    teclear('ZZ-998')
+    fireEvent.click(await screen.findByRole('link', { name: /Crear activo con este código/ }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/app/activos/nuevo'))
+    expect(router.state.location.state).toEqual({ desde: 'conteo' })
+    expect((await screen.findByRole('link', { name: 'Volver al conteo' })).getAttribute('href')).toBe('/contar/escanear')
   })
 })
 
@@ -797,7 +900,7 @@ describe('cabecera: volver a la sesión (spec 015, T9)', () => {
   it('el admin con sesión abierta ve «Volver a la sesión» hacia su detalle', async () => {
     abrir('/contar/escanear', { rol: 'admin' })
     const volver = await screen.findByRole('link', { name: 'Volver a la sesión' })
-    expect(volver.getAttribute('href')).toBe(`/admin/sesiones/${SESION}`)
+    expect(volver.getAttribute('href')).toBe(`/app/sesiones/${SESION}`)
     expect(screen.queryByRole('link', { name: 'Inicio del conteo' })).toBeNull()
   })
 

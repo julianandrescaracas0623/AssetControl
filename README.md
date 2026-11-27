@@ -1,17 +1,73 @@
-# Inventario de Activos
+# AssetControl
 
-Sistema para llevar el inventario de activos (equipos y mobiliario) de una clínica odontológica, con conteos periódicos, historial y valor total para informes.
+**Inventario de activos fijos desde el celular: escanea el sticker, registra el activo y conoce cuánto valen los bienes de tu empresa.**
 
-Primer cliente: Biotecnologia Dental (Cartago, Colombia). El diseño es multi-tenant desde el inicio.
+AssetControl es una aplicación web multiempresa (multi-tenant) para que empresas y emprendedores de cualquier sector registren sus activos fijos (equipos, computadores, mobiliario, maquinaria), los cuenten periódicamente y sepan en todo momento dónde están, en qué estado se encuentran y cuánto valen.
+
+## Por qué existe
+
+La idea surgió hace años, viendo de cerca el trabajo de una clínica odontológica en Cartago, Colombia. Cada fin de año la clínica cuenta y registra todos sus activos fijos, viejos y nuevos, y entrega un informe detallado con el estado, la ubicación y el precio de cada uno. Todo se hacía a mano en Excel: digitar los activos uno a uno, ordenarlos por ubicación y dejar el documento presentable. Era un trabajo de días.
+
+Al preparar con la clínica el recorrido anual, se decidió construir la herramienta desde cero en lugar de repetir el proceso. La idea central:
+
+- Cada activo lleva un sticker de seguridad con un código de barras que lo identifica para siempre.
+- Desde el teléfono se escanea el sticker y se registra el activo con su nombre, ubicación, foto, precio y estado.
+- El informe sale solo, con los totales calculados y listo para presentar.
+
+El principio de diseño es **cero digitación innecesaria**: escanear en vez de escribir, elegir en vez de teclear y copiar un activo parecido en vez de empezar de cero.
+
+## Para quién es
+
+Aunque nació en el sector salud, AssetControl está pensado para empresas de cualquier tipo, en especial las que hoy no llevan un registro de sus activos fijos y no saben en cuánto están valorados.
+
+Ya existen productos que ofrecen este servicio, pero muchas empresas de la región no los conocen o no tienen quién las asesore para adoptarlos. AssetControl quiere llegar a ellas con una herramienta sencilla y un acompañamiento cercano. El primer cliente es la clínica donde nació la idea; la meta es crecer por recomendación entre los empresarios de la ciudad.
+
+## Qué hace
+
+- **Alta por escaneo:** la cámara del celular lee el sticker. Si el activo no existe, ofrece crearlo con ese código, con autocompletado, listas para elegir y la opción de duplicar un activo parecido.
+- **Conteos periódicos:** sesiones de conteo por ubicación, con avance, pendientes y discrepancias (un activo encontrado en otro lugar o en otro estado).
+- **Historial por activo:** quién lo verificó y cuándo, y cada cambio de ubicación, precio o estado.
+- **Informe de valor total:** por categoría y por ubicación; se congela al cerrar el conteo y se exporta a PDF y Excel con el logo de la empresa.
+- **Inicio con indicadores:** valor del inventario, avance del conteo y evolución entre conteos.
+- **Fotos** de cada activo.
+- **Dos roles:** administrador (todo, incluidos precios e informes) y contador (cuenta, registra y corrige datos descriptivos, sin ver precios).
+- **Multiempresa:** los datos de cada empresa están aislados de las demás en la propia base de datos, no solo en la pantalla. Cada empresa tiene sus usuarios, ubicaciones y categorías, para adaptarse a distintos modelos de negocio.
+
+## Visión
+
+El MVP es una aplicación web que se usa desde el navegador del celular o del computador, sin instalar nada y con conexión a internet. Después del piloto, el plan es llevarla a una app móvil para ganar portabilidad y evaluar el conteo sin conexión. Por ahora, la app nativa y el modo sin conexión quedan fuera del MVP ([alcance](docs/01-alcance-mvp.md), [ADR-002](docs/adr/ADR-002-solo-online-cliente-web.md)).
 
 ## Estado
 
-Fase: definición de arquitectura y alcance del MVP. Fundación técnica en curso (spec 001).
+**MVP funcional y desplegado** (noviembre de 2026) en un servidor privado virtual (VPS) propio, gestionado con Coolify, con dos entornos:
+
+- **Desarrollo:** sigue la rama `develop`; solo datos de prueba.
+- **Producción:** sigue la rama `main`; lista para el piloto, todavía sin datos.
+
+Ya construido (specs 001 a 020; la 011 está reservada):
+
+- Acceso con invitaciones, dos roles y recuperación de contraseña por correo.
+- Ubicaciones, categorías y activos con alta por escaneo, fotos, historial y baja sin borrado.
+- Sesiones de conteo, discrepancias, cierre con totales congelados e informe en PDF y Excel.
+- Inicio con indicadores y evolución entre conteos; exportación de la lista de activos.
+- Interfaz rediseñada con componentes propios; vista del contador en el computador.
+- Consola interna de plataforma para dar de alta y administrar empresas.
+- Despliegue en VPS con Coolify ([018](specs/018-despliegue-vps/spec.md)).
+
+Siguientes pasos:
+
+- Segundo factor de autenticación en la consola de plataforma.
+- Seguir las pruebas con teléfonos, lectores y stickers reales (en curso) y definir el formato de los stickers.
+- Piloto con la clínica y, después, las primeras empresas por recomendación.
 
 ## Estructura
 
-- `backend/` — API Flask.
-- `web/` — cliente React responsive.
+- `backend/`: API Flask, migraciones Alembic y pruebas.
+- `web/`: cliente React responsive: conteo en el celular (`/contar`), trabajo en el computador (`/app`) y consola de plataforma (`/plataforma`).
+- `docs/`: alcance, arquitectura, modelo de datos, diseño visual, despliegue y decisiones de arquitectura (ADR).
+- `specs/`: una especificación por entrega.
+- `Orquestacion/`: método de trabajo.
+- `scripts/`, `docker/`, `.github/`: herramientas de desarrollo, base local y CI.
 
 ## Documentos
 
@@ -23,12 +79,14 @@ Fase: definición de arquitectura y alcance del MVP. Fundación técnica en curs
 | [docs/03-modelo-datos.md](docs/03-modelo-datos.md) | Entidades, relaciones e historial |
 | [docs/04-metodologia.md](docs/04-metodologia.md) | Estructura del repo, ramas, ADR, definición de terminado, fases |
 | [docs/05-preguntas-abiertas.md](docs/05-preguntas-abiertas.md) | Decisiones pendientes |
-| [docs/06-importacion-excel.md](docs/06-importacion-excel.md) | Análisis del Excel actual y plan de importación |
+| [docs/06-importacion-excel.md](docs/06-importacion-excel.md) | Análisis de inventarios en Excel y plan de importación |
+| [docs/07-casos-de-uso-y-modulos.md](docs/07-casos-de-uso-y-modulos.md) | Casos de uso y módulos |
+| [docs/08-diseno-visual.md](docs/08-diseno-visual.md) | Sistema de diseño visual |
 | [docs/09-despliegue.md](docs/09-despliegue.md) | Producción: imagen, Supabase, migrar, respaldos |
 | [docs/10-entorno-local.md](docs/10-entorno-local.md) | **Empieza aquí:** entorno local paso a paso, conexiones, pruebas y e2e |
 | [docs/adr/](docs/adr/) | Decisiones de arquitectura registradas |
 | [Orquestacion/](Orquestacion/README.md) | Método de trabajo: roles, agentes, compuertas, plan y arneses de Claude Code y Cursor |
-| [specs/](specs/001-fundacion-tecnica/spec.md) | Specs SDD de cada entrega (la primera: fundación técnica) |
+| [specs/](specs/) | Especificaciones de cada entrega (de la 001 a la 020) |
 
 ## Stack
 
@@ -100,7 +158,7 @@ Desde la raíz del repositorio (bash/Git Bash), dentro de un subshell `( ... )` 
   set -a; . ./.env; set +a
   export MIGRATION_DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
   docker compose run --rm -e MIGRATION_DATABASE_URL \
-    api uv run flask --app app create-tenant "Clínica de ejemplo" admin@ejemplo.test
+    api uv run flask --app app create-tenant "Empresa de ejemplo" admin@ejemplo.test
   unset MIGRATION_DATABASE_URL
 )
 ```
@@ -128,7 +186,7 @@ Login, refresh, validar y aceptar invitación cuentan intentos en la tabla `limi
 | `TRUSTED_PROXY_HOPS` | `0` | Proxies de confianza delante de la API (0–5). Con `0` la IP es la del par TCP y `X-Forwarded-For` se ignora; con `N`, la que añadió el proxy `N` contando desde la API. Fíjalo al número exacto de proxies: uno de más deja que el cliente elija su IP. |
 | `ARGON2_MAX_CONCURRENCY` | `4` | Hashes Argon2 simultáneos por proceso (1–64); el resto espera hasta 2 s y luego recibe `503`. |
 
-Login y refresh devuelven el intento si la petición termina bien (solo cuentan los fallos); el logout no se limita. IPv6 se agrupa por `/64`. Una clínica detrás de un NAT comparte IP: con 30 usuarios, el umbral de refresh solo se alcanza con 30 refresh **fallidos** en 15 min; si se queda corto, sube `RATE_LIMIT_*` en el entorno. Los valores no numéricos o fuera de rango impiden arrancar.
+Login y refresh devuelven el intento si la petición termina bien (solo cuentan los fallos); el logout no se limita. IPv6 se agrupa por `/64`. Una empresa detrás de un NAT comparte IP: con 30 usuarios, el umbral de refresh solo se alcanza con 30 refresh **fallidos** en 15 min; si se queda corto, sube `RATE_LIMIT_*` en el entorno. Los valores no numéricos o fuera de rango impiden arrancar.
 
 Las ventanas vencidas se ignoran; para que la tabla no crezca, el operador las purga de vez en cuando con el rol migrador (el único con `DELETE`, y solo sobre ventanas de más de un día). Como `create-tenant`, la URL llega solo por entorno y el comando no acepta argumentos:
 
@@ -190,13 +248,13 @@ Los workflows de `.github/workflows/` corren en cada PR hacia `main`, `develop` 
 
 - **Backend:** `ruff`, rol de la aplicación creado con `bash docker/postgres/init/01-app-role.sh`, comprobación de que `TEST_DATABASE_URL` no es superusuario ni tiene `BYPASSRLS`, migraciones con el rol migrador (subir, bajar, subir) y `pytest` sobre PostgreSQL 17.
 - **Web (Node 24.x):** `npm ci`, `lint`, `typecheck`, `test` y `build`.
-- **Repositorio:** enlaces de la documentación, índice de ADR, ausencia de datos de la clínica y del arnés local, `scripts/check-attribution.sh` sobre los commits del PR y que el servicio `api` del compose no reciba la URL del rol migrador.
+- **Repositorio:** enlaces de la documentación, índice de ADR, ausencia de datos reales de clientes y del arnés local, `scripts/check-attribution.sh` sobre los commits del PR y que el servicio `api` del compose no reciba la URL del rol migrador.
 
 Las credenciales del CI son valores efímeros de un PostgreSQL desechable; no hay secretos reales en los workflows.
 
 ## Producción (antes del piloto)
 
-No hay despliegue en esta fase; esto queda escrito para cuando lo haya.
+La aplicación corre en un VPS propio gestionado con Coolify, con la base de datos en Supabase ([spec 018](specs/018-despliegue-vps/spec.md), [docs/09](docs/09-despliegue.md)). Lo que sigue documenta la configuración de la base y del servidor de la API.
 
 ### Rol de la aplicación en Supabase
 
@@ -238,7 +296,7 @@ Además, desactiva la Data API en el panel del proyecto (*Project Settings → D
 - **`/health` es anónimo y hace ping a la base:** limita su tasa en el proxy inverso (p. ej. unas pocas peticiones por segundo por IP) para que no sirva para saturar la base. Para las sondas de disponibilidad usa **`GET /ready`** (`200 {"status": "ok"}` o `503 {"status": "error"}`, sin detalles), que guarda el resultado del ping 5 s por proceso.
 - **Proxy y límites de tasa:** fija `TRUSTED_PROXY_HOPS` al número exacto de proxies (ver "Límites de tasa"); limita además `/auth/*` e `/invitaciones/*` en el proxy inverso.
 - **Logs:** pueden arrastrar detalles de PostgreSQL (valores de fila, host). Restringe el acceso a quien opera el servicio y fija una retención acotada (p. ej. 14–30 días) en el alojamiento; nunca los copies a canales abiertos.
-- **Qué no se registra nunca:** la cabecera `Authorization`, cookies, tokens de invitación, URLs de conexión (`DATABASE_URL`, `MIGRATION_DATABASE_URL`), correos, teléfonos ni seriales de activos de la clínica. Sin `echo=True` en SQLAlchemy y con `log_statement = none` en PostgreSQL.
+- **Qué no se registra nunca:** la cabecera `Authorization`, cookies, tokens de invitación, URLs de conexión (`DATABASE_URL`, `MIGRATION_DATABASE_URL`), correos, teléfonos ni seriales de activos de las empresas. Sin `echo=True` en SQLAlchemy y con `log_statement = none` en PostgreSQL.
 
 ## Trabajo con asistentes de IA
 

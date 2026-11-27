@@ -68,11 +68,11 @@ describe('caracterización del tablero (T7): lo que no cambia', () => {
     abrir('/admin')
     await screen.findByRole('link', { name: /Activos hoy/ })
     const encabezado = document.querySelector('[data-kit=encabezado-pagina]') as HTMLElement
-    expect(within(encabezado).getByRole('link', { name: 'Registrar activo' }).getAttribute('href')).toBe('/admin/activos/nuevo')
-    expect(within(encabezado).getByRole('link', { name: 'Sesiones' }).getAttribute('href')).toBe('/admin/sesiones')
+    expect(within(encabezado).getByRole('link', { name: 'Registrar activo' }).getAttribute('href')).toBe('/app/activos/nuevo')
+    expect(within(encabezado).getByRole('link', { name: 'Sesiones' }).getAttribute('href')).toBe('/app/sesiones')
     expect(screen.getByRole('heading', { level: 1, name: 'Resumen' })).toBeTruthy()
     const figura = await screen.findByRole('figure', { name: 'Valor por categoría' })
-    expect(within(figura).getByRole('link', { name: 'Ver valor actual' }).getAttribute('href')).toBe('/admin/valor')
+    expect(within(figura).getByRole('link', { name: 'Ver valor actual' }).getAttribute('href')).toBe('/app/valor')
   })
 
   it('Inicio: el valor actual se rotula en vivo y nunca como informe', async () => {
@@ -156,7 +156,7 @@ describe('caracterización del tablero (T7): lo que no cambia', () => {
     abrir('/admin/sesiones/00000000-0000-4000-8000-0000000000ff/informe')
     expect(await screen.findByText('Esa sesión no existe')).toBeTruthy()
     expect(screen.getByText('Puede que el enlace esté incompleto.')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Ver sesiones' }).getAttribute('href')).toBe('/admin/sesiones')
+    expect(screen.getByRole('link', { name: 'Ver sesiones' }).getAttribute('href')).toBe('/app/sesiones')
   })
 
   it('Informe en el teléfono: el desglose sigue siendo una tabla con su fila de total', async () => {
@@ -170,14 +170,26 @@ describe('caracterización del tablero (T7): lo que no cambia', () => {
     abrir('/admin/valor')
     const tabla = await screen.findByRole('table')
     expect(cop(within(tabla).getAllByRole('row').at(-1)?.textContent)).toBe('Total$ 1.779.900,002')
-    expect(screen.getByRole('link', { name: 'Ver sesiones' }).getAttribute('href')).toBe('/admin/sesiones')
+    expect(screen.getByRole('link', { name: 'Ver sesiones' }).getAttribute('href')).toBe('/app/sesiones')
   })
 
-  it.each([['/admin'], ['/admin/valor'], [INFORME]])('el contador no entra a %s ni pide cifras', async (ruta) => {
+  it.each([['/admin/valor'], [INFORME]])('el contador no entra a %s ni pide cifras', async (ruta) => {
     const { f } = abrir(ruta, catalogoDemo('contador'), { rol: 'contador' })
     expect(await screen.findByText('No tienes permiso para ver esto')).toBeTruthy()
     const pedidas = f.mock.calls.map(([url]) => String(url))
     expect(pedidas.some((u) => u.startsWith('/api/valor-actual') || u.startsWith('/api/inicio') || u.includes('/informe'))).toBe(false)
+    expect(document.body.textContent).not.toMatch(/\$/)
+  })
+
+  // Spec 020, T3 (R10, R11): /admin es un alias de /app, que es el Inicio de cada rol. El
+  // contador en el teléfono sigue en su conteo; nunca ve el Inicio del admin ni pide valor.
+  it('el contador en /admin llega a su inicio, sin el Inicio del admin ni el valor', async () => {
+    const { f, router } = abrir('/admin', catalogoDemo('contador'), { rol: 'contador', movil: true })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Conteo' })).toBeTruthy()
+    expect(router.state.location.pathname).toBe('/contar')
+    const pedidas = f.mock.calls.map(([url]) => String(url))
+    expect(pedidas.some((u) => u.startsWith('/api/valor-actual') || u.includes('/informe') || u.startsWith('/api/inicio/evolucion'))).toBe(false)
+    expect(screen.queryByRole('heading', { level: 1, name: 'Resumen' })).toBeNull()
     expect(document.body.textContent).not.toMatch(/\$/)
   })
 })

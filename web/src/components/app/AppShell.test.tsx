@@ -2,15 +2,16 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import type { Rol } from '@/lib/api/cliente'
 import { routes } from '@/router'
 import { simularSesion } from '@/test/sesion'
 import { simularAncho, simularEscritorio } from '@/test/matchMedia'
 
-// Spec 001b, T4: AdminShell (R4, R5, R6; A4). Sin @testing-library/user-event
+// Spec 001b, T4: AdminShell (R4, R5, R6; A4); desde la spec 020, T3, AppShell (marco de los dos roles). Sin @testing-library/user-event
 // (no aprobada): fireEvent; los menús de Radix se abren con Enter.
 
-function renderAt(path: string) {
-  simularSesion('admin')
+function renderAt(path: string, rol: Rol = 'admin') {
+  simularSesion(rol)
   render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: [path] })} />)
 }
 
@@ -56,9 +57,9 @@ describe('AdminShell en computador', () => {
     const migas = await screen.findByRole('navigation', { name: 'Migas de pan' })
     expect(migas.textContent).toBe('ConteoSesionesSesiónInforme')
     // Cada nivel con pantalla propia es un enlace; el grupo y la pantalla actual no.
-    expect(within(migas).getByRole('link', { name: 'Sesiones' }).getAttribute('href')).toBe('/admin/sesiones')
+    expect(within(migas).getByRole('link', { name: 'Sesiones' }).getAttribute('href')).toBe('/app/sesiones')
     expect(within(migas).getByRole('link', { name: 'Sesión' }).getAttribute('href')).toBe(
-      '/admin/sesiones/00000000-0000-4000-8000-0000000000e1',
+      '/app/sesiones/00000000-0000-4000-8000-0000000000e1',
     )
     expect(within(migas).queryByRole('link', { name: 'Conteo' })).toBeNull()
     const nav = screen.getByRole('navigation', { name: 'Navegación principal' })
@@ -171,7 +172,7 @@ describe('AdminShell en teléfono (navegación)', () => {
   it('fuera del Inicio hay un botón para volver al Inicio', async () => {
     renderAt('/admin/valor')
     const inicio = await screen.findByRole('link', { name: 'Ir al inicio' })
-    expect(inicio.getAttribute('href')).toBe('/admin')
+    expect(inicio.getAttribute('href')).toBe('/app')
     fireEvent.click(inicio)
     expect(await screen.findByRole('heading', { level: 1, name: 'Resumen' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Ir al inicio' })).toBeNull()
@@ -309,5 +310,67 @@ describe('AdminShell: pulido (spec 016, T10)', () => {
     await screen.findByRole('navigation', { name: 'Navegación principal' })
     const pie = document.querySelector('[data-slot=sidebar-footer] [data-slot=sidebar-menu]')
     expect(pie?.className.split(/\s+/)).toContain('gap-separacion')
+  })
+})
+
+// Spec 020, T3 (R1, R4): el mismo marco para el contador, con su menú. Ocultar entradas
+// es presentación: el servidor responde 403 y las pantallas exclusivas llevan RequiereAdmin.
+describe('AppShell del contador (spec 020, T3)', () => {
+  const MENU_CONTADOR = ['Inicio', 'Activos', 'Registrar activo', 'Contar', 'Sesiones', 'Discrepancias']
+  const SOLO_ADMIN = ['Ubicaciones', 'Categorías', 'Valor actual', 'Usuarios', 'Empresa']
+
+  it('en computador ve su menú (R4) y ninguna entrada del admin', async () => {
+    simularEscritorio()
+    renderAt('/app/activos', 'contador')
+    const nav = await screen.findByRole('navigation', { name: 'Navegación principal' })
+    const enlaces = within(nav).getAllByRole('link').map((a) => a.textContent)
+    expect(enlaces.sort()).toEqual([...MENU_CONTADOR].sort())
+    for (const ajena of SOLO_ADMIN) expect(within(nav).queryByRole('link', { name: ajena })).toBeNull()
+    for (const grupo of ['Finanzas', 'Ajustes']) expect(within(nav).queryByText(grupo)).toBeNull()
+    expect(within(nav).getByRole('link', { name: 'Contar' }).getAttribute('href')).toBe('/contar/escanear')
+    expect(within(nav).getByRole('link', { name: 'Activos' }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it('el admin conserva su menú y no tiene «Contar» en la barra', async () => {
+    simularEscritorio()
+    renderAt('/app')
+    const nav = await screen.findByRole('navigation', { name: 'Navegación principal' })
+    for (const entrada of ['Inicio', 'Activos', 'Registrar activo', ...SOLO_ADMIN, 'Sesiones', 'Discrepancias']) {
+      expect(within(nav).getByRole('link', { name: entrada })).toBeTruthy()
+    }
+    expect(within(nav).queryByRole('link', { name: 'Contar' })).toBeNull()
+  })
+
+  it('tiene buscador y menú de cuenta; el buscador solo ofrece sus pantallas', async () => {
+    simularEscritorio()
+    renderAt('/app/activos', 'contador')
+    await screen.findByRole('navigation', { name: 'Navegación principal' })
+    const cuenta = screen.getByRole('button', { name: 'Menú de usuario: Luis Pérez, Contador' })
+    fireEvent.keyDown(cuenta, { key: 'Enter' })
+    expect(await screen.findByRole('menuitem', { name: 'Cerrar sesión' })).toBeTruthy()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+    const dialogo = await screen.findByRole('dialog', { name: 'Buscar' })
+    const opciones = within(dialogo).getAllByRole('option').map((o) => o.textContent)
+    expect(opciones.sort()).toEqual([...MENU_CONTADOR].sort())
+  })
+
+  it('en el teléfono el menú lleva «Contar» y no duplica «Ir a contar»', async () => {
+    simularAncho({ movil: true })
+    renderAt('/app/activos', 'contador')
+    await screen.findByRole('button', { name: 'Mostrar u ocultar el menú' })
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar u ocultar el menú' }))
+    const menu = await screen.findByRole('dialog', { name: 'Menú de navegación' })
+    expect(within(menu).getByRole('link', { name: 'Contar' }).getAttribute('href')).toBe('/contar/escanear')
+    expect(within(menu).queryByRole('link', { name: 'Ir a contar' })).toBeNull()
+    expect(within(menu).queryByRole('link', { name: 'Usuarios' })).toBeNull()
+  })
+
+  it('el marco no muestra ningún precio al contador', async () => {
+    simularEscritorio()
+    renderAt('/app/activos', 'contador')
+    await screen.findByRole('navigation', { name: 'Navegación principal' })
+    const marco = `${document.querySelector('[data-slot="sidebar"]')?.textContent ?? ''} ${screen.getByRole('banner').textContent ?? ''}`
+    expect(marco).not.toMatch(/\$|COP|precio|valor/i)
   })
 })

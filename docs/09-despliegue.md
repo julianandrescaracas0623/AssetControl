@@ -1,6 +1,6 @@
 # 09 — Despliegue
 
-> **Spec 010b.** Guía para poner AssetControl en producción y mantenerlo. Decisiones de G1 (2026-11-15): base de datos en **Supabase Free**, web y API en **un solo contenedor**, **plataforma pendiente** (Q1). Todo lo de abajo sirve para cualquier plataforma que ejecute un contenedor Docker con HTTPS delante; la sección 6 se completa cuando se elija.
+> **Spec 010b.** Guía para poner AssetControl en producción y mantenerlo. Decisiones de G1 (2026-11-15): base de datos en **Supabase Free**, web y API en **un solo contenedor**. **Plataforma (spec 018):** VPS con Coolify, con dos entornos (pruebas y producción); ver la sección 6. Las secciones 1–5 sirven para cualquier plataforma que ejecute un contenedor Docker con HTTPS delante.
 >
 > Claude no crea cuentas, no ve ni guarda secretos y no hace `push` a `main`. Los pasos con secretos los hace el humano.
 
@@ -26,7 +26,7 @@ Teléfono / computador ──HTTPS──▶ Plataforma (TLS, proxy) ──▶ Co
 | Contraseña del rol `postgres` de Supabase | Gestor de contraseñas del humano | Preparar roles y migrar |
 | `APP_DB_PASSWORD` (rol de la aplicación) | Gestor de contraseñas; dentro de `DATABASE_URL` en la plataforma | La app |
 | `SECRET_KEY` | Variable secreta de la plataforma | La app (firma los JWT) |
-| `MIGRATION_DATABASE_URL` | Secreto del entorno `production` en GitHub | `migrar.yml` |
+| `MIGRATION_DATABASE_URL` | Secreto del entorno `production` en GitHub | `migrar.yml` (alternativa; el camino habitual es migrar desde la PC, secciones 4 y 7) |
 | `SMTP_CLAVE` (y `SMTP_USUARIO`) del proveedor de correo | Variable secreta de la plataforma | La app (correo de recuperación, spec 014) |
 
 Generar valores fuertes (PowerShell, una vez cada uno; no los pegues en chats ni en archivos del repo):
@@ -39,7 +39,9 @@ uv run python -c "import secrets; print(secrets.token_urlsafe(32))"   # APP_DB_P
 
 ## 3. Supabase (plan Free)
 
-1. Crea el proyecto en [supabase.com](https://supabase.com) con una región cercana a la plataforma que se elija (sin plataforma aún: **este de EE. UU.**, cerca de Colombia). Guarda la contraseña de la base (rol `postgres`).
+**Dos proyectos separados (spec 018):** uno para **pruebas** (solo datos ficticios) y otro para **producción**, ambos en la región **São Paulo** (`sa-east-1`), la más cercana al VPS. Cada uno tiene su propia contraseña de `postgres`, su `preparar-roles`, su `APP_DB_PASSWORD`, su `SECRET_KEY`, sus llaves S3 y su bucket `fotos`: ningún secreto se comparte entre entornos. Los pasos de abajo se hacen una vez en cada proyecto.
+
+1. Crea el proyecto en [supabase.com](https://supabase.com) en la región **São Paulo** (`sa-east-1`). Guarda la contraseña de la base (rol `postgres`).
 2. **Apaga la API de datos** (en el panel del proyecto, la sección *Data API*; si tu panel la ubica en otro lugar, búscala por ese nombre). AssetControl no la usa; así nadie puede llegar a las tablas por ese camino aunque una clave se filtre. Las migraciones igual revocan todo a `anon`, `authenticated` y `service_role` (C8, migración `0012`).
 3. Copia la cadena del **pooler en modo sesión** (Connect → *Session pooler*, puerto 5432). La conexión directa puede ser solo IPv6 y el modo transacción no conserva las variables de sesión que usa el RLS. Pásala al formato de SQLAlchemy y exige TLS:
 
@@ -82,13 +84,22 @@ uv run flask --app app create-tenant "<Nombre de la clínica>" "<correo del prim
 
 ## 5. Variables de la app en la plataforma
 
+Hay **dos entornos** en el mismo VPS (spec 018), cada uno como una aplicación aparte en Coolify con sus propias variables y secretos:
+
+| Entorno | Rama | Dominio | Despliegue | Datos |
+|---|---|---|---|---|
+| pruebas | `develop` | `pruebas.<dominio>` | desde `develop` (automático si se activó; P10 pendiente) | solo ficticios |
+| producción | `main` | `app.<dominio>` | **manual**, después de migrar (sección 7) | los de la clínica (desde el piloto) |
+
+Los dos usan `ENVIRONMENT=production`, `ALMACEN=s3`, `TRUSTED_PROXY_HOPS=1` y la `DATABASE_URL` de su propio proyecto Supabase.
+
 | Variable | Valor |
 |---|---|
 | `DATABASE_URL` | La del rol de la aplicación (pooler, modo sesión, `sslmode=require`). |
 | `SECRET_KEY` | La generada (≥ 32 bytes). |
 | `ENVIRONMENT` | `production` (exige TLS a la base, cookies `Secure` y HSTS). |
-| `TRUSTED_PROXY_HOPS` | Proxies delante del contenedor; normalmente `1`. Con `0` la app avisa al arrancar y el límite de tasa trataría a todos como una sola IP. |
-| `PORT` | Lo pone la plataforma; si no, `8000`. |
+| `TRUSTED_PROXY_HOPS` | **Obligatoria en `production`** (SEC-01): sin ella la app no arranca y nombra la variable. **Valor: `1`** si la app está detrás de exactamente un proxy de confianza (en el VPS, el Traefik de Coolify). `0` solo si los clientes llegan directos al contenedor. Admite de 0 a 5. Un valor mayor que el número real de proxies deja que el cliente falsee su IP en el límite de tasa. |
+| `PORT` | Lo pone la plataforma; si no, `8000` (en Coolify se usa `8000`). |
 | `RATE_LIMIT_*`, `ARGON2_MAX_CONCURRENCY` | Opcionales (`.env.example`). |
 | `ALMACEN` | `s3` (spec 012). Sin esta variable la app arranca con las **fotos desactivadas** (responden `503`) y lo avisa en el registro; `carpeta` no se admite en producción (el contenedor no guarda archivos). |
 | `S3_ENDPOINT_URL`, `S3_REGION`, `S3_BUCKET` | Los de la sección 3, paso 4 (`S3_BUCKET=fotos`). |
@@ -101,11 +112,13 @@ uv run flask --app app create-tenant "<Nombre de la clínica>" "<correo del prim
 | `SMTP_USUARIO`, `SMTP_CLAVE` | Las credenciales del proveedor, como **secretos**; van juntas o ninguna (si falta una, la app no arranca y dice cuál, sin mostrar valores). |
 | `URL_PUBLICA` | Obligatoria con `CORREO_MODO`: `https://<tu-dominio>`, sin `/` final, sin `?`, `#` ni usuario. Es la base del enlace del correo; nunca se toma de la petición. Fuera de development debe ser `https`. |
 | `PLATAFORMA_HABILITADA` | Spec 017. Solo el valor `true` (sin distinguir mayúsculas ni espacios) habilita la consola `/plataforma`. **Apagada por defecto**: con cualquier otro valor o sin la variable no se registra ninguna ruta `/plataforma` (responde `404`) ni se crea nada al arrancar. Ver 5.2. |
-| `PLATAFORMA_REDES_PERMITIDAS` | Opcional. Redes CIDR o direcciones sueltas separadas por comas (`10.0.0.0/8, 192.168.1.10`). Vacía = sin restricción. Fuera de la lista, `/plataforma` responde `404`. Un valor mal formado impide arrancar (el mensaje no repite el valor). Es una defensa adicional: la restricción real va en el proxy o el firewall. |
+| `PLATAFORMA_REDES_PERMITIDAS` | **Obligatoria si `PLATAFORMA_HABILITADA=true` en `production`** (SEC-03): sin ella la app no arranca. Redes CIDR o direcciones sueltas separadas por comas (`10.0.0.0/8, 192.168.1.10`). Vacía = sin restricción (solo fuera de producción). Fuera de la lista, `/plataforma` responde `404`. Un valor mal formado impide arrancar (el mensaje no repite el valor). Es una defensa adicional: la restricción real va en el proxy o el firewall. |
 | `RATE_LIMIT_PLAT_LOGIN_ACCOUNT`, `RATE_LIMIT_PLAT_LOGIN_IP` | Opcionales (por defecto 5 y 10 por ventana de 15 min). Login de plataforma por cuenta y por IP. |
 | `RATE_LIMIT_PLAT_ACCION`, `RATE_LIMIT_PLAT_REFRESH_IP` | Opcionales (por defecto 60 y 30). Acciones de la consola por desarrollador (`POST`/`PATCH` de Empresas y Usuarios, subida o reemplazo del logo y, desde el cambio C1, los `PUT` de la ficha de la empresa y de nombre y rol de un usuario; los `GET` no cuentan) y refresh de plataforma por IP. Entre 1 y 10000. |
 
 `MIGRATION_DATABASE_URL` **no** va en la plataforma: la app nunca usa el rol migrador.
+
+**Fotos (SEC-02).** Límites por proceso: 25 MP por imagen (las de más se rechazan con `422`), 2 decodificaciones a la vez por proceso (si no hay cupo en 5 s, `503 procesado_ocupado`) y 60 subidas por usuario cada 10 minutos (`429 demasiadas_subidas`). Gunicorn tiene 2 trabajadores (`backend/gunicorn.conf.py`) y cada uno cuenta por separado: el tope real de subidas es hasta el doble. Un contador compartido en la base necesitaría un ámbito nuevo en `limite_tasa` (una migración), fuera de este cambio.
 
 ### 5.1 Correo de recuperación de contraseña (spec 014)
 
@@ -118,11 +131,14 @@ uv run flask --app app create-tenant "<Nombre de la clínica>" "<correo del prim
 - Cada entrega tiene **10 s por operación** y un **plazo total de 45 s** (conexión, TLS, autenticación y envío); si se pasa, se corta. No hay reintentos: la persona pide otro enlace.
 - Envíos simultáneos: 4 por proceso. Sin cupo, el correo se descarta y se registra `Correo de recuperación descartado: sin cupo de envío (request_id=…, descartados=N)`. **Pon una alerta** en la plataforma sobre ese texto: si aparece, el SMTP está lento o caído.
 
-**Cabeceras.** `/restablecer#<token>` e `/invitacion#<token>` llevan un enlace de un solo uso en el fragmento. La API ya responde `Referrer-Policy: no-referrer` en `/api/auth/*`, y la web fija el meta `referrer` en `no-referrer` mientras `/restablecer` está abierta, pero el contenedor responde hoy `Referrer-Policy: same-origin` a toda la web (`backend/app/wsgi.py`). **Pendiente de la spec de despliegue:** responder `Referrer-Policy: no-referrer` en `/restablecer`, en `/invitacion` y en el *fallback* de la SPA (`index.html`), o en toda la web.
+**Cabeceras.** `/restablecer#<token>` e `/invitacion#<token>` llevan un enlace de un solo uso en el fragmento. La API ya responde `Referrer-Policy: no-referrer` en `/api/auth/*`, y la web fija el meta `referrer` en `no-referrer` mientras `/restablecer` está abierta, pero el contenedor respondía `Referrer-Policy: same-origin` a toda la web (`backend/app/wsgi.py`). **Aplicado (SEC-05):** el contenedor responde `Referrer-Policy: no-referrer` en `/restablecer`, `/invitacion` y `/plataforma` (y sus subrutas); el resto de la web sigue con `same-origin`. **Aplicado (spec 018, T1):** `Referrer-Policy: no-referrer` y `Cache-Control: no-store` en `/restablecer`, `/invitacion`, `/cambiar-contrasena` y `/plataforma/**` (aunque exista un archivo con ese nombre) y en el *fallback* de `index.html` (cualquier otra ruta de la SPA); `/assets/*`, los archivos de la raíz y `/api/**` siguen con `same-origin` y su caché. Ver 5.2.
 
 **Registro (auditoría).** El registro de la app debe quedar en nivel **INFO** en producción (gunicorn ya usa `loglevel = "info"`): ahí quedan `Contraseña restablecida por enlace de recuperación (request_id=…, usuario_id=…)` y `Correo de recuperación entregado (request_id=…)`. Nunca se registran correo, token, enlace, host ni contraseña; los rechazos y fallos solo llevan `request_id` y el tipo de error. En la base, `log_statement` debe quedar en `none` en producción (compruébalo con `SHOW log_statement;` como `postgres` y no lo subas para depurar); es el criterio único de este documento (ver también «Registro de sentencias de PostgreSQL» en la consola de plataforma). Con `all`, PostgreSQL escribiría en su registro la clave canjeable del enlace que viaja como parámetro de `acceso.*`. `mod` hoy no registraría esas llamadas (son `SELECT acceso.fn(...)`, no sentencias que modifiquen datos), pero también se prohíbe: la regla segura es `none`, sin excepciones que dependan de cómo se escribe cada llamada.
 
-**Apagado.** Un correo en curso se pierde si el proceso se apaga (riesgo aceptado: la persona pide otro). **Pendiente de la spec de despliegue:** un `worker_exit` en `backend/gunicorn.conf.py` que llame a `Correo.esperar(timeout)` (con un plazo menor que `graceful_timeout = 20`) para dejar terminar los envíos en curso.
+**Apagado.** Un correo en curso se pierde si el proceso se apaga (riesgo aceptado: la persona pide otro). **Aplicado (spec 018, T2):** `worker_exit` en `backend/gunicorn.conf.py` espera los envíos en curso con `Correo.esperar` hasta `PLAZO_CORREO_AL_APAGAR = 15 s` (menor que `graceful_timeout = 20`); si vence, registra en nivel WARNING `Apagado: venció el plazo de 15.0 s y se perdieron correos en curso.` (texto exacto del código, útil para poner una alerta).
+
+- **Requisito del entorno:** el plazo de parada del contenedor en Coolify (*stop grace period*) debe ser de **25 s o más** en pruebas y en producción. Con el valor por defecto de Docker (10 s), el SIGKILL llega antes y corta la espera. Comprobación: `docker inspect` del contenedor de la API muestra `StopTimeout` ≥ 25.
+- **Límites aceptados:** primero se terminan las peticiones en curso y después corre `worker_exit`, dentro de la misma ventana de `graceful_timeout`. Una entrega SMTP puede tardar hasta 45 s (`SMTP_PLAZO_TOTAL_SEGUNDOS`), así que la espera no la cubre del todo. Un correo perdido deja un token sin usar que vence solo (sin fuga). El aviso de contraseña temporal (spec 017) también puede perderse en esa ventana. El reciclado de procesos por `max_requests` no pasa por Docker, y ahí la espera sí se cumple.
 
 **Prueba manual antes del piloto** (con el proveedor real y un correo de prueba, nunca uno de la clínica):
 
@@ -144,40 +160,82 @@ Consola gráfica solo para desarrolladores de AssetControl (Empresas, Usuarios y
 | `restablecer-desarrollador <correo> [--password-stdin]` | Fija una contraseña nueva y cierra todas las sesiones del desarrollador. |
 | `desactivar-desarrollador <correo> [--reactivar]` | Desactiva (cierra sus sesiones; un token vigente recibe `401` en su siguiente petición) o reactiva la cuenta. No pide contraseña. |
 
-**Exposición (riesgo R1 de la spec 017).** `/plataforma` queda en el mismo dominio que la clínica y una cuenta de desarrollador comprometida controla todas las empresas (crear admins con contraseña conocida, definir una contraseña temporal a cualquier usuario —incluido el único admin— y entrar con ella, desactivar usuarios; no lee datos de negocio). Cada contraseña temporal queda en Actividad como «Contraseña temporal definida» y la persona pierde todas sus sesiones; no hay aviso por correo. Hasta que haya spec de despliegue: **no habilites `PLATAFORMA_HABILITADA` en un entorno expuesto** sin restringir `/plataforma` y `/api/plataforma` por red en el proxy o el firewall (`PLATAFORMA_REDES_PERMITIDAS` solo es respaldo), y usa contraseñas largas y únicas. No hay segundo factor (TOTP): reevaluar antes del piloto. **No ir al piloto sin la spec de despliegue.**
+**Exposición (riesgo R1 de la spec 017).** `/plataforma` queda en el mismo dominio que la clínica y una cuenta de desarrollador comprometida controla todas las empresas (crear admins con contraseña conocida, definir una contraseña temporal a cualquier usuario —incluido el único admin— y entrar con ella, desactivar usuarios; no lee datos de negocio). Cada contraseña temporal queda en Actividad como «Contraseña temporal definida» y la persona pierde todas sus sesiones; no hay aviso por correo. **No habilites `PLATAFORMA_HABILITADA` en un entorno expuesto** sin restringir `/plataforma` y `/api/plataforma` por red en el proxy o el firewall (`PLATAFORMA_REDES_PERMITIDAS` solo es respaldo), y usa contraseñas largas y únicas. No hay segundo factor (TOTP): es trabajo de diseño aparte (SEC-03) y sigue pendiente **antes del piloto**; el arranque en producción ya exige la lista de redes. **No ir al piloto sin cerrar la spec 018 (T1, T2 y respaldo).** **Estado (spec 018, T8, comprobado por el humano el 2026-11-27):** en producción `PLATAFORMA_HABILITADA` no está definida y `/plataforma` responde `404`.
 
 **Notas de despliegue acumuladas:**
 
 - **Relojes (NTP obligatorio):** Flask y PostgreSQL deben tener la hora sincronizada. El corte `usuario.sesiones_validas_desde` usa `now()` de la base y el access token usa la hora de Flask: con la base adelantada más de 60 s, todo acceso emitido tras un cambio de contraseña se rechaza hasta que el reloj de Flask alcance el corte.
 - **Orden con la migración `0026`:** migrar `0026` **antes** de desplegar el código (el ORM lee `usuario.sesiones_validas_desde` en cada petición). Para revertir, retirar el código **antes** del `alembic downgrade`.
-- **Cookie de refresh de plataforma:** viaja con `Path=/plataforma/auth` en la aplicación. En el contenedor único, la API montada bajo `/api` la deja en `/api/plataforma/auth`, y el servidor de desarrollo de Vite ya lo reescribe (`cookiePathRewrite`); un proxy de producción que quite el prefijo `/api` debe reescribir `/plataforma/auth` a `/api/plataforma/auth` igual que hace con `/auth`. Si no, el navegador no manda la cookie al refresh y recargar la consola pierde la sesión. **Pendiente de comprobar con el despliegue real.**
-- **Cabeceras de las páginas de la consola:** las respuestas de la API de plataforma ya llevan `Cache-Control: no-store` y `Referrer-Policy: no-referrer`. Las páginas web `/plataforma/**` (y `/cambiar-contrasena`) las sirve el contenedor como el resto de la web (hoy `Referrer-Policy: same-origin`): para que lleven `no-referrer` y `no-store`, ponlo en el proxy o en `ConCabeceras` (spec de despliegue; lo mismo se pidió para `/restablecer` e `/invitacion`). Las páginas llevan `noindex, nofollow`.
-- **Tope de cuerpo:** `/plataforma` rechaza cuerpos de más de 4 KB (`413`), salvo `POST /plataforma/empresas/<id>/logo`, que admite 2 MB + 64 KB (el logo de la spec 013 y su formulario). Si el proxy impone un tope menor, súbelo solo para esa ruta. La subida chunked del logo requiere un servidor WSGI que marque `wsgi.input_terminated` (gunicorn lo hace). Si se cambia de servidor y no la marca, la subida sin Content-Length responde 400.
+- **Cookie de refresh de plataforma:** viaja con `Path=/plataforma/auth` en la aplicación. En el contenedor único, la API montada bajo `/api` la deja en `/api/plataforma/auth`, y el servidor de desarrollo de Vite ya lo reescribe (`cookiePathRewrite`); un proxy de producción que quite el prefijo `/api` debe reescribir `/plataforma/auth` a `/api/plataforma/auth` igual que hace con `/auth`. Si no, el navegador no manda la cookie al refresh y recargar la consola pierde la sesión. **Resuelto (spec 018, T7, comprobado por el humano en «pruebas» el 2026-11-27):** detrás del Traefik de Coolify la cookie sale con `Path=/api/plataforma/auth` y recargar la consola conserva la sesión.
+- **Cabeceras de las páginas de la consola:** las respuestas de la API de plataforma ya llevan `Cache-Control: no-store` y `Referrer-Policy: no-referrer`. Las páginas web `/plataforma/**` ya reciben `Referrer-Policy: no-referrer` del contenedor (SEC-05). **Aplicado (spec 018, T1):** `Referrer-Policy: no-referrer` y `Cache-Control: no-store` en `/restablecer`, `/invitacion`, `/cambiar-contrasena` y `/plataforma/**` (aunque exista un archivo con ese nombre) y en el *fallback* de `index.html` (cualquier otra ruta); `/assets/*`, los archivos de la raíz y `/api/**` siguen con `same-origin` y su caché. Se pone en el contenedor, no en el proxy. Las páginas llevan `noindex, nofollow`.
+  - *Riesgo conocido (riesgo R12 de la spec 018):* con `no-referrer` en el documento de la SPA, los POST del mismo origen envían `Origin: null`; si además falta `Sec-Fetch-Site` (Safari/iOS 16.0–16.3, Firefox anterior a la 90), la comprobación de mismo sitio responde 403 en refresh, logout, recuperar y restablecer (también en la consola). Falla cerrado, sin abrir CSRF; en esos navegadores el logout no revoca el refresh token en el servidor. El servidor no acepta `Origin: null`. Seguimiento: `referrerPolicy: 'strict-origin'` en los `fetch` del cliente web (T10 de la spec 018).
+- **Tope de cuerpo:** `/plataforma` rechaza cuerpos de más de 4 KB (`413`), salvo `POST /plataforma/empresas/<id>/logo`, que admite 2 MB + 64 KB (el logo de la spec 013 y su formulario). Si el proxy impone un tope menor, súbelo solo para esa ruta. **Resuelto (spec 018, T7, comprobado por el humano en «pruebas» el 2026-11-27):** por el dominio real, un logo de 2 MB se acepta y uno de más de 2 MB + 64 KB responde `413` de la app, sin que el Traefik de Coolify lo corte antes. La subida chunked del logo requiere un servidor WSGI que marque `wsgi.input_terminated` (gunicorn lo hace). Si se cambia de servidor y no la marca, la subida sin Content-Length responde 400.
 - **Almacén para logos:** el logo del alta y su reemplazo desde «Editar empresa» (cambio C1) usan el mismo almacén que las fotos y el logo de la clínica (`ALMACEN=s3`, bucket `fotos`, clave `<tenant>/<logo>.png`). Reemplazar no borra el archivo anterior (los informes cerrados lo siguen usando). Sin almacén, la subida responde `503 logos_no_disponibles`: la empresa se crea igual, la consola avisa «Empresa creada; el logo no se pudo subir» y se reintenta desde «Editar empresa» (o el admin lo sube en su pantalla Empresa). Si falla el borrado del archivo tras un `rollback` (mejor esfuerzo, como en la 013) puede quedar un archivo huérfano sin fila.
 - **Registro de sentencias de PostgreSQL (cambio C1b):** la contraseña temporal se convierte en hash Argon2id en Flask y el hash viaja a la base como **parámetro** de `acceso.plataforma_restablecer_password_usuario` (igual que en el alta, el cambio de contraseña y la recuperación). Criterio único: `log_statement = none` en producción (ni `ddl`, ni `mod`, ni `all`). `mod` no registraría estas llamadas, porque son `SELECT acceso.fn(...)`, pero se prohíbe igual por regla segura. Si usas `log_min_duration_statement` o `auto_explain`, fija además `log_parameter_max_length = 0` (y `log_parameter_max_length_on_error = 0`) para que no se registren los parámetros, y no actives `auto_explain` con parámetros. Si no, el hash quedaría en los registros de la base. Nota: esto vale porque hoy psycopg 3 enlaza los parámetros en el servidor (protocolo extendido). Si algún día se usa `ClientCursor` (u otro enlace en el cliente), los valores irían dentro del texto de la sentencia y `log_parameter_max_length` ya no los protegería: cualquier registro de sentencias los mostraría.
-- **Rol `plataforma_owner`:** lo crea `preparar-roles` (`NOLOGIN`, sin atributos). Antes del piloto, validar `preparar-roles` y las migraciones `0017`–`0032` con el rol real de Supabase (como C8 de la spec 002).
+- **Rol `plataforma_owner`:** lo crea `preparar-roles` (`NOLOGIN`, sin atributos). `preparar-roles` y las migraciones se ejecutaron en los dos proyectos de Supabase (T5 y T8).
 
 **Prueba manual antes del piloto** (con datos de prueba, nunca de la clínica): crea un desarrollador con `crear-desarrollador`, entra a `/plataforma/entrar`, crea una empresa con logo (con el almacén real) y entra como su admin: debe llevar a `/cambiar-contrasena` y, tras cambiarla, a `/admin`. Recarga la consola con la sesión abierta (comprueba la cookie), desactiva y reactiva la empresa y revisa Actividad. Del cambio C1: edita la ficha y reemplaza el logo (el admin lo ve en `/admin/empresa` y un informe ya cerrado conserva el anterior), cambia el rol de un usuario de prueba (su sesión abierta se cierra y al volver a entrar tiene los permisos nuevos) y comprueba en Actividad «Empresa editada», «Logo reemplazado» y «Usuario editado». Del cambio C1b: con un usuario de prueba con sesión abierta, define una contraseña temporal desde Usuarios; su sesión cae al recargar, la contraseña anterior da «incorrectos», con la temporal llega a «Cambia tu contraseña», la cambia y entra; la fila mostró «Cambio de contraseña pendiente» y Actividad registra «Contraseña temporal definida».
 
-## 6. Plataforma (pendiente, Q1)
+## 6. Plataforma: VPS con Coolify
 
-Lo que cualquier plataforma necesita de AssetControl:
+Spec 018 ([`specs/018-despliegue-vps/`](../specs/018-despliegue-vps/spec.md)). AssetControl corre en un VPS propio (Ubuntu 24.04) que ya tiene **Coolify** con su **Traefik** en los puertos 80 y 443 y otra aplicación ajena a AssetControl.
 
-- Construir la imagen con `Dockerfile.prod` desde la raíz del repo (o desde una imagen ya construida por GitHub Actions).
-- Exponer el puerto `$PORT`, comprobar salud en `/api/ready` y poner **HTTPS** delante (la cámara del teléfono no funciona sin él).
-- Las variables de la sección 5.
-- Desplegar solo desde `main` y solo después de `migrar.yml`.
+```text
+Navegador ──HTTPS──▶ <IP-del-VPS>:443  Traefik de Coolify (TLS y enrutado por dominio)
+                                         ├─ pruebas.<dominio> ─▶ contenedor «pruebas» (develop) ─▶ Supabase pruebas
+                                         ├─ app.<dominio>     ─▶ contenedor «producción» (main) ─▶ Supabase producción
+                                         ├─ <panel>.<dominio> ─▶ panel de Coolify
+                                         └─ (la otra app del VPS, sin cambios)
+```
 
-Cuando se elija la plataforma se añaden aquí sus pasos y, si conviene, un paso de despliegue al final de `migrar.yml`.
+**Arquitectura:**
 
-## 7. Cada vez que algo llega a `main`
+- **TLS y enrutado:** los hace el Traefik de Coolify (certificados gestionados por Coolify). **No** se instala Caddy ni nginx propios: un segundo proxy en 80/443 chocaría con el existente.
+- **Imagen:** `Dockerfile.prod` desde la raíz del repo, el mismo contenedor de la sección 1 (web en `/`, API en `/api`).
+- **Puerto y salud:** `PORT=8000`; healthcheck en `/api/ready`.
+- **Proxy de confianza:** `TRUSTED_PROXY_HOPS=1` (solo Traefik delante); la app toma la IP real del cliente para los límites de tasa (comprobado en «pruebas», T7).
+- **Entorno:** `ENVIRONMENT=production` en los dos entornos (TLS a la base, cookies `Secure`, HSTS).
+- **Dos entornos** (tabla de la sección 5): «pruebas» desde `develop` (despliegue automático si se activó; P10 pendiente) y solo datos ficticios; «producción» desde `main` con despliegue **manual**. Cada uno con su proyecto Supabase y sus secretos.
+- `/plataforma` apagada en producción (`PLATAFORMA_HABILITADA` sin definir; sección 5.2).
+
+**Endurecimiento del VPS (una vez, lo hace el humano):**
+
+1. **SSH:** usuario con `sudo` y llave pública; probar la llave en una **segunda** sesión antes de cerrar la primera; luego `PasswordAuthentication no` y `PermitRootLogin no`. La consola web del proveedor del VPS sirve de respaldo si se pierde el acceso.
+2. **fail2ban** para `sshd`.
+3. **Hora:** NTP activo (`timedatectl` debe mostrar `System clock synchronized: yes`); Flask y PostgreSQL no pueden diferir más de 60 s (sección 5.2, «Relojes»).
+4. **Actualizaciones** y reinicio si el kernel lo pide; comprobar que Coolify, Traefik y la otra app vuelven solos.
+5. **Panel de Coolify** solo por `https://<panel>.<dominio>`; el puerto del panel (`:8000`) y el dashboard de Traefik (`:8080`) cerrados desde fuera. Docker salta `ufw`, así que se cierran sin publicarlos en Coolify/Traefik y se comprueba desde otra red (`curl -m 5 http://<IP-del-VPS>:8000` y `:8080` deben fallar).
+6. Si el proveedor del VPS ofrece cortafuegos en su panel, permitir solo 22, 80 y 443 como capa adicional.
+
+**Crear cada aplicación en Coolify (lo hace el humano):**
+
+1. DNS: registros `A` de `pruebas.<dominio>`, `app.<dominio>` y `<panel>.<dominio>` hacia `<IP-del-VPS>`.
+2. Prepara y migra su proyecto Supabase desde la PC (sección 4) **antes** del primer despliegue.
+3. Nueva aplicación desde el repositorio, *build pack* Dockerfile con `Dockerfile.prod`, rama `develop` (pruebas) o `main` (producción), dominio `https://pruebas.<dominio>` o `https://app.<dominio>`, puerto `8000` y healthcheck `/api/ready`.
+4. Plazo de parada (*stop grace period*) de **25 s o más** (sección 5.1, «Apagado»); comprobar con `docker inspect` que `StopTimeout` ≥ 25.
+5. Variables de la sección 5, con los secretos marcados como secretos en Coolify. Nunca `MIGRATION_DATABASE_URL`.
+6. «Pruebas» se despliega desde `develop` (automático si se activó; P10 pendiente); en «producción» el despliegue automático queda desactivado (se despliega a mano, sección 7).
+7. Comprobar: `https://pruebas.<dominio>/api/ready` o `https://app.<dominio>/api/ready` responde `{"status":"ok"}`, `http://` redirige a `https://`, el registro de arranque no avisa `TRUSTED_PROXY_HOPS=0` y la otra app del VPS sigue respondiendo.
+
+**Recursos:** el VPS comparte memoria entre los dos entornos, la otra app y Coolify; gunicorn usa 2 procesos × 4 hilos y Argon2 (19 MiB) por hilo. Si la memoria aprieta, el humano decide con la medida si baja `workers` en «pruebas».
+
+## 7. Migrar y desplegar
+
+### 7.1 Antes de subir a `develop` un cambio con migración
+
+Migra primero el proyecto de «pruebas» desde la PC: en una ventana nueva de PowerShell, con la `MIGRATION_DATABASE_URL` del proyecto de pruebas solo en esa ventana, `uv run alembic upgrade head` y `uv run alembic current` (sección 4); cierra la ventana al terminar. Así la base de «pruebas» ya tiene el esquema nuevo cuando se despliega el código de `develop` (spec 018, R10 y R12).
+
+### 7.2 Cada vez que algo llega a `main`
 
 1. El humano pasa `develop` → `main` (nunca Claude).
 2. La CI corre en `main`: `backend`, `c8` (base como Supabase) e `imagen` (contenedor de producción con prueba de humo).
-3. **Migrar:** GitHub → Actions → *Migrar producción* → *Run workflow* desde `main`, escribe `migrar` y aprueba el entorno `production`. El flujo verifica que la CI de ese commit esté en verde antes de tocar la base.
-   - Configuración una sola vez: Settings → Environments → `production` con *Required reviewers* (tú); secreto `MIGRATION_DATABASE_URL`; variable `APP_DB_USER = assetcontrol_app`.
-4. **Desplegar** en la plataforma (sección 6).
-5. **Comprobar:** `https://<dominio>/api/ready` responde `{"status": "ok"}`; entra como admin; en un teléfono abre *Escanear* y confirma que la cámara funciona.
+3. **Respaldo** de producción (sección 8) si el cambio trae una migración.
+4. **Migrar desde la PC antes del despliegue manual** (spec 018): en una ventana nueva de PowerShell, con la `MIGRATION_DATABASE_URL` del proyecto de producción solo en esa ventana, `uv run alembic upgrade head` y `uv run alembic current` (sección 4); cierra la ventana al terminar. `MIGRATION_DATABASE_URL` **nunca** va en el VPS ni en Coolify.
+   - `migrar.yml` sigue en el repositorio sin cambios, pero el camino vigente con el VPS es migrar desde la PC.
+   - Alternativa: `migrar.yml` desde GitHub (configuración del entorno `production`):
+     - Configuración una sola vez: Settings → Environments → `production` con *Required reviewers* (tú); secreto `MIGRATION_DATABASE_URL`; variable `APP_DB_USER = assetcontrol_app`.
+5. **Desplegar** a mano en Coolify la aplicación de producción (sección 6), solo después de migrar y con la CI de `main` en verde.
+6. **Comprobar:** `https://app.<dominio>/api/ready` responde `{"status": "ok"}`; entra como admin; en un teléfono abre *Escanear* y confirma que la cámara funciona.
 
 ## 8. Respaldo y restauración
 
@@ -202,7 +260,7 @@ Remove-Item Env:PGPASSWORD
 
 - **`SECRET_KEY`:** cámbiala en la plataforma y vuelve a desplegar. Todas las sesiones se cierran y cada persona vuelve a entrar.
 - **Contraseña de la app:** genera una nueva, ejecuta `uv run flask --app app preparar-roles` con la nueva `APP_DB_PASSWORD` (sección 4), actualiza `DATABASE_URL` en la plataforma y vuelve a desplegar.
-- **Contraseña de `postgres`:** cámbiala en Supabase y actualiza el secreto `MIGRATION_DATABASE_URL` en GitHub.
+- **Contraseña de `postgres`:** cámbiala en cada proyecto de Supabase y actualiza el secreto `MIGRATION_DATABASE_URL` del entorno `production` en GitHub (`migrar.yml`) y tu gestor de contraseñas. Nunca en el VPS ni en Coolify.
 
 ## 10. Volver atrás
 
@@ -217,3 +275,15 @@ Remove-Item Env:PGPASSWORD
 - No desplegar con `ENVIRONMENT=development` ni con `sslmode=disable`, `allow` o `prefer` (la app se niega a arrancar). Con `development` la app aceptaría además el buzón en carpeta y una `URL_PUBLICA` con `http`.
 - No activar en el proveedor de correo la reescritura de enlaces ni el seguimiento de clics, ni subir `log_statement` de la base de `none` (tampoco a `ddl` ni `mod`).
 - No publicar `.claude/`, `.cursor/`, `AGENTS.md`, `CLAUDE.md` ni `MEMORY.md` (la imagen no los copia).
+
+**En el VPS (spec 018):**
+
+- No poner `MIGRATION_DATABASE_URL` ni la contraseña de `postgres` en el VPS ni en Coolify: se migra desde la PC (sección 7).
+- No instalar Caddy ni nginx propios: TLS y enrutado son del Traefik de Coolify.
+- No tocar la otra aplicación del VPS ni la configuración global de Traefik más de lo necesario; tras cada cambio, comprobar que sigue respondiendo.
+- No poner datos reales en «pruebas» ni restaurar en él un respaldo de producción.
+- No activar el despliegue automático en producción: se despliega a mano, después de migrar.
+- No publicar el panel de Coolify (`:8000`) ni el dashboard de Traefik (`:8080`) hacia fuera, ni volver a permitir SSH con contraseña o como `root`.
+- No escribir en el repositorio el dominio real, la IP del VPS, usuarios ni contraseñas: se usan los marcadores `<dominio>`, `<IP-del-VPS>` y `<panel>.<dominio>`.
+- No usar `StripPrefix /api` en Traefik ni la variable `SCRIPT_NAME` en gunicorn: el contenedor monta la API en `/api` (`backend/app/wsgi.py`) y decide las cabeceras de T1 por la ruta completa (`PATH_INFO`); quitar o mover el prefijo rompe la API o deja páginas sensibles sin `no-store`.
+- No agregar en Coolify un middleware de caché: las páginas sensibles deben llegar con `Cache-Control: no-store` tal como las responde el contenedor.

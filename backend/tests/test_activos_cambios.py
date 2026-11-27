@@ -9,17 +9,25 @@ Sobre una base temporal con dos tenants (A y B) y un catálogo creado por la API
   evento ni versión nueva; ``codigo`` nunca cambia; solo el admin; dado de baja ``409``.
 - Spec 015, T1 (R4, A3): ``PATCH``, ``mover``, ``estado``, ``baja`` y el ``412`` devuelven
   la ficha con ``foto`` (misma forma que ``GET /activos/{id}``).
+- Spec 020, T1 (R7; req. 1–4): el contador edita solo ``nombre``, ``categoria_id``,
+  ``marca``, ``modelo``, ``subtipo``, ``serial`` y ``fecha_compra``; cualquier otro campo
+  es ``400`` sin cambiar nada; ni el ``200`` ni el ``400`` ni el ``412`` le llevan precio;
+  mover, estado, baja y exportar siguen ``403``. El serial repetido no se rechaza; el
+  historial del contador trae autor y nada de precio; editar tras el cierre no toca lo
+  congelado y, con la sesión abierta, lo ya contado sigue en ``categoria_al_contar``.
 """
 
 import io
 import uuid
 from collections.abc import Iterator
+from decimal import Decimal
 
 import pytest
 from acceso_db import (
     ADMIN_A,
     ADMIN_B,
     CONTADOR_A,
+    CONTADOR_B,
     TENANT_A,
     TENANT_B,
     AccesoDb,
@@ -32,11 +40,14 @@ from flask import Flask
 from PIL import Image
 from sqlalchemy import text
 
+from app.activos import cambios
+from app.activos.service import ErrorActivo
 from app.fotos.almacen import EXTENSION_KEY, CarpetaLocal
 
 ADMIN = bearer(ADMIN_A, TENANT_A)
 CONTADOR = bearer(CONTADOR_A, TENANT_A, rol="contador")
 ADMIN_OTRO = bearer(ADMIN_B, TENANT_B)
+CONTADOR_OTRO = bearer(CONTADOR_B, TENANT_B, rol="contador")
 
 
 @pytest.fixture(scope="module")
@@ -114,6 +125,29 @@ def editar(client, activo_id, body, *, v=1, headers=ADMIN):
 
 def code(response) -> str:
     return response.get_json()["error"]["code"]
+
+
+def claves_de_precio(valor: object, ruta: str = "$") -> list[str]:
+    """Recorre el JSON completo y devuelve la ruta de toda clave de precio o valor."""
+    encontradas: list[str] = []
+    if isinstance(valor, dict):
+        for clave, hijo in valor.items():
+            if "precio" in clave.lower() or "valor" in clave.lower():
+                encontradas.append(f"{ruta}.{clave}")
+            encontradas += claves_de_precio(hijo, f"{ruta}.{clave}")
+    elif isinstance(valor, list):
+        for i, hijo in enumerate(valor):
+            encontradas += claves_de_precio(hijo, f"{ruta}[{i}]")
+    return encontradas
+
+
+def fila(db: AccesoDb, activo_id: str) -> dict:
+    with db.migrator.connect() as conn:
+        return dict(
+            conn.execute(text("select * from activo where id = :a"), {"a": activo_id})
+            .mappings()
+            .one()
+        )
 
 
 def eventos(db: AccesoDb, activo_id: str) -> list[tuple[str, dict, uuid.UUID]]:
@@ -314,9 +348,9 @@ def test_category_or_asset_of_another_tenant_is_404(client, cat, cam_db):
     assert eventos(cam_db, activo["id"]) == []
 
 
-def test_only_the_admin_edits(client, cat):
+def test_editing_needs_a_session(client, cat):
+    # Spec 020 (R7): el contador ya edita los campos descriptivos; sin sesión sigue 401.
     activo = nuevo(client, cat)
-    assert editar(client, activo["id"], {"nombre": "X"}, headers=CONTADOR).status_code == 403
     response = client.patch(f"/activos/{activo['id']}", json={"nombre": "X"}, headers=version(1))
     assert response.status_code == 401
 
@@ -668,11 +702,17 @@ def test_another_tenant_never_sees_the_card_nor_its_photo(client, cat):
 
 
 def test_a_counter_with_a_stale_version_gets_403_without_the_card(client, cat):
+    # Spec 020 (R7): mover, estado y baja siguen 403 al contador; el ``PATCH`` es suyo y su
+    # ``412`` trae el vigente sin precio (ver la sección de la spec 020).
     activo, _ = con_foto(client, cat)
     v = activo["row_version"]
     assert editar(client, activo["id"], {"nombre": "Ya cambió"}, v=v).status_code == 200
 
-    for nombre, response in escrituras(client, activo["id"], cat, v=v, headers=CONTADOR).items():
+    respuestas = escrituras(client, activo["id"], cat, v=v, headers=CONTADOR)
+    editado = respuestas.pop("editar")
+    assert editado.status_code == 412
+    assert claves_de_precio(editado.get_json()) == []
+    for nombre, response in respuestas.items():
         assert response.status_code == 403, nombre
         assert "activo" not in response.get_json(), nombre
 
@@ -684,3 +724,377 @@ def test_the_counter_reads_the_photo_but_never_the_price(client, cat):
     ficha = response.get_json()["activo"]
     assert ficha["foto"] == foto
     assert "precio_compra" not in ficha
+
+
+# --- Spec 020, T1: edición descriptiva por el contador (R7; req. 1–4) -------------------
+
+
+def test_the_counter_edits_the_descriptive_fields_and_leaves_its_events(client, cat, cam_db):
+    activo, foto = con_foto(client, cat)
+    v = activo["row_version"]
+    response = editar(
+        client,
+        activo["id"],
+        {
+            "nombre": "Autoclave clase B 23 L",
+            "categoria_id": cat["cat2"],
+            "marca": "W&H",
+            "modelo": "Lisa 22",
+            "subtipo": "Clase B",
+            "serial": "SN-77",
+            "fecha_compra": "2023-05-10",
+        },
+        v=v,
+        headers=CONTADOR,
+    )
+
+    assert response.status_code == 200, response.get_json()
+    assert response.headers["ETag"] == f'"{v + 1}"'
+    cuerpo = response.get_json()
+    assert claves_de_precio(cuerpo) == []
+    editado = cuerpo["activo"]
+    assert editado["row_version"] == v + 1
+    assert editado["codigo"] == activo["codigo"]
+    assert editado["nombre"] == "Autoclave clase B 23 L"
+    assert editado["categoria"] == {"id": cat["cat2"], "nombre": "Muebles"}
+    assert (editado["marca"], editado["modelo"], editado["subtipo"]) == (
+        "W&H",
+        "Lisa 22",
+        "Clase B",
+    )
+    assert (editado["serial"], editado["fecha_compra"]) == ("SN-77", "2023-05-10")
+    assert editado["foto"] == foto
+    # Misma ficha que lee el contador; el precio sigue intacto en la base.
+    assert editado == client.get(f"/activos/{activo['id']}", headers=CONTADOR).get_json()["activo"]
+    assert str(fila(cam_db, activo["id"])["precio_compra"]) == "14200000.00"
+
+    tipos = [(tipo, autor) for tipo, _, autor in eventos(cam_db, activo["id"])]
+    assert ("categoria_cambiada", CONTADOR_A.usuario_id) in tipos
+    assert ("datos_cambiados", CONTADOR_A.usuario_id) in tipos
+    assert all(tipo != "precio_cambiado" for tipo, _ in tipos)
+    categoria = next(d for t, d, _ in eventos(cam_db, activo["id"]) if t == "categoria_cambiada")
+    assert categoria == {
+        "antes": {"id": cat["cat"], "nombre": "Biomédicos"},
+        "despues": {"id": cat["cat2"], "nombre": "Muebles"},
+    }
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"precio_compra": "15000000.00"},
+        {"precio_compra": "-1"},
+        {"nombre": "Otro", "precio_compra": "1.00"},
+        {"codigo": "OTRO-1"},
+        {"nombre": "Otro", "codigo": "AC-1"},
+        {"ubicacion_id": "x"},
+        {"ubicacion": "Bodega"},
+        {"ubicacion_actual": {}},
+        {"estado": "en_reparacion"},
+        {"estado_actual": "activo"},
+        {"nombre": "Otro", "estado": "dado_de_baja"},
+        {"referencia": "R"},
+        {"atributos": {}},
+        {"row_version": 9},
+    ],
+)
+def test_the_counter_gets_400_outside_the_descriptive_fields(client, cat, cam_db, body):
+    activo = nuevo(client, cat)
+    antes = fila(cam_db, activo["id"])
+
+    response = editar(client, activo["id"], body, headers=CONTADOR)
+
+    assert response.status_code == 400, response.get_json()
+    assert code(response) in {"solicitud_invalida", "codigo_inmutable"}
+    assert claves_de_precio(response.get_json()) == []
+    assert "activo" not in response.get_json()
+    assert fila(cam_db, activo["id"]) == antes
+    assert eventos(cam_db, activo["id"]) == []
+
+
+def test_the_counter_400_does_not_reveal_how_prices_are_validated(client, cat):
+    activo = nuevo(client, cat)
+    for precio in ("-1", 10.5, "abc"):
+        response = editar(client, activo["id"], {"precio_compra": precio}, headers=CONTADOR)
+        assert response.status_code == 400
+        assert code(response) == "solicitud_invalida"
+
+
+def test_the_counter_gets_400_for_invalid_descriptive_values(client, cat, cam_db):
+    activo = nuevo(client, cat)
+    for body in ({"nombre": "   "}, {"fecha_compra": "2999-01-01"}, {"categoria_id": None}):
+        response = editar(client, activo["id"], body, headers=CONTADOR)
+        assert response.status_code == 400, body
+        assert claves_de_precio(response.get_json()) == []
+    assert eventos(cam_db, activo["id"]) == []
+
+
+def test_the_counter_needs_the_version_and_gets_428(client, cat, cam_db):
+    activo = nuevo(client, cat)
+    response = client.patch(f"/activos/{activo['id']}", json={"nombre": "X"}, headers=CONTADOR)
+    assert response.status_code == 428
+    assert code(response) == "falta_version"
+    assert claves_de_precio(response.get_json()) == []
+    assert eventos(cam_db, activo["id"]) == []
+
+
+def test_the_counter_412_carries_the_current_card_without_price(client, cat, cam_db):
+    activo, foto = con_foto(client, cat)
+    v = activo["row_version"]
+    assert editar(client, activo["id"], {"nombre": "Primero"}, v=v).status_code == 200
+
+    response = editar(client, activo["id"], {"nombre": "Tarde"}, v=v, headers=CONTADOR)
+
+    assert response.status_code == 412
+    cuerpo = response.get_json()
+    assert cuerpo["error"]["code"] == "version_desactualizada"
+    assert claves_de_precio(cuerpo) == []
+    assert cuerpo["activo"]["nombre"] == "Primero"
+    assert cuerpo["activo"]["row_version"] == v + 1
+    assert cuerpo["activo"]["foto"] == foto
+    assert fila(cam_db, activo["id"])["nombre"] == "Primero"
+
+
+def test_the_admin_still_gets_the_price_in_200_and_412(client, cat):
+    activo = nuevo(client, cat)
+    hecho = editar(client, activo["id"], {"nombre": "Primero"})
+    assert hecho.get_json()["activo"]["precio_compra"] == "14200000.00"
+    tarde = editar(client, activo["id"], {"nombre": "Tarde"})
+    assert tarde.status_code == 412
+    assert tarde.get_json()["activo"]["precio_compra"] == "14200000.00"
+
+
+def test_the_counter_cannot_edit_a_written_off_asset(client, cat, cam_db):
+    activo = nuevo(client, cat)
+    dar_de_baja_en_la_base(cam_db, activo["id"])
+    response = editar(client, activo["id"], {"nombre": "X"}, v=2, headers=CONTADOR)
+    assert response.status_code == 409
+    assert code(response) == "activo_dado_de_baja"
+    assert claves_de_precio(response.get_json()) == []
+
+
+def test_the_counter_of_another_tenant_gets_404(client, cat, cam_db):
+    activo = nuevo(client, cat)
+    antes = fila(cam_db, activo["id"])
+    for v in (1, 5):
+        response = editar(client, activo["id"], {"nombre": "Ajeno"}, v=v, headers=CONTADOR_OTRO)
+        assert response.status_code == 404
+        assert "activo" not in response.get_json()
+    # Una categoría de otro tenant tampoco existe para el contador.
+    response = editar(client, activo["id"], {"categoria_id": cat["cat_b"]}, headers=CONTADOR)
+    assert response.status_code == 404
+    assert editar(client, str(uuid.uuid4()), {"nombre": "X"}, headers=CONTADOR).status_code == 404
+    assert fila(cam_db, activo["id"]) == antes
+    assert eventos(cam_db, activo["id"]) == []
+
+
+def test_the_counter_still_cannot_move_change_state_write_off_or_export(client, cat, cam_db):
+    activo = nuevo(client, cat)
+    for nombre, body in (
+        ("mover", {"ubicacion_id": cat["otra_sala"]}),
+        ("estado", {"estado": "en_reparacion"}),
+        ("baja", {"motivo": "perdido"}),
+    ):
+        response = accion(client, activo["id"], nombre, body, headers=CONTADOR)
+        assert response.status_code == 403, nombre
+        assert claves_de_precio(response.get_json()) == []
+    assert client.get("/activos/exportar", headers=CONTADOR).status_code == 403
+    assert eventos(cam_db, activo["id"]) == []
+
+
+def test_the_counter_can_repeat_a_serial_used_by_another_asset(client, cat, cam_db):
+    # El ``serial`` no es único ni sirve para deduplicar (docs/03): no hay rechazo ni fusión.
+    serial = f"SN-DUP-{uuid.uuid4().hex[:6]}"
+    primero = nuevo(client, cat, serial=serial)
+    segundo = nuevo(client, cat)
+
+    response = editar(client, segundo["id"], {"serial": serial}, headers=CONTADOR)
+
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()["activo"]["id"] == segundo["id"]
+    assert response.get_json()["activo"]["serial"] == serial
+    assert fila(cam_db, primero["id"])["serial"] == serial
+    assert fila(cam_db, segundo["id"])["serial"] == serial
+    with cam_db.migrator.connect() as conn:
+        mismos = conn.scalar(text("select count(*) from activo where serial = :s"), {"s": serial})
+    assert mismos == 2
+    assert eventos(cam_db, primero["id"]) == []
+
+
+def test_the_counter_reads_its_own_edits_in_the_history_without_prices(client, cat):
+    activo = nuevo(client, cat)
+    response = editar(
+        client,
+        activo["id"],
+        {"categoria_id": cat["cat2"], "nombre": "Autoclave del contador"},
+        headers=CONTADOR,
+    )
+    assert response.status_code == 200, response.get_json()
+
+    historial = client.get(f"/activos/{activo['id']}/historial", headers=CONTADOR)
+
+    assert historial.status_code == 200
+    cuerpo = historial.get_json()
+    assert claves_de_precio(cuerpo) == []
+    por_tipo = {e["tipo"]: e for e in cuerpo["eventos"]}
+    for tipo in ("categoria_cambiada", "datos_cambiados"):
+        assert por_tipo[tipo]["autor"]["id"] == str(CONTADOR_A.usuario_id), tipo
+        assert por_tipo[tipo]["autor"]["nombre"], tipo
+    assert por_tipo["categoria_cambiada"]["datos"]["despues"] == {
+        "id": cat["cat2"],
+        "nombre": "Muebles",
+    }
+    nombre = por_tipo["datos_cambiados"]["datos"]["campos"]["nombre"]
+    assert nombre["despues"] == "Autoclave del contador"
+
+
+@pytest.mark.parametrize("headers", [CONTADOR, ADMIN], ids=["contador", "admin"])
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"Precio_compra": 1},
+        {" precio_compra": 1},
+        {"precio_compra​": 1},
+        {"tenant_id": str(TENANT_B)},
+        {"datos": {"precio_compra": 1}},
+    ],
+    ids=["mayuscula", "espacio", "ancho_cero", "tenant_id", "anidado"],
+)
+def test_forbidden_key_variants_are_400_and_change_nothing(client, cat, cam_db, body, headers):
+    activo = nuevo(client, cat)
+    antes = fila(cam_db, activo["id"])
+
+    response = editar(client, activo["id"], body, headers=headers)
+
+    assert response.status_code == 400, response.get_json()
+    assert code(response) == "solicitud_invalida"
+    assert "activo" not in response.get_json()
+    assert fila(cam_db, activo["id"]) == antes
+    assert eventos(cam_db, activo["id"]) == []
+
+
+def test_an_unknown_role_edits_nothing():
+    for rol in ("otro", "", "Contador", "plataforma_owner"):
+        with pytest.raises(ErrorActivo):
+            cambios.edicion({"nombre": "x"}, rol)
+
+
+def test_the_role_lists_are_read_only():
+    with pytest.raises(TypeError):
+        cambios.EDITABLES_POR_ROL["contador"] = cambios.EDITABLES  # type: ignore[index]
+    assert "precio_compra" not in cambios.EDITABLES_POR_ROL["contador"]
+
+
+# --- Spec 020, T1: la edición del contador no toca lo congelado (ADR-003, P21) ----------
+
+
+def abrir_sesion(client) -> str:
+    response = client.post(
+        "/sesiones",
+        json={"nombre": f"Conteo {uuid.uuid4().hex[:6]}", "fecha_corte": "2026-11-30"},
+        headers=ADMIN,
+    )
+    assert response.status_code == 201, response.get_json()
+    return response.get_json()["sesion"]["id"]
+
+
+def verificar(client, ubicacion_id, sesion, activo_id) -> None:
+    body = {
+        "id": str(uuid.uuid4()),
+        "activo_id": activo_id,
+        "ubicacion_encontrada_id": ubicacion_id,
+        "estado_fisico": "ok",
+    }
+    response = client.post(f"/sesiones/{sesion}/verificaciones", json=body, headers=CONTADOR)
+    assert response.status_code in (200, 201), response.get_json()
+
+
+def cerrar_sesion(client, sesion) -> None:
+    response = client.post(f"/sesiones/{sesion}/cerrar", headers=ADMIN)
+    assert response.status_code == 200, response.get_json()
+
+
+def congelado(client, db: AccesoDb, sesion: str) -> dict[str, object]:
+    """Informe (``cierre.informe``), desglose, detalle y verificaciones de la sesión."""
+    informe = client.get(f"/sesiones/{sesion}/informe", headers=ADMIN)
+    assert informe.status_code == 200, informe.get_json()
+    tablas: dict[str, object] = {"informe": informe.get_json()}
+    with db.migrator.connect() as conn:
+        for tabla in ("sesion_desglose", "sesion_detalle", "verificacion"):
+            tablas[tabla] = [
+                dict(f)
+                for f in conn.execute(
+                    text(f"select * from {tabla} where sesion_id = :s order by id"),  # noqa: S608
+                    {"s": sesion},
+                ).mappings()
+            ]
+    return tablas
+
+
+def test_counter_edits_after_closing_leave_the_frozen_report_identical(client, cat, cam_db):
+    activo = nuevo(client, cat)
+    sesion = abrir_sesion(client)
+    verificar(client, cat["box"], sesion, activo["id"])
+    cerrar_sesion(client, sesion)
+    antes = congelado(client, cam_db, sesion)
+    assert len(antes["verificacion"]) == 1
+    assert any(f["activo_id"] == uuid.UUID(activo["id"]) for f in antes["sesion_detalle"])
+
+    response = editar(
+        client,
+        activo["id"],
+        {"categoria_id": cat["cat2"], "nombre": "Renombrado tras el cierre"},
+        v=activo["row_version"],
+        headers=CONTADOR,
+    )
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()["activo"]["categoria"]["id"] == cat["cat2"]
+
+    assert congelado(client, cam_db, sesion) == antes
+
+
+def test_a_category_change_while_open_does_not_move_what_was_counted(client, cat, cam_db):
+    # P21 / ADR-003: lo encontrado se cuenta con ``categoria_al_contar`` de su verificación
+    # vigente; un cambio de categoría con la sesión abierta no mueve lo ya contado.
+    def categoria(nombre: str) -> str:
+        response = client.post("/categorias", json={"nombre": nombre}, headers=ADMIN)
+        assert response.status_code == 201, response.get_json()
+        return response.get_json()["categoria"]["id"]
+
+    sufijo = uuid.uuid4().hex[:6]
+    antes_id = categoria(f"Al contar {sufijo}")
+    despues_id = categoria(f"Después {sufijo}")
+    activo = nuevo(client, cat, categoria_id=antes_id)
+    sesion = abrir_sesion(client)
+    verificar(client, cat["box"], sesion, activo["id"])
+
+    response = editar(
+        client,
+        activo["id"],
+        {"categoria_id": despues_id},
+        v=activo["row_version"],
+        headers=CONTADOR,
+    )
+    assert response.status_code == 200, response.get_json()
+    cerrar_sesion(client, sesion)
+
+    frozen = congelado(client, cam_db, sesion)
+    (verificacion,) = frozen["verificacion"]
+    assert str(verificacion["categoria_al_contar"]) == antes_id
+    por_categoria = {
+        str(f["categoria_id"]): f
+        for f in frozen["sesion_desglose"]
+        if f["dimension"] == "categoria"
+    }
+    assert por_categoria[antes_id]["unidades_encontrado"] == 1
+    assert por_categoria[antes_id]["unidades_registrado"] == 1
+    assert por_categoria[antes_id]["total_encontrado"] == Decimal("14200000.00")
+    assert despues_id not in por_categoria
+    (detalle,) = [f for f in frozen["sesion_detalle"] if f["activo_id"] == uuid.UUID(activo["id"])]
+    assert str(detalle["categoria_id"]) == antes_id
+    assert detalle["encontrado"] is True
+    informe = {f["id"]: f for f in frozen["informe"]["desglose"]["categorias"]}
+    assert informe[antes_id]["unidades_encontrado"] == 1
+    assert despues_id not in informe
+    # El activo sí quedó con la categoría nueva.
+    assert str(fila(cam_db, activo["id"])["categoria_id"]) == despues_id

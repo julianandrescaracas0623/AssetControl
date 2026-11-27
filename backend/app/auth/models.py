@@ -76,6 +76,26 @@ class Membresia(TenantScoped, Base):
     activa: Mapped[bool]
 
 
+class MembresiaAuditoria(TenantScoped, Base):
+    """Cambio de rol o de activación de una persona de la empresa (0034).
+
+    Solo lectura para la aplicación: la escribe ``acceso.cambiar_membresia``. Sin nombres
+    ni correos; ``id`` y ``creado_en`` los pone la base.
+    """
+
+    __tablename__ = "membresia_auditoria"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, server_default=FetchedValue())
+    actor_usuario_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    usuario_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    accion: Mapped[str] = mapped_column(Text)
+    rol_anterior: Mapped[str | None] = mapped_column(Text)
+    rol_nuevo: Mapped[str | None] = mapped_column(Text)
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=FetchedValue()
+    )
+
+
 class Invitacion(TenantScoped, Base):
     __tablename__ = "invitacion"
 

@@ -1054,8 +1054,26 @@ def test_owner_cannot_delete_or_truncate(acceso, table):
 def test_owner_cannot_update_usuario_membresia_or_tenant(acceso):
     with owner_tx(acceso, app_auth_email=EMAIL_A, app_auth_usuario=str(USER_A)) as conn:
         assert_denied(conn, "update usuario set nombre = 'x'")
-        assert_denied(conn, "update membresia set activa = false")
         assert_denied(conn, "update tenant set nombre = 'x'")
+        # 0033: solo rol y activa de membresia, y la RLS acota las filas a las de la GUC de
+        # acceso.cambiar_membresia. Sin esa GUC no hay filas: no hay error, cero filas.
+        assert_denied(conn, "update membresia set usuario_id = usuario_id")
+        assert conn.execute(text("update membresia set activa = false")).rowcount == 0
+
+
+def test_owner_auditoria_solo_inserta_en_la_empresa_de_la_guc(acceso):
+    # 0034: la auditoría es inmutable también para el dueño; solo INSERT, de su empresa.
+    with owner_tx(acceso, app_auth_membresia_tenant=str(TENANT_A)) as conn:
+        assert_denied(conn, "update membresia_auditoria set accion = 'x'")
+        assert_denied(conn, "delete from membresia_auditoria")
+        assert_denied(conn, "truncate membresia_auditoria")
+        # Otra empresa: la política WITH CHECK de la GUC lo rechaza.
+        assert_rls_rejects(
+            conn,
+            "insert into membresia_auditoria (tenant_id, actor_usuario_id, usuario_id, accion) "
+            "values (:t, :a, :u, 'usuario_desactivado')",
+            {"t": TENANT_B, "a": USER_A, "u": USER_B},
+        )
 
 
 # --- 9 (nivel SQL). Las GUC no sobreviven a la transacción ni al savepoint -----------

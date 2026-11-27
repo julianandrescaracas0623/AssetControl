@@ -23,7 +23,7 @@ def test_max_length_is_the_decided_one():
         ("Ana Torres", "Ana Torres"),
         ("  Ana Torres  ", "Ana Torres"),
         ("María José Ñúñez-O'Brien", "María José Ñúñez-O'Brien"),
-        ("Clínica Biotecnología Dental 2", "Clínica Biotecnología Dental 2"),
+        ("Clínica Odontología Sonrisa 2", "Clínica Odontología Sonrisa 2"),
         ("李小龙", "李小龙"),
         ("R2", "R2"),
         ("x" * 120, "x" * 120),

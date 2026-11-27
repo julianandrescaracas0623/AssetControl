@@ -9,8 +9,9 @@ import { MEDIDAS_IMAGEN, type VarianteImagen } from './medidasImagen'
 // Spec 016, D13 (R11, A9): tamaños fijos de imagen, en un solo lugar. La caja manda: una
 // imagen enorme o diminuta ocupa la misma caja, no se deforma (object-cover en la foto,
 // object-contain en el logo) y nunca pasa del ancho disponible (sin scroll horizontal).
-// - `foto`: foto del activo en su ficha. 320 × 240 px desde md; en el teléfono, todo el
-//   ancho y 200 px de alto. Recorta (cover) para que todas las fichas se vean iguales.
+// - `foto`: foto del activo en su ficha. 256 × 256 px desde md (cabe al lado de los
+//   datos); en el teléfono, todo el ancho y 200 px de alto. Recorta (cover) para que
+//   todas las fichas se vean iguales.
 // - `logo`: logo de la empresa en Ajustes (T9). Caja de 160 × 64 px, fondo neutro,
 //   contain: la marca se ve completa.
 // - `logoCabecera`: logo en cabeceras de informe o barra (T9). 32 px de alto, ancho

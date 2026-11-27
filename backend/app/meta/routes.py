@@ -30,9 +30,15 @@ _clock = time.monotonic
 
 @bp.get("/health")
 def health() -> ResponseReturnValue:
-    if ping_database():
-        return jsonify(status="ok", db="ok", version=__version__), 200
-    return jsonify(status="error", db="error", version=__version__), 503
+    # SEC-09: la versión se mantiene (riesgo aceptado: la usan las comprobaciones y la prueba
+    # de contrato); la respuesta no la guarda ningún intermediario (no-store).
+    ok = ping_database()
+    response = jsonify(
+        status="ok" if ok else "error", db="ok" if ok else "error", version=__version__
+    )
+    response.status_code = 200 if ok else 503
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 class _ReadyCache:

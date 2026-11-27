@@ -78,7 +78,7 @@ describe('/invitacion', () => {
     await h1('Crea tu cuenta')
     crear()
     await h1('Resumen')
-    expect(router.state.location.pathname).toBe('/admin')
+    expect(router.state.location.pathname).toBe('/app')
   })
 
   it('mostrar contraseña cambia el tipo del campo', async () => {

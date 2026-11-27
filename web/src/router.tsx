@@ -1,7 +1,7 @@
 import type { RouteObject } from 'react-router'
 
 import App from './App'
-import AdminShell from './components/app/AdminShell'
+import AppShell from './components/app/AppShell'
 import Activos from './routes/admin/Activos'
 import FichaActivo from './routes/admin/FichaActivo'
 import RutaDetalleSesion from './routes/admin/DetalleSesion'
@@ -9,22 +9,17 @@ import Discrepancias from './routes/admin/Discrepancias'
 import EmpresaPagina from './routes/admin/Empresa'
 import Sesiones from './routes/admin/Sesiones'
 import Informe from './routes/admin/Informe'
-import AdminInicio from './routes/admin/Inicio'
 import RegistrarActivo from './routes/admin/RegistrarActivo'
 import RequiereAdmin from './routes/admin/RequiereAdmin'
 import Categorias from './routes/admin/Categorias'
 import Ubicaciones from './routes/admin/Ubicaciones'
 import Usuarios from './routes/admin/Usuarios'
 import Valor from './routes/admin/Valor'
-import Alta from './routes/contar/Alta'
 import Escanear from './routes/contar/Escanear'
 import EspacioConteo from './routes/contar/Escritorio'
 import Escribir from './routes/contar/Escribir'
-import Historial from './routes/contar/Historial'
-import ContarInicio from './routes/contar/Inicio'
-import Pendientes from './routes/contar/Pendientes'
 import Verificar from './routes/contar/Verificar'
-import Componentes from './routes/dev/Componentes'
+import { AliasAdmin, AltaConteo, HistorialConteo, InicioApp, InicioConteo, PendientesConteo } from './routes/app/rutasApp'
 import InicioPorRol from './routes/InicioPorRol'
 import Invitacion from './routes/Invitacion'
 import Login from './routes/Login'
@@ -41,8 +36,15 @@ import RaizPlataforma from './routes/plataforma/RaizPlataforma'
 import RequiereDesarrollador from './routes/plataforma/RequiereDesarrollador'
 import { ErrorModulo, InicioPlataforma, RutaModulo } from './routes/plataforma/RutaModulo'
 
-// Rutas de la web (spec 001b, T3; sesión y guardas de la spec 002b, T3). /admin y
+// Rutas de la web (spec 001b, T3; sesión y guardas de la spec 002b, T3). /app y
 // /contar exigen sesión; las pantallas que aún son maqueta lo dicen con su banda.
+// Spec 020, T3 (R1–R3, R11): /app es el marco compartido de los dos roles; solo las
+// pantallas exclusivas del admin van bajo RequiereAdmin. /admin/** es un alias que
+// redirige a /app/** con la misma query. En el computador, /contar lleva a /app; el
+// espacio de conteo (escanear, escribir, activo/:codigo) no redirige. T5: en el computador
+// /contar/nuevo lleva al alta del marco (/app/activos/nuevo) con la misma query. T6: en el
+// computador /contar/pendientes lleva al detalle de la sesión abierta (con su ?ubicacion=)
+// y el historial del activo, a su ficha del marco.
 export const routes: RouteObject[] = [
   // Spec 017, T8: consola de plataforma, fuera de la Raiz de la clínica (cliente de
   // consultas y sesión propios). Las pantallas de cada módulo salen de su registro
@@ -75,43 +77,53 @@ export const routes: RouteObject[] = [
       { path: '/invitacion', element: <Invitacion /> },
       { path: '/recuperar', element: <RecuperarContrasena /> },
       { path: '/restablecer', element: <NuevaContrasena /> },
-      { path: '/dev/componentes', element: <Componentes /> },
+      // SEC-07: la página de componentes (datos de ejemplo) solo existe en desarrollo; la
+      // condición es la misma que la del módulo de prueba de la consola (modulos.ts).
+      ...(import.meta.env.DEV
+        ? [
+            {
+              path: '/dev/componentes',
+              lazy: async () => ({ Component: (await import('./routes/dev/Componentes')).default }),
+            },
+          ]
+        : []),
       {
         element: <RequiereSesion />,
         children: [
           // Spec 017, T4 (R26): única pantalla mientras la cuenta deba cambiar la contraseña.
           { path: '/cambiar-contrasena', element: <CambiarContrasena /> },
           {
-            path: '/admin',
-            element: <RequiereAdmin />,
+            path: '/app',
+            element: <AppShell />,
             children: [
+              { index: true, element: <InicioApp /> },
+              { path: 'activos', element: <Activos /> },
+              { path: 'activos/nuevo', element: <RegistrarActivo /> },
+              { path: 'sesiones', element: <Sesiones /> },
+              { path: 'discrepancias', element: <Discrepancias /> },
+              { path: 'sesiones/:id', element: <RutaDetalleSesion /> },
+              { path: 'activos/:codigo', element: <FichaActivo /> },
               {
-                element: <AdminShell />,
+                element: <RequiereAdmin />,
                 children: [
-                  { index: true, element: <AdminInicio /> },
-                  { path: 'activos', element: <Activos /> },
-                  { path: 'activos/nuevo', element: <RegistrarActivo /> },
-                  { path: 'sesiones', element: <Sesiones /> },
-                  { path: 'discrepancias', element: <Discrepancias /> },
-                  { path: 'sesiones/:id', element: <RutaDetalleSesion /> },
                   { path: 'sesiones/:id/informe', element: <Informe /> },
                   { path: 'usuarios', element: <Usuarios /> },
                   { path: 'empresa', element: <EmpresaPagina /> },
                   { path: 'ubicaciones', element: <Ubicaciones /> },
                   { path: 'categorias', element: <Categorias /> },
                   { path: 'valor', element: <Valor /> },
-                  { path: 'activos/:codigo', element: <FichaActivo /> },
                 ],
               },
             ],
           },
+          { path: '/admin/*', element: <AliasAdmin /> },
           {
             element: <Maqueta />,
             children: [
               {
                 path: '/contar',
                 children: [
-                  { index: true, element: <ContarInicio /> },
+                  { index: true, element: <InicioConteo /> },
                   // Spec 015, T8: en escritorio estas tres son un solo espacio de dos
                   // paneles; en teléfono, las pantallas de siempre.
                   {
@@ -122,9 +134,9 @@ export const routes: RouteObject[] = [
                       { path: 'activo/:codigo', element: <Verificar /> },
                     ],
                   },
-                  { path: 'activo/:codigo/historial', element: <Historial /> },
-                  { path: 'nuevo', element: <Alta /> },
-                  { path: 'pendientes', element: <Pendientes /> },
+                  { path: 'activo/:codigo/historial', element: <HistorialConteo /> },
+                  { path: 'nuevo', element: <AltaConteo /> },
+                  { path: 'pendientes', element: <PendientesConteo /> },
                 ],
               },
             ],

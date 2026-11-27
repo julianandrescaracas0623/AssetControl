@@ -29,7 +29,7 @@ const INACTIVA = '00000000-0000-4000-8000-000000000102'
 function empresa(id: string, nombre: string, activa = true): Empresa {
   return { id, nombre, activa, creado_en: '2026-11-10T15:00:00+00:00', tiene_logo: false, n_membresias_activas: 2, n_admins_activos: 1 }
 }
-const EMPRESAS = [empresa(ACTIVA, 'Biotecnología Dental'), empresa(INACTIVA, 'Sonrisas del Valle', false)]
+const EMPRESAS = [empresa(ACTIVA, 'Odontología Sonrisa'), empresa(INACTIVA, 'Sonrisas del Valle', false)]
 
 const ANA: Usuario = { id: '00000000-0000-4000-8000-000000000a01', nombre: 'Ana Torres', email: 'ana@clinica.test', rol: 'admin', activa: true, debe_cambiar_password: false }
 const LUIS: Usuario = { id: '00000000-0000-4000-8000-000000000c01', nombre: 'Luis Pérez', email: 'luis@clinica.test', rol: 'contador', activa: true, debe_cambiar_password: false }
@@ -99,7 +99,7 @@ afterEach(() => {
 describe('abrir Editar usuario (CU-13; R52)', () => {
   it('cada fila tiene «Editar» junto a Desactivar/Reactivar', async () => {
     abrir(`/plataforma/usuarios?empresa=${ACTIVA}`)
-    const tabla = await screen.findByRole('table', { name: 'Usuarios de Biotecnología Dental' })
+    const tabla = await screen.findByRole('table', { name: 'Usuarios de Odontología Sonrisa' })
     for (const u of USUARIOS) {
       const fila = within(tabla).getByText(u.nombre).closest('tr')!
       expect(within(fila).getByRole('button', { name: `Editar a ${u.nombre}` })).toBeTruthy()
@@ -111,7 +111,7 @@ describe('abrir Editar usuario (CU-13; R52)', () => {
     abrir(`/plataforma/usuarios?empresa=${ACTIVA}`)
     const dialogo = await abrirEdicion('Luis Pérez')
     expect(within(dialogo).getByRole('heading', { name: 'Editar usuario' })).toBeTruthy()
-    expect(dialogo.textContent).toContain('Biotecnología Dental')
+    expect(dialogo.textContent).toContain('Odontología Sonrisa')
     const correo = within(dialogo).getByRole('textbox', { name: /Correo/ }) as HTMLInputElement
     expect(correo.value).toBe('luis@clinica.test')
     expect(correo.disabled).toBe(true)
@@ -133,14 +133,14 @@ describe('abrir Editar usuario (CU-13; R52)', () => {
   it('una membresía desactivada se puede editar y lo dice (R51)', async () => {
     abrir(`/plataforma/usuarios?empresa=${ACTIVA}`)
     const dialogo = await abrirEdicion('Eva Gil')
-    expect(dialogo.textContent).toContain('El acceso de Eva Gil a Biotecnología Dental está desactivado. Puedes editar su nombre y su rol')
+    expect(dialogo.textContent).toContain('El acceso de Eva Gil a Odontología Sonrisa está desactivado. Puedes editar su nombre y su rol')
     expect(campoNombre(dialogo).disabled).toBe(false)
   })
 
   it('a 375 px la tarjeta también tiene «Editar»', async () => {
     simularAncho({ movil: true })
     abrir(`/plataforma/usuarios?empresa=${ACTIVA}`)
-    const lista = await screen.findByRole('list', { name: 'Usuarios de Biotecnología Dental' })
+    const lista = await screen.findByRole('list', { name: 'Usuarios de Odontología Sonrisa' })
     expect(within(lista).getByRole('button', { name: 'Editar a Luis Pérez' })).toBeTruthy()
     expect(within(lista).getByRole('button', { name: 'Desactivar a Luis Pérez' })).toBeTruthy()
   })
@@ -157,7 +157,7 @@ describe('abrir Editar usuario (CU-13; R52)', () => {
 
   it('doble clic sobre la fila abre Editar usuario de esa persona, con la pista en la fila', async () => {
     abrir(`/plataforma/usuarios?empresa=${ACTIVA}`)
-    const tabla = await screen.findByRole('table', { name: 'Usuarios de Biotecnología Dental' })
+    const tabla = await screen.findByRole('table', { name: 'Usuarios de Odontología Sonrisa' })
     await waitFor(() => expect((screen.getByRole('button', { name: 'Editar a Luis Pérez' }) as HTMLButtonElement).disabled).toBe(false))
     const fila = within(tabla).getByText('Luis Pérez').closest('tr')!
     expect(fila.getAttribute('title')).toBe('Doble clic para editar')
@@ -263,7 +263,7 @@ describe('guardar (R47, R49, R50)', () => {
     fireEvent.click(guardar(dialogo))
     const confirmar = await screen.findByRole('alertdialog')
     expect(within(confirmar).getByRole('heading', { name: '¿Hacer admin a Luis Pérez?' })).toBeTruthy()
-    expect(confirmar.textContent).toContain('Luis Pérez pasará a ser admin en Biotecnología Dental.')
+    expect(confirmar.textContent).toContain('Luis Pérez pasará a ser admin en Odontología Sonrisa.')
     expect(confirmar.textContent).toContain('Su sesión abierta se cerrará y tendrá los permisos de admin.')
     fireEvent.click(within(confirmar).getByRole('button', { name: 'Cancelar' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
@@ -302,7 +302,7 @@ describe('rechazos del servidor (R48; A24)', () => {
     fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Sí, cambiar el rol' }))
     const titulo = await within(dialogo).findByText('No se puede quitar el rol admin al último admin activo de la empresa')
     const aviso = titulo.closest('[data-kit=aviso]') as HTMLElement
-    expect(aviso.textContent).toContain('Biotecnología Dental necesita al menos un admin activo')
+    expect(aviso.textContent).toContain('Odontología Sonrisa necesita al menos un admin activo')
     expect(aviso.textContent).toContain('No se cambió nada')
     expect(within(aviso).queryByRole('button', { name: 'Reintentar' })).toBeNull()
     await waitFor(() => expect(llamadas(f, listaUrl, 'GET').length).toBe(2))
@@ -316,7 +316,7 @@ describe('rechazos del servidor (R48; A24)', () => {
     fireEvent.change(campoNombre(dialogo), { target: { value: 'Luis Pérez Gómez' } })
     fireEvent.click(guardar(dialogo))
     expect(await within(dialogo).findByText('Esta empresa está desactivada')).toBeTruthy()
-    expect(dialogo.textContent).toContain('Reactiva Biotecnología Dental en Empresas')
+    expect(dialogo.textContent).toContain('Reactiva Odontología Sonrisa en Empresas')
     await waitFor(() => expect(llamadas(f, '/api/plataforma/empresas?estado=todas').length).toBeGreaterThan(1))
   })
 

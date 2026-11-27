@@ -9,11 +9,11 @@ Decisiones ya tomadas y no reabiertas: solo online (ADR-002); cámara del celula
 | Actor | Descripción | Puede | No puede |
 |---|---|---|---|
 | `admin` | Responsable de la clínica | Todo lo del contador; **ver precios** (ficha, historial, verificación, autocompletado, informes y exportaciones; P13); invitar usuarios; crear/editar ubicaciones y categorías; dar de alta activos y escribir el catálogo existente (editar, mover, cambiar estado, dar de baja); abrir y cerrar sesiones (P5, ver 6); ver y aplicar discrepancias; generar informes y exportar; ver el Inicio completo con valor, gráficas y evolución (M11); importar (fuera de esta entrega) | Modificar una sesión cerrada ni una verificación |
-| `contador` | Personal que cuenta desde el teléfono | Iniciar sesión; escanear; consultar activos y su historial; verificar activos en una sesión abierta; **dar de alta activos escaneando un sticker nuevo y duplicar** (P11, sin revisión posterior del admin); ver discrepancias de su conteo `[PENDIENTE: alcance exacto]`; **escribir el `precio_compra` solo al dar de alta (obligatorio)**; ver su versión del Inicio sin ningún precio (M11; alcance exacto `[PENDIENTE]` P25) | **Ver precios en cualquier pantalla o respuesta de la API una vez escrito** (ni ficha, ni historial, ni verificación, ni autocompletado; P13), cerrar sesión, invitar, crear/editar ubicaciones y categorías, importar, aplicar discrepancias, generar informes, editar el catálogo existente (editar, mover, cambiar estado, dar de baja). Nadie cambia el `codigo` |
+| `contador` | Personal que cuenta desde el teléfono | Iniciar sesión; escanear; consultar activos y su historial; verificar activos en una sesión abierta; **dar de alta activos escaneando un sticker nuevo y duplicar** (P11, sin revisión posterior del admin); **corregir los datos descriptivos de un activo** (`nombre`, categoría, `marca`, `modelo`, `subtipo`, `serial`, `fecha_compra`; CU-CAT-05, P36); ver sesiones y discrepancias en solo lectura y sin precios (P37); **escribir el `precio_compra` solo al dar de alta (obligatorio)**; ver su versión del Inicio sin ningún precio (M11; P25: activos hoy en unidades, avance del conteo abierto y actividad reciente; en el computador en el marco `/app` y en el teléfono en `/contar` con la cámara, P38, 2026-11-25) | **Ver precios en cualquier pantalla o respuesta de la API una vez escrito** (ni ficha, ni historial, ni verificación, ni autocompletado; P13), cerrar sesión, invitar, crear/editar ubicaciones y categorías, importar, aplicar o descartar discrepancias, generar informes, editar el precio, la ubicación o el estado de un activo existente (mover, cambiar estado, dar de baja). Nadie cambia el `codigo` |
 | Sistema | El servidor | Asigna `seq` y `recibido_en`, congela totales, desglose y lista de no encontrados al cerrar (R4, R9, R9a), escribe `activo_evento`, valida rol y tenant en cada petición, filtra precios por rol en el Inicio | — |
 | Operador técnico | Quien despliega | Crea el `tenant` y la primera invitación `admin` por script/CLI (03: sin pantalla de alta de tenant) | No es un rol de la aplicación |
 
-Alta por escaneo de un activo (P11, decidida el 2026-11-11, ver [05, sección D](05-preguntas-abiertas.md#d-preguntas-surgidas-de-los-casos-de-uso)): `contador` y `admin` pueden dar de alta activos escaneando un sticker nuevo (CU-CAT-02) y duplicar (CU-CAT-03), sin revisión posterior del admin. Criterio del humano: "una persona registrada o con permisos podrá registrar activos". El resto de la escritura del catálogo sigue siendo solo del admin. Riesgo asociado: ver sección 7.
+Alta por escaneo de un activo (P11, decidida el 2026-11-11, ver [05, sección D](05-preguntas-abiertas.md#d-preguntas-surgidas-de-los-casos-de-uso)): `contador` y `admin` pueden dar de alta activos escaneando un sticker nuevo (CU-CAT-02) y duplicar (CU-CAT-03), sin revisión posterior del admin. Criterio del humano: "una persona registrada o con permisos podrá registrar activos". El resto de la escritura del catálogo sigue siendo solo del admin, salvo la corrección de datos descriptivos por el contador (CU-CAT-05; P36 modifica P11, spec 020). Riesgo asociado: ver sección 7.
 
 Visibilidad del precio (P13, decidida el 2026-11-11, ver [05, sección D](05-preguntas-abiertas.md#d-preguntas-surgidas-de-los-casos-de-uso)): el `precio_compra` es obligatorio en el alta (nombre y precio son lo único que se teclea, C4). Solo el `admin` ve precios. El `contador` lo escribe al dar de alta y después no lo ve: ni en la ficha, ni en el historial, ni en la verificación, ni en el autocompletado, ni en ninguna respuesta de la API. Los informes y exportaciones ya son solo admin. **Requisito para las specs que toquen activos, verificaciones, historial y autocompletado (004, 005, 006, 007) y para el `security-reviewer`:** el filtrado de campos por rol se hace en el servidor (el campo no se serializa para el contador, incluidos `precio_compra`, `precio_al_contar` y `{antes, despues}` de `precio_cambiado`); ocultarlo en la UI no cuenta como seguridad. Cada endpoint afectado trae una prueba de que la respuesta al contador no contiene precios.
 
@@ -23,10 +23,10 @@ Visibilidad del precio (P13, decidida el 2026-11-11, ver [05, sección D](05-pre
 |---|---|---|---|---|---|---|---|
 | M1 | Acceso y usuarios | Login, refresh, logout, aceptar invitación, invitar, roles, aislamiento por tenant | 1 | ambos; invitar: admin | `tenant`, `usuario`, `membresia`, `invitacion` | Fundación (spec 001) | Sí |
 | M2 | Ubicaciones | Sedes, salas y boxes; jerarquía por `padre_id`; activar/desactivar | 2 | admin escribe; ambos leen | `ubicacion` | M1 | Sí |
-| M3 | Catálogo de activos | Categorías (lista cerrada), alta por escaneo/manual, duplicar, autocompletado, editar, mover, estado, baja lógica | 2 | alta y duplicar: admin y contador; resto: admin | `categoria`, `activo`, `activo_evento` | M1, M2 | Sí |
+| M3 | Catálogo de activos | Categorías (lista cerrada), alta por escaneo/manual, duplicar, autocompletado, editar, mover, estado, baja lógica | 2 | alta, duplicar y edición descriptiva: admin y contador; resto: admin | `categoria`, `activo`, `activo_evento` | M1, M2 | Sí |
 | M4 | Sesiones de conteo | Abrir, listar, estado, cerrar (la lógica de totales vive en M7) | 3 | admin abre/cierra; ambos ven | `sesion_conteo` | M1, M2, M3 | Sí |
 | M5 | Verificación y escaneo | Componente de escáner, resolución de `codigo`, verificar con UUID de cliente, idempotencia, reintento, 409 | 3 | ambos | `verificacion` (lee `activo`) | M3, M4 | Sí |
-| M6 | Discrepancias | Listar verificaciones con ubicación encontrada distinta; aplicar (genera `ubicacion_cambiada`) | 3 | admin aplica | `verificacion`, `activo`, `activo_evento` | M5 | Sí |
+| M6 | Discrepancias | Listar verificaciones con ubicación encontrada distinta; aplicar (genera `ubicacion_cambiada`) | 3 | admin aplica; ambos leen (contador sin precios) | `verificacion`, `activo`, `activo_evento` | M5 | Sí |
 | M7 | Informes y exportación | Cierre con totales, desglose y lista de no encontrados congelados (R4, R9, R9a), informe de sesión de 3 cifras, valor en tiempo real (R7), PDF y Excel | 4 | admin | `sesion_conteo`, `sesion_desglose`, `sesion_no_encontrado`, `verificacion`, `activo` | M4, M5 | Sí |
 | M8 | Historial / línea de tiempo | Vista de `activo_evento` y verificaciones de un activo | 2–3 | ambos leen | `activo_evento`, `verificacion` | M3, M5 | Sí |
 | M9 | Importación del Excel | Excel → pantalla de revisión → activos | 6 | admin | `importacion`, `importacion_fila`, `sesion_conteo` (`tipo=importacion`) | M3 | **No** (fuera de esta entrega; P10) |
@@ -92,10 +92,10 @@ Reglas: R8; una fila por unidad; el copiado del precio lo hace el servidor (P13)
 
 **CU-CAT-04 Autocompletar y buscar.** Actor: ambos. Sugiere nombre, marca, modelo y `subtipo` desde lo registrado; búsqueda por `codigo`, nombre o `serial` (el serial solo busca, no deduplica). No devuelve precio al contador (P13); el filtrado es del servidor. Contribuye a: C4.
 
-**CU-CAT-05 Editar activo (con conflicto de versión).** Actor: admin. Pre: ficha abierta con su `row_version`.
-1. Cambia campos editables (nombre, categoría, precio, marca, etc.; **no** `codigo`). 2. La app envía con `If-Match: row_version`. 3. El servidor guarda, incrementa la versión y escribe eventos (`precio_cambiado`, `categoria_cambiada` con `{antes, despues}`).
-Alternos: versión desactualizada → `412`; la app avisa y recarga conservando lo escrito para reaplicar; intento de cambiar `codigo` → rechazo; contador → 403.
-Reglas: concurrencia optimista (02); `codigo` inmutable; cambios de precio no alteran sesiones cerradas ni `precio_al_contar` (ADR-003). Contribuye a: C3.
+**CU-CAT-05 Editar activo (con conflicto de versión).** Actor: admin y contador (P36, spec 020). Pre: ficha abierta con su `row_version`.
+1. Cambia campos editables: el admin, los del activo (nombre, categoría, precio, marca, etc.; **no** `codigo`); el contador, solo los descriptivos `nombre`, categoría, `marca`, `modelo`, `subtipo`, `serial` y `fecha_compra` (nunca precio, `codigo`, ubicación ni estado). 2. La app envía con `If-Match: row_version`. 3. El servidor guarda, incrementa la versión y escribe eventos en `activo_evento` con su autor (`precio_cambiado`, `categoria_cambiada` con `{antes, despues}`).
+Alternos: falta `If-Match` → `428`; versión desactualizada → `412`; la app avisa y recarga conservando lo escrito para reaplicar; intento de cambiar `codigo` → rechazo; contador que envía un campo fuera de los descriptivos → `400` y el activo no cambia. Al contador, ni el `200` ni el `400` ni el `412` le devuelven precio (P13).
+Reglas: concurrencia optimista (02); `codigo` inmutable; cambios de precio no alteran sesiones cerradas ni `precio_al_contar` (ADR-003); la categoría corregida por el contador solo afecta cálculos futuros, nunca sesiones cerradas ni sus informes (ADR-003). Contribuye a: C3.
 
 **CU-CAT-06 Mover activo.** Actor: admin. Cambia la ubicación vigente (una sola) y escribe `ubicacion_cambiada`. Es la acción directa; la vía por conteo es CU-DIS-02. Reglas: una ubicación vigente. Contribuye a: C3.
 
@@ -150,7 +150,7 @@ Alternos: sesión cerrada entretanto → CU-SES-04. Sin cola persistente ni offl
 
 ### M6. Discrepancias
 
-**CU-DIS-01 Ver discrepancias.** Actor: admin (contador `[PENDIENTE]`). Lista verificaciones de la sesión con ubicación encontrada ≠ esperada, usando la verificación R3 vigente de cada activo. Muestra activo, esperada, encontrada, quién y cuándo. Reglas: R6. Contribuye a: C3.
+**CU-DIS-01 Ver discrepancias.** Actor: admin y contador (P37, spec 020). Lista verificaciones de la sesión (abierta o cerrada) con ubicación encontrada ≠ esperada, usando la verificación R3 vigente de cada activo. Muestra activo, esperada, encontrada, quién y cuándo. El contador la lee en solo lectura y sin precios ni valores; aplicar y descartar siguen solo del admin (CU-DIS-02; contador → 403). Reglas: R6, P13. Contribuye a: C3.
 
 **CU-DIS-02 Aplicar discrepancia.** Actor: admin. Pre: discrepancia visible; la ubicación vigente del activo sigue siendo la esperada.
 1. Elige "Aplicar" (individual o en lote `[PENDIENTE]`). 2. El servidor cambia la ubicación vigente y escribe `ubicacion_cambiada` con `{antes, despues}` y `verificacion_id`. 3. La discrepancia queda marcada como resuelta.
@@ -176,7 +176,7 @@ Alternos: sin datos → archivo con ceros, no error. Reglas: una sola fuente de 
 Visibilidad (P13): al `contador` se le ocultan los eventos `precio_cambiado` y cualquier precio dentro de otros eventos (p. ej. `creado`, `importado`); el `admin` ve todo. El filtrado lo hace el servidor.
 Alternos: activo de otro tenant → 404. Reglas: eventos solo `INSERT`, escritos por el servidor. Contribuye a: C3.
 
-**CU-HIS-02 Ver sesiones pasadas.** Actor: ambos `[PENDIENTE: contador]`. Lista de sesiones cerradas, solo lectura. Contribuye a: C3.
+**CU-HIS-02 Ver sesiones pasadas.** Actor: ambos (contador: P37, spec 020). Lista de sesiones cerradas, solo lectura. El contador la ve sin cifras de valor ni enlace al informe (P13). Contribuye a: C3.
 
 ### M11. Dashboard (Inicio)
 
@@ -195,7 +195,7 @@ Decisión del humano (2026-11-11): el Inicio completo, con evolución entre cont
 | Último informe cerrado: tres cifras | Lee `sesion_conteo` de la última sesión cerrada `tipo=conteo`; rotulado "Informe congelado" | Sí | **No** |
 
 Alternos: sin sesión abierta → la tarjeta de avance dice "Sin sesión abierta" (y el admin ve "Abrir sesión"); sin sesiones cerradas → la tarjeta de último informe muestra un estado vacío, no ceros inventados; un indicador falla → solo esa tarjeta muestra error.
-Reglas: R1, R3, R7, P13; el valor actual y el último informe nunca comparten tarjeta (R7). Qué más ve el contador: `[PENDIENTE]` P25. Contribuye a: C2 (separación de cifras).
+Reglas: R1, R3, R7, P13; el valor actual y el último informe nunca comparten tarjeta (R7). Qué ve el contador (P25, cambiada por P38 el 2026-11-25): activos hoy en unidades, avance del conteo abierto y actividad reciente, sin ningún precio ni gráficas ni evolución; en el computador su Inicio es `/app`, dentro del marco compartido, y en el teléfono sigue en `/contar` con la cámara. Contribuye a: C2 (separación de cifras).
 
 **CU-DSH-02 Actividad reciente.** Actor: admin y contador.
 1. El Inicio muestra los últimos eventos del tenant: altas (`creado`), verificaciones (`verificado`) y cambios (`ubicacion_cambiada`, `estado_cambiado`, `categoria_cambiada`, `precio_cambiado`, `dado_de_baja`), con fecha, usuario, evento y activo, ordenados por `seq`. 2. Cada fila enlaza al historial del activo (CU-HIS-01).

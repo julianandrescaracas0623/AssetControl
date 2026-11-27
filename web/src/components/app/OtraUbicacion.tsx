@@ -36,7 +36,7 @@ export function OtraUbicacion({
     <Dialogo
       abierto={abierto}
       onAbiertoChange={onAbierto}
-      forma="inferior"
+      forma="auto"
       devolverFocoA={devolverFocoA}
       titulo="¿Dónde lo encontraste?"
       descripcion={`Esperada: ${esperada}`}

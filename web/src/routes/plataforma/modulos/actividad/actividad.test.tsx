@@ -25,7 +25,7 @@ const MODULOS: Modulo[] = [
 ]
 const EMP = 'a0b1c2d3-0000-4000-8000-0000000001ab'
 const EMPRESAS: Empresa[] = [
-  { id: EMP, nombre: 'Biotecnología Dental', activa: true, creado_en: '2026-11-10T15:00:00+00:00', tiene_logo: false, n_membresias_activas: 2, n_admins_activos: 1 },
+  { id: EMP, nombre: 'Odontología Sonrisa', activa: true, creado_en: '2026-11-10T15:00:00+00:00', tiene_logo: false, n_membresias_activas: 2, n_admins_activos: 1 },
 ]
 
 function registro(n: number, extra: Partial<Registro> = {}): Registro {
@@ -36,7 +36,7 @@ function registro(n: number, extra: Partial<Registro> = {}): Registro {
     resultado: 'ok',
     desarrollador_nombre: 'Daniela Ríos',
     empresa_id: EMP,
-    empresa_nombre: 'Biotecnología Dental',
+    empresa_nombre: 'Odontología Sonrisa',
     objeto_id: EMP,
     ...extra,
   }
@@ -102,7 +102,7 @@ describe('lista de actividad (CU-08; R32)', () => {
     expect(within(filas[0]).getByText('Usuario desactivado')).toBeTruthy()
     expect(within(filas[0]).getByText('Hecho')).toBeTruthy()
     expect(within(filas[0]).getByText('Daniela Ríos')).toBeTruthy()
-    expect(within(filas[0]).getByText('Biotecnología Dental')).toBeTruthy()
+    expect(within(filas[0]).getByText('Odontología Sonrisa')).toBeTruthy()
     // 03:30 UTC del 21 = 22:30 del 20 en Colombia (UTC−5).
     const hora = within(filas[0]).getByText(/^20\D+nov/)
     expect(hora.textContent).toMatch(/10:30/)
@@ -188,7 +188,7 @@ describe('filtros (R32; A18)', () => {
   it('empresa y acción viajan al servidor y empiezan desde la primera página', async () => {
     const { f } = abrir()
     await tabla()
-    await elegirEnFiltro('Empresa', 'Biotecnología Dental')
+    await elegirEnFiltro('Empresa', 'Odontología Sonrisa')
     await waitFor(() => expect(pedidas(f).at(-1)?.get('empresa_id')).toBe(EMP))
     await elegirEnFiltro('Acción', 'Usuario desactivado')
     await waitFor(() => expect(pedidas(f).at(-1)?.get('accion')).toBe('usuario_desactivado'))

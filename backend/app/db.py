@@ -788,6 +788,82 @@ def cambiar_password_propio(
     return not rechazado and resultado is True
 
 
+# --- Cambio de rol y de activación desde la consola de la empresa (0033) -----------------
+
+_CAMBIAR_MEMBRESIA = text(
+    "select rol_resultado, activa_resultado, cambiado "
+    "from acceso.cambiar_membresia(:tenant, :actor, :usuario, :rol, :activa)"
+)
+# (SQLSTATE, mensaje) de acceso.cambiar_membresia -> código estable de la aplicación.
+_MEMBRESIA_ERRORES = {
+    ("42501", "no_autorizado"): "no_autorizado",
+    ("P0001", "cambio_propio_no_permitido"): "cambio_propio_no_permitido",
+    ("P0001", "ultimo_admin"): "ultimo_admin",
+    ("P0002", "usuario_no_encontrado"): "usuario_no_encontrado",
+    ("55P03", "membresia_ocupada"): "membresia_ocupada",
+}
+
+
+class MembresiaRechazada(Exception):
+    """Rechazo esperado de ``acceso.cambiar_membresia``: solo lleva su código.
+
+    Sin mensaje, SQL ni parámetros de la base. ``tenant_session`` revierte la transacción
+    al salir con esta excepción: no queda nada a medias.
+    """
+
+    def __init__(self, codigo: str) -> None:
+        self.codigo = codigo
+        super().__init__(codigo)
+
+
+@dataclass(frozen=True)
+class ResultadoCambioMembresia:
+    """Lo que devuelve ``acceso.cambiar_membresia``: estado resultante y si hubo escritura."""
+
+    rol: str
+    activa: bool
+    cambiado: bool
+
+
+def cambiar_membresia(
+    session: Session,
+    usuario_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID,
+    rol: str,
+    activa: bool,
+) -> ResultadoCambioMembresia:
+    """``acceso.cambiar_membresia`` dentro de la ``tenant_session`` de la petición.
+
+    El tenant es siempre el de la sesión, nunca uno que elija quien llama. Quien cambia
+    (``actor_id``) lo comprueba la función, que es la que decide. Un rechazo se levanta como
+    ``MembresiaRechazada``; cualquier otro error de la base se propaga sin leer su mensaje.
+    """
+    params = {
+        "tenant": str(_session_tenant(session)),
+        "actor": str(actor_id),
+        "usuario": str(usuario_id),
+        "rol": rol,
+        "activa": activa,
+    }
+    connection = Session.connection(session)
+    codigo = None
+    try:
+        fila = connection.execute(_CAMBIAR_MEMBRESIA, params).one()
+    except DBAPIError as exc:
+        orig = exc.orig
+        message = getattr(getattr(orig, "diag", None), "message_primary", None)
+        codigo = _MEMBRESIA_ERRORES.get((getattr(orig, "sqlstate", None), message))
+        if codigo is None:
+            raise
+    # Fuera del except: sin causa ni contexto que arrastren SQL o parámetros.
+    if codigo is not None:
+        raise MembresiaRechazada(codigo)
+    return ResultadoCambioMembresia(
+        rol=fila.rol_resultado, activa=fila.activa_resultado, cambiado=fila.cambiado
+    )
+
+
 # Candado no obtenido dentro del lock_timeout o interbloqueo al esperarlo.
 _CANDADO_NO_OBTENIDO = frozenset({"55P03", "40P01"})
 

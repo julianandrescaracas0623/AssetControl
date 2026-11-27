@@ -15,6 +15,7 @@ from app.config import (
     SECRET_KEY_MIN_BYTES,
     Config,
     MissingConfigError,
+    PlataformaSinRedesError,
     WeakSecretKeyError,
     load_config,
 )
@@ -113,7 +114,9 @@ def test_short_secret_key_fails_outside_tests_without_leaking_it(environment):
     assert len(weak.encode()) == 31
 
     with pytest.raises(WeakSecretKeyError) as excinfo:
-        load_config({**VALID_ENV, "SECRET_KEY": weak, "ENVIRONMENT": environment})
+        load_config(
+            {**VALID_ENV, "SECRET_KEY": weak, "ENVIRONMENT": environment, "TRUSTED_PROXY_HOPS": "1"}
+        )
 
     assert "SECRET_KEY" in str(excinfo.value)
     assert "32" in str(excinfo.value)
@@ -128,13 +131,72 @@ def test_short_secret_key_also_fails_when_building_config_directly():
 
 def test_secret_key_length_is_measured_in_bytes():
     # 16 caracteres de 2 bytes = 32 bytes: válida.
-    config = load_config({**VALID_ENV, "SECRET_KEY": "ñ" * 16, "ENVIRONMENT": "production"})
+    config = load_config(
+        {
+            **VALID_ENV,
+            "SECRET_KEY": "ñ" * 16,
+            "ENVIRONMENT": "production",
+            "TRUSTED_PROXY_HOPS": "1",
+        }
+    )
     assert len(config.secret_key.encode()) == 32
 
 
 def test_secret_key_of_32_bytes_is_accepted_in_production():
-    config = load_config({**VALID_ENV, "SECRET_KEY": "k" * 32, "ENVIRONMENT": "production"})
+    config = load_config(
+        {
+            **VALID_ENV,
+            "SECRET_KEY": "k" * 32,
+            "ENVIRONMENT": "production",
+            "TRUSTED_PROXY_HOPS": "1",
+        }
+    )
     assert config.environment == "production"
+
+
+# SEC-01: en producción TRUSTED_PROXY_HOPS es obligatoria y explícita (0 o 1..5).
+PROD_ENV = {**VALID_ENV, "SECRET_KEY": "k" * 32, "ENVIRONMENT": "production"}
+
+
+@pytest.mark.parametrize("valor", [None, "", "   "])
+def test_production_requires_an_explicit_trusted_proxy_hops(valor):
+    entorno = dict(PROD_ENV)
+    if valor is not None:
+        entorno["TRUSTED_PROXY_HOPS"] = valor
+    with pytest.raises(MissingConfigError) as excinfo:
+        load_config(entorno)
+    assert str(excinfo.value).endswith("TRUSTED_PROXY_HOPS")
+
+
+@pytest.mark.parametrize("valor", ["0", "1", "5"])
+def test_production_accepts_an_explicit_trusted_proxy_hops(valor):
+    config = load_config({**PROD_ENV, "TRUSTED_PROXY_HOPS": valor})
+    assert config.trusted_proxy_hops == int(valor)
+
+
+def test_development_does_not_require_trusted_proxy_hops():
+    entorno = {**VALID_ENV, "SECRET_KEY": "k" * 32, "ENVIRONMENT": "development"}
+    assert load_config(entorno).trusted_proxy_hops == 0
+
+
+# SEC-03: consola de plataforma activa en producción exige lista de redes.
+def test_production_console_enabled_requires_a_network_list():
+    activa = {**PROD_ENV, "TRUSTED_PROXY_HOPS": "1", "PLATAFORMA_HABILITADA": "true"}
+    with pytest.raises(PlataformaSinRedesError) as excinfo:
+        load_config(activa)
+    assert "PLATAFORMA_REDES_PERMITIDAS" in str(excinfo.value)
+    config = load_config({**activa, "PLATAFORMA_REDES_PERMITIDAS": "10.0.0.0/8"})
+    assert config.plataforma.habilitada
+
+
+def test_development_console_without_network_list_is_allowed():
+    entorno = {
+        **VALID_ENV,
+        "SECRET_KEY": "k" * 32,
+        "ENVIRONMENT": "development",
+        "PLATAFORMA_HABILITADA": "true",
+    }
+    assert load_config(entorno).plataforma.habilitada
 
 
 def test_short_secret_key_is_allowed_only_in_tests():

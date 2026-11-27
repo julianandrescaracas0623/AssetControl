@@ -31,6 +31,8 @@ jobs:
       DATABASE_URL: postgresql+psycopg://assetcontrol_app:ci-app-efimera@localhost:5432/assetcontrol
       MIGRATION_DATABASE_URL: postgresql+psycopg://assetcontrol_admin:ci-migrador-efimera@localhost:5432/assetcontrol?sslmode=require
       ENVIRONMENT: production
+      # SEC-01: en producción es obligatoria. Esta prueba llega directo al contenedor, sin proxy.
+      TRUSTED_PROXY_HOPS: "0"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -81,12 +83,12 @@ jobs:
         run: bash docker/postgres/init/01-app-role.sh
 
       - name: Migraciones con la imagen
-        run: docker run --rm --network host -e MIGRATION_DATABASE_URL -e DATABASE_URL -e APP_DB_USER -e SECRET_KEY -e ENVIRONMENT assetcontrol:ci alembic upgrade head
+        run: docker run --rm --network host -e MIGRATION_DATABASE_URL -e DATABASE_URL -e APP_DB_USER -e SECRET_KEY -e ENVIRONMENT -e TRUSTED_PROXY_HOPS assetcontrol:ci alembic upgrade head
 
       - name: Tenant e invitación del primer admin
         run: |
           set -euo pipefail
-          salida="$(docker run --rm --network host -e MIGRATION_DATABASE_URL -e DATABASE_URL -e APP_DB_USER -e SECRET_KEY -e ENVIRONMENT \
+          salida="$(docker run --rm --network host -e MIGRATION_DATABASE_URL -e DATABASE_URL -e APP_DB_USER -e SECRET_KEY -e ENVIRONMENT -e TRUSTED_PROXY_HOPS \
             assetcontrol:ci flask --app app create-tenant "Clínica CI" "admin@ci.ejemplo.test")"
           token="$(grep -o '#.*' <<<"$salida" | cut -c2-)"
           test -n "$token"

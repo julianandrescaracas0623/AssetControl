@@ -48,7 +48,7 @@ def test_spa_routes_get_index_html_without_cache(cliente):
         assert respuesta.status_code == 200, ruta
         assert respuesta.mimetype == "text/html", ruta
         assert b"AssetControl" in respuesta.data
-        assert respuesta.headers["Cache-Control"] == "no-cache"
+        assert respuesta.headers["Cache-Control"] == "no-store"  # spec 018, R2
 
 
 def test_hashed_assets_are_immutable_and_missing_ones_are_404(cliente):
@@ -122,3 +122,14 @@ def test_install_manifest_and_icons_are_served_with_their_types(api, dist):
     assert manifest.mimetype == "application/manifest+json"
     icono = cliente.get("/icono-192.png")
     assert (icono.status_code, icono.mimetype) == (200, "image/png")
+
+
+def test_sensitive_routes_send_no_referrer_only_once(cliente):
+    # SEC-05: restablecer, invitación y consola no filtran la URL. Spec 018 (R2): el fallback
+    # de la SPA tampoco; los archivos y la API siguen con same-origin.
+    for ruta in ("/restablecer", "/invitacion", "/plataforma", "/plataforma/entrar"):
+        assert cliente.get(ruta).headers.getlist("Referrer-Policy") == ["no-referrer"], ruta
+    for ruta in ("/", "/login", "/plataformas", "/contar/nuevo"):
+        assert cliente.get(ruta).headers.getlist("Referrer-Policy") == ["no-referrer"], ruta
+    for ruta in ("/assets/index-abc123.js", "/robots.txt", "/api/health"):
+        assert cliente.get(ruta).headers.getlist("Referrer-Policy") == ["same-origin"], ruta

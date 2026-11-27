@@ -63,6 +63,12 @@ class FotoExistente(ErrorFoto):
     message = "Esta verificación ya tiene foto."
 
 
+class FotoRetirada(ErrorFoto):
+    status = 409
+    code = "foto_retirada"
+    message = "Esa foto ya se quitó. Sube una foto nueva con otro identificador."
+
+
 class VerificacionNoEncontrada(ErrorFoto):
     status = 404
     code = "no_encontrado"
@@ -196,6 +202,9 @@ def subir_principal(
     previa = session.get(Foto, foto_id)
     if previa is not None:
         if previa.activo_id == activo_id and previa.verificacion_id is None:
+            # SEC-04: una foto quitada no vuelve a la ficha por un reintento.
+            if previa.retirada_en is not None:
+                raise FotoRetirada()
             return Subida(previa, creada=False)
         raise FotoIdEnUso()
     if activo.estado == "dado_de_baja":
@@ -265,6 +274,8 @@ def subir_de_verificacion(
     previa = session.get(Foto, foto_id)
     if previa is not None:
         if previa.verificacion_id == verificacion_id:
+            if previa.retirada_en is not None:  # SEC-04, mismo criterio que la principal
+                raise FotoRetirada()
             return Subida(previa, creada=False)
         raise FotoIdEnUso()
     if not es_admin and verificacion.verificado_por != usuario_id:

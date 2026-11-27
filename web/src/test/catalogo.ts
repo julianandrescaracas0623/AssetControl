@@ -10,6 +10,9 @@ import { errorApi, json, type Manejador } from './sesion'
 // `simularSesion(rol, catalogo.manejador)`. Los errores puntuales se fuerzan con
 // `catalogo.fallar(ruta, respuesta)`.
 
+/** Lo que el servidor deja editar al contador (spec 020, R7; `EDITABLES_CONTADOR`). */
+const EDITABLES_CONTADOR = ['nombre', 'categoria_id', 'marca', 'modelo', 'subtipo', 'serial', 'fecha_compra']
+
 export function crearCatalogo(
   inicial: {
     ubicaciones?: Ubicacion[]
@@ -17,6 +20,8 @@ export function crearCatalogo(
     activos?: Activo[]
     rol?: Rol
     sesiones?: SesionConteo[]
+    /** Spec 020 (regresión): `false` simula un servidor que sí le enviara el precio al contador. */
+    filtraPrecio?: boolean
   } = {},
 ) {
   const ubicaciones = [...(inicial.ubicaciones ?? [])]
@@ -26,8 +31,10 @@ export function crearCatalogo(
   const verificaciones: Verificacion[] = []
   const resoluciones = new Map<string, { tipo: 'aplicada' | 'descartada'; en: string }>()
   const rol = inicial.rol ?? 'admin'
+  // Quién recibe precios del doble: el admin y, si `filtraPrecio` es false, cualquiera.
+  const conPrecios = rol === 'admin' || inicial.filtraPrecio === false
   const sinPrecio = (a: Activo) => {
-    if (rol === 'admin') return { ...a }
+    if (conPrecios) return { ...a }
     const resto: Partial<Activo> = { ...a }
     delete resto.precio_compra
     return resto
@@ -197,7 +204,8 @@ export function crearCatalogo(
       activos_hoy: { unidades: hoy.length, en_reparacion: hoy.filter((a) => a.estado === 'en_reparacion').length },
       sesion_abierta,
     }
-    if (rol !== 'admin') return datos
+    // Spec 020, T6: con `filtraPrecio: false` el doble también le manda el valor al contador.
+    if (!conPrecios) return datos
     const ultima = cerradas()[0] ?? null
     const ref = abierta ?? ultima
     const valor = valorActual()
@@ -248,7 +256,7 @@ export function crearCatalogo(
       ...activos.map((a, i) => ({ seq: i + 1, tipo: 'creado', datos: { codigo: a.codigo, nombre: a.nombre, precio_compra: a.precio_compra } as Record<string, unknown>, activo: a.id })),
     ]
     return todos
-      .filter((e) => rol === 'admin' || e.tipo !== 'precio_cambiado')
+      .filter((e) => conPrecios || e.tipo !== 'precio_cambiado')
       .sort((x, y) => y.seq - x.seq)
       .slice(0, 20)
       .map((e) => {
@@ -258,7 +266,7 @@ export function crearCatalogo(
           tipo: e.tipo as EventoActividad['tipo'],
           ocurrido_en: '2026-11-14T15:30:00+00:00',
           autor: { id: '00000000-0000-4000-8000-00000000000a', nombre: 'Ana Torres' },
-          datos: (rol === 'admin' ? e.datos : Object.fromEntries(Object.entries(e.datos).filter(([k]) => !k.includes('precio')))) as EventoActividad['datos'],
+          datos: (conPrecios ? e.datos : Object.fromEntries(Object.entries(e.datos).filter(([k]) => !k.includes('precio')))) as EventoActividad['datos'],
           activo: { id: a.id, codigo: a.codigo, nombre: a.nombre },
         }
       })
@@ -464,7 +472,7 @@ export function crearCatalogo(
           por_pagina: 50,
         })
       }
-      if (rol !== 'admin') return errorApi(403, 'prohibido', 'No tienes permiso.')
+      // Spec 020, T2 (R8): la lista es de los dos roles; aplicar y descartar, solo del admin.
       if (dis[2] === 'discrepancias' && metodo === 'GET') {
         const filtro = q.get('estado') ?? 'por_resolver'
         const items = [...vigentes.values()]
@@ -483,11 +491,14 @@ export function crearCatalogo(
               recibido_en: v.recibido_en,
               estado,
               resolucion: r ? { tipo: r.tipo, por: { id: '00000000-0000-4000-8000-00000000000a', nombre: 'Ana Torres' }, en: r.en } : null,
+              // Regresión (spec 020, T6): un servidor que se equivocara y mandara el precio.
+              ...(inicial.filtraPrecio === false ? { precio_al_contar: v.precio_al_contar } : {}),
             }
           })
           .filter((d) => filtro === 'todas' || (filtro === 'resueltas') === (d.estado === 'aplicada' || d.estado === 'descartada'))
         return json(200, { discrepancias: items })
       }
+      if (rol !== 'admin') return errorApi(403, 'prohibido', 'No tienes permiso.')
       if (metodo === 'POST') {
         const b = cuerpo(init)
         const aplicar = dis[2].endsWith('aplicar')
@@ -540,7 +551,9 @@ export function crearCatalogo(
         }))
         const total = por_ubicacion.reduce((n, f) => n + f.total, 0)
         const verificados = por_ubicacion.reduce((n, f) => n + f.verificados, 0)
-        return json(200, { sesion, avance: { total, verificados, pendientes: total - verificados, por_ubicacion } })
+        // Regresión (spec 020, T6): con `filtraPrecio: false`, un valor que el servidor no manda.
+        const valor = inicial.filtraPrecio === false ? { valor_verificado: '1390000.00' } : {}
+        return json(200, { sesion, avance: { total, verificados, pendientes: total - verificados, por_ubicacion, ...valor } })
       }
       if (ses[2] && metodo === 'GET') {
         const ultima = verificaciones.filter((v) => v.sesion_id === sesion.id && v.activo.id === q.get('activo_id')).at(-1)
@@ -577,6 +590,12 @@ export function crearCatalogo(
     // Spec 005: cambios con If-Match (412 con el vigente) e historial.
     const cambio = ruta0.match(/^\/api\/activos\/([0-9a-f-]{36})(?:\/(mover|estado|baja))?$/)
     if (cambio && (metodo === 'PATCH' || (metodo === 'POST' && cambio[2]))) {
+      // Spec 020 (T1, R7): el contador solo edita los campos descriptivos; mover, estado y
+      // baja siguen siendo del admin. Un campo fuera de su lista es 400 sin tocar nada.
+      if (rol !== 'admin' && cambio[2]) return errorApi(403, 'prohibido', 'No tienes permiso.')
+      if (rol !== 'admin' && Object.keys(cuerpo(init)).some((k) => !EDITABLES_CONTADOR.includes(k))) {
+        return errorApi(400, 'solicitud_invalida', 'La solicitud no es válida.')
+      }
       const a = activos.find((x) => x.id === cambio[1])
       if (!a) return errorApi(404, 'no_encontrado', 'El recurso no existe.')
       const version = new Headers(init.headers).get('If-Match')?.replace(/"/g, '')
@@ -584,7 +603,7 @@ export function crearCatalogo(
       if (Number(version) !== a.row_version) {
         return json(412, {
           error: { code: 'version_desactualizada', message: 'Alguien cambió este activo.', request_id: 'r' },
-          activo: { ...a, foto: principales.get(a.id) ?? null },
+          activo: conFoto(a),
         })
       }
       const b = cuerpo(init)
@@ -620,7 +639,7 @@ export function crearCatalogo(
       }
       a.row_version += 1
       // Spec 015 (R4): la escritura (y el 412) traen la ficha con su foto, como el servidor.
-      return json(200, { activo: { ...a, foto: principales.get(a.id) ?? null } }, { ETag: `"${a.row_version}"` })
+      return json(200, { activo: conFoto(a) }, { ETag: `"${a.row_version}"` })
     }
     const his = ruta0.match(/^\/api\/activos\/([0-9a-f-]{36})\/historial$/)
     if (his && metodo === 'GET') {
@@ -630,13 +649,13 @@ export function crearCatalogo(
         ...eventos.filter((e) => e.activo === a.id),
         { seq: 1, tipo: 'creado', datos: { codigo: a.codigo, nombre: a.nombre, precio_compra: a.precio_compra }, activo: a.id },
       ]
-        .filter((e) => rol === 'admin' || e.tipo !== 'precio_cambiado')
+        .filter((e) => conPrecios || e.tipo !== 'precio_cambiado')
         .map(({ seq, tipo, datos, ...resto }) => ({
           seq,
           tipo,
           ocurrido_en: '2026-11-14T15:30:00+00:00',
           autor: { id: '00000000-0000-4000-8000-00000000000a', nombre: 'Ana Torres' },
-          datos: rol === 'admin' ? datos : Object.fromEntries(Object.entries(datos).filter(([k]) => !k.includes('precio'))),
+          datos: conPrecios ? datos : Object.fromEntries(Object.entries(datos).filter(([k]) => !k.includes('precio'))),
           ...('foto_id' in resto && resto.foto_id ? { foto_id: resto.foto_id } : {}),
         }))
       return json(200, { eventos: propios, siguiente: null })
@@ -716,6 +735,8 @@ export function crearCatalogo(
     principales,
     sesiones,
     verificaciones,
+    /** Resoluciones de discrepancias (verificación → aplicada o descartada). */
+    resoluciones,
     eventos,
     /** Cierra como lo haría otra persona (el informe queda congelado igual que en el servidor). */
     cerrarSesion(id: string) {
@@ -759,7 +780,7 @@ export function activoDe(
 }
 
 /** Catálogo pequeño para las pruebas de pantallas de activos (spec 004). */
-export function catalogoDemo(rol: Rol = 'admin', opciones: { sesiones?: SesionConteo[] } = {}) {
+export function catalogoDemo(rol: Rol = 'admin', opciones: { sesiones?: SesionConteo[]; filtraPrecio?: boolean } = {}) {
   const ubicaciones = [
     ub('00000000-0000-4000-8000-0000000000a1', 'Sede Principal', 'sede', null),
     ub('00000000-0000-4000-8000-0000000000a2', 'Administración', 'sala', '00000000-0000-4000-8000-0000000000a1'),
@@ -780,7 +801,7 @@ export function catalogoDemo(rol: Rol = 'admin', opciones: { sesiones?: SesionCo
       { categoria: categorias[1], ubicacion: ubicaciones[3], ruta: 'Consultorio 1 › Box 2' },
     ),
   ]
-  return crearCatalogo({ ubicaciones, categorias, activos, rol, sesiones: opciones.sesiones })
+  return crearCatalogo({ ubicaciones, categorias, activos, rol, sesiones: opciones.sesiones, filtraPrecio: opciones.filtraPrecio })
 }
 
 export function sesionDe(datos: Partial<SesionConteo> = {}): SesionConteo {

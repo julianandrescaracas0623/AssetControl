@@ -11,6 +11,7 @@ import { formatCOP, formatEntero, formatUnidades } from '@/lib/format'
 import { useValorActual } from '@/lib/informe'
 import { type Evolucion, formatPorcentaje, type Indicadores, useEvolucion, useIndicadores } from '@/lib/inicio'
 import { fechaCorte, pendientes } from '@/lib/sesiones'
+import { rutaActivo, rutaApp, rutaInforme, rutaSesion } from '@/lib/rutas'
 
 // Inicio de administración (spec 010; docs/08 §4.2, CU-DSH-01..04). Cada parte es una
 // consulta aparte y falla sola (R7). Las cifras llegan del servidor; el valor actual
@@ -32,7 +33,7 @@ function TarjetaAvance({ sesion }: { sesion: Indicadores['sesion_abierta'] }) {
         <span className="text-etiqueta text-muted-foreground">Conteo</span>
         <span className="text-titulo-seccion">Sin sesión abierta</span>
         <Boton asChild variante="secundario" className="mt-1 self-start">
-          <Link to="/admin/sesiones">Abrir sesión</Link>
+          <Link to={rutaApp('sesiones')}>Abrir sesión</Link>
         </Boton>
       </div>
     )
@@ -43,7 +44,7 @@ function TarjetaAvance({ sesion }: { sesion: Indicadores['sesion_abierta'] }) {
       rotulo={sesion.nombre}
       valor={formatPorcentaje(avance.porcentaje)}
       contexto={`${formatEntero(avance.verificados)} de ${formatEntero(avance.total)} verificados · ${pendientes(avance.pendientes)}`}
-      href={`/admin/sesiones/${sesion.id}`}
+      href={rutaSesion(sesion.id)}
       insignia={
         <Insignia tono="info" icono={null}>
           Abierta
@@ -64,7 +65,7 @@ function Tarjetas({ datos }: { datos: Indicadores }) {
         rotulo="Activos hoy"
         valor={formatEntero(activos_hoy.unidades)}
         contexto={activos_hoy.en_reparacion > 0 ? `Incluye ${formatEntero(activos_hoy.en_reparacion)} en reparación` : 'Ninguno en reparación'}
-        href="/admin/activos"
+        href={rutaApp('activos')}
       />
       {valor_actual && (
         <LiveValueCard
@@ -82,7 +83,7 @@ function Tarjetas({ datos }: { datos: Indicadores }) {
           rotulo="Discrepancias por resolver"
           valor={discrepancias ? formatEntero(discrepancias.por_resolver) : '—'}
           contexto={discrepancias ? `Otra ubicación · ${discrepancias.sesion.nombre}` : 'Aún no hay sesiones'}
-          href={discrepancias ? `/admin/discrepancias?sesion=${discrepancias.sesion.id}` : undefined}
+          href={discrepancias ? `${rutaApp('discrepancias')}?sesion=${discrepancias.sesion.id}` : undefined}
           tono={discrepancias && discrepancias.por_resolver > 0 ? 'aviso' : 'normal'}
         />
       )}
@@ -93,7 +94,7 @@ function Tarjetas({ datos }: { datos: Indicadores }) {
           contexto={`${formatEntero(danados.en_reparacion)} en reparación (estado vigente) · ${
             danados.sesion ? `${formatEntero(danados.danados)} dañados en ${danados.sesion.nombre}` : 'sin sesiones de conteo'
           }`}
-          href="/admin/activos?estado=en_reparacion"
+          href={`${rutaApp('activos')}?estado=en_reparacion`}
         />
       )}
     </div>
@@ -124,7 +125,7 @@ function UltimoInforme({ informe }: { informe: Indicadores['ultimo_informe'] }) 
       }}
       accion={
         <Boton asChild variante="secundario">
-          <Link to={`/admin/sesiones/${sesion.id}/informe`}>Ver informe</Link>
+          <Link to={rutaInforme(sesion.id)}>Ver informe</Link>
         </Boton>
       }
     />
@@ -184,7 +185,7 @@ function GraficasValor() {
         vacio={vacio}
         acciones={
           <Boton asChild variante="secundario">
-            <Link to="/admin/valor">Ver valor actual</Link>
+            <Link to={rutaApp('valor')}>Ver valor actual</Link>
           </Boton>
         }
       />
@@ -288,13 +289,13 @@ export default function AdminInicio() {
         acciones={
           <>
             <Boton asChild variante="secundario">
-              <Link to="/admin/activos/nuevo">
+              <Link to={rutaApp('activos/nuevo')}>
                 <Plus aria-hidden="true" />
                 Registrar activo
               </Link>
             </Boton>
             <Boton asChild>
-              <Link to="/admin/sesiones">Sesiones</Link>
+              <Link to={rutaApp('sesiones')}>Sesiones</Link>
             </Boton>
           </>
         }
@@ -308,7 +309,7 @@ export default function AdminInicio() {
       <Seccion titulo="Evolución entre conteos">
         <EvolucionConteos />
       </Seccion>
-      <ActividadReciente enlace={(a) => `/admin/activos/${encodeURIComponent(a.codigo)}`} />
+      <ActividadReciente enlace={(a) => rutaActivo(a.codigo)} />
     </div>
   )
 }

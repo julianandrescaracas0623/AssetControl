@@ -417,6 +417,8 @@ PROTECTED_ENDPOINTS = {
     # Spec 017, T4: roles, lista blanca del bloqueo y aislamiento en test_cambio_password.py.
     "auth.cambiar_contrasena": frozenset({"admin", "contador"}),
     "invitaciones.crear": frozenset({"admin"}),  # test_contador_*, test_invitaciones_crear
+    "usuarios.listar": frozenset({"admin"}),  # test_usuarios_api.py
+    "usuarios.cambiar": frozenset({"admin"}),  # test_usuarios_cambio_api.py
     # Spec 003 (T2): roles y aislamiento en test_ubicaciones_api.py.
     "ubicaciones.listar": frozenset({"admin", "contador"}),
     "ubicaciones.crear": frozenset({"admin"}),
@@ -433,9 +435,10 @@ PROTECTED_ENDPOINTS = {
     "activos.buscar": frozenset({"admin", "contador"}),
     "activos.sugerencias": frozenset({"admin", "contador"}),
     # Spec 005: el historial lo ven ambos (sin precios para el contador, R8); cambiar un
-    # activo existente es solo del admin (R9).
+    # activo existente es solo del admin (R9). Spec 020 (R7): el contador edita los campos
+    # descriptivos (sin precio; 400 con cualquier otro campo, en test_activos_cambios.py).
     "activos.ver_historial": frozenset({"admin", "contador"}),
-    "activos.editar": frozenset({"admin"}),
+    "activos.editar": frozenset({"admin", "contador"}),
     "activos.mover": frozenset({"admin"}),
     "activos.cambiar_estado": frozenset({"admin"}),
     "activos.dar_de_baja": frozenset({"admin"}),
@@ -448,8 +451,9 @@ PROTECTED_ENDPOINTS = {
     "sesiones.detalle": frozenset({"admin", "contador"}),
     "sesiones.verificar": frozenset({"admin", "contador"}),
     "sesiones.ultima_verificacion": frozenset({"admin", "contador"}),
-    # Spec 007: discrepancias solo admin (Q4); pendientes ambos (sin precios).
-    "sesiones.listar_discrepancias": frozenset({"admin"}),
+    # Spec 007: resolver discrepancias solo admin (Q4); pendientes ambos (sin precios).
+    # Spec 020 (R8): el contador lee la lista en solo lectura (sin precios ni valores).
+    "sesiones.listar_discrepancias": frozenset({"admin", "contador"}),
     "sesiones.aplicar_discrepancias": frozenset({"admin"}),
     "sesiones.descartar_discrepancias": frozenset({"admin"}),
     "sesiones.listar_pendientes": frozenset({"admin", "contador"}),

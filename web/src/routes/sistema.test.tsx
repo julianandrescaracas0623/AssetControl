@@ -99,13 +99,16 @@ describe('pantallas de sistema con el kit', () => {
     expect(inicio.getAttribute('href')).toBe('/')
   })
 
-  it('sin permiso: el contador sale a contar con la acción principal', async () => {
+  // Spec 020, T3 (R3; req. 8): «Sin permiso» ya no es una pantalla aparte: va dentro del
+  // marco compartido (un solo main) con salida a su Inicio como acción principal.
+  it('sin permiso: el contador sale a su inicio con la acción principal, dentro del marco', async () => {
     abrir('/admin/usuarios', 'contador')
     await h1('No tienes permiso para ver esto')
-    esperaMarco()
-    const contar = screen.getByRole('link', { name: 'Ir a contar' })
-    expect(contar.getAttribute('data-kit')).toBe('boton')
-    expect(contar.getAttribute('data-variante')).toBe('principal')
+    expect(document.querySelectorAll('main')).toHaveLength(1)
+    expect(screen.getByRole('navigation', { name: 'Navegación principal' })).toBeTruthy()
+    const inicio = screen.getAllByRole('link', { name: 'Ir al inicio' }).find((a) => a.getAttribute('data-variante') === 'principal')
+    expect(inicio?.getAttribute('data-kit')).toBe('boton')
+    expect(inicio?.getAttribute('href')).toBe('/app')
   })
 
   it('sin conexión: tono de aviso y «Reintentar» del kit', async () => {

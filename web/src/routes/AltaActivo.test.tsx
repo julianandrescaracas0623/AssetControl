@@ -63,7 +63,7 @@ describe('alta en administración', () => {
     abrir('/admin/activos/nuevo')
     fireEvent.change(await screen.findByRole('textbox', { name: /Código del sticker/ }), { target: { value: '000123' } })
     expect(await screen.findByText(/Ese código ya existe: Silla ergonómica/)).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Abrir activo' }).getAttribute('href')).toBe('/admin/activos/000123')
+    expect(screen.getByRole('link', { name: 'Abrir activo' }).getAttribute('href')).toBe('/app/activos/000123')
   })
 
   it('copia de un parecido (con precio para el admin) y guarda con el precio canónico', async () => {
@@ -257,7 +257,7 @@ describe('Registrar activo mejorado en administración (015-T10)', () => {
     fireEvent.keyDown(screen.getByRole('textbox', { name: /Serial/ }), { key: 'Enter', ctrlKey: true })
     const aviso = (await screen.findByText(/Ahora escanea el siguiente sticker/)).closest('[role=status]') as HTMLElement
     expect(aviso.textContent).toContain('Silla auxiliar · NUEVO-13')
-    expect(within(aviso).getByRole('link', { name: 'Ver el activo' }).getAttribute('href')).toBe('/admin/activos/NUEVO-13')
+    expect(within(aviso).getByRole('link', { name: 'Ver el activo' }).getAttribute('href')).toBe('/app/activos/NUEVO-13')
     const codigo = screen.getByRole('textbox', { name: /Código del sticker/ })
     await waitFor(() => expect(document.activeElement).toBe(codigo))
     expect((codigo as HTMLInputElement).value).toBe('')
@@ -469,51 +469,47 @@ describe('Registrar activo mejorado en administración (015-T10)', () => {
   })
 })
 
-describe('Registrar activo mejorado en el conteo (015-T10)', () => {
-  function abrirEscritorio(path: string, rol: Rol = 'contador') {
-    const catalogo = catalogoDemo(rol)
+// Spec 020, T5 (R6; P13): en el computador el alta es una sola, la del marco
+// (/app/activos/nuevo, RegistrarActivo) para los dos roles; /contar/nuevo redirige ahí con
+// su query (el código no encontrado en el conteo llega cargado). En el teléfono sigue el
+// alta del conteo. El contador escribe el precio al dar de alta y después no lo ve: ni en
+// el resumen, ni en «Activo creado», ni al duplicar (el servidor copia el precio).
+describe('Registrar activo en el computador, por rol (020-T5)', () => {
+  function abrirEscritorio(path: string, rol: Rol = 'contador', catalogo = catalogoDemo(rol)) {
     simularEscritorio()
     const f = simularSesion(rol, catalogo.manejador)
-    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: [path] })} />)
-    return { f, catalogo }
+    const router = createMemoryRouter(routes, { initialEntries: [path] })
+    render(<RouterProvider router={router} />)
+    return { f, catalogo, router }
   }
 
-  it('en escritorio: foco en Nombre, ubicación de la sala y resumen sin precio para el contador', async () => {
-    guardarSala('00000000-0000-4000-8000-0000000000a4')
-    abrirEscritorio('/contar/nuevo?codigo=nuevo-20')
-    const nombre = await screen.findByRole('combobox', { name: /Nombre/ })
+  afterEach(() => guardarSala(null))
+
+  const sinPrecio = (...cifras: string[]) => {
+    for (const cifra of cifras) expect(document.body.textContent, cifra).not.toContain(cifra)
+  }
+
+  it('en el computador /contar/nuevo lleva al alta del marco con la query y el código cargado', async () => {
+    const { router } = abrirEscritorio('/contar/nuevo?codigo=nuevo-20')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/app/activos/nuevo'))
+    expect(router.state.location.search).toBe('?codigo=nuevo-20')
+    const codigo = (await screen.findByRole('textbox', { name: /Código del sticker/ })) as HTMLInputElement
+    expect(codigo.value).toBe('NUEVO-20')
+    // El código ya viene del sticker: el cursor empieza en Nombre.
+    const nombre = screen.getByRole('combobox', { name: /Nombre/ })
     await waitFor(() => expect(document.activeElement).toBe(nombre))
-    expect(screen.getAllByText('NUEVO-20')).toHaveLength(2)
-    await waitFor(() => expect(screen.getByRole('combobox', { name: /Ubicación/ }).textContent).toContain('Box 2'))
-    expect(screen.getByText('Viene de la sala donde estás contando.')).toBeTruthy()
-    expect(screen.getByRole('textbox', { name: /Serial/ })).toBeTruthy()
-    const resumen = screen.getByRole('region', { name: 'Resumen' })
-    expect(within(resumen).queryByText('Precio')).toBeNull()
-    expect(screen.getByRole('link', { name: 'Volver al conteo' }).getAttribute('href')).toBe('/contar/escanear')
+    expect(screen.getByRole('navigation', { name: /principal/i })).toBeTruthy()
   })
 
-  it('en escritorio, Ctrl+Enter guarda y pide el siguiente sticker en un campo editable', async () => {
-    const { f } = abrirEscritorio('/contar/nuevo?codigo=NUEVO-21')
-    fireEvent.click(await screen.findByRole('checkbox', { name: /Coincide con el sticker/ }))
-    fireEvent.change(screen.getByRole('combobox', { name: /Nombre/ }), { target: { value: 'Monitor' } })
-    fireEvent.change(screen.getByRole('textbox', { name: /Precio/ }), { target: { value: '500.000' } })
-    await elegirSelect(/Categoría/, 'Electrónica')
-    await elegir(/Ubicación/, 'Administración')
-    fireEvent.change(screen.getByRole('combobox', { name: /Marca/ }), { target: { value: 'LG' } })
-    await focoDevuelto()
-    fireEvent.keyDown(screen.getByRole('combobox', { name: /Nombre/ }), { key: 'Enter', ctrlKey: true })
-    await screen.findByText(/Ahora escanea el siguiente sticker/)
-    const codigo = screen.getByRole('textbox', { name: /Código del sticker/ })
-    await waitFor(() => expect(document.activeElement).toBe(codigo))
-    expect(valor(/Nombre/, 'combobox')).toBe('')
-    expect(valor(/Precio/)).toBe('')
-    expect(valor(/Marca/, 'combobox')).toBe('LG')
-    expect(screen.getByRole('combobox', { name: /Categoría/ }).textContent).toContain('Electrónica')
-    fireEvent.change(codigo, { target: { value: 'nuevo-22' } })
-    fireEvent.keyDown(codigo, { key: 'Enter' })
-    expect(document.activeElement).toBe(screen.getByRole('combobox', { name: /Nombre/ }))
-    expect(posts(f)).toHaveLength(1)
-    expect(document.body.textContent).not.toContain('500.000')
+  it('en el teléfono /contar/nuevo sigue siendo el alta del conteo', async () => {
+    simularAncho({ movil: true })
+    const catalogo = catalogoDemo('contador')
+    simularSesion('contador', catalogo.manejador)
+    const router = createMemoryRouter(routes, { initialEntries: ['/contar/nuevo?codigo=nuevo-26'] })
+    render(<RouterProvider router={router} />)
+    expect(await screen.findByRole('checkbox', { name: 'Coincide' })).toBeTruthy()
+    expect(router.state.location.pathname).toBe('/contar/nuevo')
+    expect(screen.queryByRole('textbox', { name: /Código del sticker/ })).toBeNull()
   })
 
   it('en el teléfono, el pie trae «Guardar y registrar otro» y sin código en la URL se escribe', async () => {
@@ -522,49 +518,168 @@ describe('Registrar activo mejorado en el conteo (015-T10)', () => {
     expect(screen.getByRole('textbox', { name: /Código del sticker/ })).toBeTruthy()
   })
 
-  it('en escritorio, el contador duplica sin ver el precio y «registrar otro» no arrastra la copia', async () => {
+  it('/app/activos/nuevo?codigo= precarga el código también para el admin', async () => {
+    abrirEscritorio('/app/activos/nuevo?codigo=%20ac-0600%20', 'admin')
+    expect(((await screen.findByRole('textbox', { name: /Código del sticker/ })) as HTMLInputElement).value).toBe('AC-0600')
+  })
+
+  it('un código de la URL con caracteres no válidos no se precarga y el cursor queda en el código', async () => {
+    abrirEscritorio('/app/activos/nuevo?codigo=%3Cb%3Eac%2A06', 'admin')
+    const codigo = (await screen.findByRole('textbox', { name: /Código del sticker/ })) as HTMLInputElement
+    expect(codigo.value).toBe('')
+    await waitFor(() => expect(document.activeElement).toBe(codigo))
+  })
+
+  it('si llega desde el conteo, ofrece «Volver al conteo» en el pie y en «Activo creado»', async () => {
+    simularEscritorio()
+    const catalogo = catalogoDemo('contador')
+    simularSesion('contador', catalogo.manejador)
+    const router = createMemoryRouter(routes, {
+      initialEntries: [{ pathname: '/app/activos/nuevo', search: '?codigo=NUEVO-29', state: { desde: 'conteo' } }],
+    })
+    render(<RouterProvider router={router} />)
+    const volver = await screen.findByRole('link', { name: 'Volver al conteo' })
+    expect(volver.getAttribute('href')).toBe('/contar/escanear')
+    expect(screen.queryByRole('link', { name: 'Cancelar' })).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: /Revisé que coincide/ }))
+    fireEvent.change(screen.getByRole('combobox', { name: /Nombre/ }), { target: { value: 'Monitor' } })
+    fireEvent.change(screen.getByRole('textbox', { name: /Precio de compra/ }), { target: { value: '500.000' } })
+    await elegirSelect(/Categoría/, 'Electrónica')
+    await elegir(/Ubicación/, 'Administración')
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar activo' }))
+    expect(await screen.findByText('Activo creado')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Volver al conteo' }).getAttribute('href')).toBe('/contar/escanear')
+  })
+
+  it('sin venir del conteo no aparece «Volver al conteo» y el pie conserva «Cancelar»', async () => {
+    abrirEscritorio('/app/activos/nuevo?codigo=NUEVO-30')
+    expect((await screen.findByRole('link', { name: 'Cancelar' })).getAttribute('href')).toBe('/app/activos')
+    expect(screen.queryByRole('link', { name: 'Volver al conteo' })).toBeNull()
+  })
+
+  it('la ubicación empieza en la sala donde se está contando', async () => {
     guardarSala('00000000-0000-4000-8000-0000000000a4')
-    const { f } = abrirEscritorio('/contar/nuevo?codigo=NUEVO-23')
-    fireEvent.click(await screen.findByRole('checkbox', { name: /Coincide con el sticker/ }))
+    abrirEscritorio('/contar/nuevo?codigo=nuevo-27')
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /Ubicación/ }).textContent).toContain('Box 2'))
+    expect(screen.getByText('Viene de la sala donde estás contando.')).toBeTruthy()
+  })
+
+  it('el contador escribe el precio, se envía tal cual y después no lo ve en ninguna parte', async () => {
+    // Aunque el servidor devolviera el precio, la pantalla no lo pinta (dos capas).
+    const { f } = abrirEscritorio('/app/activos/nuevo?codigo=NUEVO-21', 'contador', catalogoDemo('contador', { filtraPrecio: false }))
+    const precio = await screen.findByRole('textbox', { name: /Precio de compra/ })
+    expect(screen.getByText('Después de guardar, solo lo verán los administradores.')).toBeTruthy()
+    expect(screen.queryByText('Solo lo ven los administradores.')).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: /Revisé que coincide/ }))
+    fireEvent.change(screen.getByRole('combobox', { name: /Nombre/ }), { target: { value: 'Monitor' } })
+    fireEvent.change(precio, { target: { value: '1.250.000' } })
+    await elegirSelect(/Categoría/, 'Electrónica')
+    await elegir(/Ubicación/, 'Administración')
+    const resumen = screen.getByRole('region', { name: 'Resumen' })
+    expect(within(resumen).queryByText('Precio')).toBeNull()
+    expect(resumen.textContent).not.toContain('1.250.000')
+    expect(resumen.textContent).toContain('El precio no se muestra aquí; después de guardar, solo lo ven los administradores.')
+    // «Varias unidades iguales» conservaría el precio en el formulario: no es del contador.
+    expect(screen.queryByRole('switch', { name: /Varias unidades iguales/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar activo' }))
+    expect(await screen.findByText('Activo creado')).toBeTruthy()
+    const [cuerpo] = posts(f)
+    expect(cuerpo).toMatchObject({ codigo: 'NUEVO-21', nombre: 'Monitor', precio_compra: '1250000.00' })
+    expect(cuerpo).not.toHaveProperty('copiar_de')
+    expect(screen.getByRole('link', { name: 'Ver el activo' }).getAttribute('href')).toBe('/app/activos/NUEVO-21')
+    sinPrecio('1.250.000', '1250000', 'Precio')
+  })
+
+  it('el contador con Ctrl+Enter sigue con otro sin ver el precio y «Ver el activo» va al marco', async () => {
+    const { f } = abrirEscritorio('/app/activos/nuevo?codigo=NUEVO-22', 'contador', catalogoDemo('contador', { filtraPrecio: false }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Revisé que coincide/ }))
+    fireEvent.change(screen.getByRole('combobox', { name: /Nombre/ }), { target: { value: 'Monitor' } })
+    fireEvent.change(screen.getByRole('textbox', { name: /Precio de compra/ }), { target: { value: '500.000' } })
+    await elegirSelect(/Categoría/, 'Electrónica')
+    await elegir(/Ubicación/, 'Administración')
+    fireEvent.change(screen.getByRole('combobox', { name: /Marca/ }), { target: { value: 'LG' } })
+    await focoDevuelto()
+    fireEvent.keyDown(screen.getByRole('combobox', { name: /Nombre/ }), { key: 'Enter', ctrlKey: true })
+    const aviso = (await screen.findByText(/Ahora escanea el siguiente sticker/)).closest('[role=status]') as HTMLElement
+    expect(within(aviso).getByRole('link', { name: 'Ver el activo' }).getAttribute('href')).toBe('/app/activos/NUEVO-22')
+    const codigo = screen.getByRole('textbox', { name: /Código del sticker/ })
+    await waitFor(() => expect(document.activeElement).toBe(codigo))
+    expect(valor(/Precio de compra/)).toBe('')
+    expect(valor(/Nombre/, 'combobox')).toBe('')
+    expect(valor(/Marca/, 'combobox')).toBe('LG')
+    expect(posts(f)[0].precio_compra).toBe('500000.00')
+    sinPrecio('500.000', '500000')
+  })
+
+  it('el contador duplica sin ver el precio, no lo envía y «registrar otro» no arrastra la copia', async () => {
+    const { f, catalogo } = abrirEscritorio('/app/activos/nuevo?codigo=NUEVO-23')
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Revisé que coincide/ }))
     fireEvent.click(screen.getByRole('combobox', { name: /Copiar de un parecido/ }))
     fireEvent.change(await screen.findByRole('combobox', { name: 'Buscar activo parecido' }), { target: { value: 'silla' } })
     fireEvent.click(await screen.findByRole('option', { name: /Silla ergonómica/ }))
     await focoDevuelto()
-    const resumen = screen.getByRole('region', { name: 'Resumen' })
-    expect(resumen.textContent).toContain('Silla ergonómica')
-    expect(document.body.textContent).not.toContain('389')
+    expect(screen.getByText('Se copia de Silla ergonómica')).toBeTruthy()
+    // Lo copia el servidor: ni precio ni nombre ni categoría se editan aquí.
+    expect(screen.queryByRole('textbox', { name: /Precio/ })).toBeNull()
+    expect(screen.queryByRole('combobox', { name: /Nombre/ })).toBeNull()
+    expect(screen.queryByRole('combobox', { name: /Marca/ })).toBeNull()
+    expect(screen.getByRole('textbox', { name: /Serial/ })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Resumen' }).textContent).toContain('Silla ergonómica')
+    sinPrecio('389')
+    await elegir(/Ubicación/, 'Administración')
     fireEvent.click(screen.getByRole('button', { name: 'Guardar y registrar otro' }))
     await screen.findByText(/Ahora escanea el siguiente sticker/)
     const [cuerpo] = posts(f)
     expect(Object.keys(cuerpo).sort()).toEqual(['codigo', 'copiar_de', 'id', 'serial', 'ubicacion_id'])
+    expect(cuerpo).toMatchObject({ codigo: 'NUEVO-23', copiar_de: '00000000-0000-4000-8000-0000000000d2' })
+    expect(catalogo.activos[0].precio_compra).toBe('389900.00')
     expect(valor(/Nombre/, 'combobox')).toBe('')
-    expect(valor(/Precio/)).toBe('')
-    expect(screen.getByRole('combobox', { name: /Categoría/ }).textContent).toContain('Mobiliario')
-    expect(screen.getByRole('combobox', { name: /Categoría/ }).className).toContain('bg-brand-soft')
-    expect(screen.getByRole('combobox', { name: /Ubicación/ }).className).toContain('bg-brand-soft')
-    expect(document.body.textContent).not.toContain('389')
+    expect(valor(/Precio de compra/)).toBe('')
+    expect(screen.queryByText('Se copia de Silla ergonómica')).toBeNull()
+    sinPrecio('389')
   })
 
-  // Cierre de T10 (security M2): defensa en dos capas; aunque el servidor enviara el precio
-  // del activo copiado, el formulario del contador no lo carga.
+  // Defensa en dos capas (cierre de 015-T10, security M2): aunque el servidor enviara el
+  // precio del activo copiado, el formulario del contador no lo carga.
   it('el contador que copia no carga el precio aunque el activo lo traiga', async () => {
-    const catalogo = catalogoDemo('admin')
-    simularEscritorio()
-    simularSesion('contador', catalogo.manejador)
-    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/contar/nuevo?codigo=NUEVO-25'] })} />)
+    abrirEscritorio('/contar/nuevo?codigo=NUEVO-25', 'contador', catalogoDemo('contador', { filtraPrecio: false }))
     fireEvent.click(await screen.findByRole('combobox', { name: /Copiar de un parecido/ }))
     fireEvent.change(await screen.findByRole('combobox', { name: 'Buscar activo parecido' }), { target: { value: 'silla' } })
     fireEvent.click(await screen.findByRole('option', { name: /Silla ergonómica/ }))
     await focoDevuelto()
+    sinPrecio('389')
     fireEvent.click(screen.getByRole('button', { name: 'Quitar la copia' }))
-    expect(valor(/Precio/)).toBe('')
-    expect(document.body.textContent).not.toContain('389.900')
-    expect(screen.getByText('El precio no se muestra aquí; después de guardar, solo lo ven los administradores.')).toBeTruthy()
+    expect(valor(/Precio de compra/)).toBe('')
+    expect(valor(/Nombre/, 'combobox')).toBe('')
+    sinPrecio('389')
   })
 
-  it('el admin en el conteo de escritorio ve el precio en el resumen', async () => {
-    abrirEscritorio('/contar/nuevo?codigo=NUEVO-24', 'admin')
-    fireEvent.change(await screen.findByRole('textbox', { name: /Precio/ }), { target: { value: '389.900' } })
-    expect(within(screen.getByRole('region', { name: 'Resumen' })).getByText('$ 389.900,00')).toBeTruthy()
+  it('las sugerencias del contador al escribir el nombre no traen precio', async () => {
+    const { f } = abrirEscritorio('/app/activos/nuevo?codigo=NUEVO-28')
+    const nombre = await screen.findByRole('combobox', { name: /Nombre/ })
+    fireEvent.focus(nombre)
+    fireEvent.change(nombre, { target: { value: 'sil' } })
+    const lista = document.getElementById(nombre.getAttribute('list')!)!
+    await waitFor(() => expect([...lista.querySelectorAll('option')].map((o) => o.value)).toEqual(['Silla ergonómica']))
+    expect(f.mock.calls.map(([url]) => String(url)).filter((url) => url.startsWith('/api/activos/sugerencias')).at(-1)).toBe('/api/activos/sugerencias?campo=nombre&q=sil')
+    expect(lista.textContent).not.toContain('389')
+  })
+
+  it('el admin conserva todo: precio en el resumen, su ayuda, el precio al copiar y varias unidades', async () => {
+    const { router } = abrirEscritorio('/contar/nuevo?codigo=NUEVO-24', 'admin')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/app/activos/nuevo'))
+    const precio = await screen.findByRole('textbox', { name: /Precio de compra/ })
+    expect(screen.getByText('Solo lo ven los administradores.')).toBeTruthy()
+    fireEvent.change(precio, { target: { value: '389.900' } })
+    const resumen = screen.getByRole('region', { name: 'Resumen' })
+    expect(within(resumen).getByText('$ 389.900,00')).toBeTruthy()
+    expect(resumen.textContent).not.toContain('El precio no se muestra aquí')
+    expect(within(resumen).getByRole('switch', { name: /Varias unidades iguales/ })).toBeTruthy()
+    fireEvent.change(precio, { target: { value: '' } })
+    fireEvent.click(screen.getByRole('combobox', { name: /Copiar de un parecido/ }))
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Buscar activo parecido' }), { target: { value: 'silla' } })
+    fireEvent.click(await screen.findByRole('option', { name: /Silla ergonómica/ }))
+    expect(valor(/Precio de compra/)).toBe('389.900')
+    expect(screen.queryByText('Se copia de Silla ergonómica')).toBeNull()
   })
 })
