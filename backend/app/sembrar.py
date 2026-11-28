@@ -1,8 +1,9 @@
-"""Activos sintéticos para desarrollo y pruebas (comando ``flask sembrar-demo``).
+"""Datos sintéticos para desarrollo y pruebas (``flask sembrar-demo`` / ``sembrar-contador``).
 
-Solo corre en ``development`` y ``test``. Usa el alta de dominio (evento ``creado``,
-UUID de cliente estable) y el catálogo del tenant. Códigos ``DEMO-*``. Nunca el Excel
-de la clínica ni datos reales.
+Solo corre en ``development`` y ``test``. Los activos usan el alta de dominio
+(evento ``creado``, UUID de cliente estable) y el catálogo del tenant. Códigos
+``DEMO-*``. El contador se crea por invitación de dominio (no un ``INSERT``
+directo). Nunca el Excel de la clínica ni datos reales.
 """
 
 from __future__ import annotations
@@ -12,9 +13,11 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.activos.service import CodigoExistente, DatosAlta, ErrorActivo, guardar
+from app.auth.credentials import get_passwords
 from app.auth.service import normalize_email
 from app.catalogo.service import (
     NombreDuplicado,
@@ -23,11 +26,23 @@ from app.catalogo.service import (
     listar_categorias,
     listar_ubicaciones,
 )
-from app.db import LoginRow, buscar_login, tenant_session
+from app.db import LoginRow, aceptar_invitacion, buscar_login, tenant_session
+from app.invitaciones.service import (
+    create_invitation,
+    invitation_key,
+    normalize_invitation_email,
+    normalize_nombre,
+)
 
 CODIGO_PREFIJO = "DEMO-"
 _NS = uuid.UUID("a11ce7d0-0000-4000-8000-00000000de30")
 _ADMIN_GENERICO = "No hay un administrador activo con ese correo en una sola clínica."
+_CONTADOR_GENERICO = "No se pudo crear el usuario de prueba."
+
+# Cuenta sintética local. El comando no corre fuera de development/test.
+CONTADOR_DEMO_EMAIL = "contador@ejemplo.com"
+CONTADOR_DEMO_NOMBRE = "Contador de prueba"
+CONTADOR_CLAVE_LOCAL = "ContadorLocal-26"
 
 _SEDE = "Sede de prueba"
 _CONSULTORIO = "Consultorio 1"
@@ -188,6 +203,12 @@ class ResultadoSembrar:
     existentes: int
 
 
+@dataclass(frozen=True)
+class ResultadoContador:
+    creado: bool
+    email: str
+
+
 class SembrarError(Exception):
     """Fallo del operador: el mensaje es seguro para la salida (sin filas ni correos)."""
 
@@ -284,3 +305,40 @@ def sembrar_demo(email: str) -> ResultadoSembrar:
         raise SembrarError(_ADMIN_GENERICO)
     with tenant_session(tenant_id) as session:
         return _sembrar_en_sesion(session, tenant_id=tenant_id, usuario_id=cuenta.usuario_id)
+
+
+def _contador_demo_en_tenant(tenant_id: uuid.UUID) -> bool:
+    return any(
+        fila.activo and fila.rol == "contador" and fila.tenant_id == tenant_id
+        for fila in buscar_login(CONTADOR_DEMO_EMAIL)
+    )
+
+
+def sembrar_contador(email: str) -> ResultadoContador:
+    """Crea el contador sintético del tenant del admin, por invitación de dominio."""
+    cuenta = _admin_unico(email)
+    tenant_id = cuenta.tenant_id
+    if tenant_id is None:
+        raise SembrarError(_ADMIN_GENERICO)
+    if _contador_demo_en_tenant(tenant_id):
+        return ResultadoContador(creado=False, email=CONTADOR_DEMO_EMAIL)
+    destino = normalize_invitation_email(CONTADOR_DEMO_EMAIL)
+    nombre = normalize_nombre(CONTADOR_DEMO_NOMBRE)
+    if destino is None or nombre is None:
+        raise SembrarError(_CONTADOR_GENERICO)
+    if destino == normalize_email(email):
+        raise SembrarError(_CONTADOR_GENERICO)
+    try:
+        with tenant_session(tenant_id) as session:
+            invitacion = create_invitation(
+                session, creada_por=cuenta.usuario_id, email=destino, rol="contador"
+            )
+            token = invitacion.token
+    except IntegrityError as exc:
+        raise SembrarError(_CONTADOR_GENERICO) from exc
+    aceptada = aceptar_invitacion(
+        invitation_key(token), nombre, get_passwords().hash(CONTADOR_CLAVE_LOCAL)
+    )
+    if aceptada is None or aceptada.tenant_id != tenant_id or aceptada.rol != "contador":
+        raise SembrarError(_CONTADOR_GENERICO)
+    return ResultadoContador(creado=True, email=CONTADOR_DEMO_EMAIL)

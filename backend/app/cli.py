@@ -30,6 +30,10 @@ migrador no es superusuario (Supabase), con el usuario y la contraseña solo por
 ubicaciones de prueba y activos sintéticos ``DEMO-*`` en la clínica del admin
 indicado. Idempotente. No corre en production/staging ni usa datos de la clínica.
 
+``flask sembrar-contador <email>`` (solo development/test) crea un contador sintético
+en esa clínica por invitación de dominio. Idempotente. Muestra el correo y la
+contraseña de siembra una vez por la salida estándar.
+
 Cuentas de desarrollador de la consola de plataforma (spec 017, T1; R7–R10; plan.md
 §2.4): ``flask crear-desarrollador <email>``, ``flask restablecer-desarrollador <email>`` y
 ``flask desactivar-desarrollador <email> [--reactivar]``.
@@ -73,7 +77,12 @@ from app.config import (
 from app.invitaciones.service import normalize_invitation_email
 from app.nombres import NOMBRE_MAX_LENGTH, normalize_display_name
 from app.plataforma.credenciales import hash_developer_password
-from app.sembrar import SembrarError, sembrar_demo
+from app.sembrar import (
+    CONTADOR_CLAVE_LOCAL,
+    SembrarError,
+    sembrar_contador,
+    sembrar_demo,
+)
 
 INVITATION_LINK_PREFIX = "/invitacion#"
 CONNECT_TIMEOUT_SECONDS = 5
@@ -442,6 +451,32 @@ def sembrar_demo_command(email: str) -> None:
     click.echo(f"{resultado.nuevos} activos nuevos, {resultado.existentes} ya estaban.")
 
 
+@click.command("sembrar-contador")
+@click.argument("email")
+@with_appcontext
+def sembrar_contador_command(email: str) -> None:
+    """Crea un contador sintético en la clínica del admin (solo local)."""
+    if get_config(current_app).environment not in LOCAL_ENVIRONMENTS:
+        raise click.ClickException(
+            "sembrar-contador solo se admite en development y pruebas locales."
+        )
+    failure: str | None = None
+    try:
+        resultado = sembrar_contador(email)
+    except SembrarError as exc:
+        failure = str(exc)
+    except (SQLAlchemyError, psycopg.Error) as exc:
+        failure = f"error de base ({_database_error_summary(exc)})"
+    if failure is not None:
+        raise click.ClickException(failure)
+    if resultado.creado:
+        click.echo("Contador de prueba listo.")
+    else:
+        click.echo("El contador de prueba ya existía.")
+    click.echo(f"Correo: {resultado.email}")
+    click.echo(f"Contraseña: {CONTADOR_CLAVE_LOCAL}")
+
+
 def register_cli(app: Flask) -> None:
     """Registra los comandos del operador en ``flask``."""
     app.cli.add_command(create_tenant_command)
@@ -452,3 +487,4 @@ def register_cli(app: Flask) -> None:
     app.cli.add_command(restablecer_desarrollador_command)
     app.cli.add_command(desactivar_desarrollador_command)
     app.cli.add_command(sembrar_demo_command)
+    app.cli.add_command(sembrar_contador_command)
