@@ -22,6 +22,17 @@ export type Categoria = Esquemas['Categoria']
 /** Códigos del backend más `sin_conexion` (no hubo respuesta de la API). */
 export type CodigoError = Esquemas['ErrorCode'] | 'sin_conexion'
 
+/**
+ * Opciones comunes de todo `fetch` a la API (spec 018 T10, riesgo R12). El documento lleva
+ * `Referrer-Policy: no-referrer` (T1) y con ella un POST del mismo origen manda `Origin: null`,
+ * que el servidor rechaza si falta `Sec-Fetch-Site`. `strict-origin` manda el `Origin` real y
+ * un `Referer` solo con el origen (sin ruta ni fragmento). Todo fetch nuevo las extiende.
+ */
+const OPCIONES_FETCH = {
+  credentials: 'same-origin',
+  referrerPolicy: 'strict-origin',
+} as const satisfies RequestInit
+
 const MENSAJE_SIN_CONEXION = 'No se pudo conectar con el servidor. Revisa la conexión e intenta de nuevo.'
 const MENSAJE_INESPERADO = 'Ocurrió un error inesperado. Intenta de nuevo.'
 
@@ -155,7 +166,7 @@ export async function pedir<R extends Ruta, M extends MetodoDe<R>>(
         method: metodo.toUpperCase(),
         headers,
         body: opciones.cuerpo === undefined ? undefined : JSON.stringify(opciones.cuerpo),
-        credentials: 'same-origin',
+        ...OPCIONES_FETCH,
         ...(opciones.sinRedirecciones ? { redirect: 'error' as const } : {}),
         signal: opciones.signal ? AbortSignal.any([opciones.signal, plazo.signal]) : plazo.signal,
       })
@@ -206,7 +217,7 @@ export async function descargar(ruta: string, token: string, porDefecto: string)
       respuesta = await fetch(`${API_BASE}${ruta}`, {
         method: 'GET',
         headers: { Authorization: `Bearer ${token}` },
-        credentials: 'same-origin',
+        ...OPCIONES_FETCH,
         signal: plazo.signal,
       })
     } catch {
@@ -254,7 +265,7 @@ export async function enviarMultipart<T>(
         method: metodo,
         headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
         body,
-        credentials: 'same-origin',
+        ...OPCIONES_FETCH,
         signal: plazo.signal,
       })
     } catch {

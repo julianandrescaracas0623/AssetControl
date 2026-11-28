@@ -138,6 +138,21 @@ uv run --env-file ../.env flask --app app sembrar-demo tu-correo@ejemplo.com
 
 Fuera de `development` y pruebas el comando se niega. En producción no existe este atajo.
 
+## 7c. Contador de prueba (opcional, solo development)
+
+Crea un usuario con rol `contador` en la clínica de ese admin, por el mismo camino de invitación que la app. Es idempotente. No usa datos reales.
+
+```powershell
+uv run --env-file ../.env flask --app app sembrar-contador tu-correo@ejemplo.com
+```
+
+Entra en `http://localhost:5173` con:
+
+- Correo: `contador@ejemplo.com`
+- Contraseña: `ContadorLocal-26` (solo local; si la cambiaste, usa la actual)
+
+Fuera de `development` y pruebas el comando se niega.
+
 ## 8. Encender la app
 
 **Con un solo comando** (recomendado). Abre Docker Desktop, espera a que diga *Engine running* y en PowerShell:
