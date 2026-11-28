@@ -65,6 +65,7 @@ describe('Informe de sesión (spec 008, T5)', () => {
     expect(cifras).toContain('Total registrado$ 1.779.900,00')
     expect(screen.getByText(fechaCorte('2026-11-30'), { selector: 'b' })).toBeTruthy()
     expect(screen.getByText('Ana Torres', { selector: 'b' })).toBeTruthy()
+    expect(screen.queryByText('Valores en COP')).toBeNull()
     expect(screen.getByText('50 % de las unidades encontradas.')).toBeTruthy()
   })
 
@@ -105,6 +106,8 @@ describe('Informe de sesión (spec 008, T5)', () => {
     abrir(INFORME, cerrado())
     const enlace = await screen.findByRole('link', { name: 'Ver valor actual' })
     expect(enlace.getAttribute('href')).toBe(`/app/valor?sesion=${SESION}`)
+    expect(enlace.className).toContain('text-brand-strong')
+    expect(enlace.className.split(' ').filter((c) => c === 'text-foreground' || c === 'hover:text-foreground')).toEqual([])
   })
 
   it('una sesión abierta aún no tiene informe y lleva a la sesión', async () => {

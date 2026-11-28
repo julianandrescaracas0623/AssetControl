@@ -208,16 +208,17 @@ export function CampoCategoria({
 }) {
   const { campos, errores } = alta
   const describedBy = errores.categoria ? 'categoria-error' : ayuda ? 'categoria-ayuda' : undefined
+  const sinCategorias = !cargando && categorias.length === 0
   return (
     <MarcoCampo id="categoria" etiqueta={<Etiqueta conserva>Categoría <MarcaObligatorio /></Etiqueta>} error={errores.categoria} ayuda={ayuda}>
-      <Select value={campos.categoria} onValueChange={(v) => alta.cambiar('categoria', v)} disabled={cargando}>
+      <Select value={sinCategorias ? '' : campos.categoria} onValueChange={(v) => alta.cambiar('categoria', v)} disabled={cargando || sinCategorias}>
         <SelectTrigger
           id="categoria"
           aria-invalid={errores.categoria ? true : undefined}
           aria-describedby={describedBy}
           className={claseControlAlta(alta, 'categoria', 'w-full data-[size=default]:h-control')}
         >
-          <SelectValue placeholder={cargando ? 'Cargando…' : 'Elige una categoría'} />
+          <SelectValue placeholder={cargando ? 'Cargando…' : sinCategorias ? 'No hay opciones' : 'Elige una categoría'} />
         </SelectTrigger>
         <SelectContent>
           {categorias.map((c) => (

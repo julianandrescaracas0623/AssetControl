@@ -154,9 +154,12 @@ export function Campo(props: CampoProps) {
 
   if (resto.tipo === 'seleccion') {
     const { opciones, valor, onValorChange, placeholder, cargando, disabled, name } = resto
+    // Sin filas no hay nada que elegir: mismo criterio que «Cargando…». El error
+    // de quien llama se conserva (no se pisa con «No hay opciones»).
+    const sinOpciones = !cargando && !error && opciones.length === 0
     return (
       <MarcoCampo {...marco}>
-        <Select value={valor} onValueChange={onValorChange} disabled={disabled || cargando} name={name}>
+        <Select value={sinOpciones ? '' : valor} onValueChange={onValorChange} disabled={disabled || cargando || sinOpciones} name={name}>
           <SelectTrigger
             id={id}
             aria-describedby={describedBy}
@@ -164,7 +167,7 @@ export function Campo(props: CampoProps) {
             aria-required={obligatorio || undefined}
             className={cn(CONTROL, 'w-full data-[size=default]:h-control')}
           >
-            <SelectValue placeholder={cargando ? 'Cargando…' : placeholder} />
+            <SelectValue placeholder={cargando ? 'Cargando…' : sinOpciones ? 'No hay opciones' : placeholder} />
           </SelectTrigger>
           <SelectContent>
             {opciones.map((o) => (

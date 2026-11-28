@@ -160,6 +160,25 @@ describe('Campo', () => {
     expect(combo.className).toContain('h-control')
   })
 
+  it('selección sin opciones: deshabilitada y dice «No hay opciones»; la carga y el error no se pisan', () => {
+    const { rerender } = render(<Campo id="cat" etiqueta="Categoría" tipo="seleccion" opciones={[]} placeholder="Elige una categoría" />)
+    let combo = screen.getByRole('combobox', { name: 'Categoría' })
+    expect(combo.textContent).toContain('No hay opciones')
+    expect(combo.hasAttribute('disabled')).toBe(true)
+
+    rerender(<Campo id="cat" etiqueta="Categoría" tipo="seleccion" opciones={[]} error="No se pudo cargar" placeholder="Elige una categoría" />)
+    combo = screen.getByRole('combobox', { name: 'Categoría' })
+    expect(combo.textContent).not.toContain('No hay opciones')
+    expect(combo.textContent).toContain('Elige una categoría')
+    expect(combo.getAttribute('aria-invalid')).toBe('true')
+
+    rerender(<Campo id="cat" etiqueta="Categoría" tipo="seleccion" opciones={[]} cargando placeholder="Elige una categoría" />)
+    combo = screen.getByRole('combobox', { name: 'Categoría' })
+    expect(combo.textContent).toContain('Cargando…')
+    expect(combo.textContent).not.toContain('No hay opciones')
+    expect(combo.hasAttribute('disabled')).toBe(true)
+  })
+
   it('deshabilitado y solo lectura se transmiten al control', () => {
     render(
       <>

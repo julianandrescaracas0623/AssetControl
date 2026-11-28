@@ -302,14 +302,13 @@ export default function Informe() {
             <span>
               Empresa <b className="font-medium text-foreground">{consulta.data.empresa.nombre}</b>
             </span>
-            <span>Valores en COP</span>
           </span>
         }
         claseAcciones="max-md:w-full max-md:[&>*]:flex-1"
         acciones={
           <>
-            <Boton asChild variante="fantasma">
-              {/* Spec 015 (R7): Valor ofrece volver a este informe. */}
+            <Boton asChild variante="fantasma" className="text-brand-strong hover:bg-brand-soft hover:text-brand-strong">
+              {/* Spec 015 (R7): Valor ofrece volver a este informe. El cobalto lo distingue del texto de la cabecera. */}
               <Link to={{ pathname: rutaApp('valor'), search: `?sesion=${encodeURIComponent(id)}` }}>Ver valor actual</Link>
             </Boton>
             <Exportar id={id} />
